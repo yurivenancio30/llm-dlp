@@ -103,8 +103,9 @@ Em dois passos (OCR e trava) ele usa sudo: a sua senha será pedida nessa hora.`
 	}
 	mudou := false
 	if len(cfg.DominiosInternos) == 0 {
-		fmt.Println("\n      a) Domínios internos: um trecho do endereço dos servidores e e-mails da empresa.")
-		fmt.Println("         Com \"empresa\", são mascarados mysql.empresa.intra e fulano@empresa.com.br.")
+		fmt.Println("\n      a) Domínio interno: o trecho que aparece no nome dos servidores da empresa.")
+		fmt.Println("         Com \"empresa\", mysql-prd.empresa.intra vira mysql-x7k2.invalid. Sem isso, nomes de")
+		fmt.Println("         servidor saem como estão. (E-mails são mascarados sempre, não precisa informar.)")
 		r := in.perguntar("         Digite um ou mais, separados por vírgula (Enter para pular): ")
 		for _, d := range strings.Split(r, ",") {
 			if d = strings.TrimSpace(strings.ToLower(d)); d != "" {

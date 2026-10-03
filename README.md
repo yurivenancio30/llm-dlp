@@ -49,7 +49,7 @@ O `instalar` faz tudo, em 5 passos, perguntando o que precisa:
 | Passo | O que acontece | Você responde |
 |---|---|---|
 | 1. Programa | Copia o llm-dlp para `~/.local/bin` | Nada |
-| 2. Configuração | Cria `~/.config/llm-dlp` com a configuração e a chave secreta | Os domínios internos da empresa (ex.: `empresa`) e os nomes que nunca podem sair (empresa, cliente, projetos) |
+| 2. Configuração | Cria `~/.config/llm-dlp` com a configuração e a chave secreta | O domínio interno, que aparece no nome dos servidores (ex.: `empresa`, para `mysql.empresa.intra`), e os nomes que nunca podem sair (empresa, cliente, projetos). E-mails são mascarados sempre |
 | 3. OCR | Instala o tesseract e o poppler, se faltarem | Sim e a senha do `sudo` |
 | 4. Claude Code | Liga o Claude Code ao llm-dlp (com backup do `~/.claude/settings.json`) | Sim |
 | 5. Trava | Faz o Claude Code se recusar a funcionar fora do llm-dlp | Sim e a senha do `sudo` |
