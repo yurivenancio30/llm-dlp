@@ -203,14 +203,28 @@ func desinstalar(args []string) error {
 				fica = append(fica, d)
 			}
 		}
-		perms["deny"] = fica
+		if len(fica) == 0 {
+			delete(perms, "deny")
+		} else {
+			perms["deny"] = fica
+		}
+	}
+	// não deixa restos vazios que não existiam antes da instalação
+	for _, k := range []string{"env", "hooks"} {
+		if m, ok := s[k].(map[string]any); ok && len(m) == 0 {
+			delete(s, k)
+		}
 	}
 	bak, err := gravarSettings(alvo, s, orig)
 	if err != nil {
 		return err
 	}
-	parar()
-	fmt.Println("✓ removido do Claude Code (backup em " + bak + ") e llm-dlp parado.")
+	// O proxy NÃO é parado aqui: o Claude Code aplica o settings.json às sessões já abertas,
+	// mas uma sessão aberta continua apontando para o proxy até ser reiniciada. Parar agora
+	// deixaria essas sessões sem resposta (falha fechada).
+	fmt.Println("✓ removido do Claude Code (backup em " + bak + ").")
+	fmt.Println("  O llm-dlp continua no ar para as sessões que já estão abertas. Feche e abra o Claude Code")
+	fmt.Println("  (ou o VS Code) e depois rode: llm-dlp parar")
 	cfg, _ := config.Carregar()
 	if travaInstalada(endereco(cfg)) {
 		fmt.Println("! A trava continua instalada: sem o llm-dlp, o Claude Code vai se recusar a funcionar. Remova com:")

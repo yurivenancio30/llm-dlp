@@ -83,7 +83,7 @@ Não há nada para rodar. O llm-dlp sobe ao abrir uma sessão e volta sozinho se
 | Imagem ou PDF bloqueado | Falta o OCR: a mensagem de erro traz o comando de instalação |
 | Mudei o `config.json` | `llm-dlp parar` (ele volta na próxima mensagem, com a configuração nova) |
 | Quero ver o que foi feito em cada mensagem | `~/.config/llm-dlp/llm-dlp.log` (só contagens e tempos, nunca valores) |
-| Quero desfazer tudo | `llm-dlp desinstalar` (e `sudo llm-dlp desinstalar-trava`, se instalou a trava) |
+| Quero desfazer tudo | `llm-dlp desinstalar` (e `sudo llm-dlp desinstalar-trava`, se instalou a trava). Depois, feche e abra o Claude Code e rode `llm-dlp parar` |
 
 ## Mais detalhes
 
