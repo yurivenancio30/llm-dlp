@@ -279,17 +279,13 @@ func (m *Masker) acharInsert(s, baixo string, add func(ini, fim int, tipo string
 			continue
 		}
 		for { // cada "(v1, v2, ...)"
-			for p < len(s) && (s[p] == ' ' || s[p] == '\n' || s[p] == '\t' || s[p] == '\r' || s[p] == ',') {
-				p++
-			}
+			p = pularBranco(s, p, true)
 			if p >= len(s) || s[p] != '(' {
 				break
 			}
 			p++
 			for col := 0; p < len(s); col++ {
-				for p < len(s) && (s[p] == ' ' || s[p] == '\n' || s[p] == '\t') {
-					p++
-				}
+				p = pularBranco(s, p, false)
 				ini, fim := p, p
 				if p < len(s) && s[p] == '\'' {
 					ini = p + 1
@@ -310,9 +306,7 @@ func (m *Masker) acharInsert(s, baixo string, add func(ini, fim int, tipo string
 				if col < len(classes) && classes[col] != "" && fim > ini && fim <= len(s) {
 					marcar(s, ini, fim, classes[col], add)
 				}
-				for p < len(s) && (s[p] == ' ' || s[p] == '\n' || s[p] == '\t') {
-					p++
-				}
+				p = pularBranco(s, p, false)
 				if p >= len(s) || s[p] != ',' {
 					break
 				}
@@ -423,3 +417,20 @@ func (m *Masker) DescreverCampos(s string) []Coluna {
 var reDataHora = regexp.MustCompile(`^(?:\d{4}[-/.]\d{1,2}[-/.]\d{1,2}|\d{1,2}[-/.]\d{1,2}[-/.]\d{4})(?:[T ]\d{1,2}:\d{2}(?::\d{2}(?:[.,]\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$|^\d{1,2}:\d{2}(?::\d{2})?$`)
 
 func pareceDataOuHora(v string) bool { return reDataHora.MatchString(v) }
+
+// pularBranco avança espaços, quebras de linha (e vírgulas, se virgula) e o número de linha
+// que a ferramenta de leitura do Claude Code põe no começo de cada linha ("12<tab>").
+func pularBranco(s string, p int, virgula bool) int {
+	for p < len(s) {
+		switch c := s[p]; {
+		case c == ' ' || c == '\t' || c == '\r' || (virgula && c == ','):
+			p++
+		case c == '\n':
+			p++
+			p += numeroDeLinha(s[p:min(len(s), p+16)])
+		default:
+			return p
+		}
+	}
+	return p
+}

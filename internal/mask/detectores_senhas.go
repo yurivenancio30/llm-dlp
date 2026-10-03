@@ -9,7 +9,7 @@ import (
 // Detector de senhas comuns (as que o gitleaks não pega).
 
 // Senhas "de gente": as regras do gitleaks pegam tokens com formato próprio e valores de
-// alta entropia, mas deixam passar a senha comum de banco ("Ficticia@2024"), a palavra
+// alta entropia, mas deixam passar a senha comum de banco de dados ("Ficticia@2024"), a palavra
 // "senha" em português, a senha dentro de URL e a do "mysql -pXXX". Estes padrões cobrem
 // isso. O último grupo de cada um é a senha.
 //
@@ -19,8 +19,10 @@ import (
 var (
 	// chave = valor   (senha: X, DB_PASSWORD=X, "password": "X", pwd => X)
 	reSenhaAtrib = regexp.MustCompile("(?i)(?:senha|passw(?:or)?d|pwd|secret|segredo)([\\w.\\-]*)[\"']?\\s*(?:=>|:=|=|:)\\s*[\"'`]?([^\\s\"'`,;]{4,})")
-	// frase   (a senha do banco é X, the password is X)
+	// frase   (a senha do sistema é X, the password is X)
 	reSenhaFrase = regexp.MustCompile("(?i)\\b(?:senha|password)\\b(?:[ \\t]+[\\p{L}_\\-]+){0,4}?[ \\t]+(?:é|eh|is|era|será)[ \\t]+[\"'`]?([^\\s\"'`,;]{6,})")
+	// palavra e valor entre crases ou aspas, sem ":" nem "=" (senha `X`, password "X")
+	reSenhaCitada = regexp.MustCompile("(?i)\\b(?:senha|password|passwd|pwd)\\b(?:[ \\t]+[\\p{L}_\\-]+){0,3}?[ \\t]+[`\"']([^\\s`\"']{4,})[`\"']")
 	// usuário:senha@ numa URL
 	reSenhaURL = regexp.MustCompile("[a-zA-Z][a-zA-Z0-9+.\\-]*://[^\\s:/@]+:([^\\s@/]{3,})@")
 	// linha de comando
@@ -76,6 +78,7 @@ func (m *Masker) acharSenhas(s, baixo string, add func(ini, fim int, tipo string
 		strings.Contains(baixo, "secret") || strings.Contains(baixo, "segredo") {
 		olhar(reSenhaAtrib, false)
 		olhar(reSenhaFrase, false)
+		olhar(reSenhaCitada, false)
 		olhar(reSenhaCLI, false)
 	} else if strings.Contains(s, " -p") || strings.Contains(s, " -u ") || strings.Contains(s, "--user ") {
 		olhar(reSenhaCLI, false)

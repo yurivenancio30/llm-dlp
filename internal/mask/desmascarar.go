@@ -137,7 +137,7 @@ func mesmoValor(tipo, a, b string) bool {
 	switch tipo {
 	case "segredo", "ip":
 		return false
-	case "email", "host", "pix":
+	case "email", "host", "pix", "dominio":
 		return strings.EqualFold(a, b)
 	case "cpf", "cnpj", "pis", "cnh", "telefone", "cep", "cartao", "rg", "conta":
 		return canonNum(a) == canonNum(b)

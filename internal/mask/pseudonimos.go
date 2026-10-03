@@ -33,6 +33,11 @@ func (m *Masker) aplicar(s string, achados []Achado) (string, []Entrada) {
 		b.WriteString(s[pos:a.Ini])
 		b.WriteString(ps)
 		entradas = append(entradas, Entrada{ps, a.Real, a.Tipo})
+		if a.Tipo == "email" { // o modelo às vezes cita só o domínio: "dxxxx.invalid" volta a ser o domínio real
+			if i, j := strings.LastIndexByte(ps, '@'), strings.LastIndexByte(a.Real, '@'); i >= 0 && j >= 0 {
+				entradas = append(entradas, Entrada{ps[i+1:], a.Real[j+1:], "dominio"})
+			}
+		}
 		pos = a.Fim
 	}
 	b.WriteString(s[pos:])

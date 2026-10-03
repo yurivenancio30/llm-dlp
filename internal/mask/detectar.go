@@ -58,6 +58,7 @@ func (m *Masker) detectarInteiro(s string) []Achado {
 	out := m.detectarBase(s)
 	if !m.cfg.Desligado("campo") {
 		m.acharTabelas(s, func(ini, fim int, tipo string) { out = append(out, Achado{ini, fim, tipo, s[ini:fim]}) })
+		out = append(out, nomesNaLinha(s, out)...)
 	}
 	// Valores que dependem de contexto são lembrados e reconhecidos depois em qualquer
 	// lugar (ver conhecidos.go): sem isto, vazariam quando o modelo os repete sem a
@@ -144,6 +145,7 @@ func (m *Masker) detectarGrande(s string) []Achado {
 	// tabelas: o cabeçalho vale para as linhas de qualquer pedaço, então é no texto inteiro
 	if !m.cfg.Desligado("campo") {
 		m.acharTabelas(s, func(ini, fim int, tipo string) { out = append(out, Achado{ini, fim, tipo, s[ini:fim]}) })
+		out = append(out, nomesNaLinha(s, out)...)
 	}
 	// primeiro aprende TUDO, depois procura os valores conhecidos no texto inteiro: um valor
 	// ensinado no fim do texto é reconhecido também no começo

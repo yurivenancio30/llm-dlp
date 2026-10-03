@@ -631,3 +631,47 @@ func ehSeparadorMarkdown(linha string) bool {
 	t := strings.TrimSpace(linha)
 	return len(t) >= 3 && strings.Trim(t, "|-:+= ") == ""
 }
+
+// identificaPessoa: tipos de achado que, numa linha de tabela, mostram que a linha é de uma
+// pessoa.
+var identificaPessoa = map[string]bool{"cpf": true, "email": true, "telefone": true, "rg": true, "cnh": true, "pis": true, "nascimento": true}
+
+// nomesNaLinha: numa linha de tabela sem cabeçalho (colada no chat, um pedaço de CSV) que já
+// tem um CPF, e-mail ou telefone detectado, a célula com cara de nome completo é o nome da
+// pessoa. "Maria Lopes | 529.982.247-25 | maria@x.com" -> "Maria Lopes" também é mascarado.
+func nomesNaLinha(s string, achados []Achado) []Achado {
+	linhas := map[int]bool{} // começo das linhas que têm um identificador de pessoa
+	for _, a := range achados {
+		if identificaPessoa[a.Tipo] {
+			linhas[strings.LastIndexByte(s[:a.Ini], '\n')+1] = true
+		}
+	}
+	var out []Achado
+	for ini := range linhas {
+		fim := strings.IndexByte(s[ini:], '\n')
+		if fim < 0 {
+			fim = len(s) - ini
+		}
+		l := s[ini : ini+fim]
+		if len(l) > 2000 {
+			continue
+		}
+		var sep byte
+		for _, c := range []byte{'|', '\t', ';', ','} {
+			if strings.Count(l, string(c)) >= 1 {
+				sep = c
+				break
+			}
+		}
+		if sep == 0 {
+			continue
+		}
+		for _, c := range celulas(l, sep) {
+			a, b := aparar(l, c[0], c[1])
+			if _, ok := valorDoCampo("nomecompleto", l[a:b]); ok && len(strings.Fields(l[a:b])) >= 2 {
+				out = append(out, Achado{ini + a, ini + b, "nome", l[a:b]})
+			}
+		}
+	}
+	return out
+}

@@ -135,3 +135,13 @@ func TestDesmascararComMuitosPseudonimos(t *testing.T) {
 		t.Error("ida e volta em streaming não bateu")
 	}
 }
+
+// O modelo às vezes cita só o domínio do e-mail mascarado: ele também tem que voltar ao real.
+func TestDominioDoEmailVolta(t *testing.T) {
+	m := novoTeste(t)
+	mas, ents := m.Mascarar("o e-mail é joao.silva@empresa-ficticia.com.br")
+	dom := mas[strings.LastIndexByte(mas, '@')+1:]
+	if volta := NovaTabela(ents).Desmascarar("o domínio "+dom+" não aparece em vazamentos", false); !strings.Contains(volta, "empresa-ficticia.com.br") {
+		t.Fatalf("domínio sozinho não voltou: %q", volta)
+	}
+}

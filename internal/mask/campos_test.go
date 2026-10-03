@@ -143,6 +143,8 @@ func TestFormatosGenericos(t *testing.T) {
 		{"idem, TSV", "1\tNOM_CLIENTE\tNUM_CPF\n2\tMaria Aparecida Lopes\t" + cpf + "\n", []string{"Maria Aparecida Lopes", cpf}},
 		{"idem, planilha impressa", numerar(comoPandas([]string{"nome_cliente", "cpf", "saldo"}, [][]string{{"Maria Aparecida Lopes", cpf, "10.50"}, {"José Antônio Reis", cpf, "7.00"}, {"Ana Lúcia Prado", cpf, "1.25"}})), []string{"Maria Aparecida Lopes", "José Antônio Reis", "Ana Lúcia Prado", cpf}},
 		{"TSV em que a primeira coluna é um número (não é número de linha)", "id\tnome_cliente\tcpf\n1\tMaria Aparecida Lopes\t" + cpf + "\n2\tJosé Antônio Reis\t" + cpf + "\n", []string{"Maria Aparecida Lopes", "José Antônio Reis", cpf}},
+		{"SQL INSERT lido pelo Claude Code (número de linha)", "1\t-- dump\n2\tINSERT INTO clientes (id, nome_cliente, num_cpf, dt_nascimento) VALUES\n3\t(1, 'Maria Aparecida Lopes', '" + cpf + "', '1998-04-13'),\n4\t(2, 'Jose Antonio Reis', '" + cpf + "', '1984-08-17');\n", []string{"Maria Aparecida Lopes", "Jose Antonio Reis", cpf, "1998-04-13", "1984-08-17"}},
+		{"linhas coladas sem cabeçalho, com CPF", "Maria Aparecida Lopes | " + gerarCPF("529982247") + " | maria.3@gmail.com\nJose Antonio Reis | " + gerarCPF("529982247") + " | jose.4@gmail.com\n", []string{"Maria Aparecida Lopes", "Jose Antonio Reis"}},
 		{"dado pessoal sensível em tabela", "paciente\ttipo_sanguineo\tdeficiencia\nMarcos Vinicius Paz\tAB-\tauditiva\n", []string{"Marcos Vinicius Paz", "AB-", "auditiva"}},
 	}
 	for _, c := range casos {
