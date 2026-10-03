@@ -590,3 +590,7 @@ O `estresse_test.go` do proxy faz essas três conferências e serve de modelo.
    um texto grande.
 6. Rode `go test ./...` e os benchmarks (`go test ./internal/mask -bench Frio`) para ver se
    não pesou.
+
+## Licença
+
+MIT. Ver [LICENSE](LICENSE).
