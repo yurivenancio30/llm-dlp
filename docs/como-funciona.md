@@ -90,7 +90,7 @@ Medido em sessões reais e em testes de carga.
 
 | Item | Valor |
 |---|---|
-| Mensagem numa conversa em andamento | 5–30 ms |
+| Mensagem numa conversa em andamento | 5–30 ms (em conversas muito longas, de centenas de milhares de tokens, chega a ~0,1 s) |
 | Texto novo | ~0,4 ms por trecho (95% abaixo de 8 ms) |
 | Primeira mensagem depois de reiniciar, 1 MB de conversa | 0,1–0,45 s com 32 núcleos; 0,15–0,75 s com 4 |
 | Um texto só de 1 MB | 0,1–0,3 s com 32 núcleos; 0,2–0,7 s com 4; 0,6–2,5 s com 1 |
@@ -109,3 +109,20 @@ Medido em sessões reais e em testes de carga.
   tiver. O corte é sempre num espaço em branco, para nunca dividir uma senha ou token. Por
   isso um bloco gigante sem nenhum espaço (2 MB de base64 ou de JSON minificado) não é
   dividido e leva de 1 a 5 s.
+
+## O log
+
+Cada requisição gera uma linha em `~/.config/llm-dlp/llm-dlp.log`, só com contagens e tempos:
+
+```
+POST /v1/messages -> 200 | 245 substituições | 0 colisões | mascarar 9ms | total 2.97s
+```
+
+| Campo | Significado |
+|---|---|
+| `-> 200` | Resposta da API. `RECUSADO` quer dizer que o llm-dlp barrou a requisição (falha fechada) |
+| `substituições` | Quantos valores foram trocados por pseudônimos nessa requisição (a conversa inteira é reenviada a cada mensagem, então esse número cresce com ela) |
+| `colisões` | Pseudônimos que valeriam para dois valores reais diferentes. Os pseudônimos são curtos, então isso é raro, mas possível, e mais comum em IPs (a sub-rede falsa tem poucas combinações). A ida continua mascarada; só a volta daquele pseudônimo não é feita, para não trocar pelo valor errado. No pior caso, você vê um pseudônimo numa resposta |
+| `mascarar` | Tempo gasto pelo llm-dlp |
+| `total` | Tempo total, dominado pela resposta do modelo |
+
