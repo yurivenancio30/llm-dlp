@@ -1,0 +1,157 @@
+package mask
+
+import (
+	"runtime"
+	"strings"
+	"sync"
+	"sync/atomic"
+)
+
+// Detectar: junta os detectores. Texto comum é examinado inteiro; texto grande, em pedaços
+// paralelos.
+
+// Detectar: texto comum é examinado inteiro; texto grande, em pedaços paralelos.
+
+// Detectar devolve os trechos sensíveis de s (sem sobreposição resolvida).
+func (m *Masker) Detectar(s string) []Achado {
+	if len(s) > grandeMin && !blocoLongo(s, margemGrande) {
+		return m.detectarGrande(s)
+	}
+	return m.detectarInteiro(s)
+}
+
+// Texto grande é examinado em pedaços, em paralelo. Cada pedaço é examinado junto com uma
+// margem do texto vizinho dos dois lados, e só valem os achados que COMEÇAM dentro do
+// pedaço: assim, o que fica em cima de um corte (uma chave privada de várias linhas, um
+// número com a palavra-chave logo antes) é visto inteiro por um dos dois lados.
+//
+// Os cortes e as bordas das janelas caem sempre num espaço em branco: uma "palavra" (uma
+// senha, um token, um bloco de base64, por maior que seja) nunca é dividida. Assim, só um
+// dado com espaços no meio E maior que a margem poderia ficar em cima de um corte; o único
+// desse tipo é o bloco "-----BEGIN ... -----END", e texto com um bloco maior que a margem é
+// examinado inteiro, de uma vez.
+//
+// São variáveis só para os testes poderem usar tamanhos pequenos.
+var (
+	grandeMin    = 96 << 10 // acima disso, em pedaços
+	pedacoGrande = 48 << 10
+	margemGrande = 8 << 10 // maior que os dados sensíveis de várias linhas (chave RSA 4096 ≈ 3 KB)
+)
+
+// blocoLongo: há um bloco "-----BEGIN" cujo "-----END" está a mais de limite bytes (ou falta)?
+func blocoLongo(s string, limite int) bool {
+	for i := 0; ; {
+		j := strings.Index(s[i:], "-----BEGIN")
+		if j < 0 {
+			return false
+		}
+		i += j + 10
+		k := strings.Index(s[i:], "-----END")
+		if k < 0 || k+40 > limite {
+			return true
+		}
+	}
+}
+
+// detectarInteiro examina s de uma vez só.
+func (m *Masker) detectarInteiro(s string) []Achado {
+	out := m.detectarBase(s)
+	if !m.cfg.Desligado("campo") {
+		m.acharTabelas(s, func(ini, fim int, tipo string) { out = append(out, Achado{ini, fim, tipo, s[ini:fim]}) })
+	}
+	// Valores que dependem de contexto são lembrados e reconhecidos depois em qualquer
+	// lugar (ver conhecidos.go): sem isto, vazariam quando o modelo os repete sem a
+	// palavra-chave por perto e o histórico é reenviado.
+	for _, a := range out {
+		m.aprender(a.Tipo, a.Real)
+	}
+	numLongo, _ := perfilNumerico(s)
+	m.acharConhecidos(s, numLongo, func(ini, fim int, tipo string) {
+		out = append(out, Achado{ini, fim, tipo, s[ini:fim]})
+	})
+	return out
+}
+
+func branco(b byte) bool { return b == ' ' || b == '\n' || b == '\t' || b == '\r' }
+
+// detectarGrande examina s em pedaços paralelos (ver o comentário acima).
+func (m *Masker) detectarGrande(s string) []Achado {
+	type pedaco struct{ ini, fim, jIni, jFim int } // miolo [ini,fim) e janela [jIni,jFim)
+	// depois: primeira posição >= i que vem logo depois de um espaço em branco (ou o fim)
+	depois := func(i int) int {
+		for i < len(s) && !(i > 0 && branco(s[i-1])) {
+			i++
+		}
+		return i
+	}
+	// antes: última posição <= i que vem logo depois de um espaço em branco (ou o começo)
+	antes := func(i int) int {
+		for i > 0 && !branco(s[i-1]) {
+			i--
+		}
+		return i
+	}
+	var ps []pedaco
+	for ini := 0; ini < len(s); {
+		fim := ini + pedacoGrande
+		if fim >= len(s) {
+			fim = len(s)
+		} else if k := strings.LastIndexByte(s[ini:fim], '\n'); k > pedacoGrande/2 {
+			fim = ini + k + 1 // de preferência, numa quebra de linha
+		} else {
+			fim = depois(fim) // senão, no próximo espaço: uma "palavra" nunca é cortada
+		}
+		ps = append(ps, pedaco{ini, fim, antes(max(0, ini-margemGrande)), depois(min(len(s), fim+margemGrande))})
+		ini = fim
+	}
+	if len(ps) < 2 {
+		return m.detectarInteiro(s)
+	}
+	rodar := func(f func(janela string, add func(ini, fim int, tipo string))) []Achado {
+		res := make([][]Achado, len(ps))
+		var prox atomic.Int64
+		var wg sync.WaitGroup
+		for w := 0; w < min(runtime.GOMAXPROCS(0), len(ps)); w++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for {
+					i := int(prox.Add(1)) - 1
+					if i >= len(ps) {
+						return
+					}
+					p := ps[i]
+					f(s[p.jIni:p.jFim], func(ini, fim int, tipo string) {
+						if a := p.jIni + ini; a >= p.ini && a < p.fim {
+							res[i] = append(res[i], Achado{a, p.jIni + fim, tipo, s[a : p.jIni+fim]})
+						}
+					})
+				}
+			}()
+		}
+		wg.Wait()
+		var out []Achado
+		for _, r := range res {
+			out = append(out, r...)
+		}
+		return out
+	}
+	out := rodar(func(janela string, add func(ini, fim int, tipo string)) {
+		for _, a := range m.detectarBase(janela) {
+			add(a.Ini, a.Fim, a.Tipo)
+		}
+	})
+	// tabelas: o cabeçalho vale para as linhas de qualquer pedaço, então é no texto inteiro
+	if !m.cfg.Desligado("campo") {
+		m.acharTabelas(s, func(ini, fim int, tipo string) { out = append(out, Achado{ini, fim, tipo, s[ini:fim]}) })
+	}
+	// primeiro aprende TUDO, depois procura os valores conhecidos no texto inteiro: um valor
+	// ensinado no fim do texto é reconhecido também no começo
+	for _, a := range out {
+		m.aprender(a.Tipo, a.Real)
+	}
+	return append(out, rodar(func(janela string, add func(ini, fim int, tipo string)) {
+		numLongo, _ := perfilNumerico(janela)
+		m.acharConhecidos(janela, numLongo, add)
+	})...)
+}

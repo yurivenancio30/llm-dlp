@@ -1,0 +1,8 @@
+/bin/
+*.test
+*.out
+# nunca versionar dados locais do llm-dlp
+chave
+pessoas.json
+vistos.json
+llm-dlp.log*
