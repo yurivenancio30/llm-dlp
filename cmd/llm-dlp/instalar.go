@@ -213,8 +213,11 @@ Em dois passos (OCR e trava) ele usa sudo: a sua senha será pedida nessa hora.`
 	ok(claudeLigado(home, cfg), "Claude Code passa pelo llm-dlp", "Claude Code NÃO passa pelo llm-dlp: rode o llm-dlp instalar de novo e aceite o passo 4")
 	ok(faltaOCR(cfg) == "", "OCR de imagens e PDFs", "sem OCR: imagens e PDFs ficam bloqueados")
 	ok(travaInstalada(endereco(cfg)), "trava instalada", "sem trava: rode o llm-dlp instalar de novo e aceite o passo 5")
-	ok(len(cfg.DominiosInternos) > 0 || contarTermos(cfg) > 0, "domínios internos e nomes protegidos configurados",
-		"nenhum domínio interno nem nome protegido: edite "+config.Caminho("config.json")+" (dominios_internos e termos)")
+	if len(cfg.DominiosInternos) > 0 || contarTermos(cfg) > 0 {
+		fmt.Println("  ✓ domínios internos e nomes protegidos configurados")
+	} else {
+		fmt.Println("  – sem domínio interno nem nomes protegidos (opcional: rode o llm-dlp instalar de novo para informar)")
+	}
 	fmt.Println("\nPara valer: feche e abra o Claude Code (no VS Code, recarregue a janela).")
 	return nil
 }
@@ -337,9 +340,12 @@ func instalarTrava(remover bool) error {
 		return err
 	}
 	if remover {
-		fmt.Println("✓ trava removida de", arquivoTrava, "(backup em "+bak+")")
+		fmt.Println("✓ trava removida de", arquivoTrava)
 	} else {
-		fmt.Printf("✓ trava instalada em %s (backup em %s)\n  O Claude Code só funcionará passando pelo llm-dlp em 127.0.0.1:%d.\n", arquivoTrava, bak, porta)
+		if bak != "" {
+			bak = " (backup em " + bak + ")"
+		}
+		fmt.Printf("✓ trava instalada em %s%s\n  O Claude Code só funcionará passando pelo llm-dlp em 127.0.0.1:%d.\n", arquivoTrava, bak, porta)
 	}
 	return nil
 }
