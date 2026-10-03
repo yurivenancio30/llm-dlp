@@ -57,6 +57,13 @@ func passo(n int, titulo, porque string) {
 	fmt.Printf("\n[%d/5] %s\n      %s\n", n, titulo, porque)
 }
 
+// comSudo roda um comando como administrador, ligado ao terminal (o sudo pede a senha).
+func comSudo(args ...string) error {
+	c := exec.Command("sudo", args...)
+	c.Stdin, c.Stdout, c.Stderr = os.Stdin, os.Stdout, os.Stderr
+	return c.Run()
+}
+
 // instalar faz tudo, explicando cada passo. Pode ser rodado de novo sem estragar nada.
 func instalar(args []string) error {
 	in := entrada{r: bufio.NewReader(os.Stdin)}
@@ -69,6 +76,8 @@ func instalar(args []string) error {
 		return errors.New("rode sem sudo (a instalação é do seu usuário; o único passo com sudo é a trava, no fim)")
 	}
 	home, _ := os.UserHomeDir()
+	fmt.Println(`Instalação do llm-dlp. São 5 passos; ele pergunta o que precisa e mostra o que vai mudar.
+Em dois passos (OCR e trava) ele usa sudo: a sua senha será pedida nessa hora.`)
 
 	// 1. programa
 	passo(1, "Programa", "copia o llm-dlp para ~/.local/bin, para você e o Claude Code poderem chamá-lo de qualquer pasta.")
@@ -92,30 +101,59 @@ func instalar(args []string) error {
 	if err != nil {
 		return fmt.Errorf("config: %w", err)
 	}
+	mudou := false
 	if len(cfg.DominiosInternos) == 0 {
-		r := in.perguntar("      Domínios internos (hostnames e e-mails que contêm isto são mascarados), separados por vírgula.\n      Ex.: empresa,intranet  — ou Enter para pular: ")
+		fmt.Println("\n      a) Domínios internos: um trecho do endereço dos servidores e e-mails da empresa.")
+		fmt.Println("         Com \"empresa\", são mascarados mysql.empresa.intra e fulano@empresa.com.br.")
+		r := in.perguntar("         Digite um ou mais, separados por vírgula (Enter para pular): ")
 		for _, d := range strings.Split(r, ",") {
 			if d = strings.TrimSpace(strings.ToLower(d)); d != "" {
 				cfg.DominiosInternos = append(cfg.DominiosInternos, d)
+				mudou = true
 			}
 		}
-		if len(cfg.DominiosInternos) > 0 {
-			if err := salvarConfig(cfg); err != nil {
-				return err
+	}
+	if len(cfg.Termos) == 0 {
+		fmt.Println("\n      b) Nomes que nunca podem sair: o nome da empresa ou cliente, de projetos, de sistemas.")
+		fmt.Println("         São mascarados em qualquer lugar, inclusive em nomes de pasta e arquivo.")
+		r := in.perguntar("         Digite um ou mais, separados por vírgula (Enter para pular): ")
+		var vs []string
+		for _, v := range strings.Split(r, ",") {
+			if v = strings.TrimSpace(v); v != "" {
+				vs = append(vs, v)
 			}
+		}
+		if len(vs) > 0 {
+			cfg.Termos = append(cfg.Termos, config.Termo{Rotulo: "nome", Valores: vs})
+			mudou = true
+		}
+	}
+	if mudou {
+		if err := salvarConfig(cfg); err != nil {
+			return err
 		}
 	}
 	if _, err := mask.Chave(config.Caminho("chave")); err != nil {
 		return err
 	}
-	fmt.Printf("      ✓ configuração: %s (domínios internos: %v)\n", config.Caminho("config.json"), cfg.DominiosInternos)
+	fmt.Printf("\n      ✓ configuração: %s (domínios internos: %d, nomes protegidos: %d)\n", config.Caminho("config.json"), len(cfg.DominiosInternos), contarTermos(cfg))
 	fmt.Printf("      ✓ chave: %s — guarde uma cópia no seu gerenciador de senhas\n", config.Caminho("chave"))
 
 	// 3. OCR
 	passo(3, "OCR de imagens e PDFs", "com o OCR, prints e PDFs têm os dados sensíveis cobertos antes de sair. Sem ele, ficam bloqueados.")
 	if falta := faltaOCR(cfg); falta != "" {
-		fmt.Printf("      ! falta %s. Para instalar (precisa de sudo, uma vez só):\n          %s\n", falta, ocr.DicaInstalacao())
-		fmt.Println("        Até lá, imagens e PDFs enviados ao Claude serão bloqueados (nada vaza).")
+		cmd := ocr.ComandoInstalacao()
+		fmt.Printf("      falta %s. Comando:  sudo sh -c '%s'\n", falta, cmd)
+		if cmd != "" && !in.semPerg && in.confirmar("      Instalar agora? (pede a senha do sudo)") {
+			if err := comSudo("sh", "-c", cmd); err != nil {
+				fmt.Println("      ! a instalação falhou; rode o comando acima à mão e depois rode o llm-dlp instalar de novo")
+			}
+		}
+		if falta := faltaOCR(cfg); falta != "" {
+			fmt.Println("      ✗ OCR ausente: imagens e PDFs enviados ao Claude serão bloqueados (nada vaza)")
+		} else {
+			fmt.Println("      ✓ OCR instalado")
+		}
 	} else {
 		fmt.Println("      ✓ tesseract (português) e poppler encontrados")
 	}
@@ -151,13 +189,51 @@ func instalar(args []string) error {
 	if travaInstalada(endereco(cfg)) {
 		fmt.Println("      ✓ trava já instalada")
 	} else {
-		fmt.Printf("          sudo %s instalar-trava\n", destino)
 		if v := versaoClaudeCode(); v != "" && versaoMenor(v, "2.1.285") {
-			fmt.Printf("      ! seu Claude Code está na %s; a trava exige a 2.1.285 ou mais nova — atualize antes.\n", v)
+			fmt.Printf("      ! seu Claude Code está na %s; a trava exige a 2.1.285 ou mais nova. Atualize e rode o llm-dlp instalar de novo.\n", v)
+		} else if !in.semPerg && in.confirmar("      Instalar a trava agora? (pede a senha do sudo)") {
+			if err := comSudo(destino, "instalar-trava"); err != nil {
+				fmt.Println("      ! falhou; rode à mão:  sudo", destino, "instalar-trava")
+			}
 		}
 	}
-	fmt.Println("\nPronto. Feche e abra o Claude Code (ou comece uma sessão nova) para valer.")
+
+	// resumo
+	cfg, _ = config.Carregar()
+	fmt.Println("\nResumo")
+	ok := func(b bool, sim, nao string) {
+		if b {
+			fmt.Println("  ✓", sim)
+		} else {
+			fmt.Println("  ✗", nao)
+		}
+	}
+	ok(saudavel(cfg), "llm-dlp no ar", "llm-dlp fora do ar: rode llm-dlp garantir")
+	ok(claudeLigado(home, cfg), "Claude Code passa pelo llm-dlp", "Claude Code NÃO passa pelo llm-dlp: rode o llm-dlp instalar de novo e aceite o passo 4")
+	ok(faltaOCR(cfg) == "", "OCR de imagens e PDFs", "sem OCR: imagens e PDFs ficam bloqueados")
+	ok(travaInstalada(endereco(cfg)), "trava instalada", "sem trava: rode o llm-dlp instalar de novo e aceite o passo 5")
+	ok(len(cfg.DominiosInternos) > 0 || contarTermos(cfg) > 0, "domínios internos e nomes protegidos configurados",
+		"nenhum domínio interno nem nome protegido: edite "+config.Caminho("config.json")+" (dominios_internos e termos)")
+	fmt.Println("\nPara valer: feche e abra o Claude Code (no VS Code, recarregue a janela).")
 	return nil
+}
+
+func contarTermos(cfg config.Config) int {
+	n := 0
+	for _, t := range cfg.Termos {
+		n += len(t.Valores)
+	}
+	return n
+}
+
+// claudeLigado: o settings.json do Claude Code aponta para o llm-dlp?
+func claudeLigado(home string, cfg config.Config) bool {
+	s, _, err := lerSettings(filepath.Join(home, ".claude", "settings.json"))
+	if err != nil {
+		return false
+	}
+	env, _ := s["env"].(map[string]any)
+	return env["ANTHROPIC_BASE_URL"] == "http://"+endereco(cfg)
 }
 
 func desinstalar(args []string) error {

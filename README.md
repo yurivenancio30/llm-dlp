@@ -36,40 +36,28 @@ você lê:        verifique se maria.lopes@empresa.com.br tem permissão em mysq
 
 ## Instalação
 
-Funciona em qualquer Linux, inclusive WSL no Windows. O programa é um arquivo só, sem
-dependências. No macOS compila, mas ainda não foi testado por completo.
-
-**1. Obter o programa** (por enquanto, a partir do código; precisa do Go):
+Funciona em qualquer Linux, inclusive WSL no Windows. Precisa do [Go](https://go.dev/dl/) para
+compilar. No macOS compila, mas ainda não foi testado por completo.
 
 ```bash
 git clone git@github.com:yurivenancio30/llm-dlp.git && cd llm-dlp && make build
-```
-
-**2. Instalar.** Um comando, que explica e pede confirmação a cada passo:
-
-```bash
 ./bin/llm-dlp instalar
 ```
 
-| O que ele faz | Por quê |
-|---|---|
-| Copia o programa para `~/.local/bin` | Para ser chamado de qualquer pasta |
-| Cria `~/.config/llm-dlp` com a configuração e a chave secreta | A chave gera os pseudônimos. Ele pergunta os seus domínios internos (ex.: `empresa`) |
-| Confere o OCR (tesseract) | Se faltar, mostra o comando `sudo` certo para a sua distribuição. Sem OCR, imagens e PDFs ficam bloqueados |
-| Liga o Claude Code ao llm-dlp | Mostra o que vai mudar no `~/.claude/settings.json` e só aplica se você confirmar (com backup) |
+O `instalar` faz tudo, em 5 passos, perguntando o que precisa:
 
-**3. Trava contra vazamento silencioso** (recomendada):
+| Passo | O que acontece | Você responde |
+|---|---|---|
+| 1. Programa | Copia o llm-dlp para `~/.local/bin` | Nada |
+| 2. Configuração | Cria `~/.config/llm-dlp` com a configuração e a chave secreta | Os domínios internos da empresa (ex.: `empresa`) e os nomes que nunca podem sair (empresa, cliente, projetos) |
+| 3. OCR | Instala o tesseract e o poppler, se faltarem | Sim e a senha do `sudo` |
+| 4. Claude Code | Liga o Claude Code ao llm-dlp (com backup do `~/.claude/settings.json`) | Sim |
+| 5. Trava | Faz o Claude Code se recusar a funcionar fora do llm-dlp | Sim e a senha do `sudo` |
 
-```bash
-sudo llm-dlp instalar-trava
-```
+No fim, ele mostra um resumo com ✓ e ✗. Se algo ficar com ✗, é só rodar
+`llm-dlp instalar` de novo: ele pula o que já está pronto.
 
-Sem a trava, se a configuração do passo 2 for apagada, o Claude Code volta a falar direto
-com a API, sem máscara e sem avisar. Com ela, o Claude Code **se recusa a funcionar** fora
-do llm-dlp. Precisa de `sudo` porque fica numa pasta do sistema, que o agente não consegue
-alterar. Requer Claude Code 2.1.285 ou mais novo.
-
-Depois, feche e abra o Claude Code.
+Depois, feche e abra o Claude Code (no VS Code, recarregue a janela).
 
 ## No dia a dia
 
