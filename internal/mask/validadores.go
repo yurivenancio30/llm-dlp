@@ -55,7 +55,8 @@ func CPFValido(s string) bool {
 
 func CNPJValido(s string) bool {
 	d := digitos(soDigitos(s))
-	if len(d) != 14 || todosIguais(d) {
+	// o número de ordem (posições 9 a 12) começa em 0001, a matriz: 0000 não é um CNPJ real
+	if len(d) != 14 || todosIguais(d) || (d[8] == 0 && d[9] == 0 && d[10] == 0 && d[11] == 0) {
 		return false
 	}
 	pesos := [][]int{{5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2}, {6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2}}
@@ -252,7 +253,7 @@ func CNPJAlfaValido(s string) bool {
 			return false
 		}
 	}
-	if len(v) != 14 || !letras || v[12] > 9 || v[13] > 9 {
+	if len(v) != 14 || !letras || v[12] > 9 || v[13] > 9 || (v[8] == 0 && v[9] == 0 && v[10] == 0 && v[11] == 0) {
 		return false
 	}
 	pesos := [][]int{{5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2}, {6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2}}

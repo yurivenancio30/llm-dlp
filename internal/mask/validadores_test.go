@@ -2,6 +2,7 @@ package mask
 
 import (
 	"bufio"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -76,5 +77,18 @@ func TestValidadoresExtras(t *testing.T) {
 	}
 	if TituloValido("123456780199") && TituloValido("123456780198") && TituloValido("123456780197") {
 		t.Error("título aceita qualquer coisa")
+	}
+}
+
+// Regra oficial além do dígito verificador: o número de ordem do CNPJ começa em 0001.
+func TestCNPJOrdemZero(t *testing.T) {
+	for dv := 0; dv < 100; dv++ {
+		c := fmt.Sprintf("123456780000%02d", dv)
+		if CNPJValido(c) {
+			t.Fatalf("CNPJ com ordem 0000 aceito: %s", c)
+		}
+	}
+	if !CNPJValido("11.222.333/0001-81") {
+		t.Fatal("CNPJ real de exemplo (ordem 0001) recusado")
 	}
 }
