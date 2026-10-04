@@ -223,3 +223,28 @@ func TestMemoRefeitoQuandoAprendeOutraGrafia(t *testing.T) {
 		t.Fatalf("o texto antigo continuou em claro depois de o valor ser aprendido: %q", out)
 	}
 }
+
+// Uma palavra comum mascarada como senha (exemplo numa URL de documentação) não pode ser
+// lembrada: senão toda ocorrência dela vira segredo e o histórico inteiro é reescrito.
+func TestPalavraComumNaoViraSegredoLembrado(t *testing.T) {
+	dir := t.TempDir()
+	vs, _ := CarregarVistos(dir + "/v.json")
+	m, _ := NovoMasker(novoTeste(t).cfg, chaveTeste, nil, vs)
+	m.Mascarar("export HTTPS_PROXY=http://username:pinguim@proxy.example.com:8080")
+	if out, ents := m.Mascarar("o pinguim mora no polo sul"); len(ents) > 0 {
+		t.Fatalf("palavra comum foi lembrada como segredo: %q", out)
+	}
+	// e uma senha de verdade continua sendo lembrada
+	m.Mascarar("DB_PASSWORD=Pinguim#2026")
+	if out, _ := m.Mascarar("tentei Pinguim#2026 e falhou"); strings.Contains(out, "Pinguim#2026") {
+		t.Fatalf("senha real deixou de ser lembrada: %q", out)
+	}
+	// palavra aprendida por versão antiga (hash em disco) é ignorada na consulta
+	vs.Marcar(m.p.ID("visto", "s:pinguim"), "segredo")
+	vs.SalvarSeSujo()
+	vs2, _ := CarregarVistos(dir + "/v.json")
+	m2, _ := NovoMasker(m.cfg, chaveTeste, nil, vs2)
+	if out, ents := m2.Mascarar("o pinguim mora no polo sul"); len(ents) > 0 {
+		t.Fatalf("palavra guardada por versão antiga continuou sendo mascarada: %q", out)
+	}
+}

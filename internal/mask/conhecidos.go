@@ -232,6 +232,19 @@ func (c *conhecidos) contemDesde(s string, g int) bool {
 	return achou
 }
 
+// segredoLembravel: o valor tem cara de segredo de verdade (algum dígito ou símbolo), e não de
+// palavra comum. Vale também na consulta, para ignorar palavras aprendidas por versões
+// antigas e ainda guardadas em vistos.json.
+func segredoLembravel(v string) bool {
+	for i := 0; i < len(v); i++ {
+		c := v[i]
+		if !(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= 0x80) {
+			return true
+		}
+	}
+	return false
+}
+
 func temDigito(s string) bool {
 	for i := 0; i < len(s); i++ {
 		if s[i] >= '0' && s[i] <= '9' {
@@ -345,7 +358,7 @@ func (m *Masker) acharConhecidos(s string, numLongo bool, add func(ini, fim int,
 				continue
 			}
 			if m.vistos.TemTamanho(len(v)) {
-				if tp, ok := m.vistos.Tipo(m.p.ID("visto", "s:"+v)); ok {
+				if tp, ok := m.vistos.Tipo(m.p.ID("visto", "s:"+v)); ok && segredoLembravel(v) {
 					achei(ix[0], ix[1], tp)
 					continue
 				}
@@ -373,7 +386,7 @@ func (m *Masker) acharConhecidos(s string, numLongo bool, add func(ini, fim int,
 					if fim-ini < 8 || (ini == 0 && fim == len(v)) || !m.vistos.TemTamanho(fim-ini) {
 						continue
 					}
-					if tp, ok := m.vistos.Tipo(m.p.ID("visto", "s:"+v[ini:fim])); ok {
+					if tp, ok := m.vistos.Tipo(m.p.ID("visto", "s:"+v[ini:fim])); ok && segredoLembravel(v[ini:fim]) {
 						achei(ix[0]+ini, ix[0]+fim, tp)
 						break pedacos
 					}
@@ -400,6 +413,12 @@ func (m *Masker) aprender(tipo, real string) {
 	// código curto ou sem dígito ("jsilva", "ana") só é mascarado junto do rótulo: lembrá-lo
 	// faria toda palavra igual virar dado sensível
 	if (tipo == "usuario" || tipo == "doc") && (len(real) < 5 || !temDigito(real)) {
+		return
+	}
+	// senha só de letras ("admin", uma palavra de exemplo numa URL) é mascarada onde apareceu, mas
+	// não é lembrada: lembrá-la faria toda ocorrência da palavra, em qualquer texto, virar
+	// segredo, e reescreveria o histórico inteiro da conversa (quebrando o cache)
+	if tipo == "segredo" && !segredoLembravel(real) {
 		return
 	}
 	if m.conh.aprender(tipo, real) && m.vistos != nil {
