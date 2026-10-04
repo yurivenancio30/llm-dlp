@@ -232,17 +232,17 @@ func (c *conhecidos) contemDesde(s string, g int) bool {
 	return achou
 }
 
-// segredoLembravel: o valor tem cara de segredo de verdade (algum dígito ou símbolo), e não de
-// palavra comum. Vale também na consulta, para ignorar palavras aprendidas por versões
-// antigas e ainda guardadas em vistos.json.
+// marcadores: palavras que aparecem no lugar de uma senha em exemplos e documentação
+// ("http://user:<marcador>@host"). São mascaradas onde aparecem, mas não são lembradas: lembrá-las
+// faria toda ocorrência da palavra virar segredo e reescreveria o histórico inteiro da conversa.
+// Qualquer outra senha, inclusive fraca e só de letras, é lembrada.
+var marcadores = map[string]bool{"password": true, "passwd": true, "pass": true, "pwd": true, "senha": true, "secret": true, "segredo": true, "changeme": true, "change_me": true, "example": true, "exemplo": true, "user": true, "username": true, "usuario": true, "token": true, "placeholder": true, "dummy": true, "sample": true, "xxx": true, "xxxx": true, "xxxxx": true, "yyy": true, "foo": true, "bar": true, "baz": true, "test": true, "teste": true, "mypass": true, "yourpass": true, "your_password": true, "sua_senha": true, "redacted": true, "hidden": true, "oculto": true, "none": true, "null": true, "empty": true}
+
+// segredoLembravel: o valor pode ser lembrado como segredo (não é um marcador de exemplo).
+// Vale também na consulta, para ignorar marcadores aprendidos por versões antigas e ainda
+// guardados em vistos.json.
 func segredoLembravel(v string) bool {
-	for i := 0; i < len(v); i++ {
-		c := v[i]
-		if !(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= 0x80) {
-			return true
-		}
-	}
-	return false
+	return !marcadores[strings.ToLower(v)]
 }
 
 func temDigito(s string) bool {
