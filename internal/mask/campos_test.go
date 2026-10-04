@@ -219,3 +219,17 @@ func TestCamposExtrasEOpcionais(t *testing.T) {
 		t.Errorf("DescreverCampos: %+v", cols)
 	}
 }
+
+// Item 3 (revisão externa): nomes de coluna de documento genéricos.
+func TestRotulosDeDocumento(t *testing.T) {
+	for _, r := range []string{"document", "documento", "userDocument", "user_document", "num_documento", "tax_id", "taxpayer", "taxpayer_id", "nr_documento_cliente", "CPF_CNPJ"} {
+		if classeRotulo(r) == "" {
+			t.Errorf("%q deveria ser reconhecido como documento", r)
+		}
+	}
+	for _, r := range []string{"document_type", "tipo_documento", "documento_url"} {
+		if c := classeRotulo(r); c != "" {
+			t.Errorf("%q não guarda o número do documento, mas virou %q", r, c)
+		}
+	}
+}

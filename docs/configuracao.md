@@ -18,7 +18,8 @@ Arquivo `~/.config/llm-dlp/config.json`. Depois de mudar, rode `llm-dlp parar`.
 | `detectores_desligados` | Detectores a desligar (lista abaixo) | vazio |
 | `detectores_opcionais` | Detectores a ligar. Hoje só `quase`: sexo, idade, estado civil, profissão, nacionalidade, renda, latitude/longitude | vazio |
 | `ferramentas_sem_desmascarar` | Ferramentas que recebem só pseudônimos | `WebFetch`, `WebSearch` |
-| `falhar_fechado` | Recusa o que não sabe mascarar | `true` |
+| `documentos_sem_contexto` | Mascara CPF e CNPJ só com dígitos mesmo sem a palavra "cpf"/"cnpj" por perto, se o dígito verificador conferir. Cerca de 1 em 100 números aleatórios desse tamanho também confere e é mascarado a mais | `true` |
+| `falhar_fechado` | Recusa o que não sabe mascarar. Desligado, uma falha ao mascarar manda a requisição **sem máscara** (só fica um aviso no log). Imagem e PDF que não deu para verificar são recusados de qualquer jeito. Não recomendado desligar | `true` |
 | `ocr` | `modo` (`mascarar`, `bloquear` ou `permitir`), `idioma`, `max_paginas`, caminhos do tesseract e do poppler | `mascarar`, `por`, 30 |
 | `porta` | Porta local do proxy | 8787 |
 | `upstream` | Endereço da API | `https://api.anthropic.com` |

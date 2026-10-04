@@ -59,3 +59,25 @@ não existe.
   ou separado por `= & : / ? @ | # +`. Colado direto em letras, só depois de reaparecer uma
   vez solto.
 - Por enquanto, só a API da Anthropic (ver [Acoplar outra API de LLM](desenvolvimento.md#acoplar-outra-api-de-llm)).
+
+## Decisões de projeto
+
+Comportamentos que são escolhas, não defeitos:
+
+| Comportamento | Por quê |
+|---|---|
+| Só IPs de rede interna são mascarados | IP público (de um serviço na internet) não identifica a empresa nem uma pessoa, e mascará-lo atrapalharia o diagnóstico de rede |
+| Domínios públicos não são mascarados | `github.com`, `pypi.org`, nomes de arquivo (`config.py`) têm formato de domínio; mascará-los piora as respostas sem proteger nada. Só os `dominios_internos` são mascarados |
+| E-mail precisa de domínio com ponto | `joao@localhost`, `root@servidor` e `ssh usuario@host` não são tratados como e-mail (seriam falsos positivos em comandos). E-mail escrito por extenso (`joao [at] empresa`) também não é reconhecido |
+| `WebFetch` e `WebSearch` recebem pseudônimos | O que vai para a internet não pode levar o dado real. Efeito: pesquisar na web algo mascarado não acha nada |
+| Pseudônimo com colisão não volta ao real | Dois valores com o mesmo pseudônimo: a ida continua mascarada, mas a volta não é feita, para não trocar pelo valor errado. A ferramenta recebe o pseudônimo e pode falhar |
+| Valor aprendido depois de já ter passado | Se um valor passou em claro numa mensagem e só depois foi reconhecido, ele é mascarado dali em diante, inclusive no histórico reenviado (o cache é refeito uma vez). Mas o que já foi enviado não volta: o modelo pode ligar o pseudônimo ao valor que viu antes |
+
+## Conectores e MCP
+
+| Onde o MCP roda | O que ele recebe | Situação |
+|---|---|---|
+| Na sua máquina (MCP local: banco, arquivos) | O valor **real**: a chamada é desmascarada antes de rodar | Correto: é o mesmo que um comando seu |
+| Na sua máquina, mas falando com um serviço de terceiros (uma API na internet, outro LLM) | O valor **real**, que sai da sua máquina sem passar pelo llm-dlp | **Fora da proteção.** Só use esses MCPs com dados que podem sair |
+| Do lado da Anthropic (conectores do claude.ai, `mcp_tool_use` e `server_tool_use`) | O **pseudônimo**: a chamada é feita pela API, que só conhece os pseudônimos | Uma consulta com valor mascarado falha ou não acha nada. O que esses conectores trazem já está do lado da Anthropic e não passa pelo llm-dlp |
+

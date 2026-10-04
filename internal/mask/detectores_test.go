@@ -54,7 +54,7 @@ func TestDetecta(t *testing.T) {
 func TestNaoDetecta(t *testing.T) {
 	m := novoTeste(t)
 	limpos := []string{
-		"SELECT * FROM vendas WHERE id = 52998224725 AND ts > '2026-10-02 18:35:00'",
+		"SELECT * FROM vendas WHERE id = 12345678901 AND ts > '2026-10-02 18:35:00'",
 		"versão 2.1.280, porta 8080 em 127.0.0.1, dns 8.8.8.8",
 		"oid 1.3.6.1.4.1.311 e build 10.0.19045.1",
 		"run_id 123e4567-e89b-42d3-a456-426614174000 terminou",
@@ -266,5 +266,51 @@ func TestSegredoNaFronteiraDaJanela(t *testing.T) {
 	bloco := strings.Repeat("a ", janelaLeaks/2-10) + "token=" + tok + " " + strings.Repeat("b ", janelaLeaks)
 	if out, _ := novoTeste(t).Mascarar(bloco); strings.Contains(out, tok) {
 		t.Error("token em cima do corte, sem quebra de linha, passou")
+	}
+}
+
+// Item 1 e 2 (revisão externa): CPF e CNPJ válidos, só com dígitos, sem a palavra "cpf" por
+// perto e sem nome de coluna reconhecido. Reproduz uma consulta com UNION em que a coluna
+// recebeu o alias "valor": os valores saíam em claro.
+func TestDocumentoSoDigitosSemContexto(t *testing.T) {
+	cpf1 := strings.NewReplacer(".", "", "-", "").Replace(gerarCPF("318452760"))
+	cpf2 := strings.NewReplacer(".", "", "-", "").Replace(gerarCPF("529982247"))
+	cnpj := strings.NewReplacer(".", "", "-", "", "/", "").Replace("11.222.333/0001-81")
+	casos := map[string][]string{
+		"valor\n" + cpf1 + "\n" + cpf2 + "\n":               {cpf1, cpf2},
+		`{"id": 7, "userDocument": "` + cpf1 + `"}`:         {cpf1},
+		"o resultado da consulta foi " + cpf2 + " e pronto": {cpf2},
+		"fornecedor " + cnpj + " ativo":                     {cnpj},
+	}
+	for texto, reais := range casos {
+		out, _ := novoTeste(t).Mascarar(texto)
+		for _, r := range reais {
+			if strings.Contains(out, r) {
+				t.Errorf("passou %q em %q -> %q", r, texto, out)
+			}
+		}
+	}
+}
+
+// As exceções do CPF/CNPJ sem contexto: pedaço de hash, parte decimal, número com versão e
+// carimbo de data e hora (14 dígitos) não são documentos.
+func TestDocumentoSoDigitosExcecoes(t *testing.T) {
+	cpf := strings.NewReplacer(".", "", "-", "").Replace(gerarCPF("318452760"))
+	fica := []string{
+		"hash a" + cpf + "f e id_" + cpf,
+		"pi vale 3." + cpf,
+		"versão v1." + cpf + ".2",
+		"carimbo 20261004104220 gravado",
+	}
+	for _, s := range fica {
+		if out, ents := novoTeste(t).Mascarar(s); len(ents) > 0 {
+			t.Errorf("mascarou sem precisar: %q -> %q", s, out)
+		}
+	}
+	cfg := novoTeste(t).cfg
+	cfg.DocumentosSemContexto = false
+	m, _ := NovoMasker(cfg, chaveTeste, nil, nil)
+	if out, _ := m.Mascarar("valor " + cpf); !strings.Contains(out, cpf) {
+		t.Errorf("com documentos_sem_contexto desligado, deveria ficar como está: %q", out)
 	}
 }

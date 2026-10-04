@@ -208,3 +208,18 @@ func TestVistosTemTeto(t *testing.T) {
 		t.Fatalf("hashes sem teto: %d (contador %d)", len(v.ids), v.n["rg"])
 	}
 }
+
+// Item 4 (revisão externa): um valor que passou em claro num texto e só depois foi aprendido
+// (em outra grafia) não pode continuar em claro quando o histórico é reenviado. O memo do
+// texto antigo tem que ser refeito.
+func TestMemoRefeitoQuandoAprendeOutraGrafia(t *testing.T) {
+	m := novoTeste(t)
+	antigo := "linha 7: 123456789;ATIVO"
+	if out, _ := m.Mascarar(antigo); !strings.Contains(out, "123456789") {
+		t.Skip("premissa mudou: o número já é mascarado sozinho")
+	}
+	m.Mascarar("RG: 12.345.678-9`") // aprende o mesmo número, com pontuação
+	if out, _ := m.Mascarar(antigo); strings.Contains(out, "123456789") {
+		t.Fatalf("o texto antigo continuou em claro depois de o valor ser aprendido: %q", out)
+	}
+}

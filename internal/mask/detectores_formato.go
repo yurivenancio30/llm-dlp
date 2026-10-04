@@ -287,7 +287,8 @@ func (m *Masker) detectarBase(s string) []Achado {
 	if on("cnpj") && numLongo {
 		for _, ix := range reCNPJ.FindAllStringIndex(s, -1) {
 			v := s[ix[0]:ix[1]]
-			if bordaDig(s, ix[0], ix[1]) && CNPJValido(v) && (formatado(v) || contexto(s, ix[0], "cnpj")) {
+			if bordaDig(s, ix[0], ix[1]) && CNPJValido(v) && (formatado(v) || contexto(s, ix[0], "cnpj") ||
+				(m.cfg.DocumentosSemContexto && soNumeroIsolado(s, ix[0], ix[1]) && !dataHoraJunta(v))) {
 				add(ix[0], ix[1], "cnpj")
 			}
 		}
@@ -295,7 +296,8 @@ func (m *Masker) detectarBase(s string) []Achado {
 	if on("cpf") && numLongo {
 		for _, ix := range reCPF.FindAllStringIndex(s, -1) {
 			v := s[ix[0]:ix[1]]
-			if bordaDig(s, ix[0], ix[1]) && CPFValido(v) && (formatado(v) || contexto(s, ix[0], "cpf")) {
+			if bordaDig(s, ix[0], ix[1]) && CPFValido(v) && (formatado(v) || contexto(s, ix[0], "cpf") ||
+				(m.cfg.DocumentosSemContexto && soNumeroIsolado(s, ix[0], ix[1]))) {
 				add(ix[0], ix[1], "cpf")
 			}
 		}
@@ -498,4 +500,45 @@ func dataJunta(v string) bool {
 		return ano >= 1900 && ano <= 2100 && mes >= 1 && mes <= 12 && dia >= 1 && dia <= 31
 	}
 	return ok(n(0, 4), n(4, 6), n(6, 8)) || ok(n(4, 8), n(2, 4), n(0, 2))
+}
+
+// soNumeroIsolado: s[i:j] é um número inteiro sozinho, não um pedaço de outra coisa: não está
+// colado em letra (hash, identificador), nem é a parte decimal ou um trecho de um número
+// maior com ponto, vírgula ou traço ("3.14159265358", "v1.31845276035").
+func soNumeroIsolado(s string, i, j int) bool {
+	if i > 0 {
+		a := s[i-1]
+		if ehAlnum(a) || a == '_' {
+			return false
+		}
+		if (a == '.' || a == ',' || a == '-') && i > 1 && ehAlnum(s[i-2]) {
+			return false
+		}
+	}
+	if j < len(s) {
+		b := s[j]
+		if ehAlnum(b) || b == '_' {
+			return false
+		}
+		if (b == '.' || b == ',' || b == '-') && j+1 < len(s) && ehDig(s[j+1]) {
+			return false
+		}
+	}
+	return true
+}
+
+// dataHoraJunta: 14 dígitos no formato AAAAMMDDhhmmss (carimbo de data e hora).
+func dataHoraJunta(v string) bool {
+	d := soDigitos(v)
+	if len(d) != 14 || !dataJunta(d[:8]) {
+		return false
+	}
+	n := func(a, b int) int {
+		x := 0
+		for _, c := range d[a:b] {
+			x = x*10 + int(c-'0')
+		}
+		return x
+	}
+	return n(8, 10) < 24 && n(10, 12) < 60 && n(12, 14) < 60
 }

@@ -79,13 +79,16 @@ func canonNum(v string) string {
 // quantos valores há. Tem teto: passou de maxConhecidos, a metade mais antiga sai da RAM
 // (o hash dela continua em disco).
 type conhecidos struct {
-	mu     sync.RWMutex
-	base   int               // quantos valores já saíram da RAM (mantém a "geração" crescente)
-	reais  []string          // em ordem de chegada; geração do valor = base + índice
-	tipo   map[string]string // valor exato -> tipo
-	seq    map[string]int    // valor exato -> geração em que foi aprendido
-	canon  map[string]string // chave canônica -> tipo
-	nTipos map[string]int
+	mu    sync.RWMutex
+	base  int               // quantos valores já saíram da RAM (mantém a "geração" crescente)
+	reais []string          // em ordem de chegada; geração do valor = base + índice
+	tipo  map[string]string // valor exato -> tipo
+	seq   map[string]int    // valor exato -> geração em que foi aprendido
+	canon map[string]string // chave canônica -> tipo
+	// chave canônica -> geração em que foi aprendida. Serve para refazer um texto memorizado
+	// em que o valor apareceu em OUTRA grafia (RG sem pontos, código em minúsculas).
+	canonSeq map[string]int
+	nTipos   map[string]int
 	// 4 primeiros bytes -> TAMANHOS dos valores que começam assim. Com o começo e o tamanho,
 	// o trecho do texto é consultado direto em seq (uma busca em mapa). Guardar a lista de
 	// valores aqui ficaria lento quando milhares começam igual (RGs "12.3...", CPFs em sequência).
@@ -103,7 +106,7 @@ func novosConhecidos() *conhecidos {
 
 func (c *conhecidos) zerar() {
 	c.reais = nil
-	c.tipo, c.seq, c.canon = map[string]string{}, map[string]int{}, map[string]string{}
+	c.tipo, c.seq, c.canon, c.canonSeq = map[string]string{}, map[string]int{}, map[string]string{}, map[string]int{}
 	c.nTipos, c.pref = map[string]int{}, map[uint32][]int32{}
 	c.par = [1 << 16 / 64]uint64{}
 }
@@ -118,6 +121,7 @@ func (c *conhecidos) inserir(tipo, real string) {
 	c.tipo[real] = tipo
 	c.seq[real] = c.base + len(c.reais)
 	c.canon[chaveCanonica(tipo, real)] = tipo
+	c.canonSeq[chaveCanonica(tipo, real)] = c.base + len(c.reais)
 	c.reais = append(c.reais, real)
 	c.nTipos[tipo]++
 	k := uint32(real[0])<<24 | uint32(real[1])<<16 | uint32(real[2])<<8 | uint32(real[3])
@@ -203,6 +207,28 @@ func (c *conhecidos) contemDesde(s string, g int) bool {
 	}
 	achou := false
 	c.varrer(s, g, func(int, int, string) bool { achou = true; return false })
+	if achou {
+		return true
+	}
+	// a mesma coisa em outra grafia: o número sem pontuação, o código em outra caixa
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	novo := func(chave string) bool { gen, ok := c.canonSeq[chave]; return ok && gen >= g }
+	for _, ix := range reNumTok.FindAllStringIndex(s, -1) {
+		if v := s[ix[0]:ix[1]]; len(soDigitos(v)) >= 8 && novo("n:"+canonNum(v)) {
+			return true
+		}
+	}
+	for _, ix := range rePix.FindAllStringIndex(s, -1) {
+		if novo("u:" + strings.ToLower(s[ix[0]:ix[1]])) {
+			return true
+		}
+	}
+	paraCadaCodigo(s, func(ini, fim int) {
+		if !achou && novo("c:"+strings.ToUpper(s[ini:fim])) {
+			achou = true
+		}
+	})
 	return achou
 }
 

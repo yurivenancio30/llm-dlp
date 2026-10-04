@@ -51,7 +51,7 @@ func vocabularioPadrao() *vocabulario {
 	por("rg", "rg", "identidade")
 	por("cnh", "cnh", "habilitacao")
 	por("pis", "pis", "pasep", "nis", "nit")
-	por("doc", "passaporte", "passport", "renavam", "ctps", "chassi", "vin", "placa", "cns", "ssn", "nif", "dni", "curp", "rfc", "cuit", "rut",
+	por("doc", "document", "documento", "documentos", "taxpayer", "taxid", "tin", "cpfcnpj", "passaporte", "passport", "renavam", "ctps", "chassi", "vin", "placa", "cns", "ssn", "nif", "dni", "curp", "rfc", "cuit", "rut",
 		"taxid", "imei", "certidao", "rne", "crm", "oab", "crea")
 	por("nascimento", "nascimento", "nasc", "birth", "birthdate", "birthday", "dob", "dateofbirth", "obito", "falecimento")
 	por("telefone", "telefone", "fone", "celular", "phone", "telephone", "mobile", "whatsapp", "tel", "fax", "cell", "cellphone", "ramal")

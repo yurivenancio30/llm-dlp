@@ -47,6 +47,11 @@ type Config struct {
 	// "neutra" (palavra que não muda o que o campo guarda: "bco", "sis").
 	CamposExtras []CampoExtra `json:"campos_extras,omitempty"`
 
+	// CPF e CNPJ só com dígitos (sem pontuação) são mascarados mesmo sem a palavra "cpf"/"cnpj"
+	// por perto, desde que o dígito verificador confira. Cerca de 1 em cada 100 números
+	// aleatórios desse tamanho também confere: esses são mascarados a mais (na dúvida, mascara).
+	DocumentosSemContexto bool `json:"documentos_sem_contexto"`
+
 	// Bloqueia (502) requisições que o llm-dlp não sabe mascarar, em vez de deixá-las passar.
 	FalharFechado bool `json:"falhar_fechado"`
 
@@ -90,7 +95,8 @@ func Padrao() Config {
 		DominiosEmailLiberados: []string{"example.com", "example.org", "example.net", "users.noreply.github.com", "anthropic.com"},
 		PapeisHost: []string{"mysql", "postgres", "redis", "kafka", "zookeeper", "elasticsearch", "opensearch", "neo4j",
 			"nginx", "gms", "frontend", "dh-gms", "dh-frontend", "schema-registry", "actions", "mae", "mce", "api", "db", "web"},
-		FalharFechado: true,
+		FalharFechado:         true,
+		DocumentosSemContexto: true,
 		OCR: OCR{Modo: "mascarar", Tesseract: "tesseract", PDFToText: "pdftotext", PDFToPPM: "pdftoppm",
 			Idioma: "por", Env: map[string]string{}, MaxPaginas: 30},
 		FerramentasSemDesmascarar: []string{"WebFetch", "WebSearch"},
