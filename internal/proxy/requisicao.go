@@ -7,77 +7,81 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/yurivenancio30/llm-dlp/internal/config"
 	"github.com/yurivenancio30/llm-dlp/internal/mask"
 )
 
 // Ida: mascara o corpo da requisição (formato da API da Anthropic).
 
 // mascararCorpo mascara o JSON da requisição. Corpo que não é JSON não sai (falha fechada).
-func (p *Proxy) mascararCorpo(r *http.Request, corpo []byte) ([]byte, []mask.Entrada, error) {
+// Devolve também o lote dos textos, para congelar depois que a requisição sair.
+func (p *Proxy) mascararCorpo(r *http.Request, corpo []byte) ([]byte, []mask.Entrada, *mask.Lote, error) {
 	dec := json.NewDecoder(bytes.NewReader(corpo))
 	dec.UseNumber()
 	var v any
 	if err := dec.Decode(&v); err != nil {
-		return nil, nil, fmt.Errorf("corpo não é JSON (%s)", r.Header.Get("content-type"))
+		return nil, nil, nil, fmt.Errorf("corpo não é JSON (%s)", r.Header.Get("content-type"))
 	}
-	var textos []string
-	coletarTextos(v, &textos)
-	p.m.Aquecer(textos)
+	anthropic := strings.HasPrefix(r.URL.Path, "/v1/messages")
+	lote := p.m.NovoLote()
+	// 1ª passada: só junta os textos (os mesmos que a montagem vai mascarar) e os mascara
+	// antes, em paralelo quando são muitos. Assim, todo valor aprendido nesta requisição já
+	// vale quando ela é montada, e a requisição seguinte não muda nada do que esta enviou.
+	col := &coleta{}
+	wc := walker{cfg: p.cfg, col: col}
+	if anthropic {
+		wc.requisicaoAnthropic(v)
+	} else {
+		wc.generico(v)
+	}
+	lote.Aquecer(col.locais, col.daWeb)
+
+	// 2ª passada: monta, em ordem
 	var ents []mask.Entrada
 	var errMidia error
-	w := walker{m: p.m, md: p.midia, ents: &ents, err: &errMidia}
-	if strings.HasPrefix(r.URL.Path, "/v1/messages") {
+	w := walker{cfg: p.cfg, lote: lote, md: p.midia, ents: &ents, err: &errMidia}
+	if anthropic {
 		v = w.requisicaoAnthropic(v)
 	} else {
 		v = w.generico(v)
 	}
 	if errMidia != nil {
 		// imagem/PDF que não deu para verificar nunca sai, mesmo com falhar_fechado=false
-		return nil, nil, erroObrigatorio{errMidia}
+		return nil, nil, nil, erroObrigatorio{errMidia}
 	}
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	enc.SetEscapeHTML(false)
 	if err := enc.Encode(v); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	return bytes.TrimRight(buf.Bytes(), "\n"), ents, nil
+	return bytes.TrimRight(buf.Bytes(), "\n"), ents, lote, nil
 }
 
-// coletarTextos junta os textos grandes da requisição, para serem mascarados em paralelo
-// antes da montagem (ver mask.Aquecer). Fica de fora o que nunca é mascarado: o raciocínio
-// assinado e o conteúdo de imagens/PDFs em base64.
-func coletarTextos(v any, out *[]string) {
-	switch x := v.(type) {
-	case string:
-		if len(x) >= 512 {
-			*out = append(*out, x)
-		}
-	case []any:
-		for _, e := range x {
-			coletarTextos(e, out)
-		}
-	case map[string]any:
-		if t, _ := x["type"].(string); t == "thinking" || t == "redacted_thinking" || t == "base64" {
-			return
-		}
-		for _, e := range x {
-			coletarTextos(e, out)
-		}
-	}
-}
+// coleta: os textos que a montagem vai mascarar, separados pela origem.
+type coleta struct{ locais, daWeb []string }
 
 // walker percorre o JSON de uma requisição e mascara as strings que podem levar
 // dado do usuário, guardando as entradas pseudônimo -> real usadas.
 type walker struct {
-	m    *mask.Masker
+	cfg  config.Config
+	lote *mask.Lote
 	md   *Midia
 	ents *[]mask.Entrada
 	err  *error // primeiro erro ao tratar mídia (a requisição inteira é recusada)
+	// col != nil: só junta os textos, sem mudar nada (1ª passada)
+	col *coleta
+	// idsWeb: tool_use_id das chamadas de WebFetch/WebSearch desta conversa
+	idsWeb map[string]bool
+	// daWeb: o texto atual veio da internet (mascara, mas não aprende)
+	daWeb bool
 }
 
 // midia trata um bloco de imagem/PDF; devolve os blocos que o substituem.
 func (w walker) midia(b map[string]any) []any {
+	if w.col != nil {
+		return []any{b}
+	}
 	if w.md == nil {
 		*w.err = errSemMidia
 		return nil
@@ -105,9 +109,51 @@ func ehBase64(b map[string]any) bool {
 }
 
 func (w walker) s(v string) string {
-	out, e := w.m.Mascarar(v)
+	if w.col != nil {
+		if w.daWeb {
+			w.col.daWeb = append(w.col.daWeb, v)
+		} else {
+			w.col.locais = append(w.col.locais, v)
+		}
+		return v
+	}
+	out, e := w.lote.Mascarar(v, w.daWeb)
 	*w.ents = append(*w.ents, e...)
 	return out
+}
+
+// web: as ferramentas da lista ferramentas_sem_desmascarar (WebFetch, WebSearch) trazem
+// conteúdo da internet. Um exemplo de documentação (a senha de exemplo numa URL) não é
+// segredo do usuário: é mascarado onde aparece, mas não é lembrado. Os conectores do
+// claude.ai (mcp__claude_ai_*) ficam de fora: trazem dado do próprio usuário.
+func (w walker) web(nome string) bool {
+	for _, f := range w.cfg.FerramentasSemDesmascarar {
+		if f == nome {
+			return true
+		}
+	}
+	return false
+}
+
+// idsDaWeb junta os ids das chamadas de ferramentas da web feitas na conversa.
+func (w walker) idsDaWeb(msgs []any) map[string]bool {
+	ids := map[string]bool{}
+	for _, mm := range msgs {
+		msg, _ := mm.(map[string]any)
+		blocos, _ := msg["content"].([]any)
+		for _, b := range blocos {
+			bl, _ := b.(map[string]any)
+			if bl == nil || bl["type"] != "tool_use" {
+				continue
+			}
+			if nome, _ := bl["name"].(string); w.web(nome) {
+				if id, _ := bl["id"].(string); id != "" {
+					ids[id] = true
+				}
+			}
+		}
+	}
+	return ids
 }
 
 // Chaves que nunca carregam dado do usuário (ou que não podem mudar).
@@ -128,6 +174,7 @@ func (w walker) requisicaoAnthropic(v any) any {
 			req[k] = w.conteudo(val)
 		case "messages":
 			if msgs, ok := val.([]any); ok {
+				w.idsWeb = w.idsDaWeb(msgs)
 				for _, mm := range msgs {
 					if msg, ok := mm.(map[string]any); ok {
 						msg["content"] = w.conteudo(msg["content"])
@@ -201,9 +248,16 @@ func (w walker) bloco(b map[string]any) map[string]any {
 		}
 		return b
 	case "tool_use":
+		// a entrada de WebFetch/WebSearch é escrita pelo modelo a partir do que leu na web
+		if nome, _ := b["name"].(string); w.web(nome) {
+			w.daWeb = true
+		}
 		b["input"] = w.tudo(b["input"])
 		return b
 	case "tool_result":
+		if id, _ := b["tool_use_id"].(string); w.idsWeb[id] {
+			w.daWeb = true
+		}
 		b["content"] = w.conteudo(b["content"])
 		return b
 	case "document":

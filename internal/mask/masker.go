@@ -33,7 +33,12 @@ type Entrada struct{ Pseudo, Real, Tipo string }
 type resultado struct {
 	texto    string
 	entradas []Entrada
+	trechos  []trecho
 	gen      int // quantos "valores conhecidos" existiam quando foi calculado
+	// congelado: já saiu numa requisição; nunca mais muda (ver enviados.go)
+	congelado bool
+	// semAprender: calculado sem aprender (conteúdo da internet)
+	semAprender bool
 }
 
 // Masker detecta e troca dado sensível por pseudônimos. É seguro para uso concorrente.
@@ -43,6 +48,7 @@ type Masker struct {
 	leaks    *detect.Detector
 	pessoas  *Pessoas
 	vistos   *Vistos
+	enviados *Enviados
 	conh     *conhecidos
 	extras   []*regexp.Regexp
 	rotExtra []string

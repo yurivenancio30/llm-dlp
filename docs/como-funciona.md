@@ -47,8 +47,23 @@ qualquer lugar: na saída de um comando, num arquivo lido mais tarde, sem a pist
 |---|---|
 | Memória | O valor real, enquanto o llm-dlp estiver no ar |
 | Disco (`vistos.json`, `pessoas.json`) | **Só o hash**, feito com a chave. Serve para reconhecer depois de reiniciar |
+| Disco (`enviados.log`) | Para cada texto já enviado: o hash do texto e, de cada trecho trocado, a posição, o tipo e o pseudônimo. Serve para o texto sair igual depois de reiniciar (ver abaixo) |
 
 Nenhum valor real e nenhum texto mascarado é gravado em disco pelo llm-dlp.
+
+**O valor aprendido vale para texto novo.** O Claude Code reenvia a conversa inteira a cada
+mensagem, e o cache da API só vale se o começo for idêntico ao da vez anterior. Por isso, um
+texto que já saiu para a API sai sempre igual, mesmo que depois o llm-dlp aprenda um valor
+que aparece nele: mudá-lo não protegeria nada (ele já foi enviado assim) e faria a conversa
+inteira ser regravada no cache. Isso vale também depois de reiniciar, graças ao
+`enviados.log`. Se a configuração ou a versão do llm-dlp mudar, ou se você importar pessoas,
+o registro recomeça e o histórico é mascarado de novo com as regras atuais (o cache é
+regravado uma vez).
+
+**O que vem da internet não ensina.** O resultado de `WebFetch` e `WebSearch` (e o que o
+Claude escreve nessas ferramentas) é mascarado onde aparece, mas nada dele é lembrado: uma
+página de documentação com uma senha de exemplo numa URL não faz essa palavra virar segredo
+em todo lugar.
 
 ## Falha fechada
 
@@ -81,8 +96,13 @@ nelas vai para um site de fora. Se a troca fosse feita, o dado real sairia junto
 página maliciosa poderia pedir isso de propósito. Por isso, **só nessas duas ferramentas a
 troca não é desfeita**: o site recebe o pseudônimo, que não serve para nada.
 
-O efeito colateral: pesquisar na web algo que foi mascarado não acha nada. Para mudar, edite
-`ferramentas_sem_desmascarar` no `config.json`.
+Os **conectores do claude.ai** (ferramentas `mcp__claude_ai_*`: Gmail, Drive, Agenda...) também
+recebem só o pseudônimo, sempre, mesmo que o `config.json` tenha outra lista: eles rodam nos
+servidores da Anthropic, fora da sua máquina.
+
+O efeito colateral: pesquisar na web, ou num conector, algo que foi mascarado não acha nada.
+Para mudar a lista das ferramentas da web, edite `ferramentas_sem_desmascarar` no
+`config.json`.
 
 ## Desempenho
 
@@ -103,8 +123,8 @@ Medido em sessões reais e em testes de carga.
 - **Quantidade não pesa:** o tempo não cresce com o número de valores aprendidos nem de
   pseudônimos na conversa (medido até 120 mil valores e 20 mil e-mails distintos).
 - **Tudo que é memorizado tem teto** e descarta o mais antigo.
-- **O cache é refeito uma vez** quando um valor é aprendido: as ocorrências anteriores dele
-  passam a ser mascaradas.
+- **Aprender um valor não regrava o cache:** o que já saiu continua igual (ver
+  [O que é lembrado](#o-que-é-lembrado)).
 - **Texto grande** é examinado em pedaços, em paralelo, usando os núcleos que a máquina
   tiver. O corte é sempre num espaço em branco, para nunca dividir uma senha ou token. Por
   isso um bloco gigante sem nenhum espaço (2 MB de base64 ou de JSON minificado) não é

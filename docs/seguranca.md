@@ -18,7 +18,7 @@ não existe.
 
 - Dado que ele não detecta (ver [Limites conhecidos](seguranca.md#limites-conhecidos)).
 - `curl` ou outro programa chamado pelo agente, que leve o dado real para fora. A proteção
-  de saída vale para `WebFetch` e `WebSearch`.
+  de saída vale para `WebFetch`, `WebSearch` e os conectores do claude.ai.
 - Um programa malicioso rodando com o seu próprio usuário, que pode se passar pelo proxy.
 - O que não passa por ele: outra instalação do Claude Code (a nativa do Windows, por
   exemplo), outros clientes.
@@ -58,6 +58,14 @@ não existe.
 - Depois de reiniciar, um valor lembrado só pelo hash é reconhecido quando aparece "solto"
   ou separado por `= & : / ? @ | # +`. Colado direto em letras, só depois de reaparecer uma
   vez solto.
+- Valor aprendido depois não é aplicado ao que já saiu: se um valor passou em claro numa
+  mensagem e só depois foi reconhecido, essa mensagem continua saindo em claro nos reenvios
+  (ela já tinha sido enviada assim). Só o texto novo usa o valor aprendido.
+- Senha só de letras é detectada dentro de uma URL (`mysql://app:SENHA@host`), mas não depois
+  de um rótulo (`senha: SENHA`, `DB_PASSWORD=SENHA`): ali, o detector exige um dígito ou um
+  símbolo, para não confundir com código e texto comum.
+- Imagens e PDFs: o resultado fica memorizado só enquanto o llm-dlp está no ar. Depois de
+  reiniciar, são examinados de novo com o que se sabe na hora.
 - Por enquanto, só a API da Anthropic (ver [Acoplar outra API de LLM](desenvolvimento.md#acoplar-outra-api-de-llm)).
 
 ## Decisões de projeto
@@ -69,9 +77,10 @@ Comportamentos que são escolhas, não defeitos:
 | Só IPs de rede interna são mascarados | IP público (de um serviço na internet) não identifica a empresa nem uma pessoa, e mascará-lo atrapalharia o diagnóstico de rede |
 | Domínios públicos não são mascarados | `github.com`, `pypi.org`, nomes de arquivo (`config.py`) têm formato de domínio; mascará-los piora as respostas sem proteger nada. Só os `dominios_internos` são mascarados |
 | E-mail precisa de domínio com ponto | `joao@localhost`, `root@servidor` e `ssh usuario@host` não são tratados como e-mail (seriam falsos positivos em comandos). E-mail escrito por extenso (`joao [at] empresa`) também não é reconhecido |
-| `WebFetch` e `WebSearch` recebem pseudônimos | O que vai para a internet não pode levar o dado real. Efeito: pesquisar na web algo mascarado não acha nada |
+| `WebFetch`, `WebSearch` e conectores do claude.ai recebem pseudônimos | O que vai para fora da máquina não pode levar o dado real. Efeito: pesquisar na web ou num conector algo mascarado não acha nada |
+| O que vem da web não é lembrado | Uma senha de exemplo numa página não é segredo seu. É mascarada onde aparece, mas não vira segredo em todo lugar |
 | Pseudônimo com colisão não volta ao real | Dois valores com o mesmo pseudônimo: a ida continua mascarada, mas a volta não é feita, para não trocar pelo valor errado. A ferramenta recebe o pseudônimo e pode falhar |
-| Valor aprendido depois de já ter passado | Se um valor passou em claro numa mensagem e só depois foi reconhecido, ele é mascarado dali em diante, inclusive no histórico reenviado (o cache é refeito uma vez). Mas o que já foi enviado não volta: o modelo pode ligar o pseudônimo ao valor que viu antes |
+| Valor aprendido depois de já ter passado | Se um valor passou em claro numa mensagem e só depois foi reconhecido, ele é mascarado dali em diante, só em texto novo. A mensagem antiga continua saindo igual nos reenvios: ela já foi enviada assim, e mudá-la regravaria a conversa inteira no cache sem proteger nada. O modelo pode ligar o pseudônimo ao valor que viu antes |
 
 ## Conectores e MCP
 

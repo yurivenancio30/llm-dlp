@@ -13,8 +13,14 @@ import (
 
 // aplicar resolve sobreposições (fica o trecho mais longo) e troca por pseudônimos.
 func (m *Masker) aplicar(s string, achados []Achado) (string, []Entrada) {
+	t, e, _ := m.aplicarT(s, achados)
+	return t, e
+}
+
+// aplicarT é o aplicar que devolve também os trechos trocados (ver enviados.go).
+func (m *Masker) aplicarT(s string, achados []Achado) (string, []Entrada, []trecho) {
 	if len(achados) == 0 {
-		return s, nil
+		return s, nil, nil
 	}
 	sort.Slice(achados, func(i, j int) bool {
 		if achados[i].Ini != achados[j].Ini {
@@ -24,6 +30,7 @@ func (m *Masker) aplicar(s string, achados []Achado) (string, []Entrada) {
 	})
 	var b strings.Builder
 	var entradas []Entrada
+	var ts []trecho
 	pos := 0
 	for _, a := range achados {
 		if a.Ini < pos {
@@ -32,16 +39,41 @@ func (m *Masker) aplicar(s string, achados []Achado) (string, []Entrada) {
 		ps := m.Pseudonimo(a.Tipo, a.Real)
 		b.WriteString(s[pos:a.Ini])
 		b.WriteString(ps)
-		entradas = append(entradas, Entrada{ps, a.Real, a.Tipo})
-		if a.Tipo == "email" { // o modelo às vezes cita só o domínio: "dxxxx.invalid" volta a ser o domínio real
-			if i, j := strings.LastIndexByte(ps, '@'), strings.LastIndexByte(a.Real, '@'); i >= 0 && j >= 0 {
-				entradas = append(entradas, Entrada{ps[i+1:], a.Real[j+1:], "dominio"})
-			}
-		}
+		entradas = entradaDe(entradas, ps, a.Real, a.Tipo)
+		ts = append(ts, trecho{a.Ini, a.Fim, a.Tipo, ps})
 		pos = a.Fim
 	}
 	b.WriteString(s[pos:])
-	return b.String(), entradas
+	return b.String(), entradas, ts
+}
+
+func entradaDe(entradas []Entrada, ps, real, tipo string) []Entrada {
+	entradas = append(entradas, Entrada{ps, real, tipo})
+	if tipo == "email" { // o modelo às vezes cita só o domínio: "dxxxx.invalid" volta a ser o domínio real
+		if i, j := strings.LastIndexByte(ps, '@'), strings.LastIndexByte(real, '@'); i >= 0 && j >= 0 {
+			entradas = append(entradas, Entrada{ps[i+1:], real[j+1:], "dominio"})
+		}
+	}
+	return entradas
+}
+
+// remontar refaz o texto enviado antes a partir dos trechos guardados: sai igual, byte a
+// byte, mesmo que hoje se saiba mais (ver enviados.go). Trecho inválido: não remonta.
+func remontar(s string, ts []trecho) (string, []Entrada, bool) {
+	var b strings.Builder
+	var entradas []Entrada
+	pos := 0
+	for _, t := range ts {
+		if t.Ini < pos || t.Fim <= t.Ini || t.Fim > len(s) || t.Pseudo == "" || t.Tipo == "" {
+			return "", nil, false
+		}
+		b.WriteString(s[pos:t.Ini])
+		b.WriteString(t.Pseudo)
+		entradas = entradaDe(entradas, t.Pseudo, s[t.Ini:t.Fim], t.Tipo)
+		pos = t.Fim
+	}
+	b.WriteString(s[pos:])
+	return b.String(), entradas, true
 }
 
 // Pseudonimo devolve o pseudônimo estável de um valor real de um tipo.

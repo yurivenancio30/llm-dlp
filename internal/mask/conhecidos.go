@@ -232,19 +232,6 @@ func (c *conhecidos) contemDesde(s string, g int) bool {
 	return achou
 }
 
-// marcadores: palavras que aparecem no lugar de uma senha em exemplos e documentação
-// ("http://user:<marcador>@host"). São mascaradas onde aparecem, mas não são lembradas: lembrá-las
-// faria toda ocorrência da palavra virar segredo e reescreveria o histórico inteiro da conversa.
-// Qualquer outra senha, inclusive fraca e só de letras, é lembrada.
-var marcadores = map[string]bool{"password": true, "passwd": true, "pass": true, "pwd": true, "senha": true, "secret": true, "segredo": true, "changeme": true, "change_me": true, "example": true, "exemplo": true, "user": true, "username": true, "usuario": true, "token": true, "placeholder": true, "dummy": true, "sample": true, "xxx": true, "xxxx": true, "xxxxx": true, "yyy": true, "foo": true, "bar": true, "baz": true, "test": true, "teste": true, "mypass": true, "yourpass": true, "your_password": true, "sua_senha": true, "redacted": true, "hidden": true, "oculto": true, "none": true, "null": true, "empty": true}
-
-// segredoLembravel: o valor pode ser lembrado como segredo (não é um marcador de exemplo).
-// Vale também na consulta, para ignorar marcadores aprendidos por versões antigas e ainda
-// guardados em vistos.json.
-func segredoLembravel(v string) bool {
-	return !marcadores[strings.ToLower(v)]
-}
-
 func temDigito(s string) bool {
 	for i := 0; i < len(s); i++ {
 		if s[i] >= '0' && s[i] <= '9' {
@@ -358,7 +345,7 @@ func (m *Masker) acharConhecidos(s string, numLongo bool, add func(ini, fim int,
 				continue
 			}
 			if m.vistos.TemTamanho(len(v)) {
-				if tp, ok := m.vistos.Tipo(m.p.ID("visto", "s:"+v)); ok && segredoLembravel(v) {
+				if tp, ok := m.vistos.Tipo(m.p.ID("visto", "s:"+v)); ok {
 					achei(ix[0], ix[1], tp)
 					continue
 				}
@@ -386,7 +373,7 @@ func (m *Masker) acharConhecidos(s string, numLongo bool, add func(ini, fim int,
 					if fim-ini < 8 || (ini == 0 && fim == len(v)) || !m.vistos.TemTamanho(fim-ini) {
 						continue
 					}
-					if tp, ok := m.vistos.Tipo(m.p.ID("visto", "s:"+v[ini:fim])); ok && segredoLembravel(v[ini:fim]) {
+					if tp, ok := m.vistos.Tipo(m.p.ID("visto", "s:"+v[ini:fim])); ok {
 						achei(ix[0]+ini, ix[0]+fim, tp)
 						break pedacos
 					}
@@ -413,12 +400,6 @@ func (m *Masker) aprender(tipo, real string) {
 	// código curto ou sem dígito ("jsilva", "ana") só é mascarado junto do rótulo: lembrá-lo
 	// faria toda palavra igual virar dado sensível
 	if (tipo == "usuario" || tipo == "doc") && (len(real) < 5 || !temDigito(real)) {
-		return
-	}
-	// senha só de letras ("admin", uma palavra de exemplo numa URL) é mascarada onde apareceu, mas
-	// não é lembrada: lembrá-la faria toda ocorrência da palavra, em qualquer texto, virar
-	// segredo, e reescreveria o histórico inteiro da conversa (quebrando o cache)
-	if tipo == "segredo" && !segredoLembravel(real) {
 		return
 	}
 	if m.conh.aprender(tipo, real) && m.vistos != nil {

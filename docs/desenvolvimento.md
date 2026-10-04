@@ -31,7 +31,7 @@ internal/proxy/       o servidor que fica entre o Claude Code e a API
 
 internal/mask/        detecção e troca por pseudônimos
   masker.go             o tipo Masker e a sua construção
-  mascarar.go           Mascarar: porta de entrada, com memória de resultados
+  mascarar.go           Mascarar: porta de entrada, com memória de resultados; Lote congela o que saiu
   detectar.go           Detectar: junta os detectores; texto grande vai em pedaços
   detectores_formato.go   e-mail, IP, hostname, CPF, CNPJ, telefone, cartão, tokens
   detectores_senhas.go    senhas comuns
@@ -42,12 +42,14 @@ internal/mask/        detecção e troca por pseudônimos
   validadores.go        dígitos verificadores (CPF, CNPJ, título, IBAN...)
   conhecidos.go         valores já mascarados são reconhecidos depois (em memória)
   vistos.go             os mesmos valores em disco, só como hash
+  enviados.go           o que cada texto já enviado levou (para sair igual nos reenvios)
   pessoas.go            registro de pessoas (nomes, e-mails, códigos), só como hash
   chave.go              a chave secreta e os identificadores derivados dela
   pseudonimos.go        troca dos achados por pseudônimos
   desmascarar.go        troca de volta, inclusive em resposta que chega em pedaços
 
 internal/ocr/         leitura de texto em imagem e PDF (tesseract, poppler)
+internal/versao/      versão e commit (o Makefile grava o commit no binário)
 ```
 
 Os testes ficam ao lado do código que testam, com o mesmo nome e `_test.go` no fim
@@ -59,14 +61,17 @@ tempo) e `estresse_test.go` (testes de carga).
 
 ```
 proxy.ServeHTTP                      recebe a requisição
- ├ mascararCorpo (requisicao.go)     percorre o JSON e chama Mascarar em cada texto
- │  └ mask.Mascarar (mascarar.go)    já está na memória? devolve. senão:
+ ├ mascararCorpo (requisicao.go)     1ª passada: junta os textos e os mascara antes (Aquecer),
+ │                                   para todo valor aprendido na requisição já valer na montagem
+ │                                   2ª passada: chama Lote.Mascarar em cada texto, em ordem
+ │  └ mask.Mascarar (mascarar.go)    já saiu antes (memória ou enviados.log)? sai igual.
+ │                                   já está na memória e ainda vale? devolve. senão:
  │     ├ Detectar (detectar.go)      roda os detectores e junta os achados
  │     │  ├ detectores_*.go          formato, senhas, extras
  │     │  ├ campos*.go               nome do campo
  │     │  └ conhecidos.go            valores já vistos
  │     └ aplicar (pseudonimos.go)    troca cada achado pelo pseudônimo
- ├ envia para a API
+ ├ envia para a API e congela os textos (Lote.Congelar)
  └ desmascararSSE (resposta.go)      troca os pseudônimos de volta, pedaço a pedaço
 ```
 

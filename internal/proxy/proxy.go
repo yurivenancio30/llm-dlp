@@ -18,12 +18,13 @@ import (
 
 	"github.com/yurivenancio30/llm-dlp/internal/config"
 	"github.com/yurivenancio30/llm-dlp/internal/mask"
+	"github.com/yurivenancio30/llm-dlp/internal/versao"
 )
 
 // O servidor HTTP: recebe a requisição do Claude Code, manda mascarada para a API e devolve
 // a resposta desmascarada.
 
-const Versao = "0.1.0"
+const Versao = versao.Versao
 
 type Proxy struct {
 	cfg     config.Config
@@ -57,7 +58,7 @@ var hopByHop = map[string]bool{"connection": true, "keep-alive": true, "proxy-co
 func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/__llm-dlp/saude" {
 		w.Header().Set("content-type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{"ok": true, "servico": "llm-dlp", "versao": Versao, "pid": os.Getpid(),
+		json.NewEncoder(w).Encode(map[string]any{"ok": true, "servico": "llm-dlp", "versao": Versao, "commit": versao.Commit, "pid": os.Getpid(),
 			"requisicoes": p.reqs.Load(), "no_ar_desde": p.inicio.Format(time.RFC3339)})
 		return
 	}
@@ -79,8 +80,9 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var entradas []mask.Entrada
+	var lote *mask.Lote
 	if len(bytes.TrimSpace(corpo)) > 0 {
-		novo, ents, err := p.mascararCorpo(r, corpo)
+		novo, ents, l, err := p.mascararCorpo(r, corpo)
 		if err != nil {
 			var obrig erroObrigatorio
 			if p.cfg.FalharFechado || errors.As(err, &obrig) {
@@ -89,7 +91,7 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 			p.log.Printf("AVISO %s %s: enviado sem máscara (%v)", r.Method, r.URL.Path, err)
 		} else {
-			corpo, entradas = novo, ents
+			corpo, entradas, lote = novo, ents, l
 			if strings.HasPrefix(r.URL.Path, "/v1/messages") && !strings.Contains(r.URL.Path, "count_tokens") && len(corpo) > 2000 {
 				c := corpo
 				p.ultima.Store(&c)
@@ -118,6 +120,10 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "llm-dlp: falha ao contatar a API: "+err.Error(), http.StatusBadGateway)
 		p.log.Printf("ERRO %s %s: upstream: %v", r.Method, r.URL.Path, err)
 		return
+	}
+	if lote != nil {
+		// a API recebeu: daqui em diante, estes textos saem sempre iguais (cache)
+		lote.Congelar()
 	}
 	defer resp.Body.Close()
 	for k, vs := range resp.Header {

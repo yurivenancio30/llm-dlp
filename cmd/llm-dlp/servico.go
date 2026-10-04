@@ -17,6 +17,7 @@ import (
 
 	"github.com/yurivenancio30/llm-dlp/internal/config"
 	"github.com/yurivenancio30/llm-dlp/internal/proxy"
+	"github.com/yurivenancio30/llm-dlp/internal/versao"
 )
 
 // Comandos do serviço: servir, supervisionar, garantir, verificar, status, parar.
@@ -34,7 +35,13 @@ func servir() error {
 	if err != nil {
 		return err
 	}
-	lg.Printf("no ar em %s (pid %d, versão %s)", endereco(cfg), os.Getpid(), proxy.Versao)
+	lg.Printf("no ar em %s (pid %d, versão %s)", endereco(cfg), os.Getpid(), versao.Completa())
+	// o que já saiu à API sai igual nos reenvios, também depois deste reinício (cache).
+	// Se a configuração ou a versão mudou, o registro recomeça.
+	imp, _ := json.Marshal(cfg)
+	if err := m.UsarEnviados(config.Caminho("enviados.log"), versao.Completa()+"\x00"+string(imp)); err != nil {
+		lg.Printf("AVISO enviados.log: %v (o histórico pode ser regravado no cache uma vez)", err)
+	}
 	go vigiarEmergencia(false) // se o administrador ligar a emergência, sai e o supervisor troca de modo
 	srv := &http.Server{Handler: proxy.Novo(cfg, m, vistos, lg), ReadHeaderTimeout: 30 * time.Second}
 	return srv.Serve(ln)
@@ -213,7 +220,32 @@ func status() error {
 	defer r.Body.Close()
 	b, _ := io.ReadAll(r.Body)
 	fmt.Println("no ar:", string(b))
+	var info struct {
+		Commit string `json:"commit"`
+		PID    int    `json:"pid"`
+	}
+	json.Unmarshal(b, &info)
+	if aviso := binarioNovo(info.Commit, info.PID); aviso != "" {
+		fmt.Println("⚠️  " + aviso + ": rode llm-dlp parar com o Claude Code fechado para aplicar (ele volta sozinho na próxima mensagem)")
+	}
 	return nil
+}
+
+// binarioNovo diz se o processo no ar não é o binário instalado: outro commit, ou o
+// arquivo do executável dele foi trocado depois que ele subiu.
+func binarioNovo(commit string, pid int) string {
+	if commit != versao.Commit {
+		if commit == "" {
+			commit = "sem commit (versão antiga)"
+		}
+		return fmt.Sprintf("binário novo instalado (no ar: %s; instalado: %s)", commit, versao.Commit)
+	}
+	if pid > 0 {
+		if alvo, err := os.Readlink(fmt.Sprintf("/proc/%d/exe", pid)); err == nil && strings.HasSuffix(alvo, " (deleted)") {
+			return "binário novo instalado (o arquivo do processo no ar foi substituído)"
+		}
+	}
+	return ""
 }
 
 func parar() error {

@@ -17,7 +17,7 @@ Arquivo `~/.config/llm-dlp/config.json`. Depois de mudar, rode `llm-dlp parar`.
 | `termos` | Palavras exatas a mascarar | vazio |
 | `detectores_desligados` | Detectores a desligar (lista abaixo) | vazio |
 | `detectores_opcionais` | Detectores a ligar. Hoje só `quase`: sexo, idade, estado civil, profissão, nacionalidade, renda, latitude/longitude | vazio |
-| `ferramentas_sem_desmascarar` | Ferramentas que recebem só pseudônimos | `WebFetch`, `WebSearch` |
+| `ferramentas_sem_desmascarar` | Ferramentas da web: recebem só pseudônimos, e o que trazem não é lembrado. Os conectores do claude.ai (`mcp__claude_ai_*`) recebem só pseudônimos sempre, fora desta lista | `WebFetch`, `WebSearch` |
 | `documentos_sem_contexto` | Mascara CPF e CNPJ só com dígitos mesmo sem a palavra "cpf"/"cnpj" por perto, se o dígito verificador conferir. Cerca de 1 em 100 números aleatórios desse tamanho também confere e é mascarado a mais | `true` |
 | `falhar_fechado` | Recusa o que não sabe mascarar. Desligado, uma falha ao mascarar manda a requisição **sem máscara** (só fica um aviso no log). Imagem e PDF que não deu para verificar são recusados de qualquer jeito. Não recomendado desligar | `true` |
 | `ocr` | `modo` (`mascarar`, `bloquear` ou `permitir`), `idioma`, `max_paginas`, caminhos do tesseract e do poppler | `mascarar`, `por`, 30 |
@@ -35,7 +35,7 @@ Nomes aceitos em `detectores_desligados`: `segredo`, `email`, `ip`, `host`, `cpf
 | `llm-dlp instalar` | Instala e configura tudo, explicando cada passo |
 | `sudo llm-dlp instalar-trava` | O Claude Code só funciona passando pelo llm-dlp |
 | `llm-dlp desinstalar` / `sudo llm-dlp desinstalar-trava` | Desfaz |
-| `llm-dlp status` | Mostra se está no ar e em que modo |
+| `llm-dlp status` | Mostra se está no ar, em que modo e qual commit. Avisa se há um binário novo instalado que ainda não está no ar |
 | `llm-dlp parar` | Para o proxy (ele volta na próxima mensagem) |
 | `sudo llm-dlp emergencia [30m\|sair]` | Libera o Claude sem máscara por tempo limitado |
 | `llm-dlp importar-pessoas ARQ.csv --grupo COD:NOME:EMAIL` | Ensina pessoas |
@@ -43,7 +43,30 @@ Nomes aceitos em `detectores_desligados`: `segredo`, `email`, `ip`, `host`, `cpf
 | `llm-dlp testar < arquivo` | Mostra a versão mascarada de um texto |
 | `llm-dlp testar-midia ARQ DIR` | Processa uma imagem ou PDF e grava o resultado em DIR |
 | `llm-dlp medir ARQ.jsonl` | Tempo e cobertura sobre uma sessão antiga do Claude Code (só contagens) |
-| `llm-dlp versao` | Versão |
+| `llm-dlp versao` | Versão e commit do binário |
 
 `garantir`, `verificar`, `servir` e `supervisionar` são internos: quem chama são os ganchos
 do Claude Code e o supervisor.
+
+## Atualizar o llm-dlp
+
+Instalar o binário novo não troca o que está no ar: o processo antigo continua rodando até
+ser parado.
+
+1. Compile e instale (o anterior fica guardado):
+
+   ```bash
+   make build
+   cp ~/.local/bin/llm-dlp ~/.local/bin/llm-dlp.bak-$(date +%Y%m%d-%H%M%S)
+   install -m 755 bin/llm-dlp ~/.local/bin/llm-dlp.new && mv ~/.local/bin/llm-dlp.new ~/.local/bin/llm-dlp
+   ~/.local/bin/llm-dlp versao        # mostra o commit novo
+   ```
+
+2. **Feche o Claude Code** (todas as janelas e sessões) e, num terminal, rode
+   `llm-dlp parar`. Parar com uma conversa aberta deixa essa conversa sem resposta.
+   Confira com `pgrep -a llm-dlp` que não sobrou nenhum processo.
+3. Abra o Claude Code: o gancho da sessão sobe o binário novo. Confira com `llm-dlp status`
+   (o commit tem que ser o novo, e sem aviso).
+
+Depois de atualizar, a primeira mensagem de cada conversa regrava o cache uma vez (o
+registro do que já saiu recomeça a cada versão).

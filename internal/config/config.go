@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // PadraoExtra é uma regex própria do usuário, com um rótulo para o pseudônimo.
@@ -63,7 +64,15 @@ type Config struct {
 	FerramentasSemDesmascarar []string `json:"ferramentas_sem_desmascarar"`
 }
 
+// PrefixoConectores: ferramentas dos conectores do claude.ai (Gmail, Drive...). Rodam fora
+// da máquina, nos servidores da Anthropic: a entrada delas também segue com pseudônimos.
+// Vale sempre, mesmo que o config.json tenha a própria lista.
+const PrefixoConectores = "mcp__claude_ai_"
+
 func (c Config) SemDesmascarar(ferramenta string) bool {
+	if strings.HasPrefix(ferramenta, PrefixoConectores) {
+		return true
+	}
 	for _, f := range c.FerramentasSemDesmascarar {
 		if f == ferramenta {
 			return true

@@ -8,7 +8,7 @@ import (
 
 	"github.com/yurivenancio30/llm-dlp/internal/config"
 	"github.com/yurivenancio30/llm-dlp/internal/mask"
-	"github.com/yurivenancio30/llm-dlp/internal/proxy"
+	"github.com/yurivenancio30/llm-dlp/internal/versao"
 )
 
 // llm-dlp: ponto de entrada e lista de comandos.
@@ -85,7 +85,7 @@ func main() {
 	case "desinstalar-trava":
 		err = instalarTrava(true)
 	case "versao", "--version":
-		fmt.Println("llm-dlp", proxy.Versao)
+		fmt.Println("llm-dlp", versao.Completa())
 	default:
 		fmt.Print(ajuda)
 		os.Exit(2)

@@ -223,26 +223,3 @@ func TestMemoRefeitoQuandoAprendeOutraGrafia(t *testing.T) {
 		t.Fatalf("o texto antigo continuou em claro depois de o valor ser aprendido: %q", out)
 	}
 }
-
-// Um marcador de exemplo (a palavra que a documentação põe no lugar da senha) não é lembrado;
-// uma senha fraca, só de letras, é.
-func TestMarcadorNaoViraSegredoLembrado(t *testing.T) {
-	dir := t.TempDir()
-	vs, _ := CarregarVistos(dir + "/v.json")
-	m, _ := NovoMasker(novoTeste(t).cfg, chaveTeste, nil, vs)
-	m.Mascarar("export HTTPS_PROXY=http://username:password@proxy.example.com:8080")
-	if out, ents := m.Mascarar("a palavra password aparece em todo lugar"); len(ents) > 0 {
-		t.Fatalf("marcador de exemplo foi lembrado: %q", out)
-	}
-	m.Mascarar("mysql://app:abacaxi@db1:3306/base")
-	if out, _ := m.Mascarar("tentei abacaxi e falhou"); strings.Contains(out, "abacaxi") {
-		t.Fatalf("senha fraca, só de letras, deixou de ser lembrada: %q", out)
-	}
-	vs.Marcar(m.p.ID("visto", "s:password"), "segredo") // como uma versão antiga teria guardado
-	vs.SalvarSeSujo()
-	vs2, _ := CarregarVistos(dir + "/v.json")
-	m2, _ := NovoMasker(m.cfg, chaveTeste, nil, vs2)
-	if out, ents := m2.Mascarar("a palavra password aparece em todo lugar"); len(ents) > 0 {
-		t.Fatalf("marcador guardado por versão antiga continuou sendo mascarado: %q", out)
-	}
-}

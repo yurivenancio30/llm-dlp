@@ -13,11 +13,15 @@ import (
 // Detectar: texto comum é examinado inteiro; texto grande, em pedaços paralelos.
 
 // Detectar devolve os trechos sensíveis de s (sem sobreposição resolvida).
-func (m *Masker) Detectar(s string) []Achado {
+func (m *Masker) Detectar(s string) []Achado { return m.detectar(s, true) }
+
+// detectar com aprende=false não lembra nada do que achar (conteúdo da internet): só
+// mascara onde aparece.
+func (m *Masker) detectar(s string, aprende bool) []Achado {
 	if len(s) > grandeMin && !blocoLongo(s, margemGrande) {
-		return m.detectarGrande(s)
+		return m.detectarGrande(s, aprende)
 	}
-	return m.detectarInteiro(s)
+	return m.detectarInteiroA(s, aprende)
 }
 
 // Texto grande é examinado em pedaços, em paralelo. Cada pedaço é examinado junto com uma
@@ -54,7 +58,9 @@ func blocoLongo(s string, limite int) bool {
 }
 
 // detectarInteiro examina s de uma vez só.
-func (m *Masker) detectarInteiro(s string) []Achado {
+func (m *Masker) detectarInteiro(s string) []Achado { return m.detectarInteiroA(s, true) }
+
+func (m *Masker) detectarInteiroA(s string, aprende bool) []Achado {
 	out := m.detectarBase(s)
 	if !m.cfg.Desligado("campo") {
 		m.acharTabelas(s, func(ini, fim int, tipo string) { out = append(out, Achado{ini, fim, tipo, s[ini:fim]}) })
@@ -64,7 +70,9 @@ func (m *Masker) detectarInteiro(s string) []Achado {
 	// lugar (ver conhecidos.go): sem isto, vazariam quando o modelo os repete sem a
 	// palavra-chave por perto e o histórico é reenviado.
 	for _, a := range out {
-		m.aprender(a.Tipo, a.Real)
+		if aprende {
+			m.aprender(a.Tipo, a.Real)
+		}
 	}
 	numLongo, _ := perfilNumerico(s)
 	m.acharConhecidos(s, numLongo, func(ini, fim int, tipo string) {
@@ -76,7 +84,7 @@ func (m *Masker) detectarInteiro(s string) []Achado {
 func branco(b byte) bool { return b == ' ' || b == '\n' || b == '\t' || b == '\r' }
 
 // detectarGrande examina s em pedaços paralelos (ver o comentário acima).
-func (m *Masker) detectarGrande(s string) []Achado {
+func (m *Masker) detectarGrande(s string, aprende bool) []Achado {
 	type pedaco struct{ ini, fim, jIni, jFim int } // miolo [ini,fim) e janela [jIni,jFim)
 	// depois: primeira posição >= i que vem logo depois de um espaço em branco (ou o fim)
 	depois := func(i int) int {
@@ -106,7 +114,7 @@ func (m *Masker) detectarGrande(s string) []Achado {
 		ini = fim
 	}
 	if len(ps) < 2 {
-		return m.detectarInteiro(s)
+		return m.detectarInteiroA(s, aprende)
 	}
 	rodar := func(f func(janela string, add func(ini, fim int, tipo string))) []Achado {
 		res := make([][]Achado, len(ps))
@@ -150,7 +158,9 @@ func (m *Masker) detectarGrande(s string) []Achado {
 	// primeiro aprende TUDO, depois procura os valores conhecidos no texto inteiro: um valor
 	// ensinado no fim do texto é reconhecido também no começo
 	for _, a := range out {
-		m.aprender(a.Tipo, a.Real)
+		if aprende {
+			m.aprender(a.Tipo, a.Real)
+		}
 	}
 	return append(out, rodar(func(janela string, add func(ini, fim int, tipo string)) {
 		numLongo, _ := perfilNumerico(janela)

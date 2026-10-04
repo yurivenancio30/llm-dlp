@@ -16,6 +16,7 @@ import (
 
 	"github.com/yurivenancio30/llm-dlp/internal/config"
 	"github.com/yurivenancio30/llm-dlp/internal/proxy"
+	"github.com/yurivenancio30/llm-dlp/internal/versao"
 )
 
 // Modo emergência: libera o Claude sem máscara por tempo limitado (exige sudo).
@@ -131,7 +132,7 @@ func servirEmergencia(ate time.Time) error {
 	mux.HandleFunc("/__llm-dlp/saude", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("content-type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{"ok": true, "servico": "llm-dlp", "modo": "emergencia",
-			"ate": ate.Format(time.RFC3339), "versao": proxy.Versao, "pid": os.Getpid()})
+			"ate": ate.Format(time.RFC3339), "versao": proxy.Versao, "commit": versao.Commit, "pid": os.Getpid()})
 	})
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		lg.Printf("EMERGÊNCIA (sem máscara): %s %s", r.Method, r.URL.Path)
