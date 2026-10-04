@@ -35,8 +35,6 @@ type resultado struct {
 	entradas []Entrada
 	trechos  []trecho
 	gen      int // quantos "valores conhecidos" existiam quando foi calculado
-	// congelado: já saiu numa requisição; nunca mais muda (ver enviados.go)
-	congelado bool
 	// semAprender: calculado sem aprender (conteúdo da internet)
 	semAprender bool
 }
@@ -64,6 +62,9 @@ type Masker struct {
 	memo  map[[32]byte]resultado
 	velho map[[32]byte]resultado // geração anterior do memo
 	bytes int
+	// o que já saiu, por posição na conversa (ver Lote); duas gerações, como o memo
+	cong, congVelho map[Posicao]resultado
+	congBytes       int
 }
 
 func NovoMasker(cfg config.Config, chave []byte, pessoas *Pessoas, vistos *Vistos) (*Masker, error) {
@@ -76,7 +77,7 @@ func NovoMasker(cfg config.Config, chave []byte, pessoas *Pessoas, vistos *Visto
 	// Kubernetes, que guarda tudo em base64). O padrão da biblioteca é 0 (não decodifica).
 	d.MaxDecodeDepth = 2
 	m := &Masker{cfg: cfg, p: NovoPseudo(chave), leaks: d, pessoas: pessoas, vistos: vistos, conh: novosConhecidos(),
-		memo: map[[32]byte]resultado{}, rotTermo: map[string]string{},
+		memo: map[[32]byte]resultado{}, cong: map[Posicao]resultado{}, rotTermo: map[string]string{},
 		chaveB64: base64.StdEncoding.EncodeToString(chave)}
 	// vocabulário dos nomes de campo: o padrão mais o que o usuário acrescentou
 	m.vocab = vocabularioPadrao()

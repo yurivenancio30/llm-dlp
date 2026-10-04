@@ -2,9 +2,14 @@ package proxy
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"hash"
+	"io"
 	"net/http"
+	"sort"
 	"strings"
 
 	"github.com/yurivenancio30/llm-dlp/internal/config"
@@ -28,21 +33,25 @@ func (p *Proxy) mascararCorpo(r *http.Request, corpo []byte) ([]byte, []mask.Ent
 	// antes, em paralelo quando são muitos. Assim, todo valor aprendido nesta requisição já
 	// vale quando ela é montada, e a requisição seguinte não muda nada do que esta enviou.
 	col := &coleta{}
-	wc := walker{cfg: p.cfg, col: col}
+	wc := walker{cfg: p.cfg, col: col, pos: &posicao{}}
 	if anthropic {
 		wc.requisicaoAnthropic(v)
 	} else {
+		wc.pos.bloco = depois(mask.Posicao{}, v)
 		wc.generico(v)
 	}
-	lote.Aquecer(col.locais, col.daWeb)
+	lote.Aquecer(col.itens)
 
 	// 2ª passada: monta, em ordem
 	var ents []mask.Entrada
 	var errMidia error
-	w := walker{cfg: p.cfg, lote: lote, md: p.midia, ents: &ents, err: &errMidia}
+	// as posições já foram calculadas na 1ª passada (os blocos ainda estavam intactos)
+	w := walker{cfg: p.cfg, lote: lote, md: p.midia, ents: &ents, err: &errMidia, pos: &posicao{seq: wc.pos.seq}}
 	if anthropic {
 		v = w.requisicaoAnthropic(v)
 	} else {
+		// fora de /v1/messages não há conversa: congela só o reenvio do corpo inteiro igual
+		w.pos.bloco = depois(mask.Posicao{}, v)
 		v = w.generico(v)
 	}
 	if errMidia != nil {
@@ -58,8 +67,123 @@ func (p *Proxy) mascararCorpo(r *http.Request, corpo []byte) ([]byte, []mask.Ent
 	return bytes.TrimRight(buf.Bytes(), "\n"), ents, lote, nil
 }
 
-// coleta: os textos que a montagem vai mascarar, separados pela origem.
-type coleta struct{ locais, daWeb []string }
+// coleta: os textos que a montagem vai mascarar, com a posição e a origem de cada um.
+type coleta struct{ itens []mask.ItemLote }
+
+// posicao: onde o walker está na conversa. Cada bloco (ferramenta, bloco do system, bloco
+// de mensagem) encadeia o hash do anterior, na ordem em que a API monta o cache: tools,
+// system, messages. Os textos de um bloco têm a posição de tudo o que vem antes dele. Assim
+// o congelamento (ver mask.Lote) vale só para o reenvio exato daquele ponto da conversa.
+//
+// A posição de um texto é o hash do seu bloco (que cobre tudo o que vem antes e o bloco
+// inteiro) mais a ordem do texto dentro do bloco, num percurso em ordem fixa. Assim o texto
+// de um bloco que já saiu é reconhecido sem calcular o hash dele de novo.
+type posicao struct {
+	atual mask.Posicao
+	// seq: a posição depois de cada bloco, na ordem; a 1ª passada calcula, a 2ª reaproveita
+	seq []mask.Posicao
+	i   int
+	// bloco e n: o bloco atual e quantos textos dele já foram vistos
+	bloco mask.Posicao
+	n     uint64
+}
+
+// doTexto: a posição do próximo texto do bloco atual.
+func (p *posicao) doTexto() mask.Posicao {
+	var b [40]byte
+	copy(b[:], p.bloco[:])
+	binary.LittleEndian.PutUint64(b[32:], p.n)
+	p.n++
+	return sha256.Sum256(b[:])
+}
+
+// depois: a posição seguinte a um bloco (calculada antes de o bloco ser mascarado).
+func depois(ant mask.Posicao, v any) mask.Posicao {
+	h := sha256.New()
+	h.Write(ant[:])
+	hashJSON(h, v)
+	var out mask.Posicao
+	copy(out[:], h.Sum(nil))
+	return out
+}
+
+// hashJSON escreve v em h numa forma estável: chaves em ordem e sem cache_control (o
+// marcador de cache muda de lugar a cada mensagem e não faz parte do conteúdo).
+func hashJSON(h hash.Hash, v any) {
+	var n [8]byte
+	escrever := func(tag byte, s string) {
+		binary.LittleEndian.PutUint64(n[:], uint64(len(s)))
+		h.Write([]byte{tag})
+		h.Write(n[:])
+		io.WriteString(h, s)
+	}
+	switch x := v.(type) {
+	case string:
+		escrever('s', x)
+	case json.Number:
+		escrever('n', string(x))
+	case bool:
+		escrever('b', fmt.Sprint(x))
+	case nil:
+		h.Write([]byte{'z'})
+	case []any:
+		h.Write([]byte{'['})
+		for _, e := range x {
+			hashJSON(h, e)
+		}
+		h.Write([]byte{']'})
+	case map[string]any:
+		ks := make([]string, 0, len(x))
+		for k := range x {
+			if k != "cache_control" {
+				ks = append(ks, k)
+			}
+		}
+		sort.Strings(ks)
+		h.Write([]byte{'{'})
+		for _, k := range ks {
+			escrever('k', k)
+			hashJSON(h, x[k])
+		}
+		h.Write([]byte{'}'})
+	default:
+		escrever('?', fmt.Sprint(x))
+	}
+}
+
+// unidade: processa v como um bloco da conversa, com a posição encadeada. Só os blocos de
+// primeiro nível encadeiam: o conteúdo de um tool_result é parte do bloco dele.
+func (w walker) unidade(v any, f func(w walker)) {
+	if w.dentro {
+		f(w)
+		return
+	}
+	var prox mask.Posicao
+	if w.col != nil || w.pos.i >= len(w.pos.seq) {
+		prox = depois(w.pos.atual, v)
+		if w.col != nil {
+			w.pos.seq = append(w.pos.seq, prox)
+		}
+	} else {
+		prox = w.pos.seq[w.pos.i]
+	}
+	w.pos.i++
+	w.pos.bloco, w.pos.n = prox, 0
+	w.dentro = true
+	f(w)
+	w.pos.atual = prox
+}
+
+// chaves: as chaves de um objeto JSON em ordem (a de um mapa em Go é aleatória, e a ordem
+// dos textos de um bloco faz parte da posição de cada um).
+func chaves(x map[string]any) []string {
+	ks := make([]string, 0, len(x))
+	for k := range x {
+		ks = append(ks, k)
+	}
+	sort.Strings(ks)
+	return ks
+}
 
 // walker percorre o JSON de uma requisição e mascara as strings que podem levar
 // dado do usuário, guardando as entradas pseudônimo -> real usadas.
@@ -75,6 +199,9 @@ type walker struct {
 	idsWeb map[string]bool
 	// daWeb: o texto atual veio da internet (mascara, mas não aprende)
 	daWeb bool
+	pos   *posicao
+	// dentro: já dentro de um bloco (não encadeia de novo)
+	dentro bool
 }
 
 // midia trata um bloco de imagem/PDF; devolve os blocos que o substituem.
@@ -110,14 +237,10 @@ func ehBase64(b map[string]any) bool {
 
 func (w walker) s(v string) string {
 	if w.col != nil {
-		if w.daWeb {
-			w.col.daWeb = append(w.col.daWeb, v)
-		} else {
-			w.col.locais = append(w.col.locais, v)
-		}
+		w.col.itens = append(w.col.itens, mask.ItemLote{S: v, DaWeb: w.daWeb, Pos: w.pos.doTexto()})
 		return v
 	}
-	out, e := w.lote.Mascarar(v, w.daWeb)
+	out, e := w.lote.Mascarar(v, w.daWeb, w.pos.doTexto())
 	*w.ents = append(*w.ents, e...)
 	return out
 }
@@ -168,7 +291,20 @@ func (w walker) requisicaoAnthropic(v any) any {
 	if !ok {
 		return w.generico(v)
 	}
-	for k, val := range req {
+	// ordem fixa (a de um mapa em Go é aleatória): a mesma em que a API monta o cache
+	ks := make([]string, 0, len(req))
+	for k := range req {
+		if k != "tools" && k != "system" && k != "messages" {
+			ks = append(ks, k)
+		}
+	}
+	sort.Strings(ks)
+	ks = append([]string{"tools", "system", "messages"}, ks...)
+	for _, k := range ks {
+		val, ok := req[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "system":
 			req[k] = w.conteudo(val)
@@ -177,6 +313,8 @@ func (w walker) requisicaoAnthropic(v any) any {
 				w.idsWeb = w.idsDaWeb(msgs)
 				for _, mm := range msgs {
 					if msg, ok := mm.(map[string]any); ok {
+						// quem fala também faz parte da posição
+						w.pos.atual = depois(w.pos.atual, msg["role"])
 						msg["content"] = w.conteudo(msg["content"])
 					}
 				}
@@ -186,11 +324,13 @@ func (w walker) requisicaoAnthropic(v any) any {
 			if ts, ok := val.([]any); ok {
 				for _, t := range ts {
 					if tm, ok := t.(map[string]any); ok {
-						for tk, tv := range tm {
-							if tk != "name" && tk != "type" {
-								tm[tk] = w.generico(tv)
+						w.unidade(tm, func(w walker) {
+							for _, tk := range chaves(tm) {
+								if tk != "name" && tk != "type" {
+									tm[tk] = w.generico(tm[tk])
+								}
 							}
-						}
+						})
 					}
 				}
 			}
@@ -200,7 +340,7 @@ func (w walker) requisicaoAnthropic(v any) any {
 			// parâmetros e identificadores: não carregam dado do usuário e não podem mudar
 		default:
 			// campo que não conheço: mascara por precaução (falha para o lado seguro)
-			req[k] = w.generico(val)
+			w.unidade(val, func(w walker) { req[k] = w.generico(val) })
 		}
 	}
 	return req
@@ -210,7 +350,9 @@ func (w walker) requisicaoAnthropic(v any) any {
 func (w walker) conteudo(v any) any {
 	switch c := v.(type) {
 	case string:
-		return w.s(c)
+		var out string
+		w.unidade(c, func(w walker) { out = w.s(c) })
+		return out
 	case []any:
 		// uma imagem/PDF pode virar mais de um bloco (imagem coberta + nota, páginas)
 		out := make([]any, 0, len(c))
@@ -220,11 +362,13 @@ func (w walker) conteudo(v any) any {
 				out = append(out, b)
 				continue
 			}
-			if (bl["type"] == "image" || bl["type"] == "document") && ehBase64(bl) {
-				out = append(out, w.midia(bl)...)
-				continue
-			}
-			out = append(out, w.bloco(bl))
+			w.unidade(bl, func(w walker) {
+				if (bl["type"] == "image" || bl["type"] == "document") && ehBase64(bl) {
+					out = append(out, w.midia(bl)...)
+					return
+				}
+				out = append(out, w.bloco(bl))
+			})
 		}
 		return out
 	}
@@ -292,7 +436,7 @@ func (w walker) tudo(v any) any {
 			x[i] = w.tudo(x[i])
 		}
 	case map[string]any:
-		for k := range x {
+		for _, k := range chaves(x) {
 			x[k] = w.tudo(x[k])
 		}
 	}
@@ -312,7 +456,7 @@ func (w walker) generico(v any) any {
 		if t, _ := x["type"].(string); t == "thinking" || t == "redacted_thinking" || t == "image" {
 			return x
 		}
-		for k := range x {
+		for _, k := range chaves(x) {
 			if !chavesIntocaveis[k] && k != "data" {
 				x[k] = w.generico(x[k])
 			}

@@ -42,7 +42,7 @@ internal/mask/        detecção e troca por pseudônimos
   validadores.go        dígitos verificadores (CPF, CNPJ, título, IBAN...)
   conhecidos.go         valores já mascarados são reconhecidos depois (em memória)
   vistos.go             os mesmos valores em disco, só como hash
-  enviados.go           o que cada texto já enviado levou (para sair igual nos reenvios)
+  enviados.go           o que cada texto já enviado levou, por ponto da conversa (para sair igual nos reenvios)
   pessoas.go            registro de pessoas (nomes, e-mails, códigos), só como hash
   chave.go              a chave secreta e os identificadores derivados dela
   pseudonimos.go        troca dos achados por pseudônimos
@@ -64,7 +64,9 @@ proxy.ServeHTTP                      recebe a requisição
  ├ mascararCorpo (requisicao.go)     1ª passada: junta os textos e os mascara antes (Aquecer),
  │                                   para todo valor aprendido na requisição já valer na montagem
  │                                   2ª passada: chama Lote.Mascarar em cada texto, em ordem
- │  └ mask.Mascarar (mascarar.go)    já saiu antes (memória ou enviados.log)? sai igual.
+ │  └ Lote.Mascarar (mascarar.go)    já saiu neste ponto da conversa (memória ou
+ │                                   enviados.log)? sai igual. A posição é o hash do bloco
+ │                                   (tudo antes dele e ele mesmo) mais a ordem do texto nele
  │                                   já está na memória e ainda vale? devolve. senão:
  │     ├ Detectar (detectar.go)      roda os detectores e junta os achados
  │     │  ├ detectores_*.go          formato, senhas, extras

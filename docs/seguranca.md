@@ -60,7 +60,13 @@ não existe.
   vez solto.
 - Valor aprendido depois não é aplicado ao que já saiu: se um valor passou em claro numa
   mensagem e só depois foi reconhecido, essa mensagem continua saindo em claro nos reenvios
-  (ela já tinha sido enviada assim). Só o texto novo usa o valor aprendido.
+  da mesma conversa (ela já tinha sido enviada assim). O congelamento é por ponto da
+  conversa: o mesmo texto numa mensagem nova, ou noutra conversa, já sai mascarado.
+- A exceção é uma conversa que começa **exatamente igual** a uma anterior: as mesmas
+  instruções do Claude Code, as mesmas ferramentas e as mesmas mensagens até aquele texto
+  (uma sessão retomada, por exemplo). Para o llm-dlp, isso é um reenvio, e o texto sai como saiu da primeira vez.
+  O conteúdo é o mesmo que já tinha sido enviado; nada novo vaza, mas o valor aprendido
+  depois também não é aplicado ali.
 - Senha só de letras é detectada dentro de uma URL (`mysql://app:SENHA@host`), mas não depois
   de um rótulo (`senha: SENHA`, `DB_PASSWORD=SENHA`): ali, o detector exige um dígito ou um
   símbolo, para não confundir com código e texto comum.

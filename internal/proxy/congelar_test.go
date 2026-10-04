@@ -114,6 +114,25 @@ func TestHistoricoIgualQuandoAprende(t *testing.T) {
 		t.Errorf("texto novo não usou o valor aprendido: %s | %s", r[1][2], r[2][4])
 	}
 
+	// o MESMO texto da primeira mensagem, agora numa mensagem nova: sai mascarado
+	primeira := "tentei " + s + " no login e não entrou"
+	conversa = append(conversa, msg("assistant", "certo"), msg("user", primeira))
+	enviar(t, px, conversa)
+	r3 := mensagens(t, corpos[3])
+	if r3[0] != r[2][0] {
+		t.Fatalf("o reenvio da primeira mensagem mudou")
+	}
+	if strings.Contains(r3[6], s) {
+		t.Errorf("o mesmo texto numa mensagem nova saiu com a máscara antiga: %s", r3[6])
+	}
+	// e numa conversa nova
+	enviar(t, px, []any{msg("user", "outra conversa"), msg("assistant", "ok"), msg("user", primeira)})
+	if got := mensagens(t, corpos[4]); strings.Contains(got[2], s) {
+		t.Errorf("o mesmo texto numa conversa nova saiu com a máscara antiga: %s", got[2])
+	}
+	conversa = conversa[:5]
+	r[2] = mensagens(t, corpos[2])
+
 	// reinício: memo vazio, mesmo diretório
 	var corpos2 [][]byte
 	px2 := montarDisco(t, dir, &corpos2)
@@ -206,5 +225,29 @@ func TestConectorNaoDesmascara(t *testing.T) {
 	}
 	if !strings.Contains(porIdx[1], email) {
 		t.Errorf("Bash deveria receber o real: %s", porIdx[1])
+	}
+}
+
+// O marcador de cache muda de lugar a cada mensagem: não pode mudar a posição dos textos
+// que vêm depois dele.
+func TestCacheControlNaoMudaPosicao(t *testing.T) {
+	var corpos [][]byte
+	px := montarDisco(t, t.TempDir(), &corpos)
+	s := fracaTeste
+	txt := func(t string, cc bool) map[string]any {
+		b := map[string]any{"type": "text", "text": t}
+		if cc {
+			b["cache_control"] = map[string]any{"type": "ephemeral"}
+		}
+		return b
+	}
+	enviar(t, px, []any{msg("user", []any{txt("contexto inicial", true), txt("tentei "+s+" e nada", false)})})
+	enviar(t, px, []any{msg("user", []any{txt("contexto inicial", false), txt("tentei "+s+" e nada", false)}),
+		msg("assistant", []any{txt("ok", false)}), msg("user", []any{txt("a url é "+urlCom(s), true)})})
+	var a, b []map[string]any
+	json.Unmarshal([]byte(mensagens(t, corpos[0])[0]), &struct{ Content *[]map[string]any }{&a})
+	json.Unmarshal([]byte(mensagens(t, corpos[1])[0]), &struct{ Content *[]map[string]any }{&b})
+	if len(a) != 2 || len(b) != 2 || a[1]["text"] != b[1]["text"] {
+		t.Errorf("o cache_control num bloco anterior mudou a máscara do texto seguinte")
 	}
 }

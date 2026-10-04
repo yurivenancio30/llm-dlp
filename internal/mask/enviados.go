@@ -17,8 +17,10 @@ import (
 // um texto antigo, a conversa inteira seria regravada no cache, sem proteger nada (o texto
 // antigo já tinha saído com o valor em claro). Por isso, texto que saiu fica congelado.
 //
-// Em disco fica só: o HMAC do texto (com a chave) e, para cada trecho trocado, a posição, o
-// tipo e o pseudônimo (o que a API recebeu). Nenhum valor real.
+// O registro é por posição na conversa (ver Posicao): só o reenvio exato fica congelado.
+//
+// Em disco fica só: o HMAC (com a chave) da posição mais o texto e, para cada trecho trocado,
+// onde ele está no texto, o tipo e o pseudônimo (o que a API recebeu). Nenhum valor real.
 
 type trecho struct {
 	Ini, Fim     int
@@ -116,7 +118,7 @@ func trechosDeLinha(t [][]any) ([]trecho, bool) {
 	return out, true
 }
 
-// Buscar devolve os trechos com que o texto (pelo HMAC) foi enviado.
+// Buscar devolve os trechos com que o texto foi enviado naquela posição (pelo HMAC).
 func (e *Enviados) Buscar(id string) ([]trecho, bool) {
 	e.mu.Lock()
 	defer e.mu.Unlock()

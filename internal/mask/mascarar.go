@@ -17,7 +17,7 @@ const memoMax = 64 << 20 // teto (aproximado) do texto memorizado, somando as du
 
 // Mascarar troca o dado sensível de s por pseudônimos e devolve as entradas usadas.
 // Resultados são memorizados: o Claude Code reenvia a conversa inteira a cada mensagem.
-// O proxy usa um Lote, que além disso congela o que saiu (ver enviados.go).
+// O proxy usa um Lote, que além disso congela o que saiu, por posição (ver enviados.go).
 func (m *Masker) Mascarar(s string) (string, []Entrada) {
 	r, _ := m.mascarar(s, true)
 	return r.texto, r.entradas
@@ -28,6 +28,11 @@ func (m *Masker) mascarar(s string, aprende bool) (resultado, [32]byte) {
 		return resultado{texto: s}, [32]byte{}
 	}
 	k := sha256.Sum256([]byte(s))
+	return m.mascararK(s, k, aprende), k
+}
+
+// mascararK: com o hash do texto já calculado (k).
+func (m *Masker) mascararK(s string, k [32]byte, aprende bool) resultado {
 	m.mu.Lock()
 	r, ok := m.memo[k]
 	if !ok {
@@ -37,44 +42,19 @@ func (m *Masker) mascarar(s string, aprende bool) (resultado, [32]byte) {
 	}
 	m.mu.Unlock()
 	g := m.conh.geracao()
-	if ok && r.congelado {
-		// Já saiu: sai igual, mesmo que agora se saiba mais. Reescrever não protegeria nada
-		// (o texto já foi enviado assim) e regravaria a conversa inteira no cache da API.
-		if aprende && r.semAprender {
-			m.detectar(s, true) // o mesmo texto chegou de fonte local: aprende com ele
-			r.semAprender = false
-			m.mu.Lock()
-			r = m.guardar(k, r)
-			m.mu.Unlock()
-		}
-		return r, k
-	}
 	if ok && !(aprende && r.semAprender) {
-		// Ainda não saiu: vale, a não ser que contenha um valor aprendido DEPOIS (por outro
-		// texto da mesma requisição, por exemplo).
+		// Vale, a não ser que contenha um valor aprendido DEPOIS (por outro texto, por exemplo).
 		if r.gen == g {
-			return r, k
+			return r
 		}
 		if !m.conh.contemDesde(s, r.gen) {
 			r.gen = g // conferido até aqui: da próxima vez não confere de novo
 			m.mu.Lock()
 			r = m.guardar(k, r)
 			m.mu.Unlock()
-			return r, k
+			return r
 		}
 	}
-	if !ok && m.enviados != nil {
-		// saiu antes de um reinício: remonta exatamente como saiu
-		if ts, achou := m.enviados.Buscar(m.idTexto(s)); achou {
-			if texto, entradas, valido := remontar(s, ts); valido {
-				m.mu.Lock()
-				r = m.guardar(k, resultado{texto, entradas, ts, g, true, false})
-				m.mu.Unlock()
-				return r, k
-			}
-		}
-	}
-
 	achados := m.detectar(s, aprende)
 
 	// Até que geração este resultado vale? Se nada foi aprendido durante a detecção, até g.
@@ -99,13 +79,13 @@ func (m *Masker) mascarar(s string, aprende bool) (resultado, [32]byte) {
 	texto, entradas, ts := m.aplicarT(s, achados)
 
 	m.mu.Lock()
-	r = m.guardar(k, resultado{texto, entradas, ts, g, false, !aprende})
+	r = m.guardar(k, resultado{texto, entradas, ts, g, !aprende})
 	m.mu.Unlock()
-	return r, k
+	return r
 }
 
-// idTexto: o HMAC do texto, que é como ele é guardado em disco.
-func (m *Masker) idTexto(s string) string { return m.p.raw("enviado", s, 16) }
+// idPos: como um texto numa posição é guardado em disco (HMAC da chave de posição).
+func (m *Masker) idPos(kc Posicao) string { return m.p.raw("enviado", string(kc[:]), 16) }
 
 // UsarEnviados liga o registro em disco do que já saiu (só o proxy usa). impressao
 // identifica a configuração e a versão: se mudarem, os registros antigos não valem.
@@ -118,65 +98,118 @@ func (m *Masker) UsarEnviados(path, impressao string) error {
 	return nil
 }
 
-// Lote: os textos de uma requisição. Depois que a requisição sai, Congelar fixa o
-// resultado de cada um.
-type Lote struct {
-	m      *Masker
-	textos map[[32]byte]string
+// Posicao identifica um texto num ponto exato da conversa: um hash de tudo o que vem antes
+// dele na requisição e dele mesmo (quem calcula é o proxy). O congelamento vale só para a
+// mesma Posicao: o reenvio exato daquele ponto da conversa sai igual; o mesmo texto noutra
+// conversa, ou numa mensagem nova, é mascarado com o que se sabe agora.
+type Posicao [32]byte
+
+// congelado: o resultado com que o texto saiu nesta posição, se já saiu (da memória, ou do
+// enviados.log depois de um reinício).
+func (m *Masker) congelado(kc Posicao, s string) (resultado, bool) {
+	m.mu.Lock()
+	r, ok := m.cong[kc]
+	if !ok {
+		if r, ok = m.congVelho[kc]; ok {
+			m.guardarCong(kc, r)
+		}
+	}
+	m.mu.Unlock()
+	if ok || m.enviados == nil {
+		return r, ok
+	}
+	ts, achou := m.enviados.Buscar(m.idPos(kc))
+	if !achou {
+		return r, false
+	}
+	texto, entradas, valido := remontar(s, ts)
+	if !valido {
+		return r, false
+	}
+	r = resultado{texto: texto, entradas: entradas, trechos: ts}
+	m.mu.Lock()
+	m.guardarCong(kc, r)
+	m.mu.Unlock()
+	return r, true
 }
 
-func (m *Masker) NovoLote() *Lote { return &Lote{m: m, textos: map[[32]byte]string{}} }
+// guardarCong: como guardar, para os congelados (com m.mu travado).
+func (m *Masker) guardarCong(kc Posicao, r resultado) {
+	if _, ok := m.cong[kc]; !ok {
+		if m.congBytes > memoMax/2 {
+			m.congVelho, m.cong, m.congBytes = m.cong, map[Posicao]resultado{}, 0
+		}
+		m.congBytes += len(r.texto) + 96*len(r.entradas) + 64
+	}
+	m.cong[kc] = r
+}
 
-// Mascarar: daWeb = conteúdo da internet (resultado de WebFetch/WebSearch): é mascarado,
-// mas nada dele é lembrado.
-func (l *Lote) Mascarar(s string, daWeb bool) (string, []Entrada) {
-	r, k := l.m.mascarar(s, !daWeb)
-	if len(s) >= 4 {
-		l.textos[k] = s
+// Lote: os textos de uma requisição. Depois que a requisição sai, Congelar fixa o
+// resultado de cada um na sua posição.
+type Lote struct {
+	m      *Masker
+	saidas map[Posicao]resultado // o que saiu em cada posição
+}
+
+func (m *Masker) NovoLote() *Lote { return &Lote{m: m, saidas: map[Posicao]resultado{}} }
+
+// ItemLote: um texto da requisição, onde está e se veio da internet.
+type ItemLote struct {
+	S     string
+	DaWeb bool
+	Pos   Posicao
+}
+
+// Mascarar: texto que já saiu nesta posição sai igual (reescrever não protegeria nada e
+// regravaria a conversa no cache da API). daWeb = conteúdo da internet (resultado de
+// WebFetch/WebSearch): é mascarado, mas nada dele é lembrado.
+func (l *Lote) Mascarar(s string, daWeb bool, pos Posicao) (string, []Entrada) {
+	if len(s) < 4 {
+		return s, nil
+	}
+	if r, ok := l.m.congelado(pos, s); ok {
+		return r.texto, r.entradas
+	}
+	r, _ := l.m.mascarar(s, !daWeb)
+	if _, ja := l.saidas[pos]; !ja {
+		l.saidas[pos] = r
 	}
 	return r.texto, r.entradas
 }
 
-// Aquecer mascara antes da montagem todos os textos novos da requisição, para que todo
-// valor aprendido nela já valha quando os textos forem montados em ordem.
-func (l *Lote) Aquecer(locais, daWeb []string) {
-	itens := make([]itemAquecer, 0, len(locais)+len(daWeb))
-	for _, s := range daWeb {
-		itens = append(itens, itemAquecer{s, false})
-	}
-	for _, s := range locais {
-		itens = append(itens, itemAquecer{s, true})
-	}
-	l.m.aquecer(itens)
-}
-
-// Congelar: a requisição saiu. O resultado de cada texto fica fixo (e vai para o disco).
-func (l *Lote) Congelar() {
-	m := l.m
-	type novo struct {
-		s  string
-		ts []trecho
-	}
-	var novos []novo
-	m.mu.Lock()
-	for k, s := range l.textos {
-		r, ok := m.memo[k]
-		if !ok {
-			if r, ok = m.velho[k]; !ok {
-				continue // saiu do memo (requisição enorme): será refeito
-			}
-		}
-		if r.congelado {
+// Aquecer mascara antes da montagem os textos da requisição que ainda não saíram, para que
+// todo valor aprendido nela já valha quando os textos forem montados em ordem.
+func (l *Lote) Aquecer(itens []ItemLote) {
+	pend := make([]itemAquecer, 0, len(itens))
+	for _, it := range itens {
+		if len(it.S) < 4 {
 			continue
 		}
-		r.congelado = true
-		m.guardar(k, r)
-		novos = append(novos, novo{s, r.trechos})
+		if _, ok := l.m.congelado(it.Pos, it.S); ok {
+			continue
+		}
+		pend = append(pend, itemAquecer{it.S, !it.DaWeb})
+	}
+	l.m.aquecer(pend)
+}
+
+// Congelar: a requisição saiu. O resultado de cada texto fica fixo na sua posição (e vai
+// para o disco).
+func (l *Lote) Congelar() {
+	m := l.m
+	novos := make([]Posicao, 0, len(l.saidas))
+	m.mu.Lock()
+	for kc, r := range l.saidas {
+		if _, ok := m.cong[kc]; ok {
+			continue
+		}
+		m.guardarCong(kc, r)
+		novos = append(novos, kc)
 	}
 	m.mu.Unlock()
 	if m.enviados != nil {
-		for _, n := range novos {
-			m.enviados.Gravar(m.idTexto(n.s), n.ts)
+		for _, kc := range novos {
+			m.enviados.Gravar(m.idPos(kc), l.saidas[kc].trechos)
 		}
 	}
 }
@@ -262,21 +295,12 @@ func (m *Masker) aquecer(itens []itemAquecer) {
 // aquecerMin: abaixo disso de texto novo, o paralelismo não compensa
 const aquecerMin = 48 << 10
 
-// guardar põe o resultado no memo (com m.mu travado) e devolve o que ficou: um resultado
-// congelado nunca é trocado por outro (uma requisição em paralelo pode ter calculado outro).
-// O memo tem duas gerações: quando a atual enche, vira a "velha" e começa outra vazia; o
-// que continua em uso é trazido de volta na consulta, e o resto some quando a velha é
-// descartada. Assim a RAM tem teto e não há um momento em que tudo é esquecido de uma vez.
+// guardar põe o resultado no memo (com m.mu travado) e o devolve. O memo tem duas
+// gerações: quando a atual enche, vira a "velha" e começa outra vazia; o que continua em uso
+// é trazido de volta na consulta, e o resto some quando a velha é descartada. Assim a RAM
+// tem teto e não há um momento em que tudo é esquecido de uma vez.
 func (m *Masker) guardar(k [32]byte, r resultado) resultado {
-	ant, ok := m.memo[k]
-	if !ok {
-		ant, ok = m.velho[k]
-		ok = ok && ant.congelado // da geração velha só importa se estiver congelado
-	}
-	if ok && ant.congelado && !r.congelado {
-		r = ant
-	}
-	if _, noMemo := m.memo[k]; !noMemo {
+	if _, ok := m.memo[k]; !ok {
 		if m.bytes > memoMax/2 {
 			m.velho, m.memo, m.bytes = m.memo, map[[32]byte]resultado{}, 0
 		}

@@ -47,16 +47,20 @@ qualquer lugar: na saída de um comando, num arquivo lido mais tarde, sem a pist
 |---|---|
 | Memória | O valor real, enquanto o llm-dlp estiver no ar |
 | Disco (`vistos.json`, `pessoas.json`) | **Só o hash**, feito com a chave. Serve para reconhecer depois de reiniciar |
-| Disco (`enviados.log`) | Para cada texto já enviado: o hash do texto e, de cada trecho trocado, a posição, o tipo e o pseudônimo. Serve para o texto sair igual depois de reiniciar (ver abaixo) |
+| Disco (`enviados.log`) | Para cada texto já enviado: um hash do ponto da conversa em que ele está e, de cada trecho trocado, onde ele fica no texto, o tipo e o pseudônimo. Serve para o texto sair igual depois de reiniciar (ver abaixo) |
 
 Nenhum valor real e nenhum texto mascarado é gravado em disco pelo llm-dlp.
 
 **O valor aprendido vale para texto novo.** O Claude Code reenvia a conversa inteira a cada
-mensagem, e o cache da API só vale se o começo for idêntico ao da vez anterior. Por isso, um
-texto que já saiu para a API sai sempre igual, mesmo que depois o llm-dlp aprenda um valor
-que aparece nele: mudá-lo não protegeria nada (ele já foi enviado assim) e faria a conversa
-inteira ser regravada no cache. Isso vale também depois de reiniciar, graças ao
-`enviados.log`. Se a configuração ou a versão do llm-dlp mudar, ou se você importar pessoas,
+mensagem, e o cache da API só vale se o começo for idêntico ao da vez anterior. Por isso, quando
+a conversa é reenviada, um texto que já saiu sai igual, mesmo que depois o llm-dlp aprenda um
+valor que aparece nele: mudá-lo não protegeria nada (ele já foi enviado assim) e faria a
+conversa inteira ser regravada no cache. Isso vale também depois de reiniciar, graças ao
+`enviados.log`.
+
+O congelamento é do texto **naquele ponto da conversa** (o mesmo começo de requisição até
+ele), não do texto em si: o mesmo texto numa mensagem nova, ou noutra conversa (o mesmo
+arquivo lido de novo, por exemplo), é mascarado com tudo o que se sabe agora. Se a configuração ou a versão do llm-dlp mudar, ou se você importar pessoas,
 o registro recomeça e o histórico é mascarado de novo com as regras atuais (o cache é
 regravado uma vez).
 

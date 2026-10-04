@@ -14,6 +14,9 @@ var fracas = []string{"change" + "me", "ad" + "min", "gira" + "ssol"}
 // cpfTeste: CPF fictício válido
 var cpfTeste = "529.982" + ".247-25"
 
+// posições de teste (no proxy, vêm do hash da conversa até o texto)
+var posA, posB = Posicao{1}, Posicao{2}
+
 func ensina(s string) string { return "mysql://app:" + s + "@db1:3306/base" }
 
 func maskerEmDisco(t *testing.T, dir string) (*Masker, *Vistos) {
@@ -53,7 +56,7 @@ func TestConteudoDaWebNaoEnsina(t *testing.T) {
 	m, vs := maskerEmDisco(t, dir)
 	ex := fracas[0]
 	pagina := "Exemplo da documentação: mysql://app:" + ex + "@db.example.com:3306/base"
-	out, _ := m.NovoLote().Mascarar(pagina, true)
+	out, _ := m.NovoLote().Mascarar(pagina, true, posA)
 	if strings.Contains(out, ex) {
 		t.Fatalf("na própria página, a senha de exemplo deveria ser mascarada: %q", out)
 	}
@@ -84,24 +87,28 @@ func TestTextoEnviadoFicaCongelado(t *testing.T) {
 	s := fracas[2]
 	antigo := "tentei " + s + " no login e não entrou; CPF " + cpfTeste
 	l := m.NovoLote()
-	enviado, _ := l.Mascarar(antigo, false)
+	enviado, _ := l.Mascarar(antigo, false, posA)
 	if !strings.Contains(enviado, s) {
 		t.Skip("premissa mudou: a palavra já é mascarada sem rótulo")
 	}
 	l.Congelar()
 
 	m.Mascarar(ensina(s)) // aprende depois
-	if out, _ := m.NovoLote().Mascarar(antigo, false); out != enviado {
+	if out, _ := m.NovoLote().Mascarar(antigo, false, posA); out != enviado {
 		t.Fatalf("texto já enviado mudou depois de aprender um valor:\nantes:  %q\ndepois: %q", enviado, out)
 	}
 	if out, _ := m.Mascarar("de novo: " + s); strings.Contains(out, s) {
 		t.Fatalf("texto novo não usou o valor aprendido: %q", out)
 	}
+	// o MESMO texto, noutra posição (outra conversa, mensagem nova): não herda a máscara antiga
+	if out, _ := m.NovoLote().Mascarar(antigo, false, posB); strings.Contains(out, s) {
+		t.Fatalf("o mesmo texto noutra posição saiu com a máscara antiga: %q", out)
+	}
 
 	m.Persistir()
 	vs.SalvarSeSujo()
 	m2, _ := maskerEmDisco(t, dir) // reinício
-	out, ents := m2.NovoLote().Mascarar(antigo, false)
+	out, ents := m2.NovoLote().Mascarar(antigo, false, posA)
 	if out != enviado {
 		t.Fatalf("após reinício, o texto enviado mudou:\nantes:  %q\ndepois: %q", enviado, out)
 	}
@@ -124,7 +131,7 @@ func TestEnviadosDeOutraConfiguracaoNaoValem(t *testing.T) {
 	s := fracas[2]
 	antigo := "tentei " + s + " no login"
 	l := m.NovoLote()
-	l.Mascarar(antigo, false)
+	l.Mascarar(antigo, false, posA)
 	l.Congelar()
 	m.Mascarar(ensina(s))
 	m.Persistir()
@@ -133,7 +140,7 @@ func TestEnviadosDeOutraConfiguracaoNaoValem(t *testing.T) {
 	vs, _ := CarregarVistos(dir + "/vistos.json")
 	m2, _ := NovoMasker(novoTeste(t).cfg, chaveTeste, nil, vs)
 	m2.UsarEnviados(dir+"/enviados.log", "outra configuração")
-	if out, _ := m2.Mascarar(antigo); strings.Contains(out, s) {
+	if out, _ := m2.NovoLote().Mascarar(antigo, false, posA); strings.Contains(out, s) {
 		t.Errorf("registro de outra configuração foi usado: %q", out)
 	}
 }
@@ -143,8 +150,8 @@ func TestEnviadosCorrompido(t *testing.T) {
 	dir := t.TempDir()
 	m, _ := maskerEmDisco(t, dir)
 	texto := "CPF " + cpfTeste
-	m.enviados.Gravar(m.idTexto(texto), []trecho{{4, 99, "cpf", "CPF-x"}})
-	if out, _ := m.Mascarar(texto); strings.Contains(out, texto[4:]) {
+	m.enviados.Gravar(m.idPos(posA), []trecho{{4, 99, "cpf", "CPF-x"}})
+	if out, _ := m.NovoLote().Mascarar(texto, false, posA); strings.Contains(out, texto[4:]) {
 		t.Errorf("trecho inválido foi usado: %q", out)
 	}
 	m.Persistir()
@@ -153,5 +160,27 @@ func TestEnviadosCorrompido(t *testing.T) {
 	f.Close()
 	if _, err := CarregarEnviados(dir+"/enviados.log", m.enviados.impressao); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// O congelamento é por posição: o mesmo texto noutra posição, depois de um reinício, também
+// é mascarado com o que se sabe agora.
+func TestCongeladoSoNaMesmaPosicaoAposReinicio(t *testing.T) {
+	dir := t.TempDir()
+	m, vs := maskerEmDisco(t, dir)
+	s := fracas[2]
+	antigo := "tentei " + s + " no login"
+	l := m.NovoLote()
+	enviado, _ := l.Mascarar(antigo, false, posA)
+	l.Congelar()
+	m.Mascarar(ensina(s))
+	m.Persistir()
+	vs.SalvarSeSujo()
+	m2, _ := maskerEmDisco(t, dir)
+	if out, _ := m2.NovoLote().Mascarar(antigo, false, posA); out != enviado {
+		t.Errorf("reenvio na mesma posição mudou depois do reinício")
+	}
+	if out, _ := m2.NovoLote().Mascarar(antigo, false, posB); strings.Contains(out, s) {
+		t.Errorf("noutra posição, depois do reinício, saiu com a máscara antiga: %q", out)
 	}
 }
