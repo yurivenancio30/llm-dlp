@@ -519,3 +519,10 @@ func TestDevopsNaoPegaCodigoNemProsa(t *testing.T) {
 		}
 	}
 }
+
+// Item 15: env em lista segue a mesma regra de "NOME: valor"; o resto do manifesto fica.
+func TestK8sEnvLista(t *testing.T) {
+	m := novoTeste(t)
+	s := "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: app\nspec:\n  replicas: 3\n  template:\n    spec:\n      containers:\n        - name: app\n          env:\n            - name: DB_HOST\n              value: pgprd01\n            - name: QUEUE_NAME\n              value: \"fila-x1\"\n            - name: LOG_LEVEL\n              value: debug\n          ports:\n            - containerPort: 8080\n          resources:\n            limits:\n              cpu: 500m\n          volumeMounts:\n            - name: dados\n              mountPath: /app/dados\n      tier: backend\n"
+	confere(t, m, s, []string{"pgprd01", "fila-x1"}, []string{"kind: Deployment", "replicas: 3", "value: debug", "containerPort: 8080", "cpu: 500m", "mountPath: /app/dados", "tier: backend"})
+}

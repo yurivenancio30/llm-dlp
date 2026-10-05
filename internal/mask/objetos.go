@@ -341,6 +341,13 @@ func leitoresPadrao() []Leitor {
 		{Nome: "caminho", Achar: acharCaminhos, Publico: publicoDev},
 		{Nome: "usuário de rede", Achar: acharUsuariosRede, Publico: publicoDev},
 		{Nome: "nuvem", Achar: acharNuvem, Publico: publicoDev},
+		{Nome: "código-nome", Achar: acharCodigoNome, Publico: publicoDev},
+		{Nome: "código-chamada", Achar: acharCodigoChamada, Publico: publicoDev},
+		{Nome: "linha-de-comando", Achar: acharCLI, Publico: publicoDev},
+		{Nome: "caminho-sistema", Achar: acharCaminhosFora, Publico: publicoDev},
+		{Nome: "url-nuvem", Achar: acharURLsNuvem, Publico: publicoDev},
+		{Nome: "dsn", Achar: acharDSN, Publico: publicoConexao},
+		{Nome: "env-lista", Achar: acharEnvLista, Publico: publicoDev},
 	}
 }
 

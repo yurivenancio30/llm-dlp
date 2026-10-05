@@ -191,7 +191,7 @@ func TestLeitorNuvem(t *testing.T) {
 		{"arn:aws:iam::210987654321:role/servico/role-etl-x9", []string{"conta_nuvem:210987654321!", "servico:role-etl-x9!"}},
 		{"arn:aws:iam::123456789012:user/svc-etl-x9 e arn:aws:iam::aws:policy/ReadOnlyAccess", []string{"conta_nuvem:123456789012!", "usuario:svc-etl-x9!"}},
 		{"/subscriptions/1a2b3c4d-1111-2222-3333-abcdefabcdef/resourceGroups/rg-dados-x9/providers/Microsoft.Storage/storageAccounts/contaexemplo01",
-			[]string{"conta_nuvem:1a2b3c4d-1111-2222-3333-abcdefabcdef!", "servico:contaexemplo01!", "servico:rg-dados-x9!"}},
+			[]string{"conta_nuvem:1a2b3c4d-1111-2222-3333-abcdefabcdef!", "conta_nuvem:contaexemplo01!", "namespace:rg-dados-x9!"}},
 		{"projects/proj-exemplo-01/topics/fila-pedidos-x9", []string{"conta_nuvem:proj-exemplo-01!", "fila:fila-pedidos-x9!"}},
 		{"projects/proj-exemplo-01/datasets/ds_vendas/tables/tb_pedido_x9", []string{"conta_nuvem:proj-exemplo-01!", "schema:ds_vendas!", "tabela:tb_pedido_x9!"}},
 		{"projects/proj-exemplo-01/locations/us-central1/functions/fn-carga", []string{"conta_nuvem:proj-exemplo-01!", "servico:fn-carga!"}},

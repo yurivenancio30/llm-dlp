@@ -30,15 +30,28 @@ var entPedaco = map[string]string{
 	"service":   "servico", "servico": "servico", "app": "servico", "application": "servico",
 	"bucket": "bucket", "container": "bucket",
 	"queue": "fila", "topic": "fila", "fila": "fila", "topico": "fila", "exchange": "fila", "stream": "fila", "subject": "fila",
+	"group": "servico", "consumergroup": "servico",
 	"repo": "repositorio", "repository": "repositorio",
 	"org": "organizacao", "organization": "organizacao",
 	"account": "conta_nuvem", "tenant": "conta_nuvem", "subscription": "conta_nuvem", "projectid": "conta_nuvem",
 }
 
+// atributos: último pedaço de chave que não é o nome do recurso ("db.port", "host.timeout")
+var atributoChave = conj("name", "names", "id", "ids", "port", "ports", "timeout", "timeouts", "count", "size", "enabled", "enable", "disabled", "max",
+	"min", "version", "type", "mode", "ttl", "retries", "retry", "interval", "pass"+"word", "passwd", "pwd", "secret",
+	"token", "key", "keys", "agent", "format", "level", "limit", "suffix", "encoding", "charset", "ssl", "tls",
+	"protocol", "scheme", "driver", "class", "dialect", "pool", "timezone", "locale", "lang", "url", "uri", "path",
+	"file", "dir", "region", "zone", "weight", "priority", "delay", "length", "capacity", "batch", "concurrency")
+
+// plurais aceitos como o tipo (o nome guarda uma lista desse tipo)
+var pluralTipo = conj("topics", "queues", "buckets", "hosts", "servers", "brokers", "tables", "databases", "schemas",
+	"namespaces", "clusters", "subjects", "streams", "exchanges")
+
 // "<x>_name": o pedaço antes de "name" diz a entidade (db_name, table_name...)
 var entAntesDeNome = map[string]string{"db": "database", "database": "database", "table": "tabela", "schema": "schema",
 	"host": "servidor", "server": "servidor", "user": "usuario", "service": "servico", "bucket": "bucket", "queue": "fila",
-	"topic": "fila"}
+	"topic": "fila", "group": "servico", "namespace": "namespace", "cluster": "servidor", "collection": "tabela",
+	"stream": "fila", "subject": "fila", "exchange": "fila", "repo": "repositorio", "container": "bucket"}
 
 // pedacosChave divide um nome em pedaços por . _ - : e camelCase ("dbHost" -> db, Host;
 // "DBHost" -> DB, Host). Devolve no máximo len(ps) pedaços; ok=false se havia mais.
@@ -106,8 +119,32 @@ func entChave(k string) (ent string, forte bool) {
 	if e, ok := entPedaco[string(ult)]; ok {
 		return e, true
 	}
+	// plural: topics, queues, buckets, hosts, brokers
+	if u := string(ult); len(u) > 3 && u[len(u)-1] == 's' {
+		if e, ok := entPedaco[u[:len(u)-1]]; ok && pluralTipo[u] {
+			return e, true
+		}
+	}
 	if n >= 2 {
 		pen := minusculo(k, ps[n-2], &b2)
+		// "<tipo>Name", "<tipo>_id", "groupId": o pedaço antes de name/id diz o tipo
+		if u := string(ult); u == "name" || u == "names" || u == "id" || u == "ids" {
+			if e, ok := entAntesDeNome[string(pen)]; ok {
+				return e, true
+			}
+		}
+		// "app.queue.pedidos": a palavra de tipo no meio da chave (evidência fraca), desde que o
+		// último pedaço não seja um atributo (porta, timeout, versão, senha...)
+		if !atributoChave[string(ult)] {
+			var b3 [24]byte
+			for i := n - 2; i >= 0; i-- {
+				if w := minusculo(k, ps[i], &b3); w != nil {
+					if e, ok := entPedaco[string(w)]; ok && string(w) != "app" && string(w) != "application" {
+						return e, false
+					}
+				}
+			}
+		}
 		switch string(ult) {
 		case "servers":
 			if string(pen) == "bootstrap" {
@@ -454,6 +491,10 @@ func marcarValor(s string, a, b int, ent, regra string, forte bool, add func(Obj
 // addHost: nome de servidor sem a porta (e "srv\INST": nome e instância).
 func addHost(s string, a, b int, regra string, forte bool, add func(ObjAchado)) {
 	v := s[a:b]
+	// nome DNS de serviço do Kubernetes: fica com o leitor de Kubernetes (serviço e namespace)
+	if l := strings.ToLower(v); strings.Contains(l, ".svc.cluster.local") || strings.HasSuffix(l, ".svc") {
+		return
+	}
 	if i := strings.IndexByte(v, ':'); i >= 0 {
 		if p := strings.ToLower(v[:i]); p == "tcp" || p == "np" || p == "lpc" || p == "udp" { // SQL Server: tcp:srv,1433
 			a += i + 1

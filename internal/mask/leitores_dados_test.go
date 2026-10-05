@@ -243,3 +243,20 @@ func TestVocabularioCatalogoFica(t *testing.T) {
 		}
 	}
 }
+
+// Item 13: DSN do driver MySQL do Go e DSN do PDO.
+func TestDSNGoEPDO(t *testing.T) {
+	m := novoTeste(t)
+	confere(t, m, `db, err := sql.Open("mysql", "svc_app_x1:pw@tcp(db-mysql-x1:3306)/vendas_x1?parseTime=true")`,
+		[]string{"svc_app_x1", "db-mysql-x1", "vendas_x1"}, []string{"@tcp(", ":3306)/", "?parseTime=true"})
+	confere(t, m, `$pdo = new PDO('mysql:host=db-mysql-x2;port=3306;dbname=vendas_x2;charset=utf8mb4', $u, $p);`,
+		[]string{"db-mysql-x2", "vendas_x2"}, []string{"mysql:host=", ";port=3306;", ";charset=utf8mb4"})
+	confere(t, m, `new PDO("pgsql:host=db-pg-x3;dbname=vendas_x3")`, []string{"db-pg-x3", "vendas_x3"}, []string{"pgsql:host="})
+	confere(t, m, `new PDO("sqlsrv:Server=srv-sql-x4,1433;Database=vendas_x4")`, []string{"srv-sql-x4", "vendas_x4"}, []string{"sqlsrv:Server=", ",1433;"})
+	confere(t, m, `new PDO("oci:dbname=//db-ora-x5:1521/ORCL_X5")`, []string{"db-ora-x5", "ORCL_X5"}, []string{"oci:dbname=//", ":1521/"})
+	for _, s := range []string{"git push origin main@tcp", "time:12:00 a=b"} {
+		if out, ents := m.Mascarar(s); len(ents) > 0 {
+			t.Errorf("não é DSN: %q -> %q", s, out)
+		}
+	}
+}

@@ -158,7 +158,8 @@ func acharAzure(s string, add func(ObjAchado)) {
 		k := 2
 		if len(ps) >= 4 && strings.EqualFold(seg(2), "resourceGroups") {
 			if v := seg(3); nomeSimples(v) && !publicoDev(v) {
-				add(ObjAchado{ps[3][0], ps[3][1], "servico", "azure", true})
+				// grupo de recursos: agrupa recursos dentro da assinatura (como um namespace)
+				add(ObjAchado{ps[3][0], ps[3][1], "namespace", "azure", true})
 			}
 			k = 4
 		}
@@ -166,7 +167,11 @@ func acharAzure(s string, add func(ObjAchado)) {
 			// Ns, depois pares tipo/nome
 			for t := k + 2; t+1 < len(ps); t += 2 {
 				if v := seg(t + 1); nomeSimples(v) && !publicoDev(v) {
-					add(ObjAchado{ps[t+1][0], ps[t+1][1], "servico", "azure", true})
+					ent := entTipoAzure[strings.ToLower(seg(t))]
+					if ent == "" {
+						ent = "servico"
+					}
+					add(ObjAchado{ps[t+1][0], ps[t+1][1], ent, "azure", true})
 				}
 			}
 		}
@@ -176,6 +181,126 @@ func acharAzure(s string, add func(ObjAchado)) {
 		}
 		i += 1 + j
 	}
+}
+
+// tipo de recurso do Azure (o segmento antes do nome) -> entidade
+var entTipoAzure = map[string]string{"servers": "servidor", "flexibleservers": "servidor", "managedinstances": "servidor",
+	"databases": "database", "storageaccounts": "conta_nuvem", "containers": "bucket", "shares": "bucket",
+	"filesystems": "bucket", "queues": "fila", "topics": "fila", "subscriptions": "fila", "eventhubs": "fila",
+	"namespaces": "servidor", "managedclusters": "servidor", "virtualmachines": "servidor", "databaseaccounts": "servidor",
+	"registries": "servidor", "redis": "servidor", "sites": "servico", "vaults": "servico", "workspaces": "servico",
+	"factories": "servico", "accounts": "conta_nuvem", "tables": "tabela", "schemas": "schema"}
+
+// URLs de nuvem com estrutura fixa:
+//
+//	https://<conta>.(blob|dfs|file|queue|table).core.windows.net/<contêiner>/...   Azure Storage
+//	sb://<namespace>.servicebus.windows.net/ ... EntityPath=<fila>                Service Bus/Event Hubs
+//	https://sqs.<região>.amazonaws.com/<conta>/<fila>                              SQS
+//
+// (https://learn.microsoft.com/azure/storage/common/storage-account-overview#storage-account-endpoints,
+// https://learn.microsoft.com/azure/service-bus-messaging/service-bus-dotnet-get-started-with-queues,
+// https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-queue-message-identifiers.html)
+var servicoArmazenamento = map[string]string{"blob": "bucket", "dfs": "bucket", "file": "bucket", "queue": "fila", "table": "tabela"}
+
+func acharURLsNuvem(s string, add func(ObjAchado)) {
+	if strings.Contains(s, ".core.windows.net") {
+		for i := strings.Index(s, ".core.windows.net"); i >= 0; {
+			// <conta>.<serviço>.core.windows.net
+			d := strings.LastIndexByte(s[max(0, i-40):i], '.')
+			if d >= 0 {
+				d += max(0, i-40)
+				serv := s[d+1 : i]
+				a := d
+				for a > 0 && (ehAlnum(s[a-1]) || s[a-1] == '-') {
+					a--
+				}
+				if ent, ok := servicoArmazenamento[serv]; ok && a < d && (a == 0 || !ehAlnum(s[a-1])) {
+					if conta := s[a:d]; !publicoDev(conta) {
+						add(ObjAchado{a, d, "conta_nuvem", "azure", true})
+					}
+					e := i + len(".core.windows.net")
+					if e < len(s) && s[e] == '/' {
+						b := e + 1
+						for b < len(s) && (ehAlnum(s[b]) || s[b] == '-' || s[b] == '_' || s[b] == '$') {
+							b++
+						}
+						if v := s[e+1 : b]; v != "" && !publicoDev(v) && v[0] != '$' {
+							add(ObjAchado{e + 1, b, ent, "azure", true})
+							if ent == "bucket" && b < len(s) && s[b] == '/' {
+								addPastas(s, b+1, fimCaminhoURL(s, b+1), "azure", add)
+							}
+						}
+					}
+				}
+			}
+			j := strings.Index(s[i+1:], ".core.windows.net")
+			if j < 0 {
+				break
+			}
+			i += 1 + j
+		}
+	}
+	if strings.Contains(s, ".servicebus.windows.net") {
+		for i := strings.Index(s, ".servicebus.windows.net"); i >= 0; {
+			a := i
+			for a > 0 && (ehAlnum(s[a-1]) || s[a-1] == '-') {
+				a--
+			}
+			if a < i && !publicoDev(s[a:i]) {
+				add(ObjAchado{a, i, "servidor", "azure", true})
+			}
+			j := strings.Index(s[i+1:], ".servicebus.windows.net")
+			if j < 0 {
+				break
+			}
+			i += 1 + j
+		}
+		if k := strings.Index(s, "EntityPath="); k >= 0 {
+			a := k + len("EntityPath=")
+			b := a
+			for b < len(s) && (ehAlnum(s[b]) || s[b] == '-' || s[b] == '_' || s[b] == '.' || s[b] == '/') {
+				b++
+			}
+			if b > a {
+				add(ObjAchado{a, b, "fila", "azure", true})
+			}
+		}
+	}
+	if strings.Contains(s, "amazonaws.com/") {
+		for i := strings.Index(s, "amazonaws.com/"); i >= 0; {
+			// só SQS: sqs.<região>.amazonaws.com ou queue.amazonaws.com
+			h := s[max(0, i-40):i]
+			if strings.Contains(h, "sqs.") || strings.HasSuffix(h, "queue.") {
+				a := i + len("amazonaws.com/")
+				b := a
+				for b < len(s) && ehDig(s[b]) {
+					b++
+				}
+				if b-a == 12 && b < len(s) && s[b] == '/' {
+					add(ObjAchado{a, b, "conta_nuvem", "aws", true})
+					c := b + 1
+					for c < len(s) && (ehAlnum(s[c]) || s[c] == '-' || s[c] == '_' || s[c] == '.') {
+						c++
+					}
+					if c > b+1 {
+						add(ObjAchado{b + 1, c, "fila", "aws", true})
+					}
+				}
+			}
+			j := strings.Index(s[i+1:], "amazonaws.com/")
+			if j < 0 {
+				break
+			}
+			i += 1 + j
+		}
+	}
+}
+
+func fimCaminhoURL(s string, a int) int {
+	for a < len(s) && !fimURL(s[a]) && s[a] != '?' && s[a] != '#' {
+		a++
+	}
+	return a
 }
 
 // projects/<p>/(topics|subscriptions|datasets|buckets|instances|...)/<nome> e

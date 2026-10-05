@@ -1,0 +1,170 @@
+package mask
+
+import "strings"
+
+// Caminhos fora da pasta pessoal (item 12 da revisão). A pasta pessoal (/home/u, /Users/u,
+// C:\Users\u) fica com o leitor de caminhos de usuário. Aqui:
+//
+//	/srv/x, /opt/x, /data/x, /mnt/x, /media/x, /var/www/x   cada pasta que não é pública
+//	/var/lib/x, /var/log/x, /var/opt/x, /etc/x               só pastas com cara de identificador
+//	                                                         (aqui vivem os programas instalados:
+//	                                                         /var/lib/postgresql, /etc/nginx)
+//	D:\x ... Z:\x (outras unidades)                          cada pasta que não é pública
+//	\\servidor\compartilhamento\x (UNC)                      servidor; compartilhamento e pastas
+//
+// O último pedaço com extensão é nome de arquivo e fica. Diretórios públicos do sistema
+// (bin, lib, share, log, conf...) ficam.
+
+var raizesCaminho = []struct {
+	pref    string
+	estrito bool // só pastas com cara de identificador
+}{
+	{"/srv/", false}, {"/opt/", false}, {"/data/", false}, {"/mnt/", false}, {"/media/", false}, {"/var/www/", false},
+	{"/var/lib/", true}, {"/var/log/", true}, {"/var/opt/", true}, {"/etc/", true},
+}
+
+// pastas públicas comuns dentro dessas raízes
+var pastasSistema = conj("bin", "sbin", "lib", "lib64", "share", "include", "local", "log", "logs", "conf", "config",
+	"etc", "tmp", "temp", "cache", "run", "data", "html", "www", "public", "static", "assets", "backup", "backups",
+	"current", "releases", "shared", "src", "build", "dist", "out", "docs", "doc", "man", "lost+found", "default",
+	"conf.d", "sites-available", "sites-enabled", "available", "enabled", "ssl", "certs", "private", "keys",
+	"cron.d", "systemd", "system", "init.d", "apt", "dpkg", "docker", "containerd", "kubelet", "snap", "flatpak",
+	"homebrew", "anaconda3", "miniconda3", "conda", "venv", "env", "python", "java", "node", "go", "dotnet",
+	"windows", "program files", "program files (x86)", "programdata", "users", "temp")
+
+func pastaFora(v string, estrito bool) bool {
+	if len(v) < 2 || v[0] == '.' || !nomeSimples(v) {
+		return false
+	}
+	l := strings.ToLower(v)
+	if pastasSistema[l] || pastaPublica(v) || publicoDev(v) {
+		return false
+	}
+	return !estrito || caraDeIdentificador(v)
+}
+
+// pedacosCaminho marca as pastas de s[a:] separadas por sep, até o fim do caminho.
+func pedacosCaminho(s string, a int, sep byte, estrito bool, add func(ObjAchado)) {
+	for n := 0; n < 10 && a < len(s); n++ {
+		for a < len(s) && s[a] == sep {
+			a++
+		}
+		b := a
+		for b < len(s) && (ehAlnum(s[b]) || s[b] == '.' || s[b] == '_' || s[b] == '-' || s[b] == '+') {
+			b++
+		}
+		if b == a {
+			return
+		}
+		v := s[a:b]
+		dir := b < len(s) && s[b] == sep
+		if !dir && strings.IndexByte(v, '.') > 0 {
+			return // arquivo
+		}
+		if pastaFora(v, estrito) {
+			add(ObjAchado{a, b, "pasta", "caminho", false})
+		}
+		if !dir {
+			return
+		}
+		a = b
+	}
+}
+
+// inicioCaminho: a raiz começa um caminho (não é pedaço de URL nem de outro caminho).
+func inicioCaminho(s string, i int) bool {
+	if i == 0 {
+		return true
+	}
+	c := s[i-1]
+	return c == ' ' || c == '\t' || c == '\n' || c == '"' || c == '\'' || c == '`' || c == '=' || c == '(' ||
+		c == ',' || c == ':' || c == '[' || c == '{' || c == '>'
+}
+
+func acharCaminhosFora(s string, add func(ObjAchado)) {
+	if strings.IndexByte(s, '/') >= 0 {
+		for _, r := range raizesCaminho {
+			for i := strings.Index(s, r.pref); i >= 0; {
+				// ":/srv/" só vale depois de um host (scp "host:/srv/x") ou de "=" e ":" de config
+				if inicioCaminho(s, i) && !(i >= 2 && s[i-1] == ':' && s[i-2] == '/') {
+					pedacosCaminho(s, i+len(r.pref), '/', r.estrito, add)
+				}
+				j := strings.Index(s[i+1:], r.pref)
+				if j < 0 {
+					break
+				}
+				i += 1 + j
+			}
+		}
+	}
+	if strings.IndexByte(s, '\\') < 0 {
+		return
+	}
+	// outras unidades: D:\ ... Z:\ (também escapado em JSON: D:\\)
+	for i := 1; i+2 < len(s); i++ {
+		if s[i] != ':' || s[i+1] != '\\' {
+			continue
+		}
+		u := s[i-1] | 0x20
+		if u < 'd' || u > 'z' || i >= 2 && (ehAlnum(s[i-2]) || s[i-2] == '_' || s[i-2] == '%') {
+			continue
+		}
+		a := i + 1
+		for a < len(s) && s[a] == '\\' {
+			a++
+		}
+		pedacosCaminhoBarra(s, a, add)
+	}
+	// UNC: \\servidor\compartilhamento\... (ou \\\\servidor\\... escapado)
+	for i := 0; i+3 < len(s); i++ {
+		if s[i] != '\\' || s[i+1] != '\\' || i > 0 && (s[i-1] == '\\' || ehAlnum(s[i-1])) {
+			continue
+		}
+		a := i + 2
+		for a < len(s) && s[a] == '\\' {
+			a++
+		}
+		b := a
+		for b < len(s) && (ehAlnum(s[b]) || s[b] == '.' || s[b] == '-' || s[b] == '_') {
+			b++
+		}
+		if b == a || b >= len(s) || s[b] != '\\' || a-i > 4 {
+			continue
+		}
+		h := s[a:b]
+		if !letraD(h[0]) && !ehDig(h[0]) || publicoDev(h) || dominioPublico(strings.ToLower(h)) || len(h) < 2 {
+			continue
+		}
+		add(ObjAchado{a, b, "servidor", "caminho", true})
+		pedacosCaminhoBarra(s, b, add)
+		i = b
+	}
+}
+
+// pedacosCaminhoBarra: como pedacosCaminho, com "\" (ou "\\" escapado) como separador.
+func pedacosCaminhoBarra(s string, a int, add func(ObjAchado)) {
+	for n := 0; n < 10 && a < len(s); n++ {
+		for a < len(s) && s[a] == '\\' {
+			a++
+		}
+		b := a
+		for b < len(s) && (ehAlnum(s[b]) || s[b] == '.' || s[b] == '_' || s[b] == '-' || s[b] == '$') {
+			b++
+		}
+		if b == a {
+			return
+		}
+		v := strings.TrimSuffix(s[a:b], "$") // compartilhamento administrativo: C$
+		dir := b < len(s) && s[b] == '\\'
+		if !dir && strings.IndexByte(v, '.') > 0 {
+			return
+		}
+		if pastaFora(v, false) {
+			add(ObjAchado{a, a + len(v), "pasta", "caminho", false})
+		}
+		if !dir {
+			return
+		}
+		a = b
+	}
+}

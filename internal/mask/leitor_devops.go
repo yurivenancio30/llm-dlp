@@ -1466,3 +1466,25 @@ func acharDNSK8s(s string, add func(ObjAchado)) {
 		addNome(s, sv, ns-1, "servico", "k8s-dns", true, add)
 	}
 }
+
+// Variável de ambiente em lista (Kubernetes, CI): "- name: DB_HOST" seguido de "value: x" no
+// mesmo item segue a mesma regra de "DB_HOST: x" (o nome da variável diz o tipo do valor).
+var reEnvLista = regexp.MustCompile(`(?m)^([ \t]*)-[ \t]+name:[ \t]*["']?([A-Za-z_][\w.\-]*)["']?[ \t]*\r?\n[ \t]+value:[ \t]*(["']?)([^\s"'#]+)`)
+
+func acharEnvLista(s string, add func(ObjAchado)) {
+	if !strings.Contains(s, "value:") || !strings.Contains(s, "name:") {
+		return
+	}
+	for _, m := range reEnvLista.FindAllStringSubmatchIndex(s, -1) {
+		ent, forte := entChave(s[m[4]:m[5]])
+		if ent == "" {
+			continue
+		}
+		// a linha "value:" tem que estar dentro do item (mais recuada que o "-")
+		ini := strings.LastIndexByte(s[:m[8]], '\n') + 1
+		if ini-m[0] < 0 {
+			continue
+		}
+		marcarValor(s, m[8], m[9], ent, "env-lista", forte, add)
+	}
+}

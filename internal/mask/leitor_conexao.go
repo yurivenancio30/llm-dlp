@@ -214,8 +214,9 @@ func paresConexao(s string) [][]int {
 			for k < fimChave && s[k] == ' ' {
 				k++
 			}
-			// a chave tem que começar no início de um par: começo, ; & ? espaço aspas (
-			for k < fimChave && !(k == 0 || strings.IndexByte(";&? \t\n\"'(", s[k-1]) >= 0) {
+			// a chave tem que começar no início de um par: começo, ; & ? espaço aspas ( ou o ":"
+			// do prefixo de DSN do PDO (mysql:host=...;dbname=...)
+			for k < fimChave && !(k == 0 || strings.IndexByte(";&? \t\n\"'(", s[k-1]) >= 0 || prefixoPDO(s, k-1)) {
 				k++
 				for k < fimChave && letra(s[k]) {
 					k++
@@ -254,6 +255,52 @@ func paresConexao(s string) [][]int {
 		i += n + 1
 	}
 	return out
+}
+
+// prefixoPDO: s[i] é o ":" de um DSN do PDO (mysql:, pgsql:, sqlsrv:, oci:, odbc:, dblib:,
+// firebird:, ibm:, informix:) (https://www.php.net/manual/pdo.drivers.php)
+func prefixoPDO(s string, i int) bool {
+	if i < 2 || s[i] != ':' {
+		return false
+	}
+	a := i
+	for a > 0 && s[a-1] >= 'a' && s[a-1] <= 'z' {
+		a--
+	}
+	switch s[a:i] {
+	case "mysql", "pgsql", "sqlsrv", "oci", "odbc", "dblib", "firebird", "ibm", "informix", "cubrid":
+		return a == 0 || !ehAlnum(s[a-1])
+	}
+	return false
+}
+
+// DSN do driver MySQL do Go: usuario[:senha]@protocolo(endereço)/banco[?parâmetros]
+// (https://github.com/go-sql-driver/mysql#dsn-data-source-name)
+var reDSNGo = regexp.MustCompile(`(?:^|[\s"'\x60=(,])([A-Za-z_][\w.\-]*)(?::[^@\s"'\x60]*)?@(?:tcp6?|unix)\(([^)\s"'\x60]+)\)/([A-Za-z_][\w$\-]*)`)
+
+// PDO do Oracle: oci:dbname=//host:porta/serviço
+var reDSNOci = regexp.MustCompile(`\boci:dbname=//([A-Za-z0-9_.\-]+)(?::\d+)?/([A-Za-z_][\w.$\-]*)`)
+
+func acharDSN(s string, add func(ObjAchado)) {
+	if strings.Contains(s, "@tcp") || strings.Contains(s, "@unix(") {
+		for _, m := range reDSNGo.FindAllStringSubmatchIndex(s, -1) {
+			if !publicoConexao(s[m[2]:m[3]]) {
+				add(ObjAchado{m[2], m[3], "usuario", "dsn", true})
+			}
+			if s[m[4]] != '/' { // unix(/caminho/socket) não tem host
+				addServidor(s, m[4], m[5], "dsn", add)
+			}
+			if !publicoConexao(s[m[6]:m[7]]) {
+				add(ObjAchado{m[6], m[7], "database", "dsn", true})
+			}
+		}
+	}
+	if strings.Contains(s, "oci:dbname=//") {
+		for _, m := range reDSNOci.FindAllStringSubmatchIndex(s, -1) {
+			addServidor(s, m[2], m[3], "dsn", add)
+			addPartes(s, m[4], m[5], "database", "dsn", add)
+		}
+	}
 }
 
 func semEspacoIgual(s string, m []int) bool {
