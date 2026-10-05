@@ -166,7 +166,7 @@ func (f *fracos) marcar(nome, regra string) (duas bool) {
 // aprenderObj aplica os freios e, se passar, lembra o nome (RAM e, só o hash, vistos.json).
 func (m *Masker) aprenderObj(o ObjAchado, real string, publico func(string) bool) {
 	v := strings.Trim(strings.TrimSpace(real), "[]\"`")
-	if !m.objPropaga(o.Ent) || !caraDeIdentificador(v) || rePseudoObj.MatchString(v) {
+	if len(v) < 4 || !m.objPropaga(o.Ent) || !caraDeIdentificador(v) || rePseudoObj.MatchString(v) {
 		return
 	}
 	if publico != nil && publico(v) {
@@ -264,3 +264,16 @@ func (m *Masker) IdObjeto(nome string) string { return m.idObj(nome) }
 
 // UsarLeitores troca os leitores de estrutura (os testes usam leitores próprios).
 func (m *Masker) UsarLeitores(ls []Leitor) { m.leitores = ls }
+
+// leitoresPadrao: os leitores de estrutura que vêm ligados.
+func leitoresPadrao() []Leitor {
+	return []Leitor{
+		{Nome: "sql", Achar: acharSQL, Publico: publicoSQL},
+		{Nome: "erro", Achar: acharErroObjeto, Publico: publicoSQL},
+		{Nome: "conexão", Achar: acharConexoes, Publico: publicoConexao},
+		{Nome: "tabela", Achar: acharTabelasObj, Publico: publicoSQL},
+	}
+}
+
+// LeitoresPadrao: os leitores ligados por padrão (para ferramentas de medição).
+func LeitoresPadrao() []Leitor { return leitoresPadrao() }

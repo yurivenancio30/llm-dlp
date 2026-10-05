@@ -111,8 +111,18 @@ campo: procurá-lo no texto inteiro mascararia a palavra em todo lugar. Contas d
 Nome de servidor, banco, schema, tabela, coluna, procedure, índice, usuário, namespace,
 serviço, bucket ou fila é reconhecido pela **posição na estrutura** do conteúdo (a gramática do
 SQL, a chave de uma configuração, a parte de uma URI...), nunca por parecer um nome. As regras
-de cada formato estão descritas em [estruturas.md](estruturas.md) e entram aos poucos; a base
-(pseudônimo, aprendizado, liga/desliga) já está pronta.
+de cada formato estão descritas em [estruturas.md](estruturas.md). Já ligadas:
+
+| Regra | Onde |
+|---|---|
+| SQL e DDL | Instrução com a forma da gramática (`SELECT … FROM x`, `INSERT INTO x`, `CREATE TABLE x`, `EXEC x`…), em qualquer dialeto, solta ou dentro de uma string de código. O nome depois de `FROM`/`JOIN`/`INTO`/`UPDATE`/`TABLE`/`VIEW`/`PROCEDURE`/`DATABASE`/`SCHEMA`/`INDEX` é objeto, com as partes de `servidor.banco.schema.objeto`; os outros nomes são colunas. Palavras-chave, tipos e funções nativas ficam |
+| Mensagem de erro | Palavra do tipo seguida do nome entre aspas ou colchetes (`relation "x"`, `object name 'x'`, `Table 'db.x'`), ou `Table/Dataset projeto:dataset` |
+| Conexão | Strings de conexão (`Server=…;Database=…;User Id=…`, ODBC, JDBC, DSN do libpq), URIs de banco (`postgresql://usuario@host/banco`, `jdbc:…`, `mongodb://`), `tnsnames.ora`, URNs do DataHub, `ref()`/`source()` do dbt e `conn_id` do Airflow |
+| Tabela | Saída de cliente de banco e CSV/TSV: valores das colunas de catálogo (`table_name`, `table_schema`, `column_name`, `TABNAME`, `owner`, `Tables_in_…`…) e nomes de coluna do cabeçalho que têm cara de identificador |
+
+Uma instrução em minúsculas só vale com pelo menos duas cláusulas (`select … from … where`),
+para não confundir com prosa. As regras de DevOps e de desenvolvimento entram nos próximos
+lotes.
 
 | Situação | O que acontece |
 |---|---|

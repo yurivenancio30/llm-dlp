@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -98,6 +99,56 @@ func TestIdaEVoltaValorSeguidoDePontuacao(t *testing.T) {
 					t.Errorf("%s: o arquivo gravado difere do original", caso)
 				}
 			}
+		}
+	}
+}
+
+// Nome de tabela mascarado na ida: o comando que o modelo escreve com o pseudônimo (em
+// qualquer caixa do prefixo) chega à ferramenta local com o nome real.
+func TestIdaEVoltaNomeDeTabela(t *testing.T) {
+	re := regexp.MustCompile(`\b[Tt]_[a-z2-7]{12}\b`)
+	for _, caixa := range []string{"igual", "outra"} {
+		var pseudo string
+		_, px := montar(t, func(w http.ResponseWriter, r *http.Request) {
+			b, _ := io.ReadAll(r.Body)
+			pseudo = re.FindString(string(b))
+			p := pseudo
+			if caixa == "outra" && p != "" {
+				p = strings.ToUpper(p[:1]) + p[1:]
+			}
+			arg, _ := json.Marshal(map[string]string{"command": `psql -c "SELECT count(*) FROM ` + p + `"`})
+			w.Header().Set("content-type", "text/event-stream")
+			ev := func(x any) { j, _ := json.Marshal(x); fmt.Fprintf(w, "event: x\ndata: %s\n\n", j) }
+			ev(map[string]any{"type": "content_block_start", "index": 0, "content_block": map[string]any{"type": "tool_use", "id": "t", "name": "Bash", "input": map[string]any{}}})
+			s := string(arg)
+			for i := 0; i < len(s); i += 5 {
+				ev(map[string]any{"type": "content_block_delta", "index": 0, "delta": map[string]any{"type": "input_json_delta", "partial_json": s[i:min(len(s), i+5)]}})
+			}
+			ev(map[string]any{"type": "content_block_stop", "index": 0})
+		})
+		corpo, _ := json.Marshal(map[string]any{"model": "x", "max_tokens": 1, "stream": true,
+			"messages": []any{map[string]any{"role": "user", "content": "SELECT vl_x FROM financeiro_x.tb_pedido_x9 WHERE id > 0"}}})
+		resp, err := http.Post(px.URL+"/v1/messages", "application/json", bytes.NewReader(corpo))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var entrada string
+		sc := bufio.NewScanner(resp.Body)
+		for sc.Scan() {
+			if l := sc.Text(); strings.HasPrefix(l, "data: ") {
+				var e map[string]any
+				json.Unmarshal([]byte(l[6:]), &e)
+				if d, ok := e["delta"].(map[string]any); ok {
+					entrada += d["partial_json"].(string)
+				}
+			}
+		}
+		resp.Body.Close()
+		if pseudo == "" {
+			t.Fatalf("a tabela não foi mascarada na ida")
+		}
+		if !strings.Contains(entrada, "FROM tb_pedido_x9") {
+			t.Errorf("caixa %s: o comando não voltou com o nome real", caixa)
 		}
 	}
 }

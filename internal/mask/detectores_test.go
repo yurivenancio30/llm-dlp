@@ -52,7 +52,7 @@ func TestDetecta(t *testing.T) {
 }
 
 func TestNaoDetecta(t *testing.T) {
-	m := novoTeste(t)
+	m := semObjetos(t)
 	limpos := []string{
 		"SELECT * FROM vendas WHERE id = 12345678901 AND ts > '2026-10-02 18:35:00'",
 		"versão 2.1.280, porta 8080 em 127.0.0.1, dns 8.8.8.8",
@@ -216,7 +216,7 @@ func TestDetectoresExtras(t *testing.T) {
 		"WHERE user_id = :user_id",
 	}
 	for _, s := range fica {
-		if out, ents := novoTeste(t).Mascarar(s); len(ents) > 0 {
+		if out, ents := semObjetos(t).Mascarar(s); len(ents) > 0 {
 			t.Errorf("mascarou sem precisar: %q -> %q", s, out)
 		}
 	}

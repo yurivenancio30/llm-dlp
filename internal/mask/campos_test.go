@@ -66,7 +66,7 @@ func TestCamposRotulados(t *testing.T) {
 		"usuario: postgres\nlogin = admin":                                              {"postgres", "admin"},
 	}
 	for texto, ficam := range fica {
-		out, _ := novoTeste(t).Mascarar(texto)
+		out, _ := semObjetos(t).Mascarar(texto)
 		for _, r := range ficam {
 			if !strings.Contains(out, r) {
 				t.Errorf("mascarou %q sem precisar em %q -> %q", r, texto, out)
@@ -186,7 +186,7 @@ func TestFormatosGenericos(t *testing.T) {
 		"total  used  free\n  16G    8G    8G\n",
 	}
 	for _, s := range intactos {
-		if out, ents := novoTeste(t).Mascarar(s); len(ents) > 0 {
+		if out, ents := semObjetos(t).Mascarar(s); len(ents) > 0 {
 			t.Errorf("mascarou sem precisar:\n   %q\n-> %q", s, out)
 		}
 	}

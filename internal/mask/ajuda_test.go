@@ -106,3 +106,11 @@ func numerar(texto string) string {
 	}
 	return b.String()
 }
+
+// semObjetos: sem os leitores de estrutura (nomes de tabela, coluna, servidor...), para os
+// testes que olham só os detectores de dado pessoal.
+func semObjetos(t *testing.T) *Masker {
+	m := novoTeste(t)
+	m.cfg.Objetos.Ligado = false
+	return m
+}
