@@ -32,6 +32,15 @@ var entTipoNome = map[string]string{"ns": "namespace", "namespace": "namespace",
 var subcomandosOperacao = conj("get", "describe", "logs", "exec", "rollout", "scale", "delete", "apply", "edit",
 	"patch", "port-forward", "top", "create", "expose", "attach", "cp", "install", "upgrade", "uninstall", "status")
 
+// tipoNomeCLI: "deploy/x" (a regex só roda em token com "/" que começa com letra minúscula)
+func tipoNomeCLI(v string) []int {
+	i := strings.IndexByte(v, '/')
+	if i < 2 || i > 14 || v[0] < 'a' || v[0] > 'z' {
+		return nil
+	}
+	return reTipoNome.FindStringSubmatchIndex(v)
+}
+
 func numeroCLI(v string) bool {
 	for i := 0; i < len(v); i++ {
 		if !ehDig(v[i]) && v[i] != '.' && v[i] != ',' {
@@ -112,7 +121,7 @@ func comandoCLI(s string, toks []tokenCLI, add func(ObjAchado)) {
 	for k, t := range toks {
 		v := s[t.a:t.b]
 		// "123 ns/op" (saída de benchmark) não é recurso: o tipo/nome vem depois de um comando
-		if m := reTipoNome.FindStringSubmatchIndex(v); m != nil && k > 0 && !numeroCLI(s[toks[k-1].a:toks[k-1].b]) {
+		if m := tipoNomeCLI(v); m != nil && k > 0 && !numeroCLI(s[toks[k-1].a:toks[k-1].b]) {
 			temTipoNome = true
 			ent := entTipoNome[v[m[2]:m[3]]]
 			if ent == "" {

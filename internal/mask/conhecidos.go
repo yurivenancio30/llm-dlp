@@ -240,10 +240,13 @@ func (c *conhecidos) contemDesde(s string, g int) bool {
 		}
 	})
 	if !achou && c.nObj > 0 {
-		for _, ix := range reTokObj.FindAllStringIndex(s, -1) {
-			if v := s[ix[0]:ix[1]]; novo("O:"+v) || novo("o:"+strings.ToLower(v)) {
-				return true
+		tokensObj(s, func(a, b int) {
+			if v := s[a:b]; !achou && (novo("O:"+v) || novo("o:"+strings.ToLower(v))) {
+				achou = true
 			}
+		})
+		if achou {
+			return true
 		}
 	}
 	return achou

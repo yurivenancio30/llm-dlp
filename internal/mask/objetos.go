@@ -151,7 +151,7 @@ func ehPseudoObj(v string) bool {
 // caixa ("tb_pedido", "srv01", "app.config", "svc-pedidos", "contaCorrente"). Ficam de fora
 // versões, UUIDs e hashes, que têm dígitos mas não são nomes.
 func caraDeIdentificador(v string) bool {
-	if len(v) < 3 || len(v) > 128 || reVersaoOuHash.MatchString(v) {
+	if len(v) < 3 || len(v) > 128 || temDigito(v) && reVersaoOuHash.MatchString(v) {
 		return false
 	}
 	letra := false
@@ -263,8 +263,32 @@ func (m *Masker) acharObjetos(s string, aprende bool, add func(ini, fim int, tip
 	}
 }
 
-// reTokObj: candidatos a nome aprendido no texto (palavras com "_", "-", "$", "#" no meio).
-var reTokObj = regexp.MustCompile(`[A-Za-z_][A-Za-z0-9_$#]*(?:-[A-Za-z0-9_$#]+)*`)
+// tokensObj chama fn para cada candidato a nome aprendido em s: [A-Za-z_][A-Za-z0-9_$#]*
+// com pedaços "-..." no meio (o mesmo que a regex `[A-Za-z_][\w$#]*(?:-[\w$#]+)*`, sem o
+// custo de uma regex no texto inteiro).
+func tokensObj(s string, fn func(a, b int)) {
+	ident := func(c byte) bool { return ehAlnum(c) || c == '_' || c == '$' || c == '#' }
+	for i := 0; i < len(s); {
+		c := s[i]
+		if !(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c == '_') {
+			i++
+			continue
+		}
+		j := i + 1
+		for {
+			for j < len(s) && ident(s[j]) {
+				j++
+			}
+			if j+1 < len(s) && s[j] == '-' && ident(s[j+1]) {
+				j++
+				continue
+			}
+			break
+		}
+		fn(i, j)
+		i = j
+	}
+}
 
 // acharObjetosConhecidos: nomes aprendidos (em RAM ou, só o hash, no vistos.json) que
 // aparecem em s, em qualquer caixa e fora de qualquer estrutura.
@@ -278,13 +302,14 @@ func (m *Masker) acharObjetosConhecidos(s string, add func(ini, fim int, tipo st
 		return
 	}
 	d := hoje()
-	for _, ix := range reTokObj.FindAllStringIndex(s, -1) {
+	tokensObj(s, func(a0, b0 int) {
+		ix := [2]int{a0, b0}
 		v := s[ix[0]:ix[1]]
 		if !caraDeIdentificador(v) {
-			continue
+			return
 		}
 		if ix[0] > 0 && (s[ix[0]-1] == '-' || ehAlnum(s[ix[0]-1])) {
-			continue
+			return
 		}
 		c.mu.RLock()
 		tp, ok := c.canon["O:"+v] // grafia exata
@@ -297,10 +322,10 @@ func (m *Masker) acharObjetosConhecidos(s string, add func(ini, fim int, tipo st
 			if ent := strings.TrimPrefix(tp, prefTipoObj); m.objPropaga(ent) {
 				add(ix[0], ix[1], tp)
 			}
-			continue
+			return
 		}
 		if !disco {
-			continue
+			return
 		}
 		chave := "O:" + v
 		ent, visto, ok := m.vistos.Obj(m.idObj(chave))
@@ -310,12 +335,12 @@ func (m *Masker) acharObjetosConhecidos(s string, add func(ini, fim int, tipo st
 			ok = ok && entSQL[ent]
 		}
 		if !ok || d-visto > validadeObj || !m.objPropaga(ent) {
-			continue
+			return
 		}
 		add(ix[0], ix[1], prefTipoObj+ent)
 		c.aprender(prefTipoObj+ent, v) // volta para a memória
 		m.vistos.MarcarObj(m.idObj(chave), ent, d)
-	}
+	})
 }
 
 // UsarLeitores troca os leitores de estrutura (os testes usam leitores próprios).

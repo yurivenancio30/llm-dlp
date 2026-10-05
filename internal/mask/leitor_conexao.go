@@ -122,8 +122,24 @@ func acharConexoes(s string, add func(ObjAchado)) {
 			}
 		}
 	}
-	if strings.Contains(s, "//") {
-		for _, m := range reURIBanco.FindAllStringSubmatchIndex(s, -1) {
+	// URIs de banco: em vez de rodar a regex no texto inteiro, parte de cada "://" e lê o
+	// esquema para trás; a regex só roda numa janela curta a partir do esquema
+	for i := strings.Index(s, "://"); i >= 0; {
+		a := i
+		for a > 0 && (ehAlnum(s[a-1]) || s[a-1] == '+' || s[a-1] == ':' || s[a-1] == '_') {
+			a--
+		}
+		ini := a
+		fim := min(len(s), i+3+300)
+		if !esquemaDeBanco(s[ini:i]) {
+			ini = fim // http://, https://, ftp://...: não é URI de banco
+		}
+		for _, m := range reURIBanco.FindAllStringSubmatchIndex(s[ini:fim], 1) {
+			for k := range m {
+				if m[k] >= 0 {
+					m[k] += ini
+				}
+			}
 			if m[2] >= 0 && !publicoConexao(s[m[2]:m[3]]) {
 				add(ObjAchado{m[2], m[3], "usuario", "uri", true})
 			}
@@ -137,10 +153,17 @@ func acharConexoes(s string, add func(ObjAchado)) {
 				add(ObjAchado{m[6], m[7], "database", "uri", true})
 			}
 		}
+		j := strings.Index(s[i+3:], "://")
+		if j < 0 {
+			break
+		}
+		i += 3 + j
 	}
-	for _, m := range reJDBCOracle.FindAllStringSubmatchIndex(s, -1) {
-		addServidor(s, m[2], m[3], "uri", add)
-		addPartes(s, m[4], m[5], "database", "uri", add)
+	if strings.Contains(s, "oracle:thin") {
+		for _, m := range reJDBCOracle.FindAllStringSubmatchIndex(s, -1) {
+			addServidor(s, m[2], m[3], "uri", add)
+			addPartes(s, m[4], m[5], "database", "uri", add)
+		}
 	}
 	if strings.Contains(s, "(") {
 		for _, m := range reTNS.FindAllStringSubmatchIndex(s, -1) {
@@ -255,6 +278,23 @@ func paresConexao(s string) [][]int {
 		i += n + 1
 	}
 	return out
+}
+
+// esquemaDeBanco: "jdbc:...", "postgresql", "mysql+pymysql", "mongodb+srv"... (o que vem antes de "://")
+func esquemaDeBanco(e string) bool {
+	e = strings.ToLower(e)
+	if strings.HasPrefix(e, "jdbc:") {
+		return true
+	}
+	if i := strings.IndexByte(e, '+'); i >= 0 {
+		e = e[:i]
+	}
+	switch e {
+	case "postgres", "postgresql", "mysql", "mariadb", "mssql", "sqlserver", "oracle", "redshift", "snowflake",
+		"mongodb", "clickhouse", "db2", "teradata", "presto", "trino", "hive", "cockroachdb", "sqlite":
+		return true
+	}
+	return false
 }
 
 // prefixoPDO: s[i] é o ":" de um DSN do PDO (mysql:, pgsql:, sqlsrv:, oci:, odbc:, dblib:,
