@@ -167,7 +167,8 @@ func (m *Masker) acharCampos(s string, add func(ini, fim int, tipo string)) {
 				fim++
 			}
 		} else {
-			for fim < len(s) && fim-ini < 120 && !strings.ContainsRune("\n\"',;|{}[]<", rune(s[fim])) {
+			// a crase e o ">" fecham código e marcação em volta do valor ("`User ID=x`", "<b>x</b>")
+			for fim < len(s) && fim-ini < 120 && !strings.ContainsRune("\n\"'`,;|{}[]<>", rune(s[fim])) {
 				fim++
 			}
 			if c == '=' {
@@ -195,13 +196,40 @@ func (m *Masker) acharCampos(s string, add func(ini, fim int, tipo string)) {
 				fim = p
 			}
 		}
-		for fim > ini && (s[fim-1] == ' ' || s[fim-1] == '\t' || s[fim-1] == '\r' || s[fim-1] == '.') {
-			fim--
-		}
+		fim = apararValor(s, ini, fim)
 		if fim > ini {
 			marcar(s, ini, fim, classe, add)
 		}
 	}
+}
+
+// apararValor tira do fim do valor o que é da frase ou da marcação em volta, e não do valor:
+// espaço, ponto final, e ")", "]", "}" ou "*" sem a abertura correspondente dentro do valor
+// ("(User ID=x)", "**User ID=x**"). Sem isto, o fechamento ia junto para dentro do
+// pseudônimo: o modelo não o via, e um valor com ")" era descartado inteiro (e saía em claro).
+func apararValor(s string, ini, fim int) int {
+	for fim > ini {
+		v := s[ini:fim]
+		switch s[fim-1] {
+		case ' ', '\t', '\r', '.', '*':
+		case ')':
+			if strings.Count(v, "(") >= strings.Count(v, ")") {
+				return fim
+			}
+		case ']':
+			if strings.Count(v, "[") >= strings.Count(v, "]") {
+				return fim
+			}
+		case '}':
+			if strings.Count(v, "{") >= strings.Count(v, "}") {
+				return fim
+			}
+		default:
+			return fim
+		}
+		fim--
+	}
+	return fim
 }
 
 // classeAntes classifica o rótulo que termina logo antes de s[i] (o separador). Tenta com a
