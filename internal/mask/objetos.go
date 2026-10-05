@@ -16,12 +16,14 @@ import (
 // EntObjeto: tipo de entidade -> prefixo do pseudônimo.
 var EntObjeto = map[string]string{"servidor": "HOST", "database": "DB", "schema": "SCH", "tabela": "T",
 	"coluna": "C", "procedure": "PROC", "indice": "IDX", "usuario": "USR", "namespace": "NS",
-	"servico": "SVC", "bucket": "BKT", "fila": "TOP"}
+	"servico": "SVC", "bucket": "BKT", "fila": "TOP",
+	"repositorio": "REPO", "organizacao": "ORG", "pacote": "PKG", "pasta": "DIR", "conta_nuvem": "ACC"}
 
 // propagaPadrao: tipos que, aprendidos, são mascarados também fora da posição estrutural.
 // Coluna e índice não: nomes como user_id e created_at existem em todo código.
 var propagaPadrao = map[string]bool{"servidor": true, "database": true, "schema": true, "tabela": true,
-	"procedure": true, "usuario": true, "namespace": true, "servico": true, "bucket": true, "fila": true}
+	"procedure": true, "usuario": true, "namespace": true, "servico": true, "bucket": true, "fila": true,
+	"repositorio": true, "organizacao": true, "pacote": true, "pasta": true, "conta_nuvem": true}
 
 const prefTipoObj = "obj." // o tipo interno de um objeto: "obj.tabela"
 
@@ -93,7 +95,7 @@ func (m *Masker) pseudoObjeto(ent, real string) string {
 }
 
 // rePseudoObj: um pseudônimo de objeto já pronto (não é mascarado de novo).
-var rePseudoObj = regexp.MustCompile(`^(?i:host|db|sch|t|c|proc|idx|usr|ns|svc|bkt|top|obj)_[a-z2-7]{12}$`)
+var rePseudoObj = regexp.MustCompile(`^(?i:host|db|sch|t|c|proc|idx|usr|ns|svc|bkt|top|repo|org|pkg|dir|acc|obj)_[a-z2-7]{12}$`)
 
 // caraDeIdentificador: o freio que separa um nome de recurso de uma palavra comum. Só nomes
 // assim são aprendidos e propagados: têm "_", dígito, ponto, hífen entre partes ou mistura de
