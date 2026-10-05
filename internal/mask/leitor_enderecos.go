@@ -5,12 +5,6 @@ import "strings"
 // Vocabulário e regras de domínio comuns aos leitores do lote D (chave-valor, endereços,
 // repositórios, pacotes, caminhos, nuvem). Ver docs/estruturas.md.
 
-// Sufixos de nome interno: RFC 6762 (.local, mDNS), RFC 8375 (.home.arpa), a reserva da ICANN
-// para .internal (2024), o DNS do Kubernetes (.svc, .cluster.local) e as convenções de rede
-// privada mais comuns (.intra, .intranet, .interno, .corp, .lan, .localdomain).
-var sufixosInternos = []string{".cluster.local", ".home.arpa", ".local", ".internal", ".intra", ".intranet",
-	".interno", ".corp", ".lan", ".svc", ".localdomain"}
-
 func sufixoInterno(h string) bool {
 	// nome DNS de serviço do Kubernetes (servico.namespace.svc[.cluster.local]): fica com o
 	// leitor de Kubernetes, que mascara o serviço e o namespace e deixa o sufixo público
@@ -24,16 +18,6 @@ func sufixoInterno(h string) bool {
 	}
 	return false
 }
-
-// TLDs genéricos mais usados (lista da IANA, https://data.iana.org/TLD/tlds-alpha-by-domain.txt,
-// recortada nos de uso comum). Todo TLD de 2 letras é de país (ISO 3166) e também é público.
-var tldsPublicos = conj("com", "net", "org", "edu", "gov", "mil", "int", "info", "biz", "io", "ai", "app", "dev",
-	"cloud", "tech", "online", "site", "xyz", "name", "pro", "aero", "coop", "museum", "mobi", "asia", "tel", "travel",
-	"jobs", "page", "blog", "store", "shop", "web", "news", "live", "art", "design", "digital", "network", "systems",
-	"solutions", "software", "codes", "tools", "run", "build", "google", "aws", "azure", "microsoft", "amazon", "apple")
-
-// Nomes reservados para documentação e teste (RFC 2606, RFC 6761): nunca são recurso real.
-var tldsReservados = conj("invalid", "example", "test", "localhost")
 
 // dominioPublico: nome com TLD público ou reservado (não é mascarado: domínio do cliente vai em
 // dominios_internos e é pego pelo detector de host).
@@ -67,24 +51,6 @@ func hostInterno(h string) bool {
 	return sufixoInterno(h)
 }
 
-// Palavras genéricas ("user", "bucket") e nomes de software ou padrões públicos que aparecem na
-// posição de um recurso. Nada é deixado em claro por "parecer exemplo" (my-*, example-*): um
-// nome desses pode ser real; na dúvida, mascara. Fontes: os usuários padrão das imagens de nuvem e de CI (ec2-user, ubuntu, azureuser, opc, runner,
-// jovyan, vagrant, linuxbrew) e os namespaces do Kubernetes (default, kube-system...).
-var vocabDev = conj(
-	"localhost", "test", "testing", "host", "hostname", "server", "domain", "user", "username", "usuario",
-	"name", "value", "nobody", "anonymous", "guest", "admin", "administrator", "administrators", "root",
-	"system", "users", "shared", "public", "default", "all users", "default user", "dev", "prod", "production",
-	"staging", "stage", "development", "sandbox", "main", "master", "origin", "upstream", "remote", "local",
-	"true", "false", "null", "nil", "none", "yes", "no", "on", "off", "undefined", "required", "optional",
-	"auto", "git", "ubuntu", "ec2-user", "centos", "debian", "fedora", "bitnami", "azureuser", "opc", "pi",
-	"vagrant", "runner", "jovyan", "linuxbrew", "travis", "circleci", "jenkins", "node", "www-data", "gopher",
-	"vscode", "codespace", "postgres", "sqlite", "redis", "mongo", "mongodb", "kafka", "rabbitmq", "nginx",
-	"apache", "httpd", "docker", "kubernetes", "k8s", "kube-system", "kube-public", "kube-node-lease",
-	"gunicorn", "uvicorn", "envoy", "bucket", "topic", "queue", "app", "service", "cluster", "instance",
-	"namespace", "repo", "owner", "org", "database", "db", "dbo", "schema", "table",
-)
-
 func publicoDev(v string) bool {
 	l := strings.ToLower(v)
 	return vocabDev[l] || publicoConexao(l) || receptoresCodigo[l]
@@ -113,11 +79,6 @@ func acharEnderecos(s string, add func(ObjAchado)) {
 	}
 	acharHostsInternos(s, add)
 }
-
-// esquemas cujo "host" não é servidor, ou que outro leitor já cobre
-var esquemasBanco = conj("jdbc", "postgres", "postgresql", "mysql", "mariadb", "mssql", "sqlserver", "oracle",
-	"redshift", "snowflake", "mongodb", "mongodb+srv", "clickhouse", "db2", "teradata", "presto", "trino", "hive",
-	"cockroachdb", "sqlite", "file")
 
 func urlEm(s string, i int, add func(ObjAchado)) {
 	a := i
@@ -391,9 +352,6 @@ func acharHostsInternos(s string, add func(ObjAchado)) {
 	}
 }
 
-var raizesPacote = conj("com", "org", "net", "io", "java", "javax", "jakarta", "sun", "jdk", "android", "androidx",
-	"kotlin", "scala", "akka", "golang", "std", "self", "this", "cls", "os", "sys", "threading", "asyncio")
-
 func hostInternoEm(s string, i, fim int, add func(ObjAchado)) {
 	a := i
 	for a > 0 && (ehAlnum(s[a-1]) || s[a-1] == '-' || s[a-1] == '.' || s[a-1] == '_') {
@@ -433,16 +391,6 @@ func hostInternoEm(s string, i, fim int, add func(ObjAchado)) {
 }
 
 // ---- caminhos de usuário --------------------------------------------------------------
-
-// Pastas de sistema e convenções públicas que têm cara de identificador (as palavras simples
-// como Documents, Desktop, bin, src não têm, e já ficam). Fontes: layout do Windows (Known
-// Folders), do macOS (File System Programming Guide), do Python (site-packages,
-// dist-packages, __pycache__), do Node (node_modules), do Go (go-build) e das IDEs da JetBrains.
-var pastasPublicas = conj("node_modules", "site-packages", "dist-packages", "__pycache__", "appdata", "locallow",
-	"onedrive", "ideaprojects", "pycharmprojects", "androidstudioprojects", "go-build", "lost+found",
-	"application data", "my documents", "program files", "programdata", "windowsapps", "microsoft",
-	"github.com", "gitlab.com", "bitbucket.org", "golang.org", "google.golang.org", "gopkg.in", "go.uber.org",
-	"k8s.io", "sigs.k8s.io", "pkg", "mod", "cache", "go-mod", "vscode-server", "jetbrains")
 
 func pastaPublica(v string) bool {
 	l := strings.ToLower(v)
@@ -529,10 +477,6 @@ func caminhoEm(s string, u int, add func(ObjAchado)) {
 }
 
 // ---- usuário de rede ------------------------------------------------------------------
-
-// domínios e contas embutidos do Windows (Well-known SIDs e as raízes do Registro)
-var dominiosPublicos = conj("AUTHORITY", "BUILTIN", "SERVICE", "WORKGROUP", "HKLM", "HKCU", "HKCR", "HKU", "HKCC",
-	"SOFTWARE", "SYSTEM", "MACHINE", "WINDOWS", "SYSTEM32", "PROGRA~1", "FONT", "DEVICE", "GLOBAL", "LOCAL", "PIPE")
 
 func acharUsuariosRede(s string, add func(ObjAchado)) {
 	if strings.IndexByte(s, '\\') >= 0 {

@@ -16,43 +16,6 @@ import "strings"
 // sem espaços em volta); nome pontuado sem dígito/hífen ("self.host", "cfg.user") é acesso a
 // atributo. Domínio público (TLD conhecido) não é mascarado.
 
-// último pedaço do nome da chave (minúsculas) -> entidade
-var entPedaco = map[string]string{
-	"host": "servidor", "hostname": "servidor", "server": "servidor", "servidor": "servidor", "endpoint": "servidor",
-	"address": "servidor", "addr": "servidor", "fqdn": "servidor", "broker": "servidor", "bootstrap": "servidor",
-	"bootstrapservers": "servidor", "servername": "servidor",
-	"cluster": "servidor", "instance": "servidor", "warehouse": "servidor",
-	"database": "database", "db": "database", "dbname": "database", "databasename": "database", "catalog": "database",
-	"schema": "schema", "dataset": "schema", "schemaname": "schema",
-	"table": "tabela", "tabela": "tabela", "collection": "tabela", "tablename": "tabela",
-	"user": "usuario", "username": "usuario", "usuario": "usuario", "login": "usuario", "principal": "usuario",
-	"namespace": "namespace",
-	"service":   "servico", "servico": "servico", "app": "servico", "application": "servico",
-	"bucket": "bucket", "container": "bucket",
-	"queue": "fila", "topic": "fila", "fila": "fila", "topico": "fila", "exchange": "fila", "stream": "fila", "subject": "fila",
-	"group": "servico", "consumergroup": "servico",
-	"repo": "repositorio", "repository": "repositorio",
-	"org": "organizacao", "organization": "organizacao",
-	"account": "conta_nuvem", "tenant": "conta_nuvem", "subscription": "conta_nuvem", "projectid": "conta_nuvem",
-}
-
-// atributos: último pedaço de chave que não é o nome do recurso ("db.port", "host.timeout")
-var atributoChave = conj("name", "names", "id", "ids", "port", "ports", "timeout", "timeouts", "count", "size", "enabled", "enable", "disabled", "max",
-	"min", "version", "type", "mode", "ttl", "retries", "retry", "interval", "pass"+"word", "passwd", "pwd", "secret",
-	"token", "key", "keys", "agent", "format", "level", "limit", "suffix", "encoding", "charset", "ssl", "tls",
-	"protocol", "scheme", "driver", "class", "dialect", "pool", "timezone", "locale", "lang", "url", "uri", "path",
-	"file", "dir", "region", "zone", "weight", "priority", "delay", "length", "capacity", "batch", "concurrency")
-
-// plurais aceitos como o tipo (o nome guarda uma lista desse tipo)
-var pluralTipo = conj("topics", "queues", "buckets", "hosts", "servers", "brokers", "tables", "databases", "schemas",
-	"namespaces", "clusters", "subjects", "streams", "exchanges")
-
-// "<x>_name": o pedaço antes de "name" diz a entidade (db_name, table_name...)
-var entAntesDeNome = map[string]string{"db": "database", "database": "database", "table": "tabela", "schema": "schema",
-	"host": "servidor", "server": "servidor", "user": "usuario", "service": "servico", "bucket": "bucket", "queue": "fila",
-	"topic": "fila", "group": "servico", "namespace": "namespace", "cluster": "servidor", "collection": "tabela",
-	"stream": "fila", "subject": "fila", "exchange": "fila", "repo": "repositorio", "container": "bucket"}
-
 // pedacosChave divide um nome em pedaços por . _ - : e camelCase ("dbHost" -> db, Host;
 // "DBHost" -> DB, Host). Devolve no máximo len(ps) pedaços; ok=false se havia mais.
 func pedacosChave(k string, ps *[16][2]int) (n int, ok bool) {
@@ -162,15 +125,6 @@ func entChave(k string) (ent string, forte bool) {
 	}
 	return "", false
 }
-
-// receptores comuns de código: "self.host", "cfg.user", "process.env" são acesso a atributo
-var receptoresCodigo = conj("self", "this", "cls", "cfg", "conf", "config", "settings", "options", "opts", "args",
-	"os", "env", "process", "req", "request", "ctx", "params", "props", "state", "data", "obj", "window", "document",
-	"module", "exports", "super", "m", "c", "r", "s", "t", "u", "x", "v", "p")
-
-// palavras de tipo (anotações "host: str", ajuda de flags "--host string")
-var palavrasTipo = conj("str", "string", "int", "integer", "bool", "boolean", "float", "number", "bytes", "any",
-	"object", "list", "dict", "map", "array", "optional", "none", "text", "uri", "url", "duration")
 
 // tracoOuDigito: o valor tem dígito ou hífen entre letras/dígitos, que nome de variável não tem
 func tracoOuDigito(v string) bool {
@@ -398,12 +352,6 @@ func ultimoPedaco(k string) string {
 	}
 	return k[ps[n-1][0]:ps[n-1][1]]
 }
-
-// extensões de arquivo comuns: "config.yaml" não é host
-var extensoesArquivo = conj("json", "yaml", "yml", "toml", "ini", "txt", "csv", "tsv", "go", "py", "js", "ts", "jsx",
-	"tsx", "sql", "sh", "md", "xml", "html", "htm", "conf", "cfg", "properties", "env", "log", "jar", "war", "zip",
-	"gz", "tgz", "tar", "pem", "key", "crt", "java", "rb", "rs", "c", "h", "cpp", "php", "pdf", "png", "jpg", "parquet",
-	"avro", "lock", "mod", "sum", "exe", "dll", "so", "class", "pyc", "whl", "proto")
 
 // valorRecurso: o valor pode ser nome de recurso (e não número, caminho, expressão, palavra
 // pública, domínio público ou nome de arquivo).

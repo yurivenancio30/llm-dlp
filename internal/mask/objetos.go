@@ -320,36 +320,3 @@ func (m *Masker) acharObjetosConhecidos(s string, add func(ini, fim int, tipo st
 
 // UsarLeitores troca os leitores de estrutura (os testes usam leitores próprios).
 func (m *Masker) UsarLeitores(ls []Leitor) { m.leitores = ls }
-
-// leitoresPadrao: os leitores de estrutura que vêm ligados.
-func leitoresPadrao() []Leitor {
-	return []Leitor{
-		{Nome: "sql", Achar: acharSQL, Publico: publicoSQL},
-		{Nome: "erro", Achar: acharErroObjeto, Publico: publicoSQL},
-		{Nome: "conexão", Achar: acharConexoes, Publico: publicoConexao},
-		{Nome: "tabela", Achar: acharTabelasObj, Publico: publicoSQL},
-		{Nome: "devops-yaml", Achar: acharDevopsEstruturado, Publico: publicoDevops},
-		{Nome: "terraform", Achar: acharTerraform, Publico: publicoDevops},
-		{Nome: "ansible-ini", Achar: acharAnsibleINI, Publico: publicoDevops},
-		{Nome: "bicep", Achar: acharBicep, Publico: publicoDevops},
-		{Nome: "jenkins", Achar: acharJenkins, Publico: publicoDevops},
-		{Nome: "k8s-dns", Achar: acharDNSK8s, Publico: publicoDevops},
-		{Nome: "chave-valor", Achar: acharChaveValor, Publico: publicoDev},
-		{Nome: "endereço", Achar: acharEnderecos, Publico: publicoDev},
-		{Nome: "git", Achar: acharGitSCP, Publico: publicoDev},
-		{Nome: "pacote", Achar: acharPacotes, Publico: publicoDev},
-		{Nome: "caminho", Achar: acharCaminhos, Publico: publicoDev},
-		{Nome: "usuário de rede", Achar: acharUsuariosRede, Publico: publicoDev},
-		{Nome: "nuvem", Achar: acharNuvem, Publico: publicoDev},
-		{Nome: "código-nome", Achar: acharCodigoNome, Publico: publicoDev},
-		{Nome: "código-chamada", Achar: acharCodigoChamada, Publico: publicoDev},
-		{Nome: "linha-de-comando", Achar: acharCLI, Publico: publicoDev},
-		{Nome: "caminho-sistema", Achar: acharCaminhosFora, Publico: publicoDev},
-		{Nome: "url-nuvem", Achar: acharURLsNuvem, Publico: publicoDev},
-		{Nome: "dsn", Achar: acharDSN, Publico: publicoConexao},
-		{Nome: "env-lista", Achar: acharEnvLista, Publico: publicoDev},
-	}
-}
-
-// LeitoresPadrao: os leitores ligados por padrão (para ferramentas de medição).
-func LeitoresPadrao() []Leitor { return leitoresPadrao() }

@@ -80,8 +80,7 @@ func NovoMasker(cfg config.Config, chave []byte, pessoas *Pessoas, vistos *Visto
 	d.MaxDecodeDepth = 2
 	m := &Masker{cfg: cfg, p: NovoPseudo(chave), leaks: d, pessoas: pessoas, vistos: vistos, conh: novosConhecidos(),
 		memo: map[[32]byte]resultado{}, cong: map[Posicao]resultado{}, rotTermo: map[string]string{},
-		chaveB64: base64.StdEncoding.EncodeToString(chave), leitores: leitoresPadrao()}
-	m.leitores = append(m.leitores, leitoresConfig(cfg)...) // IP público, termos embutidos
+		chaveB64: base64.StdEncoding.EncodeToString(chave), leitores: leitoresDe(cfg)}
 	// vocabulário dos nomes de campo: o padrão mais o que o usuário acrescentou
 	m.vocab = vocabularioPadrao()
 	m.vocab.quase = cfg.Opcional("quase")

@@ -43,6 +43,25 @@ internal/mask/        detecção e troca por pseudônimos
   conhecidos.go         valores já mascarados são reconhecidos depois (em memória)
   vistos.go             os mesmos valores em disco, só como hash
   enviados.go           o que cada texto já enviado levou, por ponto da conversa (para sair igual nos reenvios)
+  objetos.go            nomes de recursos internos: tipos, pseudônimo, aprendizado com freios
+  leitores.go           registro de todos os leitores de estrutura (fixos e da configuração)
+  leitor_sql.go           SQL e DDL, mensagens de erro que citam objetos (vocab_sql.txt)
+  leitor_tabela.go        saídas de banco e tabelas de catálogo
+  leitor_conexao.go       strings de conexão, URIs de banco, DSN, tnsnames, URNs, dbt, Airflow
+  leitor_yaml.go          motor de YAML/JSON por caminho e o despachante das famílias
+  leitor_kubernetes.go    Kubernetes, Helm, imagens, DNS de serviço, env em lista
+  leitor_iac.go           Terraform/HCL, Bicep, ARM, CloudFormation
+  leitor_ansible.go       inventário do Ansible
+  leitor_ci.go            pipelines de CI e Jenkinsfile
+  leitor_chave_valor.go   chave-valor genérico (YAML, JSON, INI, .env, .properties, XML, --opção)
+  leitor_enderecos.go     hosts internos, armazenamento e filas, git, usuário de rede, pasta pessoal
+  leitor_caminhos.go      caminhos fora da pasta pessoal, outras unidades, UNC
+  leitor_nuvem_pacotes.go ARN, Azure, GCP, URLs de nuvem, pacotes internos
+  leitor_codigo.go        código em qualquer linguagem: o nome ao lado e a função chamada dizem o tipo
+  leitor_cli.go           linha de comando
+  leitor_ip.go            IP público e IPv6 (opcional)
+  leitor_termos.go        termos da empresa embutidos em identificadores
+  vocab_dev.go            listas compartilhadas (palavras de tipo, sufixos internos, nomes públicos)
   pessoas.go            registro de pessoas (nomes, e-mails, códigos), só como hash
   chave.go              a chave secreta e os identificadores derivados dela
   pseudonimos.go        troca dos achados por pseudônimos
