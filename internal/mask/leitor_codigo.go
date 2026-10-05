@@ -82,7 +82,10 @@ func nomeAntes(s string, k int) string {
 			return ""
 		}
 		a += max(0, k-120)
-		return s[a+1 : k]
+		if v := s[a+1 : k]; chaveComForma(v) {
+			return v
+		}
+		return ""
 	case s[k] == ']':
 		a := strings.LastIndexByte(s[max(0, k-120):k], '[')
 		if a < 0 {
@@ -90,7 +93,7 @@ func nomeAntes(s string, k int) string {
 		}
 		a += max(0, k-120)
 		v := strings.TrimSpace(s[a+1 : k])
-		if len(v) >= 2 && ehAspa(v[0]) && v[len(v)-1] == v[0] {
+		if len(v) >= 2 && ehAspa(v[0]) && v[len(v)-1] == v[0] && chaveComForma(v[1:len(v)-1]) {
 			return v[1 : len(v)-1]
 		}
 		return ""
@@ -109,6 +112,39 @@ func nomeAntes(s string, k int) string {
 	return ""
 }
 
+// valorMarcado: em código, só ensina sozinho o valor com dígito, "_" ou "." (pgsrv-01, vendas_prd,
+// db.interno); "payments-api" é mascarado no lugar e só é aprendido se aparecer em duas regras
+// (duas palavras com hífen aparecem demais em código público).
+func valorMarcado(v string) bool { return strings.ContainsAny(v, "0123456789_.") }
+
+// ambiguaNoCodigo: o último pedaço do nome é uma palavra de tipo que, em código, quase sempre
+// quer dizer outra coisa: stream (fluxo de entrada e saída), subject (assunto de e-mail)
+func ambiguaNoCodigo(nome string) bool {
+	switch strings.ToLower(ultimoPedaco(nome)) {
+	case "stream", "streams", "subject", "subjects":
+		return true
+	}
+	return false
+}
+
+// embrulho: funções que só embrulham o valor (aws.String("x"), to.Ptr("x"), Optional.of("x"))
+var embrulho = conj("string", "str", "ptr", "toptr", "stringptr", "pointer", "some", "of", "value", "valueof",
+	"stringvalue", "new", "text", "s")
+
+// chaveComForma: uma chave entre aspas que é um nome ("host", "Kafka:Topic", "db.host"), e não
+// uma URL ou uma frase
+func chaveComForma(v string) bool {
+	if v == "" || len(v) > 80 || strings.Contains(v, "//") || !(letraD(v[0]) || v[0] == '_') {
+		return false
+	}
+	for i := 0; i < len(v); i++ {
+		if c := v[i]; !(ehAlnum(c) || c == '_' || c == '.' || c == '-' || c == ':') {
+			return false
+		}
+	}
+	return true
+}
+
 // tipoComum: nomes de tipo que aparecem entre o nome e o "=" ("String x =" fica com x, mas
 // "x: String =" precisa pular "String").
 func tipoComum(v string) bool {
@@ -124,7 +160,8 @@ func acharCodigoNome(s string, add func(ObjAchado)) {
 		return
 	}
 	for i := 0; i < len(s); i++ {
-		if !ehAspa(s[i]) {
+		// crase: em prosa (markdown) marca código, não um valor
+		if s[i] != '"' && s[i] != '\'' {
 			continue
 		}
 		j := literal(s, i)
@@ -185,8 +222,8 @@ func acharCodigoNome(s string, add func(ObjAchado)) {
 				r++
 			}
 			if r < len(s) && s[r] == ')' {
-				ini, _ := identAntes(s, antesBranco(s, k))
-				if p := antesBranco(s, ini); p >= 0 && (s[p] == ':' || s[p] == '=') && (p == 0 || s[p-1] != ':') {
+				ini, f := identAntes(s, antesBranco(s, k))
+				if p := antesBranco(s, ini); embrulho[strings.ToLower(f)] && p >= 0 && (s[p] == ':' || s[p] == '=') && (p == 0 || s[p-1] != ':') {
 					nome = nomeAntes(s, p-1)
 				}
 			}
@@ -200,6 +237,9 @@ func acharCodigoNome(s string, add func(ObjAchado)) {
 		if nome == "" {
 			continue
 		}
+		if ambiguaNoCodigo(nome) {
+			continue
+		}
 		ent, forte := entChave(nome)
 		if ent == "" && (nome == "name" || nome == "value" || nome == "names") {
 			// @Table(name = "x"), Queue(name="x"): o tipo vem de quem é chamado
@@ -210,7 +250,7 @@ func acharCodigoNome(s string, add func(ObjAchado)) {
 		if ent == "" {
 			continue
 		}
-		marcarValor(s, a, b, ent, "código-nome", forte, add)
+		marcarValor(s, a, b, ent, "código-nome", forte && valorMarcado(s[a:b]), add)
 	}
 }
 
@@ -397,7 +437,7 @@ func acharCodigoChamada(s string, add func(ObjAchado)) {
 						j = e
 						continue
 					}
-					marcarValor(s, j+1, e, ent, "código-chamada", true, add)
+					marcarValor(s, j+1, e, ent, "código-chamada", valorMarcado(s[j+1:e]), add)
 				}
 				j = e
 			}

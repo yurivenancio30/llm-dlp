@@ -1,6 +1,9 @@
 package mask
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 // Leitores de código, linha de comando, caminhos e URLs de nuvem (itens 9 a 14 da revisão).
 // Nomes fictícios.
@@ -134,5 +137,22 @@ func TestLeitorURLsNuvem(t *testing.T) {
 		if out, ents := m.Mascarar(s); len(ents) > 0 {
 			t.Errorf("documentação pública mascarada: %q -> %q", s, out)
 		}
+	}
+}
+
+// Escape de texto ("\nPALAVRA") não é DOMINIO\usuario; e valor de duas palavras com hífen,
+// sem dígito, é mascarado no lugar mas não ensina sozinho.
+func TestFreiosCodigoEUsuarioRede(t *testing.T) {
+	m := novoTeste(t)
+	if out, ents := m.Mascarar(`fmt.Printf("TEXTO\nPCALIGN %d")`); len(ents) > 0 {
+		t.Errorf("escape virou usuário de rede: %q", out)
+	}
+	confere(t, m, `await ch.assertQueue("payments-queue")`, []string{"payments-queue"}, nil)
+	if out, _ := m.Mascarar("a payments-queue encheu"); !strings.Contains(out, "payments-queue") {
+		t.Errorf("valor sem dígito/_/. ensinou sozinho: %q", out)
+	}
+	confere(t, m, `await ch.assertQueue("payments-queue-01")`, []string{"payments-queue-01"}, nil)
+	if out, _ := m.Mascarar("a payments-queue-01 encheu"); strings.Contains(out, "payments-queue-01") {
+		t.Errorf("valor com dígito deveria ensinar: %q", out)
 	}
 }

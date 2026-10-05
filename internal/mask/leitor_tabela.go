@@ -221,7 +221,8 @@ func addPartesCelula(s string, a, b int, ult string, add func(ObjAchado)) {
 	ents := entQual(len(ps), ult)
 	for k, p := range ps {
 		if p != "" && !publicoSQL(p) && reIdentSimples.MatchString(p) {
-			add(ObjAchado{a, a + len(p), ents[k], "tabela-catálogo", ents[k] != "coluna"})
+			// valor curto (até 4 caracteres: códigos, siglas) mascara no lugar, mas não ensina sozinho
+			add(ObjAchado{a, a + len(p), ents[k], "tabela-catálogo", ents[k] != "coluna" && len(p) >= 5})
 		}
 		a += len(p) + 1
 	}

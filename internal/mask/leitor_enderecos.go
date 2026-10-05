@@ -522,6 +522,8 @@ func acharDominioUsuario(s string, add func(ObjAchado)) {
 				}
 				v := s[u:b]
 				escape := strings.IndexByte("ntrbfvaxuU0", v[0]) >= 0 && a > 0 && s[a-1] != ' ' && s[a-1] != '\t' && s[a-1] != '\n'
+				// "\nPALAVRA", "\tCAMPO": letra de escape seguida de maiúscula é escape, não usuário
+				escape = escape || strings.IndexByte("ntr", v[0]) >= 0 && len(v) > 1 && v[1] >= 'A' && v[1] <= 'Z'
 				if len(v) >= 2 && !escape && (b == len(s) || s[b] != '\\' && s[b] != '/') && !publicoDev(v) {
 					add(ObjAchado{u, b, "usuario", "usuario-rede", true})
 				}
