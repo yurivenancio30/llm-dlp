@@ -274,6 +274,13 @@ func leitoresPadrao() []Leitor {
 		{Nome: "erro", Achar: acharErroObjeto, Publico: publicoSQL},
 		{Nome: "conexão", Achar: acharConexoes, Publico: publicoConexao},
 		{Nome: "tabela", Achar: acharTabelasObj, Publico: publicoSQL},
+		{Nome: "chave-valor", Achar: acharChaveValor, Publico: publicoDev},
+		{Nome: "endereço", Achar: acharEnderecos, Publico: publicoDev},
+		{Nome: "git", Achar: acharGitSCP, Publico: publicoDev},
+		{Nome: "pacote", Achar: acharPacotes, Publico: publicoDev},
+		{Nome: "caminho", Achar: acharCaminhos, Publico: publicoDev},
+		{Nome: "usuário de rede", Achar: acharUsuariosRede, Publico: publicoDev},
+		{Nome: "nuvem", Achar: acharNuvem, Publico: publicoDev},
 	}
 }
 
