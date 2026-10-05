@@ -67,10 +67,12 @@ func (m *Masker) objPropaga(ent string) bool {
 	return propagaPadrao[ent]
 }
 
-// entSQL: tipos de SQL, em que identificadores sem aspas são insensíveis à caixa em todos os
-// dialetos. Nos outros tipos (caminho, bucket, fila...) a grafia vale como está:
-// "/dados/Relatorios" e "/dados/relatorios" são duas pastas.
-var entSQL = map[string]bool{"database": true, "schema": true, "tabela": true, "coluna": true, "procedure": true, "indice": true}
+// entSQL: tipos insensíveis à caixa: os de SQL (identificadores sem aspas são insensíveis à
+// caixa em todos os dialetos) e servidor (nome DNS não diferencia maiúsculas: "sqlprd01" e
+// "SQLPRD01" são a mesma máquina). Nos outros tipos (caminho, bucket, fila...) a grafia vale
+// como está: "/dados/Relatorios" e "/dados/relatorios" são duas pastas.
+var entSQL = map[string]bool{"database": true, "schema": true, "tabela": true, "coluna": true, "procedure": true,
+	"indice": true, "servidor": true}
 
 // semCitacao: o nome sem os colchetes, aspas ou crases em volta.
 func semCitacao(v string) string {

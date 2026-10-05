@@ -260,3 +260,18 @@ func TestDSNGoEPDO(t *testing.T) {
 		}
 	}
 }
+
+// Ajuste final 3: só é catálogo a tabela cujo cabeçalho tem forma de identificador.
+func TestTabelaCabecalhoComFormaDeIdentificador(t *testing.T) {
+	m := novoTeste(t)
+	for _, s := range []string{
+		"| Benchmark | Speed MiB/s | Allocs |\n|---|---|---|\n| tb_x1 | 12 | 3 |\n",
+		"| for i := 0 | table |\n|---|---|\n| x | tb_x2 |\n",
+		"name    | Data Type | table\n--------+-----------+------\nid_x3   | int       | tb_x3\n",
+	} {
+		if out, ents := m.Mascarar(s); len(ents) > 0 {
+			t.Errorf("não é catálogo: %q -> %q", s, out)
+		}
+	}
+	confere(t, m, "table_schema,table_name\nfinanceiro_x4,tb_pedido_x4\n", []string{"financeiro_x4", "tb_pedido_x4"}, nil)
+}

@@ -44,6 +44,7 @@ func leitoresPadrao() []Leitor {
 		{Nome: "url-nuvem", Achar: acharURLsNuvem, Publico: publicoDev},
 		{Nome: "dsn", Achar: acharDSN, Publico: publicoConexao},
 		{Nome: "env-lista", Achar: acharEnvLista, Publico: publicoDev},
+		{Nome: "placeholder", Achar: acharPlaceholder, Publico: publicoDev},
 	}
 }
 

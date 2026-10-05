@@ -274,3 +274,19 @@ func TestCaixaSoNosTiposDeSQL(t *testing.T) {
 		t.Errorf("cada grafia tem que voltar com a própria (conflitos=%d)", tab.Conflitos)
 	}
 }
+
+// Ajuste final 1: servidor (nome DNS) é insensível à caixa: aprendido em minúsculas, é
+// mascarado em maiúsculas e em caixa mista, e volta com a grafia do texto.
+func TestServidorSemCaixa(t *testing.T) {
+	m := novoTeste(t)
+	m.Mascarar("DB_HOST=sqlprd01\n")
+	for _, g := range []string{"SQLPRD01", "SqlPrd01", "sqlprd01"} {
+		out, ents := m.Mascarar("o servidor " + g + " caiu")
+		if strings.Contains(out, g) {
+			t.Errorf("%s ficou em claro: %q", g, out)
+		}
+		if got := NovaTabela(ents).Desmascarar(out, false); got != "o servidor "+g+" caiu" {
+			t.Errorf("%s não voltou com a própria grafia: %q", g, got)
+		}
+	}
+}

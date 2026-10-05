@@ -151,7 +151,9 @@ func acharTabelasObj(s string, add func(ObjAchado)) {
 		}
 		ok := true
 		for _, c := range cs {
-			if c.a == c.b || !reCelulaIdent.MatchString(s[c.a:c.b]) && !(sep != 0 && sep != ',' && strings.Contains(s[c.a:c.b], " ")) {
+			// cabeçalho com forma de identificador: sem espaço, operador ou unidade ("Speed MiB/s",
+			// "for i := 0" são tabela de benchmark e trecho de código, não catálogo)
+			if c.a == c.b || !reCelulaIdent.MatchString(s[c.a:c.b]) {
 				ok = false
 				break
 			}

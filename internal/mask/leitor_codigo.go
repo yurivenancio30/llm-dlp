@@ -254,6 +254,53 @@ func acharCodigoNome(s string, add func(ObjAchado)) {
 	}
 }
 
+// Default de placeholder: ${NOME:valor} (Spring, Micronaut), ${NOME:-valor} e ${NOME-valor}
+// (shell, docker-compose). O nome da variável diz o tipo do valor, como em "NOME = valor".
+func acharPlaceholder(s string, add func(ObjAchado)) {
+	for i := strings.Index(s, "${"); i >= 0; {
+		a := i + 2
+		b := a
+		for b < len(s) && (ehAlnum(s[b]) || s[b] == '_' || s[b] == '.' || s[b] == '-' && b+1 < len(s) && s[b+1] != '}' && !(b > a && s[b-1] == ':')) {
+			b++
+		}
+		if b > a && b < len(s) && (s[b] == ':' || s[b] == '-') {
+			v := b + 1
+			if s[b] == ':' && v < len(s) && (s[v] == '-' || s[v] == '=') {
+				v++
+			}
+			fim := strings.IndexByte(s[v:min(len(s), v+300)], '}')
+			if fim > 0 && !strings.Contains(s[v:v+fim], "://") { // URL: fica com o leitor de URL
+				if ent, forte := entChave(s[a:b]); ent != "" {
+					marcarValor(s, v, v+fim, ent, "placeholder", forte, add)
+				}
+			}
+		}
+		j := strings.Index(s[i+2:], "${")
+		if j < 0 {
+			break
+		}
+		i += 2 + j
+	}
+}
+
+// defaultPlaceholder: s[k] é o ":" (ou o "-" de ":-") que separa o nome do default em ${NOME:...}.
+func defaultPlaceholder(s string, k int) bool {
+	if k > 0 && s[k] == '-' && s[k-1] == ':' {
+		k--
+	}
+	a := strings.LastIndex(s[max(0, k-120):k], "${")
+	if a < 0 {
+		return false
+	}
+	a += max(0, k-120) + 2
+	for x := a; x < k; x++ {
+		if !(ehAlnum(s[x]) || s[x] == '_' || s[x] == '.' || s[x] == '-') {
+			return false
+		}
+	}
+	return k > a
+}
+
 // chamadaEnvolvente: o nome da função, construtor ou anotação cujo "(" ainda está aberto
 // antes de s[k] (na mesma instrução, até 300 bytes atrás).
 func chamadaEnvolvente(s string, k int) string {
@@ -388,6 +435,16 @@ func entFuncao(nome string) string {
 	return ""
 }
 
+// construtores de lista: o texto dentro deles conta como argumento da chamada de fora
+// (subscribe(List.of("x")), Arrays.asList("x"), listOf("x"), []string{"x"}, new String[]{"x"})
+var construtorLista = conj("of", "aslist", "listof", "setof", "arrayof", "mutablelistof", "singletonlist", "singleton",
+	"list", "tuple", "set", "frozenset", "array", "vec")
+
+// palavras do nome de uma chamada de conexão: o texto seguido de um número de porta é o
+// servidor ($redis->connect('cache01', 6379), redis.Redis("cache01", 6379), net.Dial(...))
+var palavrasConexao = conj("connect", "connection", "conn", "dial", "open", "client", "socket", "session", "pool",
+	"link", "redis", "mongo", "connector", "strictredis")
+
 func acharCodigoChamada(s string, add func(ObjAchado)) {
 	if strings.IndexByte(s, '(') < 0 {
 		return
@@ -406,23 +463,42 @@ func acharCodigoChamada(s string, add func(ObjAchado)) {
 			continue
 		}
 		ent := entFuncao(nome)
-		if ent == "" {
+		conex := temPalavra(nome, palavrasConexao)
+		if ent == "" && !conex {
 			continue
 		}
-		// argumentos de primeiro nível (e dentro de listas [..]) até o ")" correspondente
-		prof := 0
+		// argumentos de primeiro nível, e dentro de listas ([..] e construtores de lista), até o
+		// ")" correspondente
+		var niveis []bool // cada nível aberto: é lista?
+		todosLista := func() bool {
+			for _, l := range niveis {
+				if !l {
+					return false
+				}
+			}
+			return true
+		}
 		for j := i + 1; j < len(s) && j < i+400; j++ {
 			c := s[j]
 			switch {
-			case c == '(' || c == '{':
-				prof++
+			case c == '(':
+				_, f := identAntes(s, j-1)
+				niveis = append(niveis, j > 0 && (ehAlnum(s[j-1]) || s[j-1] == '_') && construtorLista[strings.ToLower(f)])
+			case c == '{':
+				p := antesBranco(s, j)
+				lista := p >= 0 && s[p] == ']' // []string{...}, new String[]{...}
+				if p >= 0 && !lista && (ehAlnum(s[p]) || s[p] == '_') {
+					q, _ := identAntes(s, p)
+					lista = q >= 2 && s[q-2:q] == "[]"
+				}
+				niveis = append(niveis, lista)
 			case c == ')' || c == '}':
-				if prof == 0 {
+				if len(niveis) == 0 {
 					j = len(s)
 					continue
 				}
-				prof--
-			case c == '\n' && prof == 0 && j > i+200:
+				niveis = niveis[:len(niveis)-1]
+			case c == '\n' && len(niveis) == 0 && j > i+200:
 				j = len(s)
 				continue
 			case ehAspa(c):
@@ -431,16 +507,62 @@ func acharCodigoChamada(s string, add func(ObjAchado)) {
 					j = len(s)
 					continue
 				}
-				if prof == 0 {
+				if todosLista() {
 					// "nome: 'v'" / "nome = 'v'" dentro da chamada é parâmetro nomeado (item 9)
 					if p := antesBranco(s, j); p >= 0 && (s[p] == ':' || s[p] == '=') {
 						j = e
 						continue
 					}
-					marcarValor(s, j+1, e, ent, "código-chamada", valorMarcado(s[j+1:e]), add)
+					switch {
+					case conex && len(niveis) == 0 && seguidoDePorta(s, e+1):
+						marcarValor(s, j+1, e, "servidor", "código-chamada", valorMarcado(s[j+1:e]), add)
+					case ent != "":
+						marcarValor(s, j+1, e, ent, "código-chamada", valorMarcado(s[j+1:e]), add)
+					}
 				}
 				j = e
 			}
 		}
 	}
+}
+
+// seguidoDePorta: depois de s[i] vem ", <número de porta>" e o fim do argumento.
+func seguidoDePorta(s string, i int) bool {
+	for i < len(s) && (s[i] == ' ' || s[i] == '\t') {
+		i++
+	}
+	if i >= len(s) || s[i] != ',' {
+		return false
+	}
+	i++
+	for i < len(s) && (s[i] == ' ' || s[i] == '\t') {
+		i++
+	}
+	a := i
+	for i < len(s) && ehDig(s[i]) {
+		i++
+	}
+	if n := i - a; n < 2 || n > 5 {
+		return false
+	}
+	for i < len(s) && (s[i] == ' ' || s[i] == '\t') {
+		i++
+	}
+	return i < len(s) && (s[i] == ',' || s[i] == ')')
+}
+
+// temPalavra: algum pedaço do nome (camelCase, _, .) está em ws.
+func temPalavra(nome string, ws map[string]bool) bool {
+	var ps [16][2]int
+	n, ok := pedacosChave(nome, &ps)
+	if !ok {
+		return false
+	}
+	var buf [24]byte
+	for x := 0; x < n; x++ {
+		if w := minusculo(nome, ps[x], &buf); w != nil && ws[string(w)] {
+			return true
+		}
+	}
+	return false
 }

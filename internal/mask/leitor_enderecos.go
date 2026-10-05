@@ -85,7 +85,11 @@ func urlEm(s string, i int, add func(ObjAchado)) {
 	for a > 0 && i-a < 16 && (ehAlnum(s[a-1]) || s[a-1] == '+' || s[a-1] == '-' || s[a-1] == '.') {
 		a--
 	}
-	if a == i || !letraD(s[a]) || a > 0 && (ehAlnum(s[a-1]) || s[a-1] == ':') {
+	// "${X:-http://...}": o "-" de ":-" não faz parte do esquema
+	for a < i && s[a] == '-' {
+		a++
+	}
+	if a == i || !letraD(s[a]) || a > 0 && (ehAlnum(s[a-1]) || s[a-1] == ':' && !defaultPlaceholder(s, a-1) || s[a-1] == '-' && !defaultPlaceholder(s, a-1)) {
 		return
 	}
 	esq := strings.ToLower(s[a:i])

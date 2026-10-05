@@ -25,6 +25,8 @@ var matrizNomes = []string{
 	"svc-cobranca-x9",       // serviço
 	"relatorios_x9",         // pasta (/srv/relatorios_x9)
 	"api-x9.vendas.interno", // domínio interno
+	// ajustes finais: caixa de servidor, placeholder, lista aninhada, host+porta, caminho fora da lista
+	"sqlprd01", "SQLPRD01", "SqlPrd01", "erpprd01", "pedidos-criados", "pedidos-pagos", "cacheprd01", "Relatorios_x9",
 	// nuvem
 	"proj-vendas-x9", "rg-vendas-x9", "stvendasx9", "sb-vendas-x9", "123456789012",
 }
@@ -186,6 +188,22 @@ app.kubernetes.namespace=ns-pagamentos-x9
 app.cobranca.service=svc-cobranca-x9
 app.relatorios.dir=/srv/relatorios_x9
 cobranca.url=https://api-x9.vendas.interno
+`},
+	{"Caixa", `DB_HOST=sqlprd01
+o servidor SQLPRD01 caiu de novo; o SqlPrd01 voltou
+`},
+	{"Placeholder", `spring.datasource.url=${erp.url:http://erpprd01.acme.local:8080}
+ERP_URL=${ERP_URL:-http://erpprd01.acme.local:8080}
+`},
+	{"Lista aninhada", `consumer.subscribe(List.of("pedidos-criados", "pedidos-pagos"));
+consumer.subscribe(Arrays.asList("pedidos-criados"));
+consumer.subscribe(["pedidos-pagos"])
+`},
+	{"Host e porta", `$redis->connect('cacheprd01', 6379);
+r = redis.Redis("cacheprd01", 6379)
+`},
+	{"Caminho raiz", `cp /dados/Relatorios_x9/mensal/a.csv /tmp/
+ls /dados/Relatorios_x9
 `},
 	{"AWS", `arn:aws:s3:::bkt-relatorios-x9
 https://sqs.sa-east-1.amazonaws.com/123456789012/fila-pedidos-x9

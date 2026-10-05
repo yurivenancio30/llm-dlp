@@ -156,3 +156,28 @@ func TestFreiosCodigoEUsuarioRede(t *testing.T) {
 		t.Errorf("valor com dígito deveria ensinar: %q", out)
 	}
 }
+
+// Ajustes finais 2a-2d.
+func TestAjustesFinaisFormatos(t *testing.T) {
+	m := novoTeste(t)
+	confere(t, m, "spring.datasource.url=${erp.url:http://erpprd01.acme.local:8080}", []string{"erpprd01"}, []string{"${erp.url:http://", ":8080}"})
+	confere(t, m, "ERP_URL=${ERP_URL:-http://erpprd02.acme.local:8080}", []string{"erpprd02"}, []string{"${ERP_URL:-http://"})
+	confere(t, m, "host: ${DB_HOST:pgprd03}", []string{"pgprd03"}, []string{"${DB_HOST:"})
+	confere(t, m, `consumer.subscribe(List.of("pedidos-criados", "pedidos-pagos"));`, []string{"pedidos-criados", "pedidos-pagos"}, []string{"List.of("})
+	confere(t, m, `consumer.subscribe(Arrays.asList("pedidos-x4"));`, []string{"pedidos-x4"}, nil)
+	confere(t, m, `$redis->connect('cacheprd05', 6379);`, []string{"cacheprd05"}, []string{", 6379"})
+	confere(t, m, `r = redis.Redis("cacheprd06", 6379)`, []string{"cacheprd06"}, nil)
+	confere(t, m, "cp /dados/Relatorios_x7/mensal/a.csv /tmp/", []string{"Relatorios_x7", "mensal"}, []string{"/tmp/", "a.csv"})
+	for _, s := range []string{
+		`log.Printf("%s", 200)`,
+		`fmt.Sprintf("total", 10)`,
+		`fetch("/api/v1/pedidos")`,
+		"veja /usr/local/bin e /etc/hosts",
+		"GET /static/css/app.css",
+		`${HOME}/x e ${PATH}`,
+	} {
+		if out, ents := m.Mascarar(s); len(ents) > 0 {
+			t.Errorf("mascarou sem precisar: %q -> %q", s, out)
+		}
+	}
+}

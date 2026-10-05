@@ -97,6 +97,9 @@ func acharCaminhosFora(s string, add func(ObjAchado)) {
 			}
 		}
 	}
+	if strings.IndexByte(s, '/') >= 0 {
+		acharCaminhosRaiz(s, add)
+	}
 	if strings.IndexByte(s, '\\') < 0 {
 		return
 	}
@@ -166,5 +169,49 @@ func pedacosCaminhoBarra(s string, a int, add func(ObjAchado)) {
 			return
 		}
 		a = b
+	}
+}
+
+// primeiro nível público: diretórios do sistema (FHS, macOS), as raízes já tratadas acima e
+// as rotas web comuns (/api/v1/..., /static/...), que têm a mesma forma de um caminho
+var raizesPublicas = conj("bin", "boot", "dev", "etc", "home", "lib", "lib32", "lib64", "libx32", "media", "mnt", "opt",
+	"proc", "root", "run", "sbin", "snap", "srv", "sys", "tmp", "usr", "var", "data", "users", "library",
+	"applications", "system", "volumes", "private", "cores", "nix", "gnu", "network", "afs", "net", "cdrom",
+	"selinux", "workspace", "workspaces", "app", "code", "src", "go", "builds", "build", "buildd",
+	"api", "v1", "v2", "v3", "v4", "static", "assets", "public", "docs", "doc", "auth", "oauth", "login", "logout",
+	"health", "healthz", "readyz", "livez", "metrics", "graphql", "swagger", "openapi", "ws", "css", "js", "img",
+	"images", "fonts", "icons", "favicon.ico", ".well-known", "admin", "user", "users", "search", "en", "pt", "pt-br",
+	"blob", "tree", "raw", "wiki", "issues", "pull", "releases", "download", "downloads", "proxy", "callback",
+	// ID de recurso de nuvem (fica com o leitor de nuvem)
+	"subscriptions", "providers", "resourcegroups", "projects", "organizations", "folders", "locations", "apis")
+
+// acharCaminhosRaiz: caminho absoluto com 2 ou mais níveis cujo primeiro nível não é público
+// (/dados/Relatorios/..., /backup_x/...). Cada pasta que não é pública é mascarada (fraco).
+func acharCaminhosRaiz(s string, add func(ObjAchado)) {
+	for i := strings.IndexByte(s, '/'); i >= 0 && i+1 < len(s); {
+		if inicioCaminho(s, i) && letraD(s[i+1]) {
+			a := i + 1
+			b := a
+			for b < len(s) && (ehAlnum(s[b]) || s[b] == '.' || s[b] == '_' || s[b] == '-') {
+				b++
+			}
+			// primeiro nível com pelo menos 4 caracteres: raiz curta (/gc, /cpu, /x) é nome de
+			// métrica ou rota; as raízes reais de 3 letras (/srv, /opt, /mnt) têm regra própria
+			if b-a >= 4 && b+1 < len(s) && s[b] == '/' && (ehAlnum(s[b+1]) || s[b+1] == '_') && !raizesPublicas[strings.ToLower(s[a:b])] {
+				// fim do caminho; "/gc/heap/allocs:bytes" (nome de métrica com unidade) não é arquivo
+				e := b
+				for e < len(s) && (ehAlnum(s[e]) || strings.IndexByte("._-/+", s[e]) >= 0) {
+					e++
+				}
+				if !(e+1 < len(s) && s[e] == ':' && letraD(s[e+1])) {
+					pedacosCaminho(s, a, '/', false, add)
+				}
+			}
+		}
+		j := strings.IndexByte(s[i+1:], '/')
+		if j < 0 {
+			break
+		}
+		i += 1 + j
 	}
 }
