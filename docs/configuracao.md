@@ -22,6 +22,7 @@ Arquivo `~/.config/llm-dlp/config.json`. Depois de mudar, rode `llm-dlp parar`.
 | `falhar_fechado` | Recusa o que não sabe mascarar. Desligado, uma falha ao mascarar manda a requisição **sem máscara** (só fica um aviso no log). Imagem e PDF que não deu para verificar são recusados de qualquer jeito. Não recomendado desligar | `true` |
 | `ocr` | `modo` (`mascarar`, `bloquear` ou `permitir`), `idioma`, `max_paginas`, caminhos do tesseract e do poppler | `mascarar`, `por`, 30 |
 | `objetos` | Nomes de recursos internos (ver [O que é detectado](deteccao.md#5-nomes-de-recursos-internos-pela-estrutura)). `ligado`; `mascarar` e `propagar`: mapas tipo → `true`/`false` (tipos: `servidor`, `database`, `schema`, `tabela`, `coluna`, `procedure`, `indice`, `usuario`, `namespace`, `servico`, `bucket`, `fila`). Ex.: `{"mascarar": {"coluna": false}}` deixa as colunas legíveis | ligado; mascara todos; propaga todos menos `coluna` e `indice` |
+| `objetos.ip_publico` | Mascara também IPv4 público e IPv6 como nome de servidor (`HOST_...`). Ficam `::1`, link-local, faixas de documentação e os DNS públicos (`8.8.8.8`, `1.1.1.1`, `9.9.9.9`...). O IP privado é sempre mascarado pelo detector `ip` | desligado |
 | `porta` | Porta local do proxy | 8787 |
 | `upstream` | Endereço da API | `https://api.anthropic.com` |
 

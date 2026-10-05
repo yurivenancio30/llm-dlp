@@ -814,6 +814,29 @@ URN), senão o modelo perde a ligação entre os textos.
 - DataHub SchemaField / DataJob: https://docs.datahub.com/docs/generated/metamodel/entities/schemafield , .../datajob
 
 
+### 8. Armazenamento e filas: o que está implementado (leitor `endereço`)
+
+Código: `internal/mask/leitor_enderecos.go` (`urlEm`). As URIs de banco continuam com o leitor
+`conexão`; estas são as de armazenamento e de fila:
+
+| Esquema | Posição | Entidade | Forte? |
+|---|---|---|---|
+| `s3://`, `s3a://`, `s3n://`, `gs://`, `gcs://`, `az://`, `oss://` | autoridade | bucket | sim |
+| `abfs[s]://<container>@<conta>.dfs.core.windows.net`, `wasb[s]://...blob...` | container / 1º rótulo do host | bucket / conta_nuvem | sim |
+| `hdfs://`, `webhdfs://`, `viewfs://` | namenode (fora domínio público) | servidor | sim |
+| todos acima | pedaço do caminho com cara de identificador (não o arquivo final, nem `chave=valor`, curinga ou variável) | pasta | não |
+| `amqp[s]://usuario@host/vhost`, `mqtt[s]://`, `stomp://` | usuário / host(s) fora de domínio público / 1º pedaço do caminho | usuario / servidor / fila | sim |
+| `kafka://broker:9092/topico`, `pulsar[+ssl]://`, `nats://`, `tls+nats://` | idem | usuario / servidor / fila | sim |
+
+Ficam: `vhost` padrão (`/`, `%2F`) e variáveis (`s3://$BKT/`). Nome com cara de exemplo
+(`my-bucket`, `example-bucket`) é mascarado como qualquer outro: pode ser real.
+
+```text
+s3://bkt-relatorios-demo/carga_diaria/2026/arquivo.csv  →  s3://BKT_.../DIR_.../2026/arquivo.csv
+amqp://svc_relatorio:***@rabbit-01.interno:5672/vhost_pedidos  →  amqp://usr_...:***@host_...:5672/top_...
+kafka://broker-01:9092/fila-pedidos-x9  →  kafka://host_...:9092/top_...
+```
+
 ## Dados tabulares
 
 Escopo: texto que é uma tabela impressa (CSV, TSV, saídas de pandas/Polars/DuckDB/pyarrow,
@@ -1240,6 +1263,59 @@ Avro: `"namespace": "vendas_x.pedidos"` → `"DB_dqrsyg6bm5a7.SCH_3wl5qkpzifvc"`
 - GraphQL: https://spec.graphql.org/October2021/
 - URI (DSN/JDBC): https://www.rfc-editor.org/rfc/rfc3986
 
+
+### 8. O que está implementado (leitor `chave-valor`)
+
+Código: `internal/mask/leitor_chave_valor.go`. Um leitor só, sem parser de cada formato: acha o
+separador (`:` ou `=`), a chave antes dele e o valor depois. Vale para YAML, JSON, TOML, INI,
+.env, .properties, atributo XML (`host="x"`), elemento XML sem atributos (`<host>x</host>`) e
+opção longa de linha de comando (`--host x`, `--host=x`).
+
+**Chave → entidade, pelo ÚLTIMO pedaço** (divide em `.` `_` `-` `:` e camelCase, minúsculas):
+
+| Último pedaço | Entidade | Pseudônimo |
+|---|---|---|
+| `host`, `hostname`, `server`, `servername`, `servidor`, `endpoint`, `address`, `addr`, `fqdn`, `broker`, `bootstrap`, `bootstrap.servers`, `cluster`, `instance`, `warehouse` | servidor | `HOST_` |
+| `database`, `db`, `dbname`, `databasename`, `catalog` | database | `DB_` |
+| `schema`, `schemaname`, `dataset` | schema | `SCH_` |
+| `table`, `tablename`, `tabela`, `collection` | tabela | `T_` |
+| `user`, `username`, `usuario`, `login`, `principal` | usuario | `USR_` |
+| `namespace` | namespace | `NS_` |
+| `service`, `servico`, `app`, `application` | servico | `SVC_` |
+| `bucket`, `container` | bucket | `BKT_` |
+| `queue`, `topic`, `fila`, `topico`, `exchange`, `stream`, `subject` | fila | `TOP_` |
+| `repo`, `repository` | repositorio | `REPO_` |
+| `org`, `organization` | organizacao | `ORG_` |
+| `account`, `tenant`, `subscription`, `project_id`/`projectId` | conta_nuvem | `ACC_` |
+| `<x>_name` com x = db, database, table, schema, host, server, user, service, bucket, queue, topic | a entidade de x | — |
+
+Chave terminada em outra coisa (`port`, `timeout`, `count`, `size`, `enabled`, `max`, `min`,
+`version`, `type`, `mode`, `ttl`, `retries`, `id`...) não está na tabela e fica de fora.
+**Forte** quando a chave é exatamente o nome (`host:`, `database=`, `--host`, `HOST=`);
+**fraco** quando é composta (`db_host`, `spring.datasource.username`).
+
+**Valor que fica:** `true/false/null/none`, número, IP (fica com o detector de IP), `localhost`,
+`0.0.0.0`, caminho (`/`, `./`, `~`), expressão (`${...}`, `{{...}}`, `%s`, `$VAR`, `<x>`), e-mail,
+URL (os leitores de URL decidem), domínio público (TLD conhecido ou reservado: `.com`, `.io`,
+ccTLD, `.example`, `.invalid`), nome de arquivo (`config.yaml`), versão/hash, palavra de tipo
+(`str`, `string`, `int`). Nome com cara de exemplo (`my-bucket`) não é exceção: é mascarado.
+
+**Freios contra código:** `:=`, `==`, `+=`... ficam; valor seguido de `(`, `[` ou `"` é chamada,
+índice ou literal composto; valor sem aspas, sem hífen e sem dígito (pode ser variável) só vale em
+linha de configuração (chave no começo da linha, valor até o fim dela, com `:` de YAML, chave de
+.env em MAIÚSCULAS, chave pontuada de .properties que não começa por `self.`/`cfg.`..., ou `=`
+sem espaços); valor pontuado sem dígito/hífen (`self.host`, `http.server`) é acesso a atributo
+ou módulo; `Server: nginx` (chave em Título com `:`) é rótulo de prosa ou cabeçalho HTTP.
+Medido em 4 MB do código-fonte do Go e 4 MB da biblioteca do Python 3.10: 0 e 2 achados.
+
+```text
+ANTES                                        DEPOIS
+DB_HOST=db-exemplo-01                        DB_HOST=HOST_r2wq7m4kd3xa          (fraco: chave composta)
+<database>vendas_x</database>                <database>db_k5n2b7xqe4ma</database>
+pg_dump --host db-exemplo-01 --dbname=vendas_x   pg_dump --host HOST_r2wq7m4kd3xa --dbname=db_k5n2b7xqe4ma
+bootstrap.servers=kafka-01:9092,kafka-02:9092    bootstrap.servers=host_...:9092,host_...:9092
+user = request.user                          (fica: expressão de código)
+```
 
 ## Kubernetes e contêineres
 
@@ -2872,6 +2948,102 @@ jobs:                                            jobs:
 pipeline {                                         pipeline {
   agent { label 'agente-build-x6' }                  agent { label 'svc_...' }   // HOST
   ...                                                ...
+
+### 8. O que está implementado
+
+A reserva de chave-valor é o leitor `chave-valor` (ver a seção JSON, YAML, TOML..., §8). Além
+dele, dois leitores genéricos sem formato:
+
+**Host interno em URL e endereço solto** (leitor `endereço`, regras `url-interna` e
+`host-interno`). Em `http(s)://`, `ws(s)://`, `grpc://`, `ftp://`, `redis://`... (qualquer
+esquema que não seja de banco, armazenamento, fila ou git), o host é servidor **forte** quando é
+interno: rótulo único sem ponto (`http://wiki-interna/`) ou terminado em `.local` (RFC 6762),
+`.internal` (reserva da ICANN, 2024), `.home.arpa` (RFC 8375), `.svc`/`.cluster.local` (DNS do
+Kubernetes), `.intra`, `.intranet`, `.interno`, `.corp`, `.lan`, `.localdomain`. O usuário antes do
+`@` também. Domínio público fica (os do cliente vão em `dominios_internos`). Fora de URL, um nome
+com esses sufixos (`db01.corp:5432`, `redis.vendas.svc.cluster.local`) também é servidor, se tiver
+dígito ou hífen, ou dois rótulos antes do sufixo, e não for atributo de código (`threading.local()`)
+nem pacote Java (`org.foo.internal`).
+
+**Termo cadastrado dentro de um identificador** (leitor `termo-embutido`, ligado quando há
+`termos` de uma palavra só). O detector de termos troca a palavra inteira; este troca o
+identificador com cara de identificador que tem o termo como pedaço inteiro (separado por
+`_ . -` ou camelCase): termo `acmex` pega `acmex_pedidos`, `dbAcmexVendas01`, `svc-acmex-carga`,
+mas não `acmexvendas` nem `macmex_x`. O tipo vem da posição (depois de `FROM`/`JOIN` → tabela,
+de `DATABASE`/`USE` → database, valor de chave conhecida → a entidade da chave, host de URL →
+servidor); sem posição, servico. Sempre forte.
+
+| Regra | Pega | Forte? |
+|---|---|---|
+| `url-interna` | host interno em URL; usuário da URL | sim |
+| `host-interno` | `nome.sufixo-interno` fora de URL | sim |
+| `termo-embutido` | identificador com um termo cadastrado como pedaço | sim |
+
+## Repositórios, pacotes e caminhos
+
+Ideia central: o nome da organização, do repositório, do pacote interno e do usuário dono de uma
+pasta aparece em posições fixas de formatos públicos (remoto do git, `go.mod`, `pom.xml`,
+`package.json`, caminho de home). A posição diz o tipo; os hosts e prefixos públicos ficam.
+Código: `internal/mask/leitor_enderecos.go` (git, caminhos) e `leitor_nuvem_pacotes.go` (pacotes).
+
+### 1. Sinais de detecção
+
+| Família | Sinal (filtro barato antes de qualquer análise) |
+|---|---|
+| Remoto do git (scp) | `git@host:org/repo(.git)` — só se o texto tiver `git@` |
+| Remoto do git (URL) | `ssh://`, `git://`, `git+ssh://` sempre; `https://` só se o caminho terminar em `.git`, se vier depois de `git clone`, `git remote`, `git push`, `git pull`, `git fetch` ou `git submodule` na mesma linha, ou se for o `url =` de uma seção `[remote "..."]`/`[submodule "..."]` do `.git/config` |
+| Módulo Go | linha que começa com `module ` e só tem o caminho (go.mod) |
+| groupId | `<groupId>...</groupId>` (Maven) ou `group = '...'` / `group "..."` no começo da linha (Gradle) |
+| Escopo npm | `"name": "@escopo/pacote"` (package.json) |
+| Caminho de usuário | `/home/<u>/`, `/Users/<u>/`, `C:\Users\<u>\` (também `C:\\Users\\` escapado em JSON) |
+
+### 2. Posição → tipo de entidade
+
+| Formato | Posição | Entidade | Forte? |
+|---|---|---|---|
+| remoto do git | pedaços antes do último (grupo e subgrupos; `scm`, `_git`, `v3` são da hospedagem e ficam) | organizacao (`ORG_`) | sim |
+| remoto do git | último pedaço sem `.git` | repositorio (`REPO_`) | sim |
+| remoto do git | host interno (rótulo único ou sufixo interno) | servidor (`HOST_`) | sim |
+| remoto do git | usuário de `ssh://usuario@` (não `git`) | usuario (`USR_`) | sim |
+| go.mod | host fora da lista pública: interno → servidor; cada pedaço do caminho (menos `vN`) | servidor / pacote (`PKG_`) | sim |
+| groupId | pedaços depois do TLD invertido (`br.com.`, `com.`) | pacote | sim |
+| package.json | `@escopo` / `pacote` | organizacao / pacote | sim |
+| caminho de home | o pedaço depois de `home`/`Users` | usuario | sim |
+| caminho de home | pastas seguintes com cara de identificador (não o arquivo final) | pasta (`DIR_`) | não |
+
+Fora desses contextos, uma URL comum do github.com ou gitlab.com **não** é mascarada (aparece em
+toda documentação pública). Medido em 2 MB de `.md` de módulos Go: 6 nomes em contexto de git.
+
+### 3. Vocabulário público (nunca mascarar)
+
+| Grupo | Lista | Fonte |
+|---|---|---|
+| Hosts de módulo Go | `github.com`, `gitlab.com`, `bitbucket.org`, `golang.org`, `google.golang.org`, `gopkg.in`, `go.uber.org`, `k8s.io`, `sigs.k8s.io`, `example.com/org/net` | os hosts de módulo mais comuns; `example.*` reservado (RFC 2606) |
+| Prefixos de groupId | `org.apache`, `org.springframework`, `com.google`, `io.*`, `javax`, `jakarta`, `org.jetbrains`, `org.junit`, `junit`, `org.slf4j`, `ch.qos`, `com.fasterxml`, `org.hibernate`, `org.projectlombok`, `org.mockito`, `org.eclipse`, `com.amazonaws`, `software.amazon`, `com.microsoft`, `com.azure`, `org.postgresql`, `com.mysql`, `com.oracle`, `com.h2database`, `org.yaml`, `com.squareup`, `org.codehaus`, `org.gradle`, `com.android`, `androidx`, `org.jboss`, `org.testcontainers`, `org.flywaydb`, `org.liquibase`, `commons-*`, `com.github`, `org.example`, `com.example`... (lista completa em `gruposPublicos`) | coordenadas do Maven Central (central.sonatype.org) e grupos mais usados (mvnrepository.com/popular) |
+| Escopos npm | `@types`, `@angular`, `@babel`, `@vue`, `@nestjs`, `@aws-sdk`, `@google-cloud`, `@azure`, `@mui`, `@testing-library`, `@typescript-eslint`, `@storybook`, `@tanstack`, `@octokit`, `@sentry`... (lista em `escoposNpmPublicos`) | escopos mais baixados do registro npm |
+| Usuários de caminho | `user`, `runner` (GitHub Actions), `ubuntu`, `ec2-user`, `azureuser`, `opc`, `vagrant`, `jovyan` (Jupyter), `linuxbrew` (Homebrew), `node`, `gopher`, `Shared`, `Public`, `Default`... | usuários padrão das imagens de nuvem e de CI |
+| Pastas | `node_modules`, `site-packages`, `dist-packages`, `__pycache__`, `AppData`, `LocalLow`, `OneDrive`, `IdeaProjects`, `PycharmProjects`, `go-build*`, ferramenta+versão (`python3.10`, `go1.22.0`), pastas ocultas (`.config`, `.venv`) | Known Folders do Windows, layout do macOS, Python, Node, Go, JetBrains |
+
+As pastas sem cara de identificador (`Documents`, `Desktop`, `src`, `bin`, `projetos`) já ficam pela regra geral.
+
+### 4. Regras de identificador
+
+- Repositório e organização: `[A-Za-z0-9_.-]+`, começa por letra ou dígito (regra do GitHub e do GitLab).
+- Módulo Go: caminho de importação (`[A-Za-z0-9._~/-]`); `v2`, `v3`... são versão maior e ficam.
+- groupId: pedaços `[A-Za-z_][A-Za-z0-9_$#-]*` separados por ponto.
+- Escopo npm: minúsculas, dígitos, `-`, `_`, `.` (regras de nome do npm).
+- Usuário de caminho: `[A-Za-z0-9._-]{1,32}`, seguido de separador ou fim; `$USER` e `<voce>` ficam.
+
+### 5. Exemplos antes/depois
+
+```text
+git clone git@github.com:org-exemplo/repo-demo.git   →  git clone git@github.com:ORG_.../REPO_....git
+git remote add origin https://gitlab.interno/org-exemplo/sub/repo-demo  →  https://host_.../org_.../org_.../repo_...
+module git.interno/org-exemplo/svc-pedidos   →  module host_.../pkg_.../pkg_...
+<groupId>br.com.exemplo01.vendas</groupId>   →  <groupId>br.com.pkg_....pkg_...</groupId>
+"name": "@org-exemplo/pacote-demo"           →  "name": "@org_.../pkg_..."
+/home/joao_x/projetos/cliente_x9/main.go     →  /home/usr_.../projetos/dir_.../main.go
+https://github.com/org-exemplo/repo-demo/issues/1   (fica: fora de contexto de git)
 ```
 
 ### 6. Casos difíceis e limites
@@ -2892,3 +3064,112 @@ pipeline {                                         pipeline {
 - Azure Pipelines YAML schema: https://learn.microsoft.com/azure/devops/pipelines/yaml-schema/
 - Jenkins Pipeline syntax: https://www.jenkins.io/doc/book/pipeline/syntax/
 - não consultados nesta rodada [VERIFICAR]: os links acima foram escritos de memória
+
+- `git clone https://github.com/golang/go.git` num README é mascarado (está em contexto de git):
+  o leitor não sabe se o projeto é público. Nomes simples (`golang`) não propagam.
+- Caminho com espaço (`C:\Users\Maria Souza\`) não é lido (o usuário teria espaço).
+- `import "git.interno/org/x/pkg"` em código Go: não há leitor de import; o nome aprendido no
+  `go.mod` só propaga se tiver cara de identificador (`svc-pedidos` sim, `vendas` não).
+- groupId de empresa sob `com.github.*` ou `io.*` fica (prefixo público).
+
+### 7. Links usados
+
+- Git — URLs: https://git-scm.com/docs/git-clone#_git_urls
+- Go Modules Reference (go.mod, module path): https://go.dev/ref/mod
+- Maven Central — coordenadas: https://central.sonatype.org/publish/requirements/coordinates/
+- Maven — convenção de nomes: https://maven.apache.org/guides/mini/guide-naming-conventions.html
+- npm — scope: https://docs.npmjs.com/cli/v10/using-npm/scope ; package.json name: https://docs.npmjs.com/cli/v10/configuring-npm/package-json#name
+- Windows Known Folders: https://learn.microsoft.com/windows/win32/shell/knownfolderid
+- AWS — usuários padrão das AMIs: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/managing-users.html
+
+## Recursos de nuvem e usuários de rede
+
+Ideia central: identificadores de recurso de nuvem têm gramática publicada (ARN, ID do Azure
+Resource Manager, nome de recurso do Google Cloud); usuário de rede tem duas formas fixas
+(`DOMINIO\usuario`, `usuario@host` depois de ssh/scp). A gramática diz o tipo de cada pedaço.
+Código: `internal/mask/leitor_nuvem_pacotes.go` (nuvem, IP público) e `leitor_enderecos.go`
+(usuário de rede).
+
+### 1. Sinais de detecção
+
+| Família | Sinal (filtro antes de analisar) |
+|---|---|
+| ARN | texto com `arn:`; `arn:aws[-cn|-us-gov|-iso...]:serviço:região:conta:recurso` |
+| Azure | texto com `/subscriptions/`; `/subscriptions/<guid>/resourceGroups/<rg>/providers/<Ns>/<tipo>/<nome>...` |
+| Google Cloud | texto com `projects/`; `projects/<p>/<coleção>/<nome>` ou `projects/<p>/locations/<l>/<coleção>/<nome>` |
+| DOMINIO\usuario | texto com `\`; domínio NetBIOS (maiúsculas, dígitos, `-`; 2 a 15) antes da barra |
+| ssh/scp/sftp/rsync | o comando como palavra, e na mesma linha um argumento `usuario@host[:caminho]` |
+| IP público (opção `ip_publico`) | IPv4 com 3 pontos ou IPv6 com 2+ `:` |
+
+### 2. Posição → tipo de entidade
+
+| Formato | Posição | Entidade | Forte? |
+|---|---|---|---|
+| ARN | conta (12 dígitos) | conta_nuvem (`ACC_`) | sim |
+| ARN | recurso do `s3` (até `/`) | bucket | sim |
+| ARN | recurso do `sqs` e do `sns` | fila | sim |
+| ARN | `dynamodb` `table/<nome>` | tabela | sim |
+| ARN | `iam` `user/<nome>` | usuario | sim |
+| ARN | demais (`tipo/nome`, `tipo:nome`, `role/caminho/nome`) | servico | sim |
+| ARN | partição, serviço, região | **nunca** | — |
+| Azure | GUID da assinatura / resource group / nome de cada recurso (`tipo/nome`) | conta_nuvem / servico / servico | sim |
+| Google Cloud | projeto | conta_nuvem | sim |
+| Google Cloud | `topics`/`subscriptions`/`queues` → fila; `datasets` → schema; `tables` → tabela; `buckets` → bucket; demais (`instances`, `functions`, `services`...) → servico | conforme coleção | sim |
+| `DOMINIO\usuario` | usuário (o domínio fica com os outros detectores) | usuario | sim |
+| `ssh usuario@host` | usuário / host fora de domínio público e que não seja IP | usuario / servidor | sim |
+| IP público | IPv4 público ou IPv6 | servidor | sim |
+
+### 3. Vocabulário público (nunca mascarar)
+
+| Grupo | Lista | Fonte |
+|---|---|---|
+| Contas de exemplo da AWS | `123456789012`, `111122223333`, `444455556666`, `012345678901`; recursos gerenciados (`arn:aws:iam::aws:policy/...`) | documentação da AWS |
+| Exemplos do Google Cloud / Azure | `my-project`, `project-id`, `my-topic`, `my-subscription`; assinatura `00000000-0000-...`; `my-resource-group` | documentação do Google Cloud e do Azure |
+| Domínios e contas do Windows | `NT AUTHORITY`, `BUILTIN`, `NT SERVICE`, `WORKGROUP`, raízes do Registro (`HKLM`, `HKCU`...); contas `SYSTEM`, `Administrator(s)`, `Guest` | Well-known SIDs (Microsoft Learn) |
+| Usuários de ssh | `root`, `git`, `ubuntu`, `ec2-user`, `admin`, `pi`... | usuários padrão de imagens |
+| IPs | `::1`, link-local, `0.0.0.0`, broadcast, multicast, faixas privadas (o detector de IP já cuida), faixas de documentação (RFC 5737: `192.0.2.0/24`, `198.51.100.0/24`, `203.0.113.0/24`; RFC 3849: `2001:db8::/32`), DNS públicos `8.8.8.8`, `8.8.4.4`, `1.1.1.1`, `1.0.0.1`, `9.9.9.9`, `208.67.222.222`, `2001:4860:4860::8888`, `2606:4700:4700::1111` | IANA Special-Purpose Address Registry |
+
+### 4. Regras de identificador
+
+- Conta AWS: exatamente 12 dígitos. Recurso com curinga ou variável (`fila-*`, `${Nome}`) fica.
+- GUID do Azure: 36 caracteres com 4 hífens. Nomes `[A-Za-z0-9_.-]+`.
+- Projeto do Google Cloud: 6 a 30 caracteres, minúsculas, dígitos e hífen, começa por letra (sem ponto).
+- `DOMINIO\usuario`: o usuário começa por letra, tem 2+ caracteres, e não continua com `\` ou `/`
+  (`HKLM\SOFTWARE\...` e `\\SERVIDOR\compartilhamento` ficam). Sequência de escape de código
+  (`"ERRO\nfalhou"`: usuário começando por `n t r b f v a x u 0` colado a outro caractere) fica.
+- IPv4 com os três primeiros números de um dígito (`6.0.6.1`, `8.2.4.44`) é versão ou número de
+  seção e fica. IPv6 precisa de 3+ `:` ou de um grupo com 3+ dígitos hexadecimais (`x[1::2]` fica).
+
+### 5. Exemplos antes/depois
+
+```text
+arn:aws:sqs:us-east-1:210987654321:fila-pedidos-x9     →  arn:aws:sqs:us-east-1:ACC_...:top_...
+arn:aws:s3:::bkt-relatorios-demo/*                      →  arn:aws:s3:::bkt_.../*
+/subscriptions/1a2b3c4d-1111-2222-3333-abcdefabcdef/resourceGroups/rg-dados-x9/providers/Microsoft.Storage/storageAccounts/contaexemplo01
+   →  /subscriptions/acc_.../resourceGroups/svc_.../providers/Microsoft.Storage/storageAccounts/svc_...
+projects/proj-exemplo-01/topics/fila-pedidos-x9         →  projects/acc_.../topics/top_...
+entrou como CORPX\svc_relatorio                         →  entrou como CORPX\usr_...
+ssh -p 2222 svc_relatorio@db-exemplo-01                  →  ssh -p 2222 usr_...@host_...
+servidor em 34.120.10.5 (com ip_publico ligado)        →  servidor em HOST_...
+```
+
+### 6. Casos difíceis e limites
+
+- IP público vem **desligado**: um IP de serviço público (CDN, API) também seria trocado, e o
+  modelo perde a referência. Ligue com `objetos.ip_publico`.
+- Em ARN de IAM sem caminho (`role/nome`) o nome é servico; em `user/nome`, usuario.
+- `ssh host` sem usuário: o host só é mascarado se outro leitor o pegar (sufixo interno,
+  `dominios_internos`).
+- `DOMINIO\usuario` com usuário que tem espaço não é lido.
+- Nome de recurso do Google Cloud fora de `projects/...` (`gs://`, `bq://`) fica com outros leitores.
+
+### 7. Links usados
+
+- ARN: https://docs.aws.amazon.com/IAM/latest/UserGuide/reference-arns.html
+- Azure Resource Manager — IDs e regras de nome: https://learn.microsoft.com/azure/azure-resource-manager/management/resource-name-rules
+- Google Cloud — nomes de recurso: https://cloud.google.com/apis/design/resource_names
+- Google Cloud — ID de projeto: https://cloud.google.com/resource-manager/docs/creating-managing-projects
+- Windows — Well-known SIDs: https://learn.microsoft.com/windows/win32/secauthz/well-known-sids
+- NetBIOS — nomes de domínio: https://learn.microsoft.com/troubleshoot/windows-server/active-directory/naming-conventions-for-computer-domain-site-ou
+- IANA — IPv4 e IPv6 Special-Purpose Address Registry: https://www.iana.org/assignments/iana-ipv4-special-registry/ ; https://www.iana.org/assignments/iana-ipv6-special-registry/
+- RFC 5737 (IPv4 de documentação): https://www.rfc-editor.org/rfc/rfc5737 ; RFC 3849 (IPv6): https://www.rfc-editor.org/rfc/rfc3849

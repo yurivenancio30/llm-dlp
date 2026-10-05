@@ -356,15 +356,35 @@ func acharErroObjeto(s string, add func(ObjAchado)) {
 	}
 }
 
+// palavrasErro: a linha tem cara de mensagem de erro (só então o nome citado ensina)
+var palavrasErro = []string{"error", "erro", "exist", "not found", "invalid", "unknown", "not authorized", "denied",
+	"failed", "falhou", "inválid", "não encontrad", "msg ", "ora-", "sqlstate", "exception"}
+
+func linhaDeErro(s string, i int) bool {
+	a := strings.LastIndexByte(s[:i], '\n') + 1
+	z := len(s)
+	if k := strings.IndexByte(s[i:], '\n'); k >= 0 {
+		z = i + k
+	}
+	l := strings.ToLower(s[max(a, i-300):min(z, i+300)])
+	for _, p := range palavrasErro {
+		if strings.Contains(l, p) {
+			return true
+		}
+	}
+	return false
+}
+
 func erroEm(s string, a, b int, e string, add func(ObjAchado)) {
 	if publicoSQL(s[a:b]) {
 		return
 	}
+	forte := e != "coluna" && linhaDeErro(s, a)
 	ps := strings.Split(s[a:b], ".")
 	ents := entQual(len(ps), e)
 	for k, p := range ps {
 		if p != "" && reIdentSimples.MatchString(p) {
-			add(ObjAchado{a, a + len(p), ents[k], "erro", e != "coluna"})
+			add(ObjAchado{a, a + len(p), ents[k], "erro", forte})
 		}
 		a += len(p) + 1
 	}

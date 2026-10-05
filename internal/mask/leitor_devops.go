@@ -189,7 +189,7 @@ func chaveYAML(s string, p, fim int) (ki, kf, vp int, ok bool) {
 	return
 }
 
-// fechaAspas: a aspa que fecha a que está em s[p], na mesma linha ('' e \" são escapes).
+// fechaAspas: a aspa que fecha a que está em s[p], na mesma linha (” e \" são escapes).
 func fechaAspas(s string, p, fim int) int {
 	q := s[p]
 	for j := p + 1; j < fim; j++ {

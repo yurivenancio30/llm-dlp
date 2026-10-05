@@ -280,6 +280,13 @@ func leitoresPadrao() []Leitor {
 		{Nome: "bicep", Achar: acharBicep, Publico: publicoDevops},
 		{Nome: "jenkins", Achar: acharJenkins, Publico: publicoDevops},
 		{Nome: "k8s-dns", Achar: acharDNSK8s, Publico: publicoDevops},
+		{Nome: "chave-valor", Achar: acharChaveValor, Publico: publicoDev},
+		{Nome: "endereço", Achar: acharEnderecos, Publico: publicoDev},
+		{Nome: "git", Achar: acharGitSCP, Publico: publicoDev},
+		{Nome: "pacote", Achar: acharPacotes, Publico: publicoDev},
+		{Nome: "caminho", Achar: acharCaminhos, Publico: publicoDev},
+		{Nome: "usuário de rede", Achar: acharUsuariosRede, Publico: publicoDev},
+		{Nome: "nuvem", Achar: acharNuvem, Publico: publicoDev},
 	}
 }
 

@@ -74,6 +74,10 @@ func addServidor(s string, a, b int, regra string, add func(ObjAchado)) {
 	if v == "" || publicoConexao(v) || v == "." || strings.HasPrefix(v, "(") {
 		return
 	}
+	// nome DNS de serviço do Kubernetes: fica com o leitor de Kubernetes (serviço e namespace)
+	if l := strings.ToLower(v); strings.HasSuffix(l, ".svc.cluster.local") || strings.HasSuffix(l, ".svc") {
+		return
+	}
 	add(ObjAchado{a, a + len(v), "servidor", regra, true})
 }
 

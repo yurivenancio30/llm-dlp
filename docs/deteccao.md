@@ -120,9 +120,16 @@ de cada formato estão descritas em [estruturas.md](estruturas.md). Já ligadas:
 | Conexão | Strings de conexão (`Server=…;Database=…;User Id=…`, ODBC, JDBC, DSN do libpq), URIs de banco (`postgresql://usuario@host/banco`, `jdbc:…`, `mongodb://`), `tnsnames.ora`, URNs do DataHub, `ref()`/`source()` do dbt e `conn_id` do Airflow |
 | Tabela | Saída de cliente de banco e CSV/TSV: valores das colunas de catálogo (`table_name`, `table_schema`, `column_name`, `TABNAME`, `owner`, `Tables_in_…`…) e nomes de coluna do cabeçalho que têm cara de identificador |
 
+| Kubernetes, Helm, docker-compose | Manifestos (pelo par `apiVersion` + `kind`): `metadata.name` conforme o tipo, `namespace`, referências a secret, configmap e service account, hosts do Ingress, kubeconfig; nome DNS `serviço.namespace.svc.cluster.local`; `Chart.yaml`; serviços, `container_name` e `hostname` do compose; imagens de registro privado (o registro e o caminho; a tag fica) |
+| Terraform, Ansible, CloudFormation, ARM/Bicep, CI | Valores literais de atributos que são nomes (`name`, `bucket`, `identifier`, `*Name`…; o nome local do recurso, referências e região ficam), conta da nuvem, hosts do inventário, runners próprios |
+| Chave-valor | Em YAML, JSON, TOML, INI, `.env`, `.properties`, XML e opções `--chave valor`: o valor de uma chave cujo último pedaço indica nome de recurso (`host`, `database`, `schema`, `user`, `bucket`, `topic`, `namespace`, `service`, `repo`, `account`…). Valor que é expressão de código fica |
+| Endereços e caminhos | Host interno em URL ou solto (rótulo único ou `.local`, `.internal`, `.corp`…), buckets e filas (`s3://`, `gs://`, `abfss://`, `amqp://`, `kafka://`), remotos do git (organização e repositório), pacotes internos (`go.mod`, groupId, escopo npm), usuário em `/home/usuario/` e pastas, `DOMINIO\usuario`, `ssh usuario@host` |
+| Nuvem | ARN da AWS, `/subscriptions/…` do Azure, `projects/…` do GCP: conta e recurso. IP público e IPv6 só com `objetos.ip_publico` ligado |
+| Nome da empresa embutido | Identificador que contém um dos seus `termos` como pedaço (`acme_pedidos`) |
+
 Uma instrução em minúsculas só vale com pelo menos duas cláusulas (`select … from … where`),
-para não confundir com prosa. As regras de DevOps e de desenvolvimento entram nos próximos
-lotes.
+para não confundir com prosa. Um nome citado numa mensagem de erro só é aprendido quando a
+linha tem cara de erro. Nome com cara de exemplo (`my-bucket`) é mascarado como qualquer outro.
 
 | Situação | O que acontece |
 |---|---|

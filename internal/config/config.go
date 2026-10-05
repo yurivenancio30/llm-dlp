@@ -74,6 +74,8 @@ type Objetos struct {
 	Ligado   bool            `json:"ligado"`
 	Mascarar map[string]bool `json:"mascarar,omitempty"`
 	Propagar map[string]bool `json:"propagar,omitempty"`
+	// IPv4 público e IPv6 viram nome de servidor (desligado: só o IP privado é mascarado).
+	IPPublico bool `json:"ip_publico"`
 }
 
 // PrefixoConectores: ferramentas dos conectores do claude.ai (Gmail, Drive...). Rodam fora

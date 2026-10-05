@@ -271,7 +271,7 @@ volumes:
   dados-pg-x1:
 `
 	out := confere(t, m, s, []string{"svc-pedidos-x9", "registry.exemplo.interno", "app-demo", "ctr-pedidos-x9", "srv-exemplo-01", "db-demo-x1", "rede-interna-x1", "dados-pg-x1"},
-		[]string{"services:\n", "image: postgres:16", ":1.2\n", `"8080:80"`, "POSTGRES_DB: base", "networks:\n", "volumes:\n", "depends_on:"})
+		[]string{"services:\n", "image: postgres:16", ":1.2\n", `"8080:80"`, "POSTGRES_DB: ", "networks:\n", "volumes:\n", "depends_on:"})
 	mesmaEstrutura(t, s, out)
 	// YAML qualquer com "services:" sem cara de compose
 	if o, _ := m.Mascarar("services:\n  pagamento-x1:\n    descricao: algo\n"); !strings.Contains(o, "pagamento-x1") {
