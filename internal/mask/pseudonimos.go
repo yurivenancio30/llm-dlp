@@ -23,10 +23,19 @@ func (m *Masker) aplicarT(s string, achados []Achado) (string, []Entrada, []trec
 		return s, nil, nil
 	}
 	sort.Slice(achados, func(i, j int) bool {
-		if achados[i].Ini != achados[j].Ini {
-			return achados[i].Ini < achados[j].Ini
+		a, b := achados[i], achados[j]
+		if a.Ini != b.Ini {
+			return a.Ini < b.Ini
 		}
-		return achados[i].Fim-achados[i].Ini > achados[j].Fim-achados[j].Ini
+		if a.Fim-a.Ini != b.Fim-b.Ini {
+			return a.Fim-a.Ini > b.Fim-b.Ini
+		}
+		// mesmo trecho com dois tipos: sempre a mesma escolha (o pseudônimo não pode variar).
+		// Fica o detector de dado pessoal; entre objetos, a ordem do tipo.
+		if ehObjeto(a.Tipo) != ehObjeto(b.Tipo) {
+			return !ehObjeto(a.Tipo)
+		}
+		return a.Tipo < b.Tipo
 	})
 	var b strings.Builder
 	var entradas []Entrada
