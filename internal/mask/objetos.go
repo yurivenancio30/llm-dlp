@@ -274,6 +274,12 @@ func leitoresPadrao() []Leitor {
 		{Nome: "erro", Achar: acharErroObjeto, Publico: publicoSQL},
 		{Nome: "conexão", Achar: acharConexoes, Publico: publicoConexao},
 		{Nome: "tabela", Achar: acharTabelasObj, Publico: publicoSQL},
+		{Nome: "devops-yaml", Achar: acharDevopsEstruturado, Publico: publicoDevops},
+		{Nome: "terraform", Achar: acharTerraform, Publico: publicoDevops},
+		{Nome: "ansible-ini", Achar: acharAnsibleINI, Publico: publicoDevops},
+		{Nome: "bicep", Achar: acharBicep, Publico: publicoDevops},
+		{Nome: "jenkins", Achar: acharJenkins, Publico: publicoDevops},
+		{Nome: "k8s-dns", Achar: acharDNSK8s, Publico: publicoDevops},
 	}
 }
 

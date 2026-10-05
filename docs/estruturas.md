@@ -1258,6 +1258,7 @@ Um sinal forte basta. Dois sinais fracos juntos também bastam.
 | `kubectl describe` | linhas `Name:`, `Namespace:`, `Labels:`, `Annotations:`, `Events:` alinhadas em coluna | `Controlled By:  ReplicaSet/...` (formato `Kind/nome`) |
 | `kubectl -o yaml/json` | como manifesto, com `status:`, `uid`, `resourceVersion`, `managedFields` | `"kind": "List"` com `items` |
 | Nome DNS de serviço | sufixo `.svc.cluster.local` (ou `.svc.<domínio do cluster>`), `.pod.cluster.local` | forma curta `<svc>.<ns>` dentro de URL/connection string |
+| kubeconfig | `apiVersion: v1` + `kind: Config` com `clusters:` / `contexts:` / `users:` | `current-context:` |
 | Helm | `Chart.yaml` com `apiVersion: v2` + `name` + `version`; templates com `{{ .Values.` / `{{ .Release.` / `{{ include` | `values.yaml` sem `kind` |
 | docker-compose | chave `services:` no topo, com filhos contendo `image:`/`build:`; `networks:`/`volumes:`/`secrets:` no topo | `name:` no topo (nome do projeto) |
 | Dockerfile | linha começando com instrução: `FROM`, `RUN`, `COPY`, `ENV`, `ARG`, `WORKDIR`, `ENTRYPOINT`, `CMD`, `LABEL`, `EXPOSE` | `FROM x AS estagio` |
@@ -1305,6 +1306,19 @@ Caminhos em notação do OpenAPI (`[]` = qualquer item da lista). `PodSpec` apar
 | compose `depends_on[]`, `links[]` (`SVC[:ALIAS]`), `extra_hosts` (`HOST=IP`) | `SVC_`, `HOST_` | — |
 | compose `name` (topo) | `PROJ_` | — |
 | Helm `Chart.yaml`: `name`, `dependencies[].name`, `dependencies[].repository` | `CHART_`, URL → detector | chart público de repo público pode ficar |
+| `Ingress ...backend.serviceName` (v1beta1), `PodSpec.serviceAccount` (nome antigo) | `SVC_`, `SA_` | — |
+| `labels` / `matchLabels` / `selector`: valor de `app.kubernetes.io/name`, `app.kubernetes.io/instance`, `app.kubernetes.io/part-of` | `SVC_` (evidência fraca: mascara no lugar, não ensina sozinho) | as outras labels ficam |
+| kubeconfig: `clusters[].name`, `contexts[].name`, `contexts[].context.cluster`, `current-context` | `HOST_` | nome em forma de ARN (`arn:aws:eks:<região>:<conta>:cluster/<nome>`): só a conta (`ACC_`) e o nome final |
+| kubeconfig: `users[].name`, `contexts[].context.user` | `USR_` | — |
+| kubeconfig: `contexts[].context.namespace` | `NS_` | — |
+| kubeconfig: `clusters[].cluster.server` | host da URL → `HOST_` | esquema, porta e caminho ficam |
+| nome DNS `<svc>.<ns>.svc.cluster.local` (em qualquer texto) | `SVC_` + `NS_` | o sufixo fica; o rótulo antes do serviço (pod de StatefulSet) fica |
+
+Na implementação os tipos acima caem nas entidades da base: `metadata.name` de `Namespace` → namespace,
+de `ServiceAccount` → usuário, dos outros `kind` → serviço; `SECRET_`, `CM_`, `PVC_`, `SA_` → serviço/usuário;
+`IMG_` → registro como servidor e cada pedaço do caminho como serviço (a tag e o digest ficam). O
+manifesto só é reconhecido com `apiVersion` (na forma `grupo/vN`) e `kind` no mesmo objeto; dentro de
+`{{ }}` nada é tocado.
 | `kubectl get`: colunas `NAME`, `NAMESPACE`, `NODE`, `NOMINATED NODE` | conforme o recurso pedido | `READY`, `STATUS`, `AGE`, `TYPE` ficam |
 | `docker ps`: `NAMES`, `IMAGE` | `CTR_`, `IMG_` | `CONTAINER ID` é hash: fica ou vira `ID_` |
 
@@ -1505,18 +1519,28 @@ atributo-nome**.
 | HCL | `name` em `azurerm_mssql_server`, `server_name`, `host`, `endpoint`, `address` | HOST/SRV | sim |
 | HCL | `name` em VPC/VNet/subnet, `network`, `vpc_id` literal | NET | sim |
 | HCL | `account_id`, `project`, `account`, `username`, `user` | ACC/USR | sim |
+| HCL | `cluster_name`, `cluster_identifier`, `instance_name` | HOST | sim |
+| HCL | `namespace`, `topic`, `queue_name`, `subscription`, `repository`, `dataset_id`, `table_id`, `organization`, `folder`, `function_name` | NS / TOP / REPO / SCH / T / ORG / DIR / SVC | sim |
+| HCL | `account_id` de 12 dígitos (AWS) | ACC | sim; outros números puros ficam |
+| HCL | `provider "x" { project = ... }`, `backend "x" { bucket = ... }` | ACC / BKT | sim |
+| HCL | `tags { Name = ... }` / `tags = { Name = ... }` | tipo do recurso | sim, evidência fraca |
+| HCL | valor com `${...}` | tipo do atributo | só os pedaços literais, evidência fraca |
 | HCL | `default` de `variable` cujo nome sugere a entidade (`db_name`) | herda o tipo do uso | sim |
 | plan texto | valor à direita de `=`, nos dois lados de `->` | tipo do atributo | sim, os dois lados |
 | plan/state JSON | `before.<attr>`, `after.<attr>`, `values.<attr>` | tipo do atributo | sim |
 | Ansible INI | 1º token da linha, sob `[grupo]` | HOST | sim |
 | Ansible INI/YAML | `ansible_host`, `ansible_user`, `delegate_to` | HOST / USR | sim |
+| Ansible YAML | chaves filhas de `hosts:` (mapa) no inventário | HOST | sim |
+| Ansible playbook | `hosts: <padrão>` de um play (com `tasks`/`roles`/`become`...) | HOST | sim, evidência fraca (`all`, `localhost` ficam) |
 | Ansible | nome do grupo `[dbservers]` | rótulo interno | opcional |
 | Ansible | parâmetros `name`/`login_host`/`login_user`/`db` de módulos de banco (ex.: `community.mysql.mysql_db`) | DB / HOST / USR | sim |
 | Ansible | nome de arquivo em `host_vars/<host>.yml` | HOST | sim (o caminho também vaza) |
 | CFN | chave lógica em `Resources:` (`BancoRelatorios:`) | nome lógico | opcional |
-| CFN | `DBInstanceIdentifier`, `DBName`, `BucketName`, `TableName`, `DBClusterIdentifier`, `MasterUsername` | DB / BKT / USR | sim |
+| CFN | `DBInstanceIdentifier`, `DBName`, `DatabaseName`, `BucketName`, `TableName`, `DBClusterIdentifier`, `MasterUsername`, `UserName`, `RoleName`, `GroupName` | DB / BKT / T / USR | sim |
+| CFN | `ServerName`, `ClusterName` / `QueueName`, `TopicName`, `StreamName` / `FunctionName`, `ServiceName` / `RepositoryName` | HOST / TOP / SVC / REPO | sim; `!Ref`/`!GetAtt` ficam, em `!Sub` só o literal fora de `${}` |
 | CFN | `Default` de `Parameters` usado nessas propriedades | herda | sim |
 | ARM | `resources[].name` | conforme `type` | sim |
+| ARM / Bicep | nome de recurso filho `pai/filho` (`Microsoft.Sql/servers/databases`) | um pedaço por tipo: HOST / DB | sim |
 | Bicep | símbolo depois de `resource` | nome local | opcional |
 | Bicep | `name:` dentro do corpo | conforme o tipo | sim |
 
@@ -2774,3 +2798,97 @@ Comprehend PII não tem tipo para host, database, tabela ou coluna (tem `USERNAM
 - Amazon S3 nomes de bucket: https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucketnamingrules.html
 - SemVer (regex de versão): https://semver.org/ [DOC ✓] — não consultado nesta rodada
 
+
+## Pipelines de CI
+
+Num pipeline quase tudo é vocabulário da ferramenta (chaves, ações públicas, rótulos de runner
+hospedado). Os nomes próprios ficam em poucos lugares estáveis: a **imagem** de contêiner, o
+**runner/agente** próprio e o **ambiente** de deploy. Só esses são tratados; o resto (comandos de
+`script`/`run`, variáveis) passa pelos outros detectores.
+
+### 1. Sinais de detecção
+
+| Formato | Sinal forte | Sinal fraco |
+|---|---|---|
+| GitHub Actions (`.github/workflows/*.yml`) | `jobs:` no topo com `runs-on:` nos jobs | `on:` no topo, `steps:` com `uses:` |
+| GitLab CI (`.gitlab-ci.yml`) | job com `script:`; `stages:` no topo | `image:`, `services:`, `tags:` no job |
+| Azure Pipelines (`azure-pipelines.yml`) | `trigger:`/`pool:`/`stages:`/`jobs:`/`steps:` no topo | `- script:`, `- task:` |
+| Jenkinsfile (declarativo) | `pipeline {` | `agent {`, `stages {`, `stage('x') {` |
+| Jenkinsfile (scripted) | `node(` junto com `stage(` | — |
+
+### 2. Posição → tipo de entidade
+
+| Formato | Posição | Entidade | Observação |
+|---|---|---|---|
+| GitHub Actions | `jobs.<id>.runs-on` (texto, lista, `group:`, `labels:`) | HOST | evidência fraca; rótulos públicos ficam |
+| GitHub Actions | `jobs.<id>.container` (texto ou `.image`), `jobs.<id>.services.<nome>.image` | imagem | regra de imagem (seção Kubernetes, item 3) |
+| GitHub Actions | `jobs.<id>.environment` (texto ou `.name`) | SVC | evidência fraca |
+| GitLab CI | `image` (texto ou `.name`), `services[]` (texto ou `.name`) | imagem | regra de imagem |
+| GitLab CI | `<job>.tags[]` | HOST | evidência fraca; só em job (com `script`/`stage`...) |
+| GitLab CI | `<job>.environment` (texto ou `.name`) | SVC | evidência fraca |
+| Azure Pipelines | `pool` (texto) ou `pool.name` | HOST | evidência fraca; `pool.vmImage` fica |
+| Azure Pipelines | `container` (texto ou `.image`), `environment` | imagem / SVC | — |
+| Jenkinsfile | `agent { label 'x' }`, `node('x')` | HOST | evidência fraca |
+| Jenkinsfile | `docker { image 'x' }`, `docker.image('x')` | imagem | regra de imagem |
+
+Evidência fraca: o valor é mascarado onde aparece, mas só é aprendido (e propagado para o resto do
+texto) se aparecer também em outra regra.
+
+### 3. Vocabulário público (nunca mascarar)
+
+| Vocabulário | Exemplos | Fonte |
+|---|---|---|
+| rótulos de runner hospedado | `ubuntu-latest`, `ubuntu-24.04`, `windows-latest`, `windows-2022`, `macos-latest`, `macos-14`, `self-hosted`, `linux`, `x64`, `arm64` | doc "GitHub-hosted runners" e "self-hosted runners" (rótulos padrão) |
+| imagens públicas | sem registro (`node:20`, `postgres:16`) ou registro público oficial (`docker.io`, `ghcr.io`, `quay.io`, `gcr.io`, `registry.k8s.io`, `mcr.microsoft.com`, `public.ecr.aws`) | regra de imagem |
+| ambientes genéricos | `production`, `staging`, `development`, `dev`, `prod`, `test`, `qa` | — |
+| expressões | `${{ ... }}` (Actions), `$VAR` / `${VAR}` (GitLab), `$(var)` (Azure) | não são valores: ficam |
+| chaves e ações | `jobs`, `steps`, `uses: actions/checkout@v4`, `script`, `stage`, `pipeline`, `agent` | spec de cada ferramenta |
+
+### 4. Regras de identificador
+
+- Valor mascarado só tem letras, dígitos, `_`, `.` e `-` (sem espaço, aspas ou expressão). Rótulo
+  composto do Jenkins (`'linux && docker'`) fica.
+- Imagem: `[registro/]caminho[:tag][@digest]`; registro = primeiro pedaço com `.` ou `:`. Registro
+  privado vira HOST, cada pedaço do caminho vira SVC; a tag e o digest ficam.
+- `tags:` só conta como runner dentro de um job do GitLab: em tarefa do Ansible (lista na raiz), `tags`
+  é rótulo de tarefa e fica.
+
+### 5. Exemplos antes/depois
+
+```yaml
+# antes                                          # depois
+jobs:                                            jobs:
+  build:                                           build:
+    runs-on: [self-hosted, runner-financeiro-x1]     runs-on: [self-hosted, HOST_...]
+    container: registry.exemplo.interno/ci/builder-x1:3    container: host_.../svc_.../svc_...:3
+    environment:                                     environment:
+      name: amb-pedidos-x9                             name: svc_...
+    steps:                                           steps:
+      - uses: actions/checkout@v4                      - uses: actions/checkout@v4
+```
+
+```groovy
+// antes                                           // depois
+pipeline {                                         pipeline {
+  agent { label 'agente-build-x6' }                  agent { label 'svc_...' }   // HOST
+  ...                                                ...
+```
+
+### 6. Casos difíceis e limites
+
+- **Matriz e expressões.** `runs-on: ${{ matrix.os }}` não tem valor literal: fica.
+- **Runner com nome genérico** (`build`, `linux-grande`): mascarado no lugar, não propaga (não tem
+  cara de identificador ou é evidência fraca).
+- **Ações de terceiros** (`uses: org/acao@v1`) e `include:` do GitLab apontam para repositórios; ficam
+  com as regras de URL/repositório, não com estas.
+- **Variáveis de ambiente** (`env:`, `variables:`) são chave-valor comum (reserva genérica).
+- **Jenkins scripted** com lógica Groovy arbitrária: só `node('x')` e `docker.image('x')` são estáveis.
+
+### 7. Links usados
+
+- GitHub Actions, sintaxe de workflow: https://docs.github.com/actions/reference/workflows-and-actions/workflow-syntax
+- GitHub-hosted runners (rótulos): https://docs.github.com/actions/reference/runners/github-hosted-runners
+- GitLab CI/CD YAML: https://docs.gitlab.com/ci/yaml/
+- Azure Pipelines YAML schema: https://learn.microsoft.com/azure/devops/pipelines/yaml-schema/
+- Jenkins Pipeline syntax: https://www.jenkins.io/doc/book/pipeline/syntax/
+- não consultados nesta rodada [VERIFICAR]: os links acima foram escritos de memória

@@ -1,0 +1,2 @@
+go test fuzz v1
+string("services:\n 0:\n  image: .@/")
