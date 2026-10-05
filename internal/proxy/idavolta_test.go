@@ -74,7 +74,9 @@ func TestIdaEVoltaValorSeguidoDePontuacao(t *testing.T) {
 						}
 					}
 				} else {
-					var r struct{ Content []struct{ Input json.RawMessage } }
+					var r struct {
+						Content []struct{ Input json.RawMessage }
+					}
 					json.NewDecoder(resp.Body).Decode(&r)
 					if len(r.Content) > 0 {
 						entrada = string(r.Content[0].Input)

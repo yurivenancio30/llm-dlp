@@ -62,6 +62,18 @@ type Config struct {
 	// levar só pseudônimos (evita que uma página maliciosa induza o modelo a mandar o
 	// dado real numa URL).
 	FerramentasSemDesmascarar []string `json:"ferramentas_sem_desmascarar"`
+
+	// Nomes de recursos internos (servidor, banco, schema, tabela, coluna...), reconhecidos
+	// pela estrutura do conteúdo. Ver docs/configuracao.md.
+	Objetos Objetos `json:"objetos"`
+}
+
+// Objetos liga e desliga, por tipo de entidade, o mascaramento e a propagação. Tipo que não
+// estiver nos mapas fica no padrão: mascarar todos; propagar todos menos coluna e índice.
+type Objetos struct {
+	Ligado   bool            `json:"ligado"`
+	Mascarar map[string]bool `json:"mascarar,omitempty"`
+	Propagar map[string]bool `json:"propagar,omitempty"`
 }
 
 // PrefixoConectores: ferramentas dos conectores do claude.ai (Gmail, Drive...). Rodam fora
@@ -98,6 +110,7 @@ type OCR struct {
 func Padrao() Config {
 	return Config{
 		Porta:                  8787,
+		Objetos:                Objetos{Ligado: true},
 		Upstream:               "https://api.anthropic.com",
 		DominiosInternos:       []string{},
 		EmailsLiberados:        []string{},

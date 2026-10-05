@@ -106,6 +106,24 @@ Código de usuário curto ou sem dígito (`jsilva`, `ana`) só é mascarado junt
 campo: procurá-lo no texto inteiro mascararia a palavra em todo lugar. Contas de serviço
 (`root`, `postgres`, `admin`) não são mascaradas.
 
+## 5. Nomes de recursos internos (pela estrutura)
+
+Nome de servidor, banco, schema, tabela, coluna, procedure, índice, usuário, namespace,
+serviço, bucket ou fila é reconhecido pela **posição na estrutura** do conteúdo (a gramática do
+SQL, a chave de uma configuração, a parte de uma URI...), nunca por parecer um nome. As regras
+de cada formato estão descritas em [estruturas.md](estruturas.md) e entram aos poucos; a base
+(pseudônimo, aprendizado, liga/desliga) já está pronta.
+
+| Situação | O que acontece |
+|---|---|
+| O nome aparece numa posição estrutural | Mascarado ali, com um pseudônimo do tipo (`T_…` tabela, `HOST_…` servidor, `C_…` coluna) |
+| A posição é inequívoca (ou o nome foi visto em duas regras diferentes) e ele tem cara de identificador (`_`, dígito, ponto, hífen entre partes ou mistura de caixa) | É lembrado e mascarado também em qualquer outro texto, em qualquer caixa, inclusive depois de reiniciar |
+| Palavra simples (`cliente`), coluna, índice, vocabulário do próprio formato, conteúdo da web, posição duvidosa | Mascarado só onde apareceu; não é lembrado |
+| Não visto há mais de 90 dias | Deixa de ser procurado fora da estrutura |
+
+**Limite:** um nome que só aparece em frases, sem nunca ter passado por uma estrutura que o
+llm-dlp reconheça ("o problema é na tabela de pedidos do sistema X"), **não é pego**.
+
 ## Na dúvida, mascara
 
 Perto de `senha`, `password` ou `secret`, qualquer valor com dígito ou símbolo é tratado como

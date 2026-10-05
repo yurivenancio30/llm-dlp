@@ -21,6 +21,7 @@ Arquivo `~/.config/llm-dlp/config.json`. Depois de mudar, rode `llm-dlp parar`.
 | `documentos_sem_contexto` | Mascara CPF e CNPJ só com dígitos mesmo sem a palavra "cpf"/"cnpj" por perto, se o dígito verificador conferir. Cerca de 1 em 100 números aleatórios desse tamanho também confere e é mascarado a mais | `true` |
 | `falhar_fechado` | Recusa o que não sabe mascarar. Desligado, uma falha ao mascarar manda a requisição **sem máscara** (só fica um aviso no log). Imagem e PDF que não deu para verificar são recusados de qualquer jeito. Não recomendado desligar | `true` |
 | `ocr` | `modo` (`mascarar`, `bloquear` ou `permitir`), `idioma`, `max_paginas`, caminhos do tesseract e do poppler | `mascarar`, `por`, 30 |
+| `objetos` | Nomes de recursos internos (ver [O que é detectado](deteccao.md#5-nomes-de-recursos-internos-pela-estrutura)). `ligado`; `mascarar` e `propagar`: mapas tipo → `true`/`false` (tipos: `servidor`, `database`, `schema`, `tabela`, `coluna`, `procedure`, `indice`, `usuario`, `namespace`, `servico`, `bucket`, `fila`). Ex.: `{"mascarar": {"coluna": false}}` deixa as colunas legíveis | ligado; mascara todos; propaga todos menos `coluna` e `indice` |
 | `porta` | Porta local do proxy | 8787 |
 | `upstream` | Endereço da API | `https://api.anthropic.com` |
 
@@ -43,6 +44,8 @@ Nomes aceitos em `detectores_desligados`: `segredo`, `email`, `ip`, `host`, `cpf
 | `llm-dlp testar < arquivo` | Mostra a versão mascarada de um texto |
 | `llm-dlp testar-midia ARQ DIR` | Processa uma imagem ou PDF e grava o resultado em DIR |
 | `llm-dlp medir ARQ.jsonl` | Tempo e cobertura sobre uma sessão antiga do Claude Code (só contagens) |
+| `llm-dlp aprendidos` | Quantos nomes de recursos internos foram aprendidos, por tipo e por mês (só contagens) |
+| `llm-dlp esquecer NOME` | Apaga um nome aprendido. Também `--tipo T`, `--desde AAAA-MM-DD`, `--ate AAAA-MM-DD`, `--tudo`. Só com o proxy parado (feche o Claude Code e rode `llm-dlp parar`) |
 | `llm-dlp versao` | Versão e commit do binário |
 
 `garantir`, `verificar`, `servir` e `supervisionar` são internos: quem chama são os ganchos

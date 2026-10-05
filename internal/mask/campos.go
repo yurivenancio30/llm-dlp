@@ -55,7 +55,7 @@ func marcar(s string, ini, fim int, classe string, add func(ini, fim int, tipo s
 
 // valorDoCampo decide se v, num campo da classe dada, deve ser mascarado, e com que tipo.
 func valorDoCampo(classe, v string) (string, bool) {
-	if naoEValor[strings.ToLower(v)] || len(v) > 120 || rePseudoPronto.MatchString(v) {
+	if naoEValor[strings.ToLower(v)] || len(v) > 120 || rePseudoPronto.MatchString(v) || rePseudoObj.MatchString(v) {
 		return "", false
 	}
 	dig, let := 0, 0

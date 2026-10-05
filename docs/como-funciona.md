@@ -46,7 +46,7 @@ qualquer lugar: na saída de um comando, num arquivo lido mais tarde, sem a pist
 | Onde | O que guarda |
 |---|---|
 | Memória | O valor real, enquanto o llm-dlp estiver no ar |
-| Disco (`vistos.json`, `pessoas.json`) | **Só o hash**, feito com a chave. Serve para reconhecer depois de reiniciar |
+| Disco (`vistos.json`, `pessoas.json`) | **Só o hash**, feito com a chave. Serve para reconhecer depois de reiniciar. Para nomes de recursos internos (tabela, servidor...), também o tipo e o dia em que foi aprendido e visto pela última vez (para a validade de 90 dias e para `llm-dlp esquecer --desde`) |
 | Disco (`enviados.log`) | Para cada texto já enviado: um hash do ponto da conversa em que ele está e, de cada trecho trocado, onde ele fica no texto, o tipo e o pseudônimo. Serve para o texto sair igual depois de reiniciar (ver abaixo) |
 
 Nenhum valor real e nenhum texto mascarado é gravado em disco pelo llm-dlp.

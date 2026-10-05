@@ -49,6 +49,15 @@ func (m *Masker) aplicarT(s string, achados []Achado) (string, []Entrada, []trec
 
 func entradaDe(entradas []Entrada, ps, real, tipo string) []Entrada {
 	entradas = append(entradas, Entrada{ps, real, tipo})
+	if ehObjeto(tipo) { // o modelo pode escrever o prefixo na outra caixa ("T_..." por "t_...")
+		if i := strings.IndexByte(ps, '_'); i > 0 {
+			alt := strings.ToUpper(ps[:i]) + ps[i:]
+			if alt == ps {
+				alt = strings.ToLower(ps[:i]) + ps[i:]
+			}
+			entradas = append(entradas, Entrada{alt, real, tipo})
+		}
+	}
 	if tipo == "email" { // o modelo às vezes cita só o domínio: "dxxxx.invalid" volta a ser o domínio real
 		if i, j := strings.LastIndexByte(ps, '@'), strings.LastIndexByte(real, '@'); i >= 0 && j >= 0 {
 			entradas = append(entradas, Entrada{ps[i+1:], real[j+1:], "dominio"})
@@ -78,6 +87,9 @@ func remontar(s string, ts []trecho) (string, []Entrada, bool) {
 
 // Pseudonimo devolve o pseudônimo estável de um valor real de um tipo.
 func (m *Masker) Pseudonimo(tipo, real string) string {
+	if ehObjeto(tipo) {
+		return m.pseudoObjeto(strings.TrimPrefix(tipo, prefTipoObj), real)
+	}
 	switch tipo {
 	case "email":
 		e := strings.ToLower(real)

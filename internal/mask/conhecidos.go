@@ -52,6 +52,9 @@ func paraCadaCodigo(s string, fn func(ini, fim int)) {
 // chaveCanonica: forma do valor usada para comparar independentemente do tipo e da
 // pontuação ("12.345.678-9" e "123456789" são o mesmo número).
 func chaveCanonica(tipo, real string) string {
+	if ehObjeto(tipo) {
+		return "o:" + normObj(real)
+	}
 	switch tipo {
 	case "segredo":
 		return "s:" + real
@@ -89,6 +92,7 @@ type conhecidos struct {
 	// em que o valor apareceu em OUTRA grafia (RG sem pontos, código em minúsculas).
 	canonSeq map[string]int
 	nTipos   map[string]int
+	nObj     int // quantos nomes de objeto (ver objetos.go)
 	// 4 primeiros bytes -> TAMANHOS dos valores que começam assim. Com o começo e o tamanho,
 	// o trecho do texto é consultado direto em seq (uma busca em mapa). Guardar a lista de
 	// valores aqui ficaria lento quando milhares começam igual (RGs "12.3...", CPFs em sequência).
@@ -107,7 +111,7 @@ func novosConhecidos() *conhecidos {
 func (c *conhecidos) zerar() {
 	c.reais = nil
 	c.tipo, c.seq, c.canon, c.canonSeq = map[string]string{}, map[string]int{}, map[string]string{}, map[string]int{}
-	c.nTipos, c.pref = map[string]int{}, map[uint32][]int32{}
+	c.nTipos, c.pref, c.nObj = map[string]int{}, map[uint32][]int32{}, 0
 	c.par = [1 << 16 / 64]uint64{}
 }
 
@@ -124,6 +128,9 @@ func (c *conhecidos) inserir(tipo, real string) {
 	c.canonSeq[chaveCanonica(tipo, real)] = c.base + len(c.reais)
 	c.reais = append(c.reais, real)
 	c.nTipos[tipo]++
+	if ehObjeto(tipo) {
+		c.nObj++
+	}
 	k := uint32(real[0])<<24 | uint32(real[1])<<16 | uint32(real[2])<<8 | uint32(real[3])
 	tem := false
 	for _, n := range c.pref[k] {
@@ -189,6 +196,9 @@ func (c *conhecidos) varrer(s string, desde int, fn func(ini, fim int, tipo stri
 			if ehAlnum(v[len(v)-1]) && fim < len(s) && ehAlnum(s[fim]) {
 				continue
 			}
+			if tp := c.tipo[v]; ehObjeto(tp) && (i > 0 && ehIdent(s[i-1]) || fim < len(s) && ehIdent(s[fim])) {
+				continue // nome de objeto só vale inteiro ("tb_x" não é pedaço de "tb_x_hist")
+			}
 			if !fn(i, fim, c.tipo[v]) {
 				return
 			}
@@ -229,6 +239,13 @@ func (c *conhecidos) contemDesde(s string, g int) bool {
 			achou = true
 		}
 	})
+	if !achou && c.nObj > 0 {
+		for _, ix := range reTokObj.FindAllStringIndex(s, -1) {
+			if novo("o:" + strings.ToLower(s[ix[0]:ix[1]])) {
+				return true
+			}
+		}
+	}
 	return achou
 }
 
@@ -240,6 +257,9 @@ func temDigito(s string) bool {
 	}
 	return false
 }
+
+// ehIdent: caractere que continua um identificador (letra, dígito, _ $ # -).
+func ehIdent(b byte) bool { return ehAlnum(b) || b == '_' || b == '$' || b == '#' || b == '-' }
 
 func ehAlnum(b byte) bool {
 	return b >= '0' && b <= '9' || b >= 'a' && b <= 'z' || b >= 'A' && b <= 'Z'
@@ -257,8 +277,15 @@ var (
 )
 
 // conhecidos acrescenta a out as ocorrências, em s, de valores já conhecidos.
-func (m *Masker) acharConhecidos(s string, numLongo bool, add func(ini, fim int, tipo string)) {
+func (m *Masker) acharConhecidos(s string, numLongo bool, add0 func(ini, fim int, tipo string)) {
 	c := m.conh
+	add := func(ini, fim int, tipo string) {
+		if ehObjeto(tipo) && !m.objPropaga(strings.TrimPrefix(tipo, prefTipoObj)) {
+			return // tipo desligado depois de aprendido
+		}
+		add0(ini, fim, tipo)
+	}
+	m.acharObjetosConhecidos(s, add)
 
 	// 1) valores em RAM, pelo texto exato (pega qualquer formato já visto)
 	c.varrer(s, 0, func(ini, fim int, tipo string) bool { add(ini, fim, tipo); return true })

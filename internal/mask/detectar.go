@@ -62,6 +62,7 @@ func (m *Masker) detectarInteiro(s string) []Achado { return m.detectarInteiroA(
 
 func (m *Masker) detectarInteiroA(s string, aprende bool) []Achado {
 	out := m.detectarBase(s)
+	m.acharObjetos(s, aprende, func(ini, fim int, tipo string) { out = append(out, Achado{ini, fim, tipo, s[ini:fim]}) })
 	if !m.cfg.Desligado("campo") {
 		m.acharTabelas(s, func(ini, fim int, tipo string) { out = append(out, Achado{ini, fim, tipo, s[ini:fim]}) })
 		out = append(out, nomesNaLinha(s, out)...)
@@ -150,7 +151,8 @@ func (m *Masker) detectarGrande(s string, aprende bool) []Achado {
 			add(a.Ini, a.Fim, a.Tipo)
 		}
 	})
-	// tabelas: o cabeçalho vale para as linhas de qualquer pedaço, então é no texto inteiro
+	// estrutura (objetos) e tabelas: no texto inteiro (uma estrutura pode passar de um pedaço)
+	m.acharObjetos(s, aprende, func(ini, fim int, tipo string) { out = append(out, Achado{ini, fim, tipo, s[ini:fim]}) })
 	if !m.cfg.Desligado("campo") {
 		m.acharTabelas(s, func(ini, fim int, tipo string) { out = append(out, Achado{ini, fim, tipo, s[ini:fim]}) })
 		out = append(out, nomesNaLinha(s, out)...)

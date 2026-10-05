@@ -48,6 +48,8 @@ type Masker struct {
 	vistos   *Vistos
 	enviados *Enviados
 	conh     *conhecidos
+	leitores []Leitor // leitores de estrutura (objetos.go)
+	fracos   fracos
 	extras   []*regexp.Regexp
 	rotExtra []string
 	termos   *regexp.Regexp
