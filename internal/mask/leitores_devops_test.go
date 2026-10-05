@@ -476,7 +476,7 @@ func TestDevopsAprendidoEmOutroFormato(t *testing.T) {
 	m.Mascarar("resource \"aws_s3_bucket\" \"b\" {\n  bucket = \"bkt-extratos-x8\"\n}\n")
 	for _, s := range []string{
 		"o pod caiu no namespace ns-tesouraria-x8 de novo",
-		"kubectl -n NS-TESOURARIA-X8 get pods",
+		"kubectl -n ns-tesouraria-x8 get pods",
 		"services:\n  app:\n    environment:\n      NAMESPACE: ns-tesouraria-x8\n",
 		"aws s3 ls s3://bkt-extratos-x8/2026/",
 		"Server=srv-x;Database=bkt-extratos-x8;",

@@ -56,17 +56,19 @@ func TestCamposRotulados(t *testing.T) {
 			}
 		}
 	}
-	// o que NÃO é sensível fica como está (nomes de sistemas, tabelas, valores)
+	// o que NÃO é sensível fica como está (valores, nomes de sistema). Nomes de coluna de
+	// cabeçalho, schema/tabela de catálogo e "table_name" são nomes de recursos e são
+	// mascarados de propósito (ver TestDesenhoMascaraRecursos).
 	fica := map[string][]string{
-		"NOM_SISTEMA;COD_USU_OWNER;NOM_OWNER\nSISTEMA_X;B123456;Carlos Eduardo Nunes\n": {"NOM_SISTEMA", "SISTEMA_X", "COD_USU_OWNER"},
-		"NOM_CLIENTE,NUM_CPF,VL_SALDO\nMaria Aparecida Lopes,52998224725,10.50\n":       {"VL_SALDO", "10.50", "NOM_CLIENTE"},
-		"TABLE_SCHEMA,TABLE_NAME,ROW_COUNT\nGOLD,TB_CLIENTE,1500\n":                     {"GOLD", "TB_CLIENTE", "1500"},
-		`{"name": "Bash", "user": "root", "table_name": "TB_X"}`:                        {"Bash", "root", "TB_X"},
+		"NOM_SISTEMA;COD_USU_OWNER;NOM_OWNER\nSISTEMA_X;B123456;Carlos Eduardo Nunes\n": {"SISTEMA_X"},
+		"NOM_CLIENTE,NUM_CPF,VL_SALDO\nMaria Aparecida Lopes,52998224725,10.50\n":       {"10.50"},
+		"TABLE_SCHEMA,TABLE_NAME,ROW_COUNT\nGOLD,TB_CLIENTE,1500\n":                     {"1500"},
+		`{"name": "Bash", "user": "root", "table_name": "TB_X"}`:                        {"Bash", "root"},
 		"name,owner\nTAG_X,SYSADMIN\nTAG_Y,ACCOUNTADMIN\n":                              {"SYSADMIN", "ACCOUNTADMIN"},
 		"usuario: postgres\nlogin = admin":                                              {"postgres", "admin"},
 	}
 	for texto, ficam := range fica {
-		out, _ := semObjetos(t).Mascarar(texto)
+		out, _ := novoTeste(t).Mascarar(texto)
 		for _, r := range ficam {
 			if !strings.Contains(out, r) {
 				t.Errorf("mascarou %q sem precisar em %q -> %q", r, texto, out)
@@ -158,13 +160,10 @@ func TestFormatosGenericos(t *testing.T) {
 	// O que não é dado de pessoa fica como está, em qualquer formato.
 	intactos := []string{
 		"name,type,size\nreport.pdf,file,1024\nimages,dir,4096\n",
-		"table_name;row_count\nTB_CLIENTE;1500\nTB_CONTA;90\n",
 		`{"name": "build", "steps": [{"name": "Run tests", "run": "go test ./..."}]}`,
 		"name: Deploy to Production\non: push\njobs:\n  build:\n    name: Build and Test\n",
 		"| Sistema | Status | Dono do processo |\n|---|---|---|\n| SIS_A | ativo | TI |\n",
-		"INSERT INTO produtos (id, nome_produto, preco) VALUES (1, 'CDB Liquidez Diaria', 10.5);",
 		"<produto><nome>CDB Liquidez</nome><tipo>renda fixa</tipo></produto>",
-		"SELECT nome_cliente, cpf FROM clientes WHERE dt_nascimento > '1990-01-01'", // nomes de coluna numa consulta
 		"func login(user string) error { return nil } // login: ver docs",
 		"cliente = buscar_cliente(id)\nresponsavel = None\n",
 		// listas de colunas em SQL e em texto não são cabeçalho de tabela
@@ -174,8 +173,6 @@ func TestFormatosGenericos(t *testing.T) {
 		"`user_id`, `user_name`, `role_name`\n`REQUEST_ID`, `USER_TAGS`, `TOKENS`\n",
 		"group by user_name, role_name\norder by total_elapsed, QUERY_TYPE\n",
 		// linha de dados de uma tabela não vira cabeçalho, mesmo com nome de campo numa célula
-		"| Column | Data Type | Description |\n|---|---|---|\n| REQUEST_ID | VARCHAR | id |\n| USER_ID | NUMBER | Identifier of the user |\n| USER_NAME | VARCHAR | Name of the user |\n| USAGE_TIME | TIMESTAMP | when |\n",
-		"coluna;tipo;descricao\nNOM_CLIENTE;VARCHAR;nome\nNUM_CPF;VARCHAR;documento\nVL_SALDO;NUMBER;saldo\n",
 		// data numa coluna de documento não é documento
 		"cep,cidade\n2026-10-03,Belo Horizonte\n",
 		"num_cpf: 2026-10-03T12:30:00",
@@ -186,7 +183,7 @@ func TestFormatosGenericos(t *testing.T) {
 		"total  used  free\n  16G    8G    8G\n",
 	}
 	for _, s := range intactos {
-		if out, ents := semObjetos(t).Mascarar(s); len(ents) > 0 {
+		if out, ents := novoTeste(t).Mascarar(s); len(ents) > 0 {
 			t.Errorf("mascarou sem precisar:\n   %q\n-> %q", s, out)
 		}
 	}
@@ -230,6 +227,37 @@ func TestRotulosDeDocumento(t *testing.T) {
 	for _, r := range []string{"document_type", "tipo_documento", "documento_url"} {
 		if c := classeRotulo(r); c != "" {
 			t.Errorf("%q não guarda o número do documento, mas virou %q", r, c)
+		}
+	}
+}
+
+// O desenho mascara nomes de recursos (tabela, coluna de cabeçalho, schema de catálogo) de
+// propósito. Nesses textos, o que sai mascarado tem que ser só pseudônimo de objeto: nenhum
+// detector de dado pessoal pode disparar.
+func TestDesenhoMascaraRecursos(t *testing.T) {
+	for _, s := range []string{
+		"table_name;row_count\nTB_CLIENTE;1500\nTB_CONTA;90\n",
+		"INSERT INTO produtos (id, nome_produto, preco) VALUES (1, 'CDB Liquidez Diaria', 10.5);",
+		"SELECT nome_cliente, cpf FROM clientes WHERE dt_nascimento > '1990-01-01'", // nomes de coluna numa consulta
+		"| Column | Data Type | Description |\n|---|---|---|\n| REQUEST_ID | VARCHAR | id |\n| USER_ID | NUMBER | Identifier of the user |\n| USER_NAME | VARCHAR | Name of the user |\n| USAGE_TIME | TIMESTAMP | when |\n",
+		"coluna;tipo;descricao\nNOM_CLIENTE;VARCHAR;nome\nNUM_CPF;VARCHAR;documento\nVL_SALDO;NUMBER;saldo\n",
+		"NOM_SISTEMA;COD_USU_OWNER;NOM_OWNER\nSISTEMA_X;x;y\n",
+		"TABLE_SCHEMA,TABLE_NAME,ROW_COUNT\nGOLD,TB_CLIENTE,1500\n",
+		`{"name": "Bash", "user": "root", "table_name": "TB_X"}`,
+		"SELECT * FROM vendas WHERE id = 12345678901 AND ts > '2026-10-02 18:35:00'",
+		"bank_name,bank_code\nBanco X,341\n",
+	} {
+		_, ents := novoTeste(t).Mascarar(s)
+		obj := 0
+		for _, e := range ents {
+			if strings.HasPrefix(e.Tipo, "obj.") {
+				obj++
+			} else {
+				t.Errorf("detector de dado pessoal disparou (%s) em %q", e.Tipo, s)
+			}
+		}
+		if obj == 0 {
+			t.Errorf("nenhum nome de recurso mascarado em %q", s)
 		}
 	}
 }

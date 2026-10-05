@@ -53,7 +53,7 @@ func paraCadaCodigo(s string, fn func(ini, fim int)) {
 // pontuação ("12.345.678-9" e "123456789" são o mesmo número).
 func chaveCanonica(tipo, real string) string {
 	if ehObjeto(tipo) {
-		return "o:" + normObj(real)
+		return canonObj(strings.TrimPrefix(tipo, prefTipoObj), real)
 	}
 	switch tipo {
 	case "segredo":
@@ -241,7 +241,7 @@ func (c *conhecidos) contemDesde(s string, g int) bool {
 	})
 	if !achou && c.nObj > 0 {
 		for _, ix := range reTokObj.FindAllStringIndex(s, -1) {
-			if novo("o:" + strings.ToLower(s[ix[0]:ix[1]])) {
+			if v := s[ix[0]:ix[1]]; novo("O:"+v) || novo("o:"+strings.ToLower(v)) {
 				return true
 			}
 		}

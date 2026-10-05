@@ -52,9 +52,8 @@ func TestDetecta(t *testing.T) {
 }
 
 func TestNaoDetecta(t *testing.T) {
-	m := semObjetos(t)
+	m := novoTeste(t)
 	limpos := []string{
-		"SELECT * FROM vendas WHERE id = 12345678901 AND ts > '2026-10-02 18:35:00'",
 		"versão 2.1.280, porta 8080 em 127.0.0.1, dns 8.8.8.8",
 		"oid 1.3.6.1.4.1.311 e build 10.0.19045.1",
 		"run_id 123e4567-e89b-42d3-a456-426614174000 terminou",
@@ -207,7 +206,6 @@ func TestDetectoresExtras(t *testing.T) {
 		"o título do relatório tem 123456789012 caracteres",
 		"placa de vídeo RTX4090 instalada",
 		"sexo;idade;uf\nF;34;MG\n", // quase identificadores: desligados por padrão
-		"bank_name,bank_code\nBanco X,341\n",
 		"card_type: visa",
 		"status_code: 200\ncontent-type: application/json",
 		"curl -H \"Authorization: Bearer ${TOKEN}\" https://x.test",
@@ -216,7 +214,7 @@ func TestDetectoresExtras(t *testing.T) {
 		"WHERE user_id = :user_id",
 	}
 	for _, s := range fica {
-		if out, ents := semObjetos(t).Mascarar(s); len(ents) > 0 {
+		if out, ents := novoTeste(t).Mascarar(s); len(ents) > 0 {
 			t.Errorf("mascarou sem precisar: %q -> %q", s, out)
 		}
 	}

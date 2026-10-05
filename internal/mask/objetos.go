@@ -4,6 +4,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -66,9 +67,13 @@ func (m *Masker) objPropaga(ent string) bool {
 	return propagaPadrao[ent]
 }
 
-// normObj: o nome sem aspas, colchetes ou crases, em minúsculas (identificadores sem aspas são
-// insensíveis à caixa em todos os dialetos de SQL).
-func normObj(v string) string {
+// entSQL: tipos de SQL, em que identificadores sem aspas são insensíveis à caixa em todos os
+// dialetos. Nos outros tipos (caminho, bucket, fila...) a grafia vale como está:
+// "/dados/Relatorios" e "/dados/relatorios" são duas pastas.
+var entSQL = map[string]bool{"database": true, "schema": true, "tabela": true, "coluna": true, "procedure": true, "indice": true}
+
+// semCitacao: o nome sem os colchetes, aspas ou crases em volta.
+func semCitacao(v string) string {
 	v = strings.TrimSpace(v)
 	if len(v) >= 2 {
 		switch {
@@ -76,14 +81,30 @@ func normObj(v string) string {
 			v = v[1 : len(v)-1]
 		}
 	}
-	return strings.ToLower(v)
+	return v
 }
 
-// pseudoObjeto: prefixo do tipo + 12 caracteres (60 bits) do HMAC da chave. Estável entre
-// conversas e reinícios. Nome em minúsculas recebe o prefixo em minúsculas ("t_..."), para o
-// pseudônimo combinar com o estilo do texto; a volta aceita as duas formas.
+// normObj: a forma do nome que identifica o objeto (sem citação; em minúsculas nos tipos de SQL).
+func normObj(ent, v string) string {
+	v = semCitacao(v)
+	if entSQL[ent] {
+		return strings.ToLower(v)
+	}
+	return v
+}
+
+// canonObj: a chave do nome na memória e no vistos.json. "o:" = sem caixa (SQL), "O:" = exata.
+func canonObj(ent, v string) string {
+	if entSQL[ent] {
+		return "o:" + strings.ToLower(semCitacao(v))
+	}
+	return "O:" + semCitacao(v)
+}
+
+// pseudoObjeto: prefixo do tipo + o ID do HMAC da chave (o mesmo tamanho dos outros tipos).
+// Estável entre conversas e reinícios. Nome em minúsculas recebe o prefixo em minúsculas
+// ("t_..."), para combinar com o estilo do texto; a volta aceita qualquer caixa.
 func (m *Masker) pseudoObjeto(ent, real string) string {
-	id := strings.ToLower(m.p.raw("objeto", ent+"\x00"+normObj(real), 8))[:12]
 	pref := EntObjeto[ent]
 	if pref == "" {
 		pref = "OBJ"
@@ -91,11 +112,39 @@ func (m *Masker) pseudoObjeto(ent, real string) string {
 	if strings.ToLower(real) == real {
 		pref = strings.ToLower(pref)
 	}
-	return pref + "_" + id
+	ps := pref + "_" + m.p.ID("objeto", ent+"\x00"+normObj(ent, real))
+	registrarPseudo(ps)
+	return ps
 }
 
-// rePseudoObj: um pseudônimo de objeto já pronto (não é mascarado de novo).
-var rePseudoObj = regexp.MustCompile(`^(?i:host|db|sch|t|c|proc|idx|usr|ns|svc|bkt|top|repo|org|pkg|dir|acc|obj)_[a-z2-7]{12}$`)
+// rePseudoObj: a FORMA de um pseudônimo de objeto. Só a forma não basta para pular um nome
+// ("t_customer" é uma tabela real com essa cara): ver ehPseudoObj.
+var rePseudoObj = regexp.MustCompile(`^(?i:host|db|sch|t|c|proc|idx|usr|ns|svc|bkt|top|repo|org|pkg|dir|acc|obj)_[a-z2-7]{8}$`)
+
+// pseudônimos de objeto gerados neste processo (em minúsculas): só esses são pulados.
+var (
+	pseudosGerados sync.Map
+	nPseudos       atomic.Int64
+)
+
+const maxPseudosGerados = 500_000
+
+func registrarPseudo(ps string) {
+	k := strings.ToLower(ps)
+	if _, ok := pseudosGerados.LoadOrStore(k, true); !ok && nPseudos.Add(1) > maxPseudosGerados {
+		pseudosGerados.Clear()
+		nPseudos.Store(0)
+	}
+}
+
+// ehPseudoObj: v é um pseudônimo de objeto gerado por nós (em qualquer caixa)?
+func ehPseudoObj(v string) bool {
+	if !rePseudoObj.MatchString(v) {
+		return false
+	}
+	_, ok := pseudosGerados.Load(strings.ToLower(v))
+	return ok
+}
 
 // caraDeIdentificador: o freio que separa um nome de recurso de uma palavra comum. Só nomes
 // assim são aprendidos e propagados: têm "_", dígito, ponto, hífen entre partes ou mistura de
@@ -168,25 +217,23 @@ func (f *fracos) marcar(nome, regra string) (duas bool) {
 // aprenderObj aplica os freios e, se passar, lembra o nome (RAM e, só o hash, vistos.json).
 func (m *Masker) aprenderObj(o ObjAchado, real string, publico func(string) bool) {
 	v := strings.Trim(strings.TrimSpace(real), "[]\"`")
-	if len(v) < 4 || !m.objPropaga(o.Ent) || !caraDeIdentificador(v) || rePseudoObj.MatchString(v) {
+	if len(v) < 4 || !m.objPropaga(o.Ent) || !caraDeIdentificador(v) || ehPseudoObj(v) {
 		return
 	}
 	if publico != nil && publico(v) {
 		return
 	}
-	if !o.Forte && !m.fracos.marcar(normObj(v), o.Regra) {
+	if !o.Forte && !m.fracos.marcar(canonObj(o.Ent, v), o.Regra) {
 		return // evidência fraca: mascara no lugar, mas não ensina
 	}
 	m.conh.aprender(prefTipoObj+o.Ent, v)
 	if m.vistos != nil {
-		m.vistos.MarcarObj(m.idObj(v), o.Ent, hoje())
+		m.vistos.MarcarObj(m.idObj(canonObj(o.Ent, v)), o.Ent, hoje())
 	}
 }
 
-// idObj: o hash com que o nome fica no vistos.json (65 bits; sem o tipo, que vai no valor).
-func (m *Masker) idObj(v string) string {
-	return "o:" + strings.ToLower(m.p.raw("visto-objeto", normObj(v), 9))[:13]
-}
+// idObj: o hash com que o nome fica no vistos.json (o tipo vai no valor).
+func (m *Masker) idObj(chave string) string { return m.p.ID("visto", chave) }
 
 // hoje: dias desde 1970 (o vistos.json guarda datas assim). Variável para os testes.
 var hoje = func() int { return int(time.Now().Unix() / 86400) }
@@ -205,7 +252,7 @@ func (m *Masker) acharObjetos(s string, aprende bool, add func(ini, fim int, tip
 				return
 			}
 			v := s[o.Ini:o.Fim]
-			if rePseudoObj.MatchString(v) || (l.Publico != nil && l.Publico(strings.Trim(v, "[]\"`"))) {
+			if ehPseudoObj(v) || (l.Publico != nil && l.Publico(strings.Trim(v, "[]\"`"))) {
 				return
 			}
 			add(o.Ini, o.Fim, prefTipoObj+o.Ent)
@@ -240,7 +287,11 @@ func (m *Masker) acharObjetosConhecidos(s string, add func(ini, fim int, tipo st
 			continue
 		}
 		c.mu.RLock()
-		tp, ok := c.canon["o:"+strings.ToLower(v)]
+		tp, ok := c.canon["O:"+v] // grafia exata
+		if !ok {
+			tp, ok = c.canon["o:"+strings.ToLower(v)] // nome de SQL, em qualquer caixa
+			ok = ok && entSQL[strings.TrimPrefix(tp, prefTipoObj)]
+		}
 		c.mu.RUnlock()
 		if ok {
 			if ent := strings.TrimPrefix(tp, prefTipoObj); m.objPropaga(ent) {
@@ -251,18 +302,21 @@ func (m *Masker) acharObjetosConhecidos(s string, add func(ini, fim int, tipo st
 		if !disco {
 			continue
 		}
-		ent, visto, ok := m.vistos.Obj(m.idObj(v))
+		chave := "O:" + v
+		ent, visto, ok := m.vistos.Obj(m.idObj(chave))
+		if !ok {
+			chave = "o:" + strings.ToLower(v)
+			ent, visto, ok = m.vistos.Obj(m.idObj(chave))
+			ok = ok && entSQL[ent]
+		}
 		if !ok || d-visto > validadeObj || !m.objPropaga(ent) {
 			continue
 		}
 		add(ix[0], ix[1], prefTipoObj+ent)
 		c.aprender(prefTipoObj+ent, v) // volta para a memória
-		m.vistos.MarcarObj(m.idObj(v), ent, d)
+		m.vistos.MarcarObj(m.idObj(chave), ent, d)
 	}
 }
-
-// IdObjeto: o hash com que um nome de objeto fica no vistos.json (para "llm-dlp esquecer").
-func (m *Masker) IdObjeto(nome string) string { return m.idObj(nome) }
 
 // UsarLeitores troca os leitores de estrutura (os testes usam leitores próprios).
 func (m *Masker) UsarLeitores(ls []Leitor) { m.leitores = ls }

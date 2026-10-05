@@ -31,12 +31,12 @@ func comLeitor(t *testing.T) *Masker {
 	return m
 }
 
-var rePseudoT = regexp.MustCompile(`\b[Tt]_[a-z2-7]{12}\b`)
+var rePseudoT = regexp.MustCompile(`\b[Tt]_[a-z2-7]{8}\b`)
 
 func TestPseudonimoDeObjeto(t *testing.T) {
 	m := comLeitor(t)
 	a := m.Pseudonimo("obj.tabela", "tb_pedido_x9")
-	if !regexp.MustCompile(`^t_[a-z2-7]{12}$`).MatchString(a) {
+	if !regexp.MustCompile(`^t_[a-z2-7]{8}$`).MatchString(a) {
 		t.Fatalf("formato: %q", a)
 	}
 	if b := m.Pseudonimo("obj.tabela", "TB_PEDIDO_X9"); b != "T"+a[1:] {
@@ -174,7 +174,7 @@ func TestObjetoAposReinicioEValidade(t *testing.T) {
 	m, _ := NovoMasker(novoTeste(t).cfg, chaveTeste, nil, vs)
 	m.UsarLeitores(leitorTeste())
 	m.Mascarar("TABLE tb_disco_01")
-	vs.Salvar()
+	vs.SalvarSeSujo()
 	if b, _ := os.ReadFile(dir + "/vistos.json"); strings.Contains(string(b), "tb_disco") {
 		t.Fatalf("nome em claro no vistos.json")
 	}
@@ -191,31 +191,6 @@ func TestObjetoAposReinicioEValidade(t *testing.T) {
 	hoje = func() int { return antes() + validadeObj + 5 }
 	if out, _ := novo().Mascarar("bem depois: tb_disco_01"); !strings.Contains(out, "tb_disco_01") {
 		t.Errorf("nome não visto há mais de %d dias continuou propagando: %q", validadeObj, out)
-	}
-}
-
-func TestEsquecer(t *testing.T) {
-	dir := t.TempDir()
-	vs, _ := CarregarVistos(dir + "/vistos.json")
-	m, _ := NovoMasker(novoTeste(t).cfg, chaveTeste, nil, vs)
-	m.UsarLeitores(leitorTeste())
-	m.Mascarar("TABLE tb_esq_01 HOST srv-esq-01 TABLE tb_esq_02")
-	if n := vs.Esquecer(m.IdObjeto("TB_ESQ_01"), func(string, int, int) bool { return true }); n != 1 {
-		t.Fatalf("por nome: %d", n)
-	}
-	if n := vs.Esquecer("", func(e string, _, _ int) bool { return e == "servidor" }); n != 1 {
-		t.Fatalf("por tipo: %d", n)
-	}
-	d := hoje()
-	if n := vs.Esquecer("", func(_ string, a, _ int) bool { return a >= d+1 }); n != 0 {
-		t.Fatalf("por data (futura): %d", n)
-	}
-	vs.Salvar()
-	v2, _ := CarregarVistos(dir + "/vistos.json")
-	m2, _ := NovoMasker(novoTeste(t).cfg, chaveTeste, nil, v2)
-	out, _ := m2.Mascarar("tb_esq_01 srv-esq-01 tb_esq_02")
-	if !strings.Contains(out, "tb_esq_01") || !strings.Contains(out, "srv-esq-01") || strings.Contains(out, "tb_esq_02") {
-		t.Errorf("depois de esquecer: %q", out)
 	}
 }
 
@@ -252,5 +227,50 @@ func TestObjetoAprendidoNaoMudaOQueJaSaiu(t *testing.T) {
 	}
 	if out, _ := m.NovoLote().Mascarar(antigo, false, posB); strings.Contains(out, "tb_cong_01") {
 		t.Errorf("texto novo não usou o nome aprendido: %q", out)
+	}
+}
+
+// Item 3: nome com a forma de um pseudônimo (prefixo de tipo + 8 letras) não é pulado: só é
+// pulado o pseudônimo que nós mesmos geramos.
+func TestNomeComFormaDePseudonimoEMascarado(t *testing.T) {
+	m := novoTeste(t)
+	for _, n := range []string{"t_transactions", "t_customer", "repo_services", "org_platform", "pkg_payments", "dir_archives", "acc_billings"} {
+		out, _ := m.Mascarar("SELECT id_x FROM " + n + " WHERE a = 1 AND b = 2")
+		if strings.Contains(out, n) {
+			t.Errorf("SQL: %q ficou em claro: %q", n, out)
+		}
+		if out, _ := m.Mascarar("a carga da " + n + " atrasou"); strings.Contains(out, n) {
+			t.Errorf("prosa: %q ficou em claro: %q", n, out)
+		}
+	}
+	// o pseudônimo que nós geramos não é mascarado de novo
+	out, _ := m.Mascarar("SELECT id_x FROM tb_ja_x1 WHERE a = 1 AND b = 2")
+	p := rePseudoT.FindString(out)
+	if p == "" {
+		t.Fatal("sem pseudônimo")
+	}
+	if out2, _ := m.Mascarar("SELECT id_x FROM " + p + " WHERE a = 1 AND b = 2"); !strings.Contains(out2, p) {
+		t.Errorf("pseudônimo nosso foi mascarado de novo: %q", out2)
+	}
+}
+
+// Item 4a: caixa só é ignorada nos tipos de SQL; nos outros, cada grafia é um nome.
+func TestCaixaSoNosTiposDeSQL(t *testing.T) {
+	m := novoTeste(t)
+	if m.Pseudonimo("obj.tabela", "TB_X1") == "" || m.Pseudonimo("obj.tabela", "TB_X1")[2:] != m.Pseudonimo("obj.tabela", "tb_x1")[2:] {
+		t.Errorf("tabela: a caixa deveria ser ignorada")
+	}
+	a, b := m.Pseudonimo("obj.pasta", "Relatorios_x1"), m.Pseudonimo("obj.pasta", "relatorios_x1")
+	if a[strings.IndexByte(a, '_'):] == b[strings.IndexByte(b, '_'):] {
+		t.Errorf("pasta: grafias diferentes deveriam ter pseudônimos diferentes")
+	}
+	_, ents := m.Mascarar("aws s3 sync s3://Bkt-Dados-x1/a s3://bkt-dados-x1/b")
+	tab := NovaTabela(ents)
+	reais := map[string]bool{}
+	for _, e := range ents {
+		reais[e.Real] = true
+	}
+	if !reais["Bkt-Dados-x1"] || !reais["bkt-dados-x1"] || tab.Conflitos > 0 {
+		t.Errorf("cada grafia tem que voltar com a própria (conflitos=%d)", tab.Conflitos)
 	}
 }

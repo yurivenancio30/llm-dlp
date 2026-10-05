@@ -135,7 +135,8 @@ func (t *Tabela) varrer(s string, fn func(ini, fim int)) {
 // "12.345.678-9" e "123456789")? Segue a mesma normalização usada para gerar o pseudônimo.
 func mesmoValor(tipo, a, b string) bool {
 	if ehObjeto(tipo) {
-		return normObj(a) == normObj(b)
+		ent := strings.TrimPrefix(tipo, prefTipoObj)
+		return normObj(ent, a) == normObj(ent, b)
 	}
 	switch tipo {
 	case "segredo", "ip":

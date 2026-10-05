@@ -199,13 +199,51 @@ func acharSQL(s string, add func(ObjAchado)) {
 			return
 		}
 		claus := len(reClausulasSQL.FindAllStringIndex(corpo, 4))
+		inequivoca := false
 		if !maiusc && claus < 2 {
-			return
+			if inequivoca = formaInequivoca(corpo, kw); !inequivoca {
+				return
+			}
 		}
 		ate = fim
-		forte := claus >= 2
+		forte := claus >= 2 || inequivoca
 		instrucaoSQL(s, i, corpo, kw, forte, add)
 	})
+}
+
+// Instrução em minúsculas com uma cláusula só ("select * from tb_pedido", "delete from
+// tb_log where ..."): vale quando a forma não deixa dúvida, para não pegar prosa ("select from
+// the list", "update the readme"). A lista do SELECT é "*" ou nomes separados por vírgula (sem
+// palavras soltas lado a lado), e depois do nome da tabela vem o fim, ";" ou outra cláusula;
+// ou o nome da tabela tem cara de identificador.
+var (
+	reSelectMin = regexp.MustCompile(`(?is)^select\s+(?:distinct\s+|top\s+\d+\s+)?(\*|` + reQualSQL + `(?:\s*\([^)]{0,80}\))?(?:\s+as\s+\w+)?(?:\s*,\s*(?:\*|` + reQualSQL + `(?:\s*\([^)]{0,80}\))?(?:\s+as\s+\w+)?))*)\s+from\s+(` + reQualSQL + `)(.{0,12})`)
+	reAlvoMin   = regexp.MustCompile(`(?is)^(?:insert\s+into|delete\s+from|update)\s+(` + reQualSQL + `)(.{0,12})`)
+	reDepoisMin = regexp.MustCompile(`(?i)^(?:\s*(?:;|$)|\s+(?:where|join|inner|left|right|full|cross|limit|order|group|having|union|values|set|select|as\s+\w+\s+(?:where|join)|\(|[a-z]\w{0,2}\s+(?:where|join|on)\b)|\s*\n)`)
+)
+
+func formaInequivoca(corpo, kw string) bool {
+	var alvo, depois string
+	switch kw {
+	case "SELECT":
+		m := reSelectMin.FindStringSubmatch(corpo)
+		if m == nil {
+			return false
+		}
+		alvo, depois = m[2], m[3]
+		if m[1] == "*" || strings.Contains(m[1], ",") {
+			return reDepoisMin.MatchString(depois) || caraDeIdentificador(alvo)
+		}
+	case "INSERT", "DELETE", "UPDATE":
+		m := reAlvoMin.FindStringSubmatch(corpo)
+		if m == nil {
+			return false
+		}
+		alvo, depois = m[1], m[2]
+	default:
+		return false
+	}
+	return caraDeIdentificador(alvo) || reDepoisMin.MatchString(depois)
 }
 
 // instrucaoSQL classifica os identificadores de uma instrução já reconhecida.
@@ -216,7 +254,7 @@ func instrucaoSQL(s string, base int, corpo, kw string, forte bool, add func(Obj
 	marcarQual := func(a, b int, ult string) {
 		var vs [][2]int
 		for _, p := range partesSQL(lit, a, b) {
-			if !publicoSQL(strings.Trim(lit[p[0]:p[1]], "[]\"`")) {
+			if v := strings.Trim(lit[p[0]:p[1]], "[]\"`"); len(v) > 1 && !publicoSQL(v) {
 				vs = append(vs, p)
 			}
 		}

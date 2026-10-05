@@ -58,13 +58,13 @@ func (m *Masker) aplicarT(s string, achados []Achado) (string, []Entrada, []trec
 
 func entradaDe(entradas []Entrada, ps, real, tipo string) []Entrada {
 	entradas = append(entradas, Entrada{ps, real, tipo})
-	if ehObjeto(tipo) { // o modelo pode escrever o prefixo na outra caixa ("T_..." por "t_...")
+	if ehObjeto(tipo) { // o modelo pode reescrever a caixa ("T_abc", "t_abc", "T_ABC")
 		if i := strings.IndexByte(ps, '_'); i > 0 {
-			alt := strings.ToUpper(ps[:i]) + ps[i:]
-			if alt == ps {
-				alt = strings.ToLower(ps[:i]) + ps[i:]
+			for _, alt := range []string{strings.ToUpper(ps[:i]) + ps[i:], strings.ToLower(ps), strings.ToUpper(ps)} {
+				if alt != ps {
+					entradas = append(entradas, Entrada{alt, real, tipo})
+				}
 			}
-			entradas = append(entradas, Entrada{alt, real, tipo})
 		}
 	}
 	if tipo == "email" { // o modelo às vezes cita só o domínio: "dxxxx.invalid" volta a ser o domínio real

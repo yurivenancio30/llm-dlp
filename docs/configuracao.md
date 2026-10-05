@@ -45,8 +45,6 @@ Nomes aceitos em `detectores_desligados`: `segredo`, `email`, `ip`, `host`, `cpf
 | `llm-dlp testar < arquivo` | Mostra a versão mascarada de um texto |
 | `llm-dlp testar-midia ARQ DIR` | Processa uma imagem ou PDF e grava o resultado em DIR |
 | `llm-dlp medir ARQ.jsonl` | Tempo e cobertura sobre uma sessão antiga do Claude Code (só contagens) |
-| `llm-dlp aprendidos` | Quantos nomes de recursos internos foram aprendidos, por tipo e por mês (só contagens) |
-| `llm-dlp esquecer NOME` | Apaga um nome aprendido. Também `--tipo T`, `--desde AAAA-MM-DD`, `--ate AAAA-MM-DD`, `--tudo`. Só com o proxy parado (feche o Claude Code e rode `llm-dlp parar`) |
 | `llm-dlp versao` | Versão e commit do binário |
 
 `garantir`, `verificar`, `servir` e `supervisionar` são internos: quem chama são os ganchos

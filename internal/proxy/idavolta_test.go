@@ -106,7 +106,7 @@ func TestIdaEVoltaValorSeguidoDePontuacao(t *testing.T) {
 // Nome de tabela mascarado na ida: o comando que o modelo escreve com o pseudônimo (em
 // qualquer caixa do prefixo) chega à ferramenta local com o nome real.
 func TestIdaEVoltaNomeDeTabela(t *testing.T) {
-	re := regexp.MustCompile(`\b[Tt]_[a-z2-7]{12}\b`)
+	re := regexp.MustCompile(`\b[Tt]_[a-z2-7]{8}\b`)
 	for _, caixa := range []string{"igual", "outra"} {
 		var pseudo string
 		_, px := montar(t, func(w http.ResponseWriter, r *http.Request) {
@@ -149,6 +149,67 @@ func TestIdaEVoltaNomeDeTabela(t *testing.T) {
 		}
 		if !strings.Contains(entrada, "FROM tb_pedido_x9") {
 			t.Errorf("caixa %s: o comando não voltou com o nome real", caixa)
+		}
+	}
+}
+
+// Item 4: a volta aceita o pseudônimo de objeto em qualquer caixa (inclusive todo em
+// maiúsculas), e uma pasta volta com a grafia exata dela.
+func TestIdaEVoltaObjetoQualquerCaixa(t *testing.T) {
+	re := regexp.MustCompile(`\b(?i:t|bkt)_[a-z2-7]{8}\b`)
+	for _, c := range []struct{ msg, real, comando string }{
+		{"SELECT vl_x FROM financeiro_x.tb_pedido_x9 WHERE id > 0 AND a = 1", "tb_pedido_x9", "psql -c 'SELECT 1 FROM %s'"},
+		{"aws s3 ls s3://Bkt-Dados-x1/hoje/", "Bkt-Dados-x1", "aws s3 ls s3://%s/"},
+	} {
+		for _, caixa := range []string{"igual", "maiusc", "minusc"} {
+			var pseudos []string
+			_, px := montar(t, func(w http.ResponseWriter, r *http.Request) {
+				b, _ := io.ReadAll(r.Body)
+				pseudos = re.FindAllString(string(b), -1)
+				p := ""
+				for _, x := range pseudos {
+					p = x // o último é o do nome procurado
+				}
+				switch caixa {
+				case "maiusc":
+					p = strings.ToUpper(p)
+				case "minusc":
+					p = strings.ToLower(p)
+				}
+				arg, _ := json.Marshal(map[string]string{"command": fmt.Sprintf(c.comando, p)})
+				w.Header().Set("content-type", "text/event-stream")
+				ev := func(x any) { j, _ := json.Marshal(x); fmt.Fprintf(w, "event: x\ndata: %s\n\n", j) }
+				ev(map[string]any{"type": "content_block_start", "index": 0, "content_block": map[string]any{"type": "tool_use", "id": "t", "name": "Bash", "input": map[string]any{}}})
+				s := string(arg)
+				for i := 0; i < len(s); i += 4 {
+					ev(map[string]any{"type": "content_block_delta", "index": 0, "delta": map[string]any{"type": "input_json_delta", "partial_json": s[i:min(len(s), i+4)]}})
+				}
+				ev(map[string]any{"type": "content_block_stop", "index": 0})
+			})
+			corpo, _ := json.Marshal(map[string]any{"model": "x", "max_tokens": 1, "stream": true,
+				"messages": []any{map[string]any{"role": "user", "content": c.msg}}})
+			resp, err := http.Post(px.URL+"/v1/messages", "application/json", bytes.NewReader(corpo))
+			if err != nil {
+				t.Fatal(err)
+			}
+			var entrada string
+			sc := bufio.NewScanner(resp.Body)
+			for sc.Scan() {
+				if l := sc.Text(); strings.HasPrefix(l, "data: ") {
+					var e map[string]any
+					json.Unmarshal([]byte(l[6:]), &e)
+					if d, ok := e["delta"].(map[string]any); ok {
+						entrada += d["partial_json"].(string)
+					}
+				}
+			}
+			resp.Body.Close()
+			if len(pseudos) == 0 {
+				t.Fatalf("%s: não foi mascarado na ida", c.real)
+			}
+			if !strings.Contains(entrada, c.real) {
+				t.Errorf("%s, caixa %s: o comando não voltou com o nome real", c.real, caixa)
+			}
 		}
 	}
 }

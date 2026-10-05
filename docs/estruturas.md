@@ -32,49 +32,26 @@ código, as regras de nome do identificador de instância RDS, do bucket S3 e de
 Um formato só, para todas as famílias:
 
 ```
-<PREFIXO>_<ID>        ex.: T_cszwa3rio2f5   (tabela tb_pedido_x9)
+<PREFIXO>_<ID>        ex.: T_x7k2m9qa   (tabela tb_pedido_x9)
 ```
 
-- **ID:** 12 caracteres base32 minúsculos (`a-z`, `2-7`) = **60 bits**, tirados de
-  `HMAC-SHA256(chave do llm-dlp, "objeto" ‖ tipo ‖ nome normalizado)`. É o mesmo mecanismo dos
-  pseudônimos atuais (`internal/mask/chave.go`), com um ID mais longo.
+- **ID:** 8 caracteres base32 minúsculos, o mesmo tamanho dos outros pseudônimos do llm-dlp,
+  tirados de `HMAC-SHA256(chave do llm-dlp, "objeto" ‖ tipo ‖ nome normalizado)`
+  (`internal/mask/chave.go`).
 - **Estável:** o mesmo nome do mesmo tipo dá o mesmo pseudônimo em qualquer conversa e depois
-  de reiniciar (só depende da chave). Nunca é "por sessão" e nunca é um contador (`HOST_01`):
-  o contador mudaria conforme a ordem em que os nomes aparecem, e o mesmo objeto teria
-  pseudônimos diferentes em conversas diferentes.
-- **Nome normalizado:** sem aspas, colchetes ou crases, em minúsculas. Identificadores sem
-  aspas são insensíveis à caixa nos nove dialetos de SQL, então `TB_PEDIDO` e `tb_pedido` são
-  o mesmo objeto e recebem o mesmo pseudônimo. Limite: dois objetos que só diferem pela caixa
-  (possível com aspas no PostgreSQL, Oracle e Snowflake) recebem o mesmo pseudônimo; na volta,
-  isso conta como colisão e o pseudônimo não é trocado (regra atual do llm-dlp).
-- **Prefixo:** o do tipo de entidade (tabela abaixo). Tipos diferentes têm prefixos diferentes,
-  então só há colisão dentro do mesmo tipo.
-- **Formas exigidas pelo formato:** onde o formato só aceita minúsculas e hífen (nomes DNS-1123
-  do Kubernetes, bucket S3, servidor Azure SQL), o mesmo ID vai em minúsculas com hífen:
-  `svc-n3dsajwofw2w`; onde não aceita separador (storage account da Azure), sem ele: `bktsfdst7tgimuu`; no
-  índice do Elasticsearch, em minúsculas com `_`: `t_cszwa3rio2f5`. Em todo o resto, a forma canônica
-  `T_cszwa3rio2f5`, que é um identificador válido sem aspas em todos os dialetos.
-- **Volta:** o desmascaramento reconhece o ID em qualquer dessas formas e em qualquer caixa
-  (restauração tolerante), e devolve o nome real.
-
-**Por que 12 caracteres.** Com *n* nomes de um tipo e um ID de *b* bits, o número esperado de
-pares com o mesmo ID é n(n−1)/2 ÷ 2^b. Para **n = 500 mil por tipo** (n(n−1)/2 ≈ 1,25 × 10¹¹):
-
-| ID | Bits | Colisões esperadas entre pseudônimos | Falso positivo por consulta ao `vistos.json` (500 mil guardados) |
-|---|---:|---:|---:|
-| 4 caracteres | 20 | ≈ 119 mil (inviável) | 0,48 |
-| 8 caracteres (o atual) | 40 | 0,11 (10,7% de chance de haver alguma) | 4,5 × 10⁻⁷ |
-| 10 caracteres | 50 | 1,1 × 10⁻⁴ | 4,4 × 10⁻¹⁰ |
-| **12 caracteres** | **60** | **1,1 × 10⁻⁷ (≈ 1 em 9 milhões)** | 4,3 × 10⁻¹³ |
-
-No `vistos.json`, o hash destes tipos passa a ter 13 caracteres (65 bits). A consulta acontece
-para cada candidato de cada texto novo (centenas de milhares por dia); com 40 bits, isso daria
-um falso positivo a cada poucos dias. O teto de 500 mil hashes do `vistos.json` passa a ser
-separado para os tipos de objeto, para os nomes de um catálogo grande não expulsarem as senhas
-e os documentos aprendidos.
-
-Custo: um pseudônimo de 12 caracteres custa alguns tokens a mais que um de 8. A medição fica
-para a 1ª fase.
+  de reiniciar (só depende da chave). Nunca é "por sessão" e nunca é um contador.
+- **Caixa:** nos tipos de SQL (banco, schema, tabela, coluna, procedure, índice), identificadores
+  sem aspas são insensíveis à caixa, então `TB_PEDIDO` e `tb_pedido` são o mesmo objeto. Nos
+  outros tipos (pasta, bucket, fila, serviço...) a grafia vale como está: `/dados/Relatorios` e
+  `/dados/relatorios` são duas pastas, e cada uma volta com a própria grafia.
+- **Prefixo:** o do tipo de entidade (tabela abaixo); em minúsculas quando o nome é todo em
+  minúsculas (`t_…`). Onde o formato exige minúsculas e hífen (DNS-1123, bucket S3), vale a mesma
+  ideia.
+- **Volta:** o desmascaramento aceita o pseudônimo em qualquer caixa (`T_abc…`, `t_abc…`,
+  `T_ABC…`) e devolve o nome real.
+- **Só o que nós geramos é pulado:** um nome do texto com a forma de um pseudônimo
+  (`t_customer`) é mascarado como qualquer outro; só é deixado como está o pseudônimo que o
+  próprio llm-dlp gerou.
 
 ### Tipos de entidade
 
@@ -142,13 +119,9 @@ entre partes ou mistura de caixa), se o seu tipo estiver em `propagar` e se a ev
 Leitura duvidosa (a regra de origem, um cabeçalho de tabela qualquer) mascara no lugar, mas não
 ensina.
 
-### Inspecionar e desfazer
+### Validade
 
-- `llm-dlp aprendidos`: quantos nomes foram aprendidos, por tipo e por data do
-  aprendizado e da última vez que foram vistos. Só contagens, nunca valores.
-- `llm-dlp esquecer NOME` (o nome é transformado em hash e apagado), `llm-dlp esquecer --tipo
-  coluna`, `llm-dlp esquecer --desde 2026-10-01` / `--ate …`.
-- Validade: um nome não visto há **90 dias** deixa de ser propagado (continua mascarado na
+um nome não visto há **90 dias** deixa de ser propagado (continua mascarado na
   posição estrutural). O `vistos.json` guarda, junto do hash, o dia da última vez que o nome
   foi visto (2 bytes a mais por nome).
 
@@ -299,7 +272,7 @@ Consequência para o mascarador: a chave do mapa é o nome **normalizado** confo
 
 ### 5. Exemplos antes/depois
 
-Pseudônimo: no formato único do llm-dlp (ver [Formato do pseudônimo](#formato-do-pseudônimo)): prefixo do tipo + 12 caracteres derivados por HMAC da chave. É sempre um identificador válido sem aspas em todos os dialetos. A saída copia a **forma da caixa** do original (tudo maiúsculo → `T_A8F1`) e mantém aspas/colchetes/backticks. Na volta, a busca ignora caixa nos dialetos que dobram.
+Pseudônimo: no formato único do llm-dlp (ver [Formato do pseudônimo](#formato-do-pseudônimo)): prefixo do tipo + 8 caracteres derivados por HMAC da chave. É sempre um identificador válido sem aspas em todos os dialetos. A saída copia a **forma da caixa** do original (tudo maiúsculo → `T_A8F1`) e mantém aspas/colchetes/backticks. Na volta, a busca ignora caixa nos dialetos que dobram.
 
 T-SQL:
 ```sql
@@ -307,8 +280,8 @@ T-SQL:
 SELECT p.[Valor Total], c.nome FROM [srv-exemplo-01].vendas_demo.financeiro.tb_pedido_x9 AS p
 JOIN dbo.tb_cliente c ON c.id = p.id_cliente; EXEC financeiro.usp_fecha_mes @ano = 2024;
 -- depois
-SELECT p.[C_xsdgeq7lerj2], c.C_rr476ahyjvnd FROM [HOST_zvfrq7zbrgap].DB_2vmfnowroy5c.SCH_mvrhafaercjl.T_cszwa3rio2f5 AS p
-JOIN dbo.T_3ms3mjt3smt3 c ON c.C_x6w4tokbdlwc = p.C_c5w3hetutvpw; EXEC SCH_mvrhafaercjl.PROC_zx55ztp53fxw @ano = 2024;
+SELECT p.[C_xsdgeq7l], c.C_rr476ahy FROM [HOST_zvfrq7zb].DB_2vmfnowr.SCH_mvrhafae.T_cszwa3ri AS p
+JOIN dbo.T_3ms3mjt3 c ON c.C_x6w4tokb = p.C_c5w3hetu; EXEC SCH_mvrhafae.PROC_zx55ztp5 @ano = 2024;
 ```
 (`dbo`, `SELECT`, `JOIN`, `EXEC` ficam; `@ano` é parâmetro local: fica, ver 6.)
 
@@ -319,7 +292,7 @@ CREATE OR REPLACE TASK VENDAS_DEMO.FINANCEIRO.TSK_CARGA WAREHOUSE = WH_ETL_DEMO
 AS COPY INTO "Tb_Pedido" FROM @FINANCEIRO.STG_ENTRADA/2024/ ;
 -- depois
 CREATE OR REPLACE TASK DB_X7K2.SCH_Q3M9.TSK_W2C4 WAREHOUSE = WH_N8L0
-AS COPY INTO "T_qwea6mavieli" FROM @SCH_Q3M9.STG_F1Y6/2024/ ;
+AS COPY INTO "T_qwea6mav" FROM @SCH_Q3M9.STG_F1Y6/2024/ ;
 ```
 (`"Tb_Pedido"` citado e de caixa mista é outro objeto que `TB_PEDIDO` e recebe pseudônimo próprio. O caminho `/2024/` dentro do stage fica com o detector de caminhos.)
 
@@ -329,8 +302,8 @@ BigQuery:
 SELECT id_pedido FROM `projeto-exemplo-01.vendas_demo.tb_pedido_x9`
 WHERE _TABLE_SUFFIX > '2024' AND status = 'ok';
 -- depois
-SELECT C_yxptlwins5j3 FROM `DB_2t2xlad4mefr.SCH_iardtg5mrvi5.T_cszwa3rio2f5`
-WHERE _TABLE_SUFFIX > '2024' AND C_hpawygueuynd = 'ok';
+SELECT C_yxptlwin FROM `DB_2t2xlad4.SCH_iardtg5m.T_cszwa3ri`
+WHERE _TABLE_SUFFIX > '2024' AND C_hpawygue = 'ok';
 ```
 
 PostgreSQL / Oracle:
@@ -340,9 +313,9 @@ CREATE INDEX ix_pedido_data ON financeiro.tb_pedido_x9 (dt_emissao);
 GRANT SELECT ON financeiro.vw_resumo TO analista_ro;
 SELECT * FROM financeiro.tb_pedido_x9@lk_srv_exemplo;
 -- depois
-CREATE INDEX IX_c8r1 ON SCH_mvrhafaercjl.T_cszwa3rio2f5 (C_zh6xlzrrfyvy);
-GRANT SELECT ON SCH_mvrhafaercjl.T_me3bezjywef3 TO USR_f3kpe7dgbz4t;
-SELECT * FROM SCH_mvrhafaercjl.T_cszwa3rio2f5@HOST_z2l74vie7hc6;
+CREATE INDEX IX_c8r1 ON SCH_mvrhafae.T_cszwa3ri (C_zh6xlzrr);
+GRANT SELECT ON SCH_mvrhafae.T_me3bezjy TO USR_f3kpe7dg;
+SELECT * FROM SCH_mvrhafae.T_cszwa3ri@HOST_z2l74vie;
 ```
 
 ### 6. Casos difíceis e limites
@@ -478,10 +451,10 @@ dicionário de idioma. Comparação sem caixa.
   plano usa colchetes `[x]`; MySQL em SQL usa crase `` `x` ``.
 - **Nome qualificado**: separar por `.` (e `:` no BigQuery) e mascarar **cada parte** com seu tipo
   pela posição: 4 partes SQL Server = SRV.DB.SCH.T; 3 partes Snowflake = DB.SCH.T; 2 partes = SCH.T.
-  Partes de sistema (item 3) ficam: `dbo.tb_pedido_x9` → `dbo.T_cszwa3rio2f5`.
+  Partes de sistema (item 3) ficam: `dbo.tb_pedido_x9` → `dbo.T_cszwa3ri`.
 - **Caixa**: Oracle e Snowflake guardam sem aspas em MAIÚSCULAS; PostgreSQL em minúsculas; SQL Server
   depende da collation (doc do erro 208: `CS` diferencia caixa) [DOC]. O mapa de pseudônimos deve ser
-  **sem caixa** para o mesmo objeto (`TB_PEDIDO_X9` e `tb_pedido_x9` → mesmo `T_cszwa3rio2f5`) e devolver o
+  **sem caixa** para o mesmo objeto (`TB_PEDIDO_X9` e `tb_pedido_x9` → mesmo `T_cszwa3ri`) e devolver o
   pseudônimo na caixa do original (`T_A8F1` em texto maiúsculo) para não quebrar a leitura.
 - **Caracteres válidos** sem aspas: letra inicial, depois alfanumérico, `_`, `$`, `#` (Oracle [DOC]);
   com aspas, qualquer coisa — o delimitador decide o fim, não a classe de caractere.
@@ -490,8 +463,8 @@ dicionário de idioma. Comparação sem caixa.
 
 ### 5. Exemplos antes/depois
 
-Pseudônimos: `DB_2vmfnowroy5c` (vendas_demo), `SCH_mvrhafaercjl` (financeiro), `T_cszwa3rio2f5` (tb_pedido_x9),
-`C_xsdgeq7lerj2` (vl_total), `HOST_kdekbkuz5mxx` (srv-exemplo-01).
+Pseudônimos: `DB_2vmfnowr` (vendas_demo), `SCH_mvrhafae` (financeiro), `T_cszwa3ri` (tb_pedido_x9),
+`C_xsdgeq7l` (vl_total), `HOST_kdekbkuz` (srv-exemplo-01).
 
 psql `aligned` (`\dt financeiro.*`) — **realinhar é necessário** (larguras mudam):
 ```
@@ -499,7 +472,7 @@ antes                                   depois
          List of relations                       List of relations
    Schema   |     Name     | Type  | Own    Schema  |  Name  | Type  | Own
 ------------+--------------+-------+----   ----------+--------+-------+----
- financeiro | tb_pedido_x9 | table | ...    SCH_mvrhafaercjl | T_cszwa3rio2f5 | table | ...
+ financeiro | tb_pedido_x9 | table | ...    SCH_mvrhafae | T_cszwa3ri | table | ...
 (1 row)                                   (1 row)
 ```
 Estratégia: parsear as células pela posição dos `+` da linha de traços, trocar, recalcular a largura
@@ -510,7 +483,7 @@ redesenhar).
 psql `csv` / `unaligned` — **sem realinhamento**:
 ```
 table_schema,table_name,column_name     ->  table_schema,table_name,column_name
-financeiro,tb_pedido_x9,vl_total        ->  SCH_mvrhafaercjl,T_cszwa3rio2f5,C_xsdgeq7lerj2
+financeiro,tb_pedido_x9,vl_total        ->  SCH_mvrhafae,T_cszwa3ri,C_xsdgeq7l
 ```
 
 MySQL `SHOW TABLES` — nome no cabeçalho, realinhar a moldura:
@@ -519,16 +492,16 @@ antes                            depois (moldura redesenhada)
 +-----------------------+        +-------------------+
 | Tables_in_vendas_demo |        | Tables_in_DB_x7k2 |
 +-----------------------+        +-------------------+
-| tb_pedido_x9          |        | T_cszwa3rio2f5            |
+| tb_pedido_x9          |        | T_cszwa3ri            |
 +-----------------------+        +-------------------+
 1 row in set (0.00 sec)          1 row in set (0.00 sec)
 ```
 
 Erros — sem alinhamento a preservar:
 ```
-ERROR:  relation "financeiro.tb_pedido_x9" does not exist   -> relation "SCH_mvrhafaercjl.T_cszwa3rio2f5" ...
-Msg 208, Level 16, State 1, Server srv-exemplo-01, Line 1   -> Server HOST_kdekbkuz5mxx, Line 1
-Invalid object name 'financeiro.tb_pedido_x9'.              -> 'SCH_mvrhafaercjl.T_cszwa3rio2f5'.
+ERROR:  relation "financeiro.tb_pedido_x9" does not exist   -> relation "SCH_mvrhafae.T_cszwa3ri" ...
+Msg 208, Level 16, State 1, Server srv-exemplo-01, Line 1   -> Server HOST_kdekbkuz, Line 1
+Invalid object name 'financeiro.tb_pedido_x9'.              -> 'SCH_mvrhafae.T_cszwa3ri'.
 ORA-00904: "VL_TOTAL": invalid identifier                   -> "C_P2V6": invalid identifier
 SQL compilation error: Object 'VENDAS_DEMO.FINANCEIRO.TB_PEDIDO_X9' does not exist or not authorized.
                                                             -> 'DB_X7K2.SCH_Q3M9.T_A8F1'
@@ -710,46 +683,46 @@ desconhecida, deixa o valor (preferir não mascarar a quebrar).
 
 ```
 postgresql://svc_relatorio@db-exemplo-01.interno.exemplo:5432/vendas_demo?sslmode=require&application_name=etl_diario
-postgresql://USR_4w6dj5i6pkmq@HOST_7rhd4fspnbbj:5432/DB_gbzw6njkambe?sslmode=require&application_name=SVC_it27pom2gezx
+postgresql://USR_4w6dj5i6@HOST_7rhd4fsp:5432/DB_gbzw6njk?sslmode=require&application_name=SVC_it27pom2
 
 host=db-exemplo-01.interno.exemplo port=5432 dbname=vendas_demo user=svc_relatorio sslmode=verify-full
-host=HOST_7rhd4fspnbbj port=5432 dbname=DB_gbzw6njkambe user=USR_4w6dj5i6pkmq sslmode=verify-full
+host=HOST_7rhd4fsp port=5432 dbname=DB_gbzw6njk user=USR_4w6dj5i6 sslmode=verify-full
 
 jdbc:sqlserver://db-exemplo-01.interno.exemplo\INST01:1433;databaseName=vendas_demo;encrypt=true;integratedSecurity=true
-jdbc:sqlserver://HOST_7rhd4fspnbbj\SVC_tjhnxdvlzmyr:1433;databaseName=DB_gbzw6njkambe;encrypt=true;integratedSecurity=true
+jdbc:sqlserver://HOST_7rhd4fsp\SVC_tjhnxdvl:1433;databaseName=DB_gbzw6njk;encrypt=true;integratedSecurity=true
 
 Driver={ODBC Driver 18 for SQL Server};Server=tcp:db-exemplo-01.interno.exemplo,1433;Database=vendas_demo;UID=svc_relatorio;Encrypt=yes
-Driver={ODBC Driver 18 for SQL Server};Server=tcp:HOST_7rhd4fspnbbj,1433;Database=DB_gbzw6njkambe;UID=USR_4w6dj5i6pkmq;Encrypt=yes
+Driver={ODBC Driver 18 for SQL Server};Server=tcp:HOST_7rhd4fsp,1433;Database=DB_gbzw6njk;UID=USR_4w6dj5i6;Encrypt=yes
 
 Data Source=db-exemplo-01.interno.exemplo;Initial Catalog=vendas_demo;Integrated Security=SSPI
-Data Source=HOST_7rhd4fspnbbj;Initial Catalog=DB_gbzw6njkambe;Integrated Security=SSPI
+Data Source=HOST_7rhd4fsp;Initial Catalog=DB_gbzw6njk;Integrated Security=SSPI
 
 jdbc:oracle:thin:@//db-exemplo-01.interno.exemplo:1521/vendas_demo.interno.exemplo
-jdbc:oracle:thin:@//HOST_7rhd4fspnbbj:1521/DB_gbzw6njkambe
+jdbc:oracle:thin:@//HOST_7rhd4fsp:1521/DB_gbzw6njk
 
 VENDAS_DEMO = (DESCRIPTION=(ADDRESS=(PROTOCOL=tcp)(HOST=db-exemplo-01.interno.exemplo)(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=vendas_demo)))
-SVC_3xwx6qbjong3 = (DESCRIPTION=(ADDRESS=(PROTOCOL=tcp)(HOST=HOST_7rhd4fspnbbj)(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=DB_gbzw6njkambe)))
+SVC_3xwx6qbj = (DESCRIPTION=(ADDRESS=(PROTOCOL=tcp)(HOST=HOST_7rhd4fsp)(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=DB_gbzw6njk)))
 
 jdbc:snowflake://contaexemplo-lab01.snowflakecomputing.com/?user=svc_relatorio&db=vendas_demo&schema=bruto&warehouse=wh_carga
-jdbc:snowflake://HOST_q6q2hfsbc25e.snowflakecomputing.com/?user=USR_4w6dj5i6pkmq&db=DB_gbzw6njkambe&schema=SCH_nmnf5hmdhjw7&warehouse=SVC_or7lqk6i3ib7
+jdbc:snowflake://HOST_q6q2hfsb.snowflakecomputing.com/?user=USR_4w6dj5i6&db=DB_gbzw6njk&schema=SCH_nmnf5hmd&warehouse=SVC_or7lqk6i
 
 jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443;ProjectId=projeto-exemplo-123;OAuthType=3;DefaultDataset=vendas_demo
-jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443;ProjectId=DB_ky3aazqn7izf;OAuthType=3;DefaultDataset=SCH_gbzw6njkambe
+jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443;ProjectId=DB_ky3aazqn;OAuthType=3;DefaultDataset=SCH_gbzw6njk
 
 mongodb+srv://svc_relatorio@cluster-exemplo.interno.exemplo/vendas_demo?authSource=admin&replicaSet=rs-exemplo
-mongodb+srv://USR_4w6dj5i6pkmq@HOST_fhoczv7pczj5/DB_gbzw6njkambe?authSource=admin&replicaSet=SVC_o5rj6dbi4znj
+mongodb+srv://USR_4w6dj5i6@HOST_fhoczv7p/DB_gbzw6njk?authSource=admin&replicaSet=SVC_o5rj6dbi
 
 mysql+pymysql://svc_relatorio@db-exemplo-01.interno.exemplo/vendas_demo?charset=utf8mb4
-mysql+pymysql://USR_4w6dj5i6pkmq@HOST_7rhd4fspnbbj/DB_gbzw6njkambe?charset=utf8mb4
+mysql+pymysql://USR_4w6dj5i6@HOST_7rhd4fsp/DB_gbzw6njk?charset=utf8mb4
 
 s3://bucket-exemplo-dados/bruto/vendas/2026/arquivo.parquet
-s3://BKT_t6h4hj3hiz25/BKT_vknckg5spiev/BKT_xxuwjapl3dtg/2026/BKT_u6vhnh6ov547.parquet
+s3://BKT_t6h4hj3h/BKT_vknckg5s/BKT_xxuwjapl/2026/BKT_u6vhnh6o.parquet
 abfss://container-exemplo@contaexemplo.dfs.core.windows.net/bruto/vendas
-abfss://BKT_t6h4hj3hiz25@BKT_dreioxlgjdba.dfs.core.windows.net/BKT_vknckg5spiev/BKT_xxuwjapl3dtg
+abfss://BKT_t6h4hj3h@BKT_dreioxlg.dfs.core.windows.net/BKT_vknckg5s/BKT_xxuwjapl
 
 urn:li:dataset:(urn:li:dataPlatform:snowflake,vendas_demo.bruto.pedidos,PROD)
-urn:li:dataset:(urn:li:dataPlatform:snowflake,DB_gbzw6njkambe.SCH_nmnf5hmdhjw7.T_a4pg76j2mdsd,PROD)
-urn:li:corpuser:svc_relatorio   →   urn:li:corpuser:USR_4w6dj5i6pkmq
+urn:li:dataset:(urn:li:dataPlatform:snowflake,DB_gbzw6njk.SCH_nmnf5hmd.T_a4pg76j2,PROD)
+urn:li:corpuser:svc_relatorio   →   urn:li:corpuser:USR_4w6dj5i6
 ```
 
 Mesmo valor real → mesmo pseudônimo em todas as famílias (o `vendas_demo` do JDBC é o do
@@ -936,7 +909,7 @@ Fixe a versão de cada lib no gerador, porque o pandas 3 trocou `object` por `st
   prompt inteiro e desfeito na resposta. Quebraria se mascarássemos rótulos genéricos ou o
   vocabulário, e por isso essas duas listas existem.
 - **Aspas no CSV**: tire as aspas de fora, desfaça `""` → `"`, avalie o conteúdo. Ao gravar, aplique
-  aspas de novo só se o pseudônimo exigir (nunca exige, porque `T_cszwa3rio2f5` é `[A-Za-z0-9_]`). Se o
+  aspas de novo só se o pseudônimo exigir (nunca exige, porque `T_cszwa3ri` é `[A-Za-z0-9_]`). Se o
   original estava entre aspas, **mantenha as aspas**: a diferença fica mínima e o CSV continua válido.
 - **Identificador composto na célula** (`financeiro.tb_pedido_x9`): separe por `.` fora de aspas e
   mascare cada parte com o seu tipo.
@@ -951,7 +924,7 @@ CSV (realinhar não se aplica, o CSV continua válido e com o mesmo número de c
 ```
 antes:  id_pedido,vl_total,"dt_emissao",obs
         1,"10,50",2026-01-02,"diz ""ok"""
-depois: C_4bszwltrwd3p,C_xsdgeq7lerj2,"C_4uhd5laptwyx",obs
+depois: C_4bszwltr,C_xsdgeq7l,"C_4uhd5lap",obs
         1,"10,50",2026-01-02,"diz ""ok"""
 ```
 `obs` ficou porque tem 3 caracteres sem `_` nem dígito, e cai na regra do rótulo genérico. Ajuste
@@ -962,7 +935,7 @@ Inventário (valores mascarados por causa do cabeçalho-gatilho):
 antes:  table_schema	table_name	column_name
         financeiro	tb_pedido_x9	vl_total
 depois: table_schema	table_name	column_name
-        SCH_tkrm6wg56jou	T_cszwa3rio2f5	C_xsdgeq7lerj2
+        SCH_tkrm6wg5	T_cszwa3ri	C_xsdgeq7l
 ```
 
 pandas `df.info()` (realinha: a largura da coluna `Column` é recalculada):
@@ -973,8 +946,8 @@ antes:   #   Column      Non-Null Count  Dtype
          1   vl_total    5 non-null      float64
 depois:  #   Column  Non-Null Count  Dtype
         ---  ------  --------------  -----
-         0   C_4bszwltrwd3p  5 non-null      int64
-         1   C_xsdgeq7lerj2  5 non-null      float64
+         0   C_4bszwltr  5 non-null      int64
+         1   C_xsdgeq7l  5 non-null      float64
 ```
 
 Polars / markdown (realinha, redesenhando bordas e `---` na largura nova):
@@ -982,7 +955,7 @@ Polars / markdown (realinha, redesenhando bordas e `---` na largura nova):
 antes:  │ id_pedido ┆ vl_total │        | id_pedido | vl_total |
         │ ---       ┆ ---      │        |----------:|---------:|
         │ i64       ┆ f64      │
-depois: │ C_4bszwltrwd3p ┆ C_xsdgeq7lerj2 │              | C_4bszwltrwd3p | C_xsdgeq7lerj2 |
+depois: │ C_4bszwltr ┆ C_xsdgeq7l │              | C_4bszwltr | C_xsdgeq7l |
         │ ---    ┆ ---    │              |-------:|-------:|
         │ i64    ┆ f64    │
 ```
@@ -1141,7 +1114,7 @@ Onde ficam os nomes internos (o que mascarar):
   controles). Pseudônimos só com `[A-Za-z0-9_]` evitam o problema.
 - **YAML:** escalar pode ser plano, `'simples'` (escape `''`) ou `"duplo"` (escapes `\`). Preservar o
   estilo original. Escalar plano que vire `true`, `null`, `1e3` ou comece com `&*!|>%@` muda de
-  tipo: pseudônimo deve começar por letra e não colidir com o schema Core (`T_cszwa3rio2f5` é seguro).
+  tipo: pseudônimo deve começar por letra e não colidir com o schema Core (`T_cszwa3ri` é seguro).
   **Âncoras/aliases** (`&base`, `*base`): o nome da âncora é rótulo do documento, normalmente não
   sensível; o alias reaproveita o nó, então mascarar no nó resolve todas as ocorrências. Se a âncora
   tiver nome interno, renomear `&x` e todos os `*x` juntos. Chaves complexas (`? `) raras: tratar como §6.
@@ -1170,22 +1143,22 @@ Mesmo nome → mesmo pseudônimo em todo o arquivo (e na sessão). Estrutura e t
 {"host": "db-exemplo-01", "database": "vendas_x", "table": "tb_pedido_x9",
  "columns": {"vl_total": "decimal(12,2)", "dt_pedido": "date"}}
 // depois
-{"host": "HOST_7rhd4fspnbbj", "database": "DB_dqrsyg6bm5a7", "table": "T_cszwa3rio2f5",
- "columns": {"C_xsdgeq7lerj2": "decimal(12,2)", "C_6kntohazmty6": "date"}}
+{"host": "HOST_7rhd4fsp", "database": "DB_dqrsyg6b", "table": "T_cszwa3ri",
+ "columns": {"C_xsdgeq7l": "decimal(12,2)", "C_6kntohaz": "date"}}
 ```
 
 ```yaml
 # antes                                   # depois
 fonte: &origem                            fonte: &origem
-  host: db-exemplo-01                       host: HOST_7rhd4fspnbbj
-  table: "tb_pedido_x9"                     table: "T_cszwa3rio2f5"
+  host: db-exemplo-01                       host: HOST_7rhd4fsp
+  table: "tb_pedido_x9"                     table: "T_cszwa3ri"
 destino: *origem                          destino: *origem
 ```
 
 ```toml
 # antes                                   # depois
-[tables.tb_pedido_x9]                     [tables.T_cszwa3rio2f5]
-cluster_by = ["dt_pedido"]                cluster_by = ["C_6kntohazmty6"]
+[tables.tb_pedido_x9]                     [tables.T_cszwa3ri]
+cluster_by = ["dt_pedido"]                cluster_by = ["C_6kntohaz"]
 ```
 
 ```properties
@@ -1193,8 +1166,8 @@ cluster_by = ["dt_pedido"]                cluster_by = ["C_6kntohazmty6"]
 spring.datasource.url=jdbc:postgresql://db-exemplo-01:5432/vendas_x
 spring.datasource.username=usr_etl_x
 # depois
-spring.datasource.url=jdbc:postgresql://HOST_7rhd4fspnbbj:5432/DB_dqrsyg6bm5a7
-spring.datasource.username=USR_m5og72t3leh5
+spring.datasource.url=jdbc:postgresql://HOST_7rhd4fsp:5432/DB_dqrsyg6b
+spring.datasource.username=USR_m5og72t3
 ```
 
 ```json
@@ -1203,18 +1176,18 @@ spring.datasource.username=USR_m5og72t3leh5
    "properties": {"vl_total": {"type": "number"}}, "required": ["vl_total"]}},
  "$ref": "#/$defs/tb_pedido_x9"}
 // depois
-{"$defs": {"T_cszwa3rio2f5": {"type": "object",
-   "properties": {"C_xsdgeq7lerj2": {"type": "number"}}, "required": ["C_xsdgeq7lerj2"]}},
- "$ref": "#/$defs/T_cszwa3rio2f5"}
+{"$defs": {"T_cszwa3ri": {"type": "object",
+   "properties": {"C_xsdgeq7l": {"type": "number"}}, "required": ["C_xsdgeq7l"]}},
+ "$ref": "#/$defs/T_cszwa3ri"}
 ```
 
 ```proto
 // antes                                  // depois
-package vendas_x.pedidos;                 package DB_dqrsyg6bm5a7.SCH_3wl5qkpzifvc;
-message TbPedidoX9 { double vl_total = 1; }  message T_c3wyfawvy5jq { double C_xsdgeq7lerj2 = 1; }
+package vendas_x.pedidos;                 package DB_dqrsyg6b.SCH_3wl5qkpz;
+message TbPedidoX9 { double vl_total = 1; }  message T_c3wyfawv { double C_xsdgeq7l = 1; }
 ```
 
-Avro: `"namespace": "vendas_x.pedidos"` → `"DB_dqrsyg6bm5a7.SCH_3wl5qkpzifvc"`, `"name": "tb_pedido_x9"` → `"T_cszwa3rio2f5"`
+Avro: `"namespace": "vendas_x.pedidos"` → `"DB_dqrsyg6b.SCH_3wl5qkpz"`, `"name": "tb_pedido_x9"` → `"T_cszwa3ri"`
 (o pseudônimo respeita `[A-Za-z_][A-Za-z0-9_]*`, então o .avsc continua válido).
 
 ### 6. Casos difíceis e limites
@@ -1232,7 +1205,7 @@ Avro: `"namespace": "vendas_x.pedidos"` → `"DB_dqrsyg6bm5a7.SCH_3wl5qkpzifvc"`
 - **Listas allow/deny com regex/glob** (`include: ["tb_pedido_.*"]`, `deny: ["stg_*"]`): o padrão
   contém nome parcial. Opções: (1) mascarar só os literais máximos do padrão (`tb_pedido_` → um
   pseudônimo de prefixo) mantendo metacaracteres; (2) mascarar o padrão inteiro como opaco
-  (`T_kwvciyutk3nw`). A (1) quebra se o LLM gerar regex nova; a (2) é segura e é o padrão sugerido.
+  (`T_kwvciyut`). A (1) quebra se o LLM gerar regex nova; a (2) é segura e é o padrão sugerido.
   `patternProperties` do JSON Schema cai aqui.
 - **Mesma palavra, papéis diferentes:** `name` é vocabulário em Avro/OpenAPI (chave), mas o valor é
   nome interno; `namespace` em Kubernetes é ambiente, em Avro é pacote. Decidir pelo formato detectado.
@@ -1310,9 +1283,9 @@ Medido em 4 MB do código-fonte do Go e 4 MB da biblioteca do Python 3.10: 0 e 2
 
 ```text
 ANTES                                        DEPOIS
-DB_HOST=db-exemplo-01                        DB_HOST=HOST_r2wq7m4kd3xa          (fraco: chave composta)
-<database>vendas_x</database>                <database>db_k5n2b7xqe4ma</database>
-pg_dump --host db-exemplo-01 --dbname=vendas_x   pg_dump --host HOST_r2wq7m4kd3xa --dbname=db_k5n2b7xqe4ma
+DB_HOST=db-exemplo-01                        DB_HOST=HOST_r2wq7m4k          (fraco: chave composta)
+<database>vendas_x</database>                <database>db_k5n2b7xq</database>
+pg_dump --host db-exemplo-01 --dbname=vendas_x   pg_dump --host HOST_r2wq7m4k --dbname=db_k5n2b7xq
 bootstrap.servers=kafka-01:9092,kafka-02:9092    bootstrap.servers=host_...:9092,host_...:9092
 user = request.user                          (fica: expressão de código)
 ```
@@ -1447,8 +1420,8 @@ Regexes de validação do apimachinery: label `[a-z0-9]([-a-z0-9]*[a-z0-9])?`, s
 Como usar: (a) **sinal** — valor em campo de referência que casa com DNS-1123 reforça a detecção;
 valor que não casa (tem maiúscula, espaço) indica que o campo é outro ou é template. (b) **restrição
 do pseudônimo** — o pseudônimo precisa continuar válido no mesmo campo. Por isso a forma
-`NS_wbk2i5ofk4mz` (maiúscula e `_`) **não serve dentro do YAML**: use a forma minúscula com hífen
-`ns-wbk2i5ofk4mz`, `svc-n3dsajwofw2w`, `host-scsrx4tuxv6n`, mantendo o prefixo de tipo. A forma `NS_wbk2i5ofk4mz` fica para
+`NS_wbk2i5of` (maiúscula e `_`) **não serve dentro do YAML**: use a forma minúscula com hífen
+`ns-wbk2i5of`, `svc-n3dsajwo`, `host-scsrx4tu`, mantendo o prefixo de tipo. A forma `NS_wbk2i5of` fica para
 texto livre fora de campo validado. Mapear as duas formas para o mesmo original.
 Comprimento do pseudônimo ≤ original quando o limite apertar (63).
 
@@ -1485,22 +1458,22 @@ spec:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: svc-n3dsajwofw2w
-  namespace: ns-wbk2i5ofk4mz
+  name: svc-n3dsajwo
+  namespace: ns-wbk2i5of
   labels:
-    app.kubernetes.io/name: svc-n3dsajwofw2w
+    app.kubernetes.io/name: svc-n3dsajwo
 spec:
-  serviceName: svc-n3dsajwofw2w
+  serviceName: svc-n3dsajwo
   template:
     spec:
-      serviceAccountName: usr-vhkjy7s42g4j
+      serviceAccountName: usr-vhkjy7s4
       containers:
       - name: api
-        image: host-scsrx4tuxv6n/svc-3acw37uoslf5:1.2
+        image: host-scsrx4tu/svc-3acw37uo:1.2
         imagePullPolicy: IfNotPresent
         env:
         - name: DB_HOST
-          value: svc-vk7i3ahqma3a.ns-wbk2i5ofk4mz.svc.cluster.local
+          value: svc-vk7i3ahq.ns-wbk2i5of.svc.cluster.local
         - name: DB_PASSWORD
           valueFrom:
             secretKeyRef: {name: secret-w6n0, key: password}
@@ -1508,19 +1481,19 @@ spec:
 
 Ficou: `apiVersion`, `kind`, chaves, `api` (nome genérico curto [VERIFICAR política]), `IfNotPresent`,
 `DB_HOST`, `password`, `svc.cluster.local`, a tag `1.2`. O namespace dentro do FQDN recebeu o
-**mesmo** `ns-wbk2i5ofk4mz` do `metadata.namespace`.
+**mesmo** `ns-wbk2i5of` do `metadata.namespace`.
 
 Saída de `kubectl get pods -n ns-financeiro-demo`:
 
 ```
 ANTES                                                   DEPOIS
 NAME                              READY STATUS  AGE     NAME                     READY STATUS  AGE
-svc-pedidos-x9-0                  1/1   Running 3d      svc-n3dsajwofw2w-0               1/1   Running 3d
-api-demo-7d9f8b6c5d-x2k8q         0/1   CrashLoopBackOff  svc-7eygw6syht5w-7d9f8b6c5d-x2k8q 0/1 CrashLoopBackOff
+svc-pedidos-x9-0                  1/1   Running 3d      svc-n3dsajwo-0               1/1   Running 3d
+api-demo-7d9f8b6c5d-x2k8q         0/1   CrashLoopBackOff  svc-7eygw6sy-7d9f8b6c5d-x2k8q 0/1 CrashLoopBackOff
 ```
 
 docker-compose: `services: { svc-pedidos-x9: { image: registry.exemplo.interno/app-demo:1.2, depends_on: [db-demo] } }`
-→ `services: { svc-n3dsajwofw2w: { image: host-scsrx4tuxv6n/svc-3acw37uoslf5:1.2, depends_on: [svc-jgzcjsnqlvvl] } }`.
+→ `services: { svc-n3dsajwo: { image: host-scsrx4tu/svc-3acw37uo:1.2, depends_on: [svc-jgzcjsnq] } }`.
 
 ### 6. Casos difíceis e limites
 
@@ -1545,7 +1518,7 @@ docker-compose: `services: { svc-pedidos-x9: { image: registry.exemplo.interno/a
 - **Strings curtas genéricas.** `api`, `web`, `db`, `worker` em `containers[].name` ou chave de compose:
   mascarar por posição é coerente, mas atrapalha pouco deixá-las [VERIFICAR política].
 - **Alinhamento de colunas.** Pseudônimo de tamanho diferente desalinha `kubectl get`/`docker ps`; para o LLM tanto faz; não reformatar.
-- **Volta (desmascarar).** Resposta do LLM pode trazer `svc-n3dsajwofw2w` dentro de comando novo; trocar de volta só tokens inteiros que estão no mapa.
+- **Volta (desmascarar).** Resposta do LLM pode trazer `svc-n3dsajwo` dentro de comando novo; trocar de volta só tokens inteiros que estão no mapa.
 - **CRDs e operadores** (Argo, cert-manager etc.): `kind` fora da lista oficial; só `metadata` tem regra garantida.
 
 ### 7. Links usados
@@ -1647,7 +1620,7 @@ ajudam na revisão: atributos com `sensitive: true` (senhas) entram em outro tip
 - **Interpolação HCL `${...}`**: dentro de uma string, o trecho literal se mascara e a expressão não.
   Em `"${var.prefixo}-relatorios-demo"`, `var.prefixo` fica como está (é referência). O sufixo
   literal `-relatorios-demo` só se mascara se o atributo estiver na tabela; nesse caso o pseudônimo
-  substitui a string inteira e a expressão fica preservada: `"${var.prefixo}-BKT_sfdst7tgimuu"`.
+  substitui a string inteira e a expressão fica preservada: `"${var.prefixo}-BKT_sfdst7tg"`.
   O escape `$${` é texto literal e não abre interpolação.
 - **Referências `tipo.nome.atributo`** (`aws_db_instance.relatorios.address`,
   `data.aws_vpc.principal.id`, `module.rede.subnet_ids`, `var.x`, `local.y`): é um endereço de
@@ -1665,14 +1638,14 @@ ajudam na revisão: atributos com `sensitive: true` (senhas) entram em outro tip
 
 | Recurso | Restrição oficial | Forma do pseudônimo |
 |---|---|---|
-| Bucket S3 | 3–63 caracteres, minúsculas, dígitos, `.` e `-` | `bkt-sfdst7tgimuu` |
-| RDS `DBInstanceIdentifier` / `identifier` | 1–63 caracteres, letras, dígitos e `-`; começa com letra; sem `--` nem `-` no fim | `db-gbzw6njkambe` |
+| Bucket S3 | 3–63 caracteres, minúsculas, dígitos, `.` e `-` | `bkt-sfdst7tg` |
+| RDS `DBInstanceIdentifier` / `identifier` | 1–63 caracteres, letras, dígitos e `-`; começa com letra; sem `--` nem `-` no fim | `db-gbzw6njk` |
 | Azure Storage account | 3–24 caracteres, só minúsculas e dígitos, único global | `bktsfdst7tgimuu` |
-| Azure SQL server | minúsculas, dígitos e `-`, sem `-` nas pontas, único global | `host-7rhd4fspnbbj` |
-| Hostname DNS (Ansible) | rótulos de letras, dígitos e `-`; `_` é inválido | `host-7rhd4fspnbbj` |
+| Azure SQL server | minúsculas, dígitos e `-`, sem `-` nas pontas, único global | `host-7rhd4fsp` |
+| Hostname DNS (Ansible) | rótulos de letras, dígitos e `-`; `_` é inválido | `host-7rhd4fsp` |
 
-  Regra prática: o pseudônimo canônico é `TIPO_sufixo` (ex.: `BKT_sfdst7tgimuu`). Quando o atributo tem
-  restrição, o proxy emite uma **forma derivada** (`bkt-sfdst7tgimuu`, `bktsfdst7tgimuu`) e guarda no mapa reverso
+  Regra prática: o pseudônimo canônico é `TIPO_sufixo` (ex.: `BKT_sfdst7tg`). Quando o atributo tem
+  restrição, o proxy emite uma **forma derivada** (`bkt-sfdst7tg`, `bktsfdst7tgimuu`) e guarda no mapa reverso
   as duas formas apontando para o mesmo original.
 
 ### 5. Exemplos antes/depois
@@ -1690,12 +1663,12 @@ resource "aws_db_instance" "principal" {
 }
 # depois
 resource "aws_s3_bucket" "relatorios" {
-  bucket = "bkt-sfdst7tgimuu"
+  bucket = "bkt-sfdst7tg"
 }
 resource "aws_db_instance" "principal" {
-  identifier = "db-gbzw6njkambe"
-  db_name    = "DB_wzm3mqvx6hi7"
-  username   = "USR_uu7ojlpgyfdc"
+  identifier = "db-gbzw6njk"
+  db_name    = "DB_wzm3mqvx"
+  username   = "USR_uu7ojlpg"
 }
 ```
 
@@ -1703,7 +1676,7 @@ resource "aws_db_instance" "principal" {
 ```ini
 # antes                                    # depois
 [dbservers]                                [dbservers]
-db-exemplo-01 ansible_host=10.0.0.5        host-7rhd4fspnbbj ansible_host=IP_r9d3
+db-exemplo-01 ansible_host=10.0.0.5        host-7rhd4fsp ansible_host=IP_r9d3
 ```
 
 **CloudFormation**
@@ -1719,8 +1692,8 @@ Resources:
     Properties:
       BucketName: !Sub 'bkt-relatorios-demo-${AWS::Region}'
 # depois
-      DBInstanceIdentifier: db-gbzw6njkambe
-      BucketName: !Sub 'bkt-sfdst7tgimuu-${AWS::Region}'
+      DBInstanceIdentifier: db-gbzw6njk
+      BucketName: !Sub 'bkt-sfdst7tg-${AWS::Region}'
 ```
 
 **Bicep**
@@ -1732,7 +1705,7 @@ resource sql 'Microsoft.Sql/servers@2023-08-01' = {
 }
 // depois
 resource sql 'Microsoft.Sql/servers@2023-08-01' = {
-  name: 'host-7rhd4fspnbbj'
+  name: 'host-7rhd4fsp'
   location: location
 }
 ```
@@ -1745,7 +1718,7 @@ resource sql 'Microsoft.Sql/servers@2023-08-01' = {
       + address    = (known after apply)
 # depois
   ~ resource "aws_db_instance" "principal" {
-      ~ identifier = "db-gbzw6njkambe" -> "db-6rosk7bpp3kb"
+      ~ identifier = "db-gbzw6njk" -> "db-6rosk7bp"
       + address    = (known after apply)
 ```
 
@@ -1772,7 +1745,7 @@ resource sql 'Microsoft.Sql/servers@2023-08-01' = {
 - **Tags `Name`.** São texto livre, mas na prática repetem o nome real. Tratar `tags.Name` como do
   mesmo tipo do recurso. `[VERIFICAR]` se vale estender para outras tags.
 - **Valor que já é referência a outro recurso** (`vpc_id = aws_vpc.principal.id`): não mascarar.
-  Se for um ID literal (`host-bakbyhxo3t4v…`, ARN), ele cai na família de IDs/ARN, não nesta.
+  Se for um ID literal (`host-bakbyhxo…`, ARN), ele cai na família de IDs/ARN, não nesta.
 - **ARN e connection strings dentro de valores** (`arn:aws:rds:…:db:db-exemplo-01`,
   `Server=tcp:sqlsrv-exemplo-01.database.windows.net`): o segmento final se mascara com o **mesmo**
   pseudônimo do recurso, e o sufixo DNS público do provedor fica.
@@ -1780,7 +1753,7 @@ resource sql 'Microsoft.Sql/servers@2023-08-01' = {
   e como nome de arquivo em `host_vars/`. Os três precisam do mesmo pseudônimo. Faixas
   `db[01:03].exemplo` se mascaram como unidade (o padrão inteiro vira um pseudônimo). Expandir a
   faixa geraria pseudônimos independentes e quebraria o padrão.
-- **Restrições que o pseudônimo não cumpre.** `HOST_7rhd4fspnbbj` tem `_` e maiúscula, então é inválido em
+- **Restrições que o pseudônimo não cumpre.** `HOST_7rhd4fsp` tem `_` e maiúscula, então é inválido em
   bucket, storage account e hostname. Sem a forma derivada do item 4, o arquivo continua
   sintaticamente válido mas falha no `validate` do provider. Isso não é problema se o arquivo só vai
   para o LLM, mas é problema se a resposta for aplicada sem reverter o mascaramento.
@@ -1943,27 +1916,27 @@ dbt (schema.yml + modelo):
 ```yaml
 # antes                                   # depois
 sources:                                  sources:
-  - name: financeiro                        - name: SCH_mvrhafaercjl
+  - name: financeiro                        - name: SCH_mvrhafae
     tables:                                   tables:
-      - name: tb_pedido_x9                      - name: T_cszwa3rio2f5
+      - name: tb_pedido_x9                      - name: T_cszwa3ri
 models:                                   models:
-  - name: fct_pedido_x9                     - name: T_lnnfl7qrmo7r
+  - name: fct_pedido_x9                     - name: T_lnnfl7qr
     columns:                                  columns:
-      - name: vl_total                          - name: C_xsdgeq7lerj2
+      - name: vl_total                          - name: C_xsdgeq7l
         data_tests: [not_null, unique]            data_tests: [not_null, unique]
 ```
 ```sql
-{{ config(schema='financeiro', alias='fct_pedido_x9') }}   →  {{ config(schema='SCH_mvrhafaercjl', alias='T_lnnfl7qrmo7r') }}
+{{ config(schema='financeiro', alias='fct_pedido_x9') }}   →  {{ config(schema='SCH_mvrhafae', alias='T_lnnfl7qr') }}
 select vl_total from {{ source('financeiro','tb_pedido_x9') }}
-→ select C_xsdgeq7lerj2 from {{ source('SCH_mvrhafaercjl','T_cszwa3rio2f5') }}
+→ select C_xsdgeq7l from {{ source('SCH_mvrhafae','T_cszwa3ri') }}
 ```
 
 Airflow:
 ```python
-DAG(dag_id="carga_pedido_x9")                          →  DAG(dag_id="SVC_56abpg7aieum")
-SQLExecuteQueryOperator(task_id="soma_total",          →  SQLExecuteQueryOperator(task_id="SVC_gxv6bzrwulja",
-    conn_id="conn_vendas_demo",                        →      conn_id="SVC_tnmdaymggcvy",
-    sql="select sum(vl_total) from financeiro.tb_pedido_x9")  →  sql="select sum(C_xsdgeq7lerj2) from SCH_mvrhafaercjl.T_cszwa3rio2f5")
+DAG(dag_id="carga_pedido_x9")                          →  DAG(dag_id="SVC_56abpg7a")
+SQLExecuteQueryOperator(task_id="soma_total",          →  SQLExecuteQueryOperator(task_id="SVC_gxv6bzrw",
+    conn_id="conn_vendas_demo",                        →      conn_id="SVC_tnmdaymg",
+    sql="select sum(vl_total) from financeiro.tb_pedido_x9")  →  sql="select sum(C_xsdgeq7l) from SCH_mvrhafae.T_cszwa3ri")
 # AIRFLOW_CONN_CONN_VENDAS_DEMO  →  AIRFLOW_CONN_CONN_X7K2  (env exige maiúsculas: mapa sem caixa)
 ```
 
@@ -1972,13 +1945,13 @@ DataHub (receita + URN):
 source:                                   source:
   type: postgres                            type: postgres
   config:                                   config:
-    database: vendas_demo                     database: DB_egzghucdw6p5
+    database: vendas_demo                     database: DB_egzghucd
     table_pattern:                            table_pattern:
-      allow: ["^vendas_demo\\.financeiro\\..*"]   allow: ["^DB_egzghucdw6p5\\.SCH_mvrhafaercjl\\..*"]
-      deny:  [".*\\.tb_pedido_x9$"]               deny:  [".*\\.T_cszwa3rio2f5$"]
+      allow: ["^vendas_demo\\.financeiro\\..*"]   allow: ["^DB_egzghucd\\.SCH_mvrhafae\\..*"]
+      deny:  [".*\\.tb_pedido_x9$"]               deny:  [".*\\.T_cszwa3ri$"]
 ```
 `urn:li:dataset:(urn:li:dataPlatform:postgres,vendas_demo.financeiro.tb_pedido_x9,PROD)`
-→ `urn:li:dataset:(urn:li:dataPlatform:postgres,DB_egzghucdw6p5.SCH_mvrhafaercjl.T_cszwa3rio2f5,PROD)`
+→ `urn:li:dataset:(urn:li:dataPlatform:postgres,DB_egzghucd.SCH_mvrhafae.T_cszwa3ri,PROD)`
 
 OpenLineage:
 ```json
@@ -1986,25 +1959,25 @@ OpenLineage:
  "inputs":[{"namespace":"postgres://db.exemplo.local:5432","name":"vendas_demo.financeiro.tb_pedido_x9",
    "facets":{"schema":{"fields":[{"name":"vl_total","type":"NUMERIC"}]}}}]}
 ```
-→ `"namespace":"HOST_7h2tokhwff3a"`, `"name":"SVC_56abpg7aieum.SVC_gxv6bzrwulja"`, `"name":"DB_egzghucdw6p5.SCH_mvrhafaercjl.T_cszwa3rio2f5"`,
-`"fields":[{"name":"C_xsdgeq7lerj2","type":"NUMERIC"}]` (host do namespace vai para a família de rede; `postgres://` e `NUMERIC` ficam).
+→ `"namespace":"HOST_7h2tokhw"`, `"name":"SVC_56abpg7a.SVC_gxv6bzrw"`, `"name":"DB_egzghucd.SCH_mvrhafae.T_cszwa3ri"`,
+`"fields":[{"name":"C_xsdgeq7l","type":"NUMERIC"}]` (host do namespace vai para a família de rede; `postgres://` e `NUMERIC` ficam).
 
 Liquibase / Alembic / GX:
 ```xml
-<createTable schemaName="financeiro" tableName="tb_pedido_x9">   →  <createTable schemaName="SCH_mvrhafaercjl" tableName="T_cszwa3rio2f5">
-  <column name="vl_total" type="numeric(12,2)"/>                  →    <column name="C_xsdgeq7lerj2" type="numeric(12,2)"/>
+<createTable schemaName="financeiro" tableName="tb_pedido_x9">   →  <createTable schemaName="SCH_mvrhafae" tableName="T_cszwa3ri">
+  <column name="vl_total" type="numeric(12,2)"/>                  →    <column name="C_xsdgeq7l" type="numeric(12,2)"/>
 ```
 ```python
 op.add_column('tb_pedido_x9', sa.Column('vl_total', sa.Numeric()), schema='financeiro')
-→ op.add_column('T_cszwa3rio2f5', sa.Column('C_xsdgeq7lerj2', sa.Numeric()), schema='SCH_mvrhafaercjl')
-gx.expectations.ExpectColumnValuesToNotBeNull(column="vl_total")  →  (column="C_xsdgeq7lerj2")
+→ op.add_column('T_cszwa3ri', sa.Column('C_xsdgeq7l', sa.Numeric()), schema='SCH_mvrhafae')
+gx.expectations.ExpectColumnValuesToNotBeNull(column="vl_total")  →  (column="C_xsdgeq7l")
 ```
 
 ### 6. Casos difíceis e limites
 
 - **Regex com fragmento de nome.** `^tb_ped.*`, `.*_x9$`, `financeiro_(2023|2024)`: o literal é *pedaço* de nome,
   não nome inteiro; trocar por pseudônimo quebra o casamento. Política: (a) se o fragmento casa com ≥1 nome do
-  mapa, gerar pseudônimo de **padrão** (`T_kwvciyutk3nw`) e **não prometer equivalência** — marcar `[VERIFICAR]` na
+  mapa, gerar pseudônimo de **padrão** (`T_kwvciyut`) e **não prometer equivalência** — marcar `[VERIFICAR]` na
   saída de diagnóstico; (b) se não casa com nada conhecido, deixar como está (é estrutura, ex.: `_tmp$`).
   Alternância `(a|b)` com literais inteiros → mascarar cada ramo. Classes `[0-9]{4}` sempre mantidas.
 - **Prefixo/sufixo de convenção** (`stg_`, `_tmp`, `_x9`): não é entidade; mascarar o nome inteiro, nunca o afixo,
@@ -2164,7 +2137,7 @@ Formato sugerido de armazenamento: um arquivo por linguagem/CLI com `{api, posi�
    ler o SQL; ao recolocar, **re-escapar** o pseudônimo do mesmo jeito. Em literal `r"..."` não há escape.
    Como os pseudônimos são `[A-Z0-9_]`, não exigem escape — a regra importa ao *ler* o nome.
 2. **Aspas do SQL ficam.** `"vl_total"`, `` `vl_total` ``, `[vl_total]` → troca-se só o miolo:
-   `"C_xsdgeq7lerj2"`. Nome entre aspas duplas é sensível a caixa em Postgres/Snowflake; o pseudônimo é sempre o mesmo
+   `"C_xsdgeq7l"`. Nome entre aspas duplas é sensível a caixa em Postgres/Snowflake; o pseudônimo é sempre o mesmo
    para a mesma grafia exata (case-sensitive na tabela de pseudônimos quando estava entre aspas).
 3. **Nome multiparte** (`d.t`, `projeto:dataset.tabela`, `s.t.c`): partir no separador da API (`.`; `:` só no
    `bq` e no `scp`) e mascarar cada parte com seu tipo.
@@ -2186,7 +2159,7 @@ Python com f-string (o `{dt}` não é tocado):
 # antes
 sql = f"""SELECT vl_total FROM vendas_demo.tb_pedido_x9 WHERE dt_ref = '{dt}'"""
 # depois
-sql = f"""SELECT C_xsdgeq7lerj2 FROM DB_gbzw6njkambe.T_cszwa3rio2f5 WHERE C_fvp7nx2jcl7s = '{dt}'"""
+sql = f"""SELECT C_xsdgeq7l FROM DB_gbzw6njk.T_cszwa3ri WHERE C_fvp7nx2j = '{dt}'"""
 ```
 
 SQLAlchemy e Django:
@@ -2198,11 +2171,11 @@ class Pedido(models.Model):
     class Meta:
         db_table = "tb_pedido_x9"
 # depois
-pedido = Table("T_cszwa3rio2f5", metadata, Column("C_xsdgeq7lerj2", Numeric), schema="SCH_wy3wj5vm6bg6")
+pedido = Table("T_cszwa3ri", metadata, Column("C_xsdgeq7l", Numeric), schema="SCH_wy3wj5vm")
 class Pedido(models.Model):
-    total = models.DecimalField(db_column="C_xsdgeq7lerj2")
+    total = models.DecimalField(db_column="C_xsdgeq7l")
     class Meta:
-        db_table = "T_cszwa3rio2f5"
+        db_table = "T_cszwa3ri"
 ```
 (Note que `Pedido` e `total` são identificadores do programa, não do banco: ficam.)
 
@@ -2212,28 +2185,28 @@ JPA e Prisma:
 @Table(name = "tb_pedido_x9", schema = "vendas_demo")
 class Pedido { @Column(name = "vl_total") BigDecimal total; }
 // depois
-@Table(name = "T_cszwa3rio2f5", schema = "SCH_wy3wj5vm6bg6")
-class Pedido { @Column(name = "C_xsdgeq7lerj2") BigDecimal total; }
+@Table(name = "T_cszwa3ri", schema = "SCH_wy3wj5vm")
+class Pedido { @Column(name = "C_xsdgeq7l") BigDecimal total; }
 ```
 ```prisma
-model Pedido { total Decimal @map("C_xsdgeq7lerj2")  @@map("T_cszwa3rio2f5") }   // antes: "vl_total", "tb_pedido_x9"
+model Pedido { total Decimal @map("C_xsdgeq7l")  @@map("T_cszwa3ri") }   // antes: "vl_total", "tb_pedido_x9"
 ```
 
 PySpark / pandas:
 ```python
 df = spark.read.table("vendas_demo.tb_pedido_x9").select("vl_total")   # antes
-df = spark.read.table("DB_gbzw6njkambe.T_cszwa3rio2f5").select("C_xsdgeq7lerj2")               # depois
+df = spark.read.table("DB_gbzw6njk.T_cszwa3ri").select("C_xsdgeq7l")               # depois
 df.to_sql("tb_pedido_x9", con, schema="vendas_demo")                    # antes
-df.to_sql("T_cszwa3rio2f5", con, schema="SCH_wy3wj5vm6bg6")                               # depois
+df.to_sql("T_cszwa3ri", con, schema="SCH_wy3wj5vm")                               # depois
 ```
 
 Shell:
 ```bash
 psql -h db-exemplo-01 -dvendas_demo -U usr_relatorio -c "SELECT vl_total FROM tb_pedido_x9"   # antes
-psql -h HOST_7rhd4fspnbbj -dDB_gbzw6njkambe -U USR_jqndvqfslis4 -c "SELECT C_xsdgeq7lerj2 FROM T_cszwa3rio2f5"                          # depois
-ssh usr_relatorio@db-exemplo-01        →  ssh USR_jqndvqfslis4@HOST_7rhd4fspnbbj
-bq show projeto-demo:vendas_demo.tb_pedido_x9  →  bq show DB_7jsplxmw5jz3:DB_gbzw6njkambe.T_cszwa3rio2f5
-kubectl -n ns-demo get pods            →  kubectl -n NS_eorwmkh3nqfz get pods
+psql -h HOST_7rhd4fsp -dDB_gbzw6njkambe -U USR_jqndvqfs -c "SELECT C_xsdgeq7l FROM T_cszwa3ri"                          # depois
+ssh usr_relatorio@db-exemplo-01        →  ssh USR_jqndvqfs@HOST_7rhd4fsp
+bq show projeto-demo:vendas_demo.tb_pedido_x9  →  bq show DB_7jsplxmw:DB_gbzw6njk.T_cszwa3ri
+kubectl -n ns-demo get pods            →  kubectl -n NS_eorwmkh3 get pods
 ```
 Os pseudônimos são identificadores válidos sem aspas em SQL, Python, Java e shell, então o código continua
 sintaticamente válido; na volta, a tabela de pseudônimos devolve o nome real e o comando roda como antes.
@@ -2362,7 +2335,7 @@ Sinal sozinho fraco (`GET x` pode ser HTTP ou Redis): exigir contexto (prompt, `
 - **Cassandra**: sem aspas `[a-zA-Z_0-9]{1,48}`, case-insensitive; keyspace ≤ 48, tabela ≤ 222; com aspas é case-sensitive.
 - **DynamoDB**: tabela/índice 3–255 chars `[a-zA-Z0-9_.-]`, case-sensitive; atributo ≥ 1 char e < 64 KB (255 para chaves de índice secundário); `#` e `:` têm sentido especial em expressões.
 
-Consequência: pseudônimo **minúsculo**, `[a-z0-9_]`, começando com letra: `db_gbzw6njkambe`, `t_cszwa3rio2f5`, `t_kzkcrymy6zxq`, `c_xsdgeq7lerj2`. Vale em todos os sistemas acima (no texto abaixo, maiúsculo só para leitura; no índice ES usar `t_kzkcrymy6zxq` obrigatoriamente minúsculo).
+Consequência: pseudônimo **minúsculo**, `[a-z0-9_]`, começando com letra: `db_gbzw6njk`, `t_cszwa3ri`, `t_kzkcrymy`, `c_xsdgeq7l`. Vale em todos os sistemas acima (no texto abaixo, maiúsculo só para leitura; no índice ES usar `t_kzkcrymy` obrigatoriamente minúsculo).
 
 ### 5. Exemplos antes → depois
 
@@ -2377,12 +2350,12 @@ db.pedidos_x9.aggregate([
 ])
 ```
 ```js
-use DB_gbzw6njkambe
-db.T_cszwa3rio2f5.find({ "C_xsdgeq7lerj2.C_2slmva2fyggz": "Recife", C_gdgjt7njcpu2: { $gt: 100 } })
-db.T_cszwa3rio2f5.aggregate([
-  { $match: { C_wkpovbsaraom: "pago" } },
-  { $lookup: { from: "T_cua5v3bz5rz6", localField: "_id", foreignField: "C_roj22pqm5qnc", as: "C_yw3muenbkrcn" } },
-  { $group: { _id: "$C_xsdgeq7lerj2.C_2slmva2fyggz", C_mihi7y6y463j: { $sum: "$C_gdgjt7njcpu2" } } }
+use DB_gbzw6njk
+db.T_cszwa3ri.find({ "C_xsdgeq7l.C_2slmva2f": "Recife", C_gdgjt7nj: { $gt: 100 } })
+db.T_cszwa3ri.aggregate([
+  { $match: { C_wkpovbsa: "pago" } },
+  { $lookup: { from: "T_cua5v3bz", localField: "_id", foreignField: "C_roj22pqm", as: "C_yw3muenb" } },
+  { $group: { _id: "$C_xsdgeq7l.C_2slmva2f", C_mihi7y6y: { $sum: "$C_gdgjt7nj" } } }
 ])
 ```
 `_id` fica (nome reservado). Valores (`"Recife"`, `"pago"`) são problema de outro detector. `as:` cria campo novo → `F_`.
@@ -2398,15 +2371,15 @@ PUT /idx-logs-demo
   "usuario": { "properties": { "email": { "type": "keyword" } } } } } }
 ```
 ```
-GET /t_kzkcrymy6zxq/_search
-{ "query": { "bool": { "filter": [ { "term": { "C_n33epld6rhtb": "erro" } },
-  { "range": { "C_wommwydirpwz": { "gte": "now-1d" } } } ] } } }
+GET /t_kzkcrymy/_search
+{ "query": { "bool": { "filter": [ { "term": { "C_n33epld6": "erro" } },
+  { "range": { "C_wommwydi": { "gte": "now-1d" } } } ] } } }
 
-PUT /t_kzkcrymy6zxq
-{ "mappings": { "properties": { "C_n33epld6rhtb": { "type": "keyword" },
-  "C_rkykwjjg5mxv": { "properties": { "C_2xgvahgaoaob": { "type": "keyword" } } } } } }
+PUT /t_kzkcrymy
+{ "mappings": { "properties": { "C_n33epld6": { "type": "keyword" },
+  "C_rkykwjjg": { "properties": { "C_2xgvahga": { "type": "keyword" } } } } } }
 ```
-`_cat/indices?v`: manter o cabeçalho, trocar só a coluna `index` (`idx-logs-demo` → `t_kzkcrymy6zxq`), `uuid` é opaco (mascarar se a política tratar como identificador).
+`_cat/indices?v`: manter o cabeçalho, trocar só a coluna `index` (`idx-logs-demo` → `t_kzkcrymy`), `uuid` é opaco (mascarar se a política tratar como identificador).
 
 Redis:
 ```
@@ -2416,25 +2389,25 @@ Redis:
 2) 1) "pedido:123:status"
 ```
 ```
-127.0.0.1:6379> HSET T_637plzydtuac:123:T_sj65iemslwdo C_vkzmx2ottfzd enviado
-127.0.0.1:6379> SCAN 0 MATCH T_637plzydtuac:*:T_sj65iemslwdo COUNT 100
+127.0.0.1:6379> HSET T_637plzyd:123:T_sj65iems C_vkzmx2ot enviado
+127.0.0.1:6379> SCAN 0 MATCH T_637plzyd:*:T_sj65iems COUNT 100
 1) "0"
-2) 1) "T_637plzydtuac:123:T_sj65iemslwdo"
+2) 1) "T_637plzyd:123:T_sj65iems"
 ```
 Segmentos numéricos/IDs passam ou vão para o detector de identificador; o mapa precisa ser o **mesmo** dentro do padrão e na saída.
 
 Cassandra / DynamoDB:
 ```
-SELECT * FROM vendas_demo.pedidos_x9 WHERE pedido_id = 1;   → SELECT * FROM DB_gbzw6njkambe.T_cszwa3rio2f5 WHERE C_roj22pqm5qnc = 1;
+SELECT * FROM vendas_demo.pedidos_x9 WHERE pedido_id = 1;   → SELECT * FROM DB_gbzw6njk.T_cszwa3ri WHERE C_roj22pqm = 1;
 {"TableName":"pedidos_x9","KeySchema":[{"AttributeName":"pedido_id","KeyType":"HASH"}]}
-→ {"TableName":"T_cszwa3rio2f5","KeySchema":[{"AttributeName":"C_roj22pqm5qnc","KeyType":"HASH"}]}
+→ {"TableName":"T_cszwa3ri","KeySchema":[{"AttributeName":"C_roj22pqm","KeyType":"HASH"}]}
 ```
 
 ### 6. Casos difíceis e limites
 
 - **Chave Redis com dado pessoal dentro** (`sessao:maria@exemplo.com`, `cpf:00000000000:score`): segmentar por `:`; cada segmento vai **também** pelos detectores de valor (e-mail, CPF, telefone). Segmento de prefixo → `KEY_`; segmento que é dado → pseudônimo do tipo do dado. Chave sem `:` (ex. JSON serializado, hash SHA) → tratar como opaca e mascarar inteira. Hashtag `{x}` preservar as chaves `{}` (mudam o slot do cluster).
 - **Campo dinâmico** (`"properties"` com nomes gerados, ex. datas `2026-10-01` como chave; Mongo `{ "metricas": { "sku_991": 3 } }`): não há como saber pela estrutura se a chave é esquema ou dado. Regra: se as chaves irmãs seguem um padrão numérico/data/ID, mascarar como valor; senão `F_`. `dynamic_templates` (`"match": "attr_*"`) traz padrões, não nomes.
-- **Padrões com curinga**: `GET /idx-logs-*/_search`, `SCAN MATCH pedido:*`, `"match": "attr_*"`, `index_patterns`. Mascarar só a parte literal e manter `* ? [ ]`; o mesmo prefixo precisa virar o mesmo pseudônimo dos nomes concretos, senão o padrão deixa de casar (`idx-logs-*` → `t_kzkcrymy6zxq*` só funciona se a troca for por **prefixo**, não por nome inteiro — limite real: pseudonimizar prefixo e nome completo de forma consistente exige tokenizar o nome por `-`/`_`).
+- **Padrões com curinga**: `GET /idx-logs-*/_search`, `SCAN MATCH pedido:*`, `"match": "attr_*"`, `index_patterns`. Mascarar só a parte literal e manter `* ? [ ]`; o mesmo prefixo precisa virar o mesmo pseudônimo dos nomes concretos, senão o padrão deixa de casar (`idx-logs-*` → `t_kzkcrymy*` só funciona se a troca for por **prefixo**, não por nome inteiro — limite real: pseudonimizar prefixo e nome completo de forma consistente exige tokenizar o nome por `-`/`_`).
 - **Listas e datas em índice ES**: `GET /a,b/_search`, `logs-2026.10.05` (data math `<logs-{now/d}>`): separar por `,`; sufixo de data é estrutura, manter.
 - **Dot notation ambígua**: `"a.b"` pode ser campo literal com ponto (5.0+) ou caminho. Mascarar segmento a segmento cobre os dois.
 - **`$` como referência vs. operador**: `"$total"` (valor) é campo; `$sum` (chave) é operador. Decidir pela lista do item 3, não pelo `$`.
@@ -2564,9 +2537,9 @@ diff --git a/sql/relatorio_pedidos.sql b/sql/relatorio_pedidos.sql
 ```
 ```
 diff --git a/sql/relatorio_pedidos.sql b/sql/relatorio_pedidos.sql
-@@ -3,2 +3,2 @@ CREATE VIEW SCH_mvrhafaercjl.T_nebrjj4tdbgi AS
--SELECT id FROM SCH_mvrhafaercjl.T_cszwa3rio2f5
-+SELECT id, valor FROM SCH_mvrhafaercjl.T_cszwa3rio2f5
+@@ -3,2 +3,2 @@ CREATE VIEW SCH_mvrhafae.T_nebrjj4t AS
+-SELECT id FROM SCH_mvrhafae.T_cszwa3ri
++SELECT id, valor FROM SCH_mvrhafae.T_cszwa3ri
 ```
 
 grep (`:` casamento, `-` contexto, `--` grupo):
@@ -2576,7 +2549,7 @@ sql/relatorio_pedidos.sql-11-  -- totais
 sql/relatorio_pedidos.sql:12:  FROM financeiro.tb_pedido_x9 p
 --
 ```
-→ `sql/relatorio_pedidos.sql:12:  FROM SCH_mvrhafaercjl.T_cszwa3rio2f5 p` (linha 11 e `--` intactos)
+→ `sql/relatorio_pedidos.sql:12:  FROM SCH_mvrhafae.T_cszwa3ri p` (linha 11 e `--` intactos)
 
 Log PostgreSQL (prefixo `%m [%p] %u@%d `; usuário e banco também são dados):
 
@@ -2584,7 +2557,7 @@ Log PostgreSQL (prefixo `%m [%p] %u@%d `; usuário e banco também são dados):
 2026-01-10 08:00:01.120 UTC [4410] app_rel@dw_vendas LOG:  statement: DELETE FROM financeiro.tb_pedido_x9 WHERE id = 7
 ```
 ```
-2026-01-10 08:00:01.120 UTC [4410] USR_n4a4muktfw6w@DB_k3gr76nw6puj LOG:  statement: DELETE FROM SCH_mvrhafaercjl.T_cszwa3rio2f5 WHERE id = 7
+2026-01-10 08:00:01.120 UTC [4410] USR_n4a4mukt@DB_k3gr76nw LOG:  statement: DELETE FROM SCH_mvrhafae.T_cszwa3ri WHERE id = 7
 ```
 
 JSON → heredoc → SQL (mapa composto; `\n` preservado):
@@ -2593,7 +2566,7 @@ JSON → heredoc → SQL (mapa composto; `\n` preservado):
 {"command":"psql <<'EOF'\nSELECT * FROM \"financeiro\".tb_pedido_x9;\nEOF"}
 ```
 ```
-{"command":"psql <<'EOF'\nSELECT * FROM \"SCH_mvrhafaercjl\".T_cszwa3rio2f5;\nEOF"}
+{"command":"psql <<'EOF'\nSELECT * FROM \"SCH_mvrhafae\".T_cszwa3ri;\nEOF"}
 ```
 Note: `\"financeiro\"` no original ocupa 14 bytes; no interno `"financeiro"` ocupa 12. O
 achado é `financeiro` (sem aspas); o mapa por caractere devolve exatamente os 10 bytes
@@ -2618,7 +2591,7 @@ entre os `\"`, e as aspas escapadas ficam.
 - **Caminho com nome de servidor**: `config/sqlserver_srv-exemplo-01.yaml`. O caminho é
   dado. Quebrar em componentes (`/`, `.`, `_`), manter extensão e partes de vocabulário do
   produto (`config`, `sqlserver`, `yaml`) e mascarar o trecho com forma de host
-  (`srv-exemplo-01` → `HOST_vltoxf7e27s2`): `config/sqlserver_HOST_r4t6.yaml`. A **extensão continua
+  (`srv-exemplo-01` → `HOST_vltoxf7e`): `config/sqlserver_HOST_r4t6.yaml`. A **extensão continua
   decidindo o tipo** — por isso detectar o tipo antes de mascarar o caminho. Aplicar o mesmo
   pseudônimo em `a/`, `b/`, `---`, `+++`, prefixo do grep e cabeçalho do rg.
 - **Caminhos com aspas no git** (`core.quotePath`): `"config/\303\241rea.yaml"`; desfazer o
@@ -2712,20 +2685,20 @@ modelo a raciocinar.
 
 | Núcleo da chave (EN / PT) | Entidade | Pseudônimo |
 |---|---|---|
-| host, hostaddr, server, servidor, address, addr, data source, network address, failover partner, proxyhost, nonproxyhosts, workstation/wsid | HOST | `HOST_tu6pvlhb6mve` |
-| database, db, dbname, banco, catalog, initial catalog, project (BigQuery: `database` = projeto) | DATABASE | `DB_xoal5ygh5i5p` |
-| schema, esquema, dataset | SCHEMA | `SCH_7h7ved4bd7rc` |
-| table, tabela, relation, view | TABLE | `T_3gjogzbdwxox` |
-| column, coluna, field, campo | COLUMN | `C_etwhmr4n5jvm` |
-| user, usuario, username, uid, login, owner, dono, proxyuser | USER | `USR_j4ed3tyqdeaz` |
-| role, papel | ROLE | `USR_xgbsyz5dziw3` |
-| namespace | NAMESPACE | `NS_xcykm4tbrktk` |
-| cluster, context, current-context | CLUSTER | `HOST_yw4kukvbgxk5` |
-| bucket | BUCKET | `BKT_xztzuyuw4fe5` |
-| topic, topico, queue, fila, group (`group.id`) | FILA_TOPICO | `TOP_7bwlqw3sktgz` |
-| service, servico, application, app, instance, instancia | SERVICO | `SVC_rmaijblsv65y` |
-| warehouse | WAREHOUSE | `SVC_mdgkpbbybwyn` |
-| account, conta, tenant | CONTA | `HOST_bth7wilh527e` |
+| host, hostaddr, server, servidor, address, addr, data source, network address, failover partner, proxyhost, nonproxyhosts, workstation/wsid | HOST | `HOST_tu6pvlhb` |
+| database, db, dbname, banco, catalog, initial catalog, project (BigQuery: `database` = projeto) | DATABASE | `DB_xoal5ygh` |
+| schema, esquema, dataset | SCHEMA | `SCH_7h7ved4b` |
+| table, tabela, relation, view | TABLE | `T_3gjogzbd` |
+| column, coluna, field, campo | COLUMN | `C_etwhmr4n` |
+| user, usuario, username, uid, login, owner, dono, proxyuser | USER | `USR_j4ed3tyq` |
+| role, papel | ROLE | `USR_xgbsyz5d` |
+| namespace | NAMESPACE | `NS_xcykm4tb` |
+| cluster, context, current-context | CLUSTER | `HOST_yw4kukvb` |
+| bucket | BUCKET | `BKT_xztzuyuw` |
+| topic, topico, queue, fila, group (`group.id`) | FILA_TOPICO | `TOP_7bwlqw3s` |
+| service, servico, application, app, instance, instancia | SERVICO | `SVC_rmaijbls` |
+| warehouse | WAREHOUSE | `SVC_mdgkpbby` |
+| account, conta, tenant | CONTA | `HOST_bth7wilh` |
 
 Credenciais (`password`, `token`, `private_key`…) **não** são desta família: vão para a família de
 segredos, que mascara sempre, sem olhar forma.
@@ -2787,7 +2760,7 @@ Hífen sozinho **não** é sinal (só conta com dígito ou junto de outro sinal)
 | Data / hora | `2026-10-05`, `05/10/2026`, `20261005T120000Z` | excluir | regex ISO 8601 e dd/mm/aaaa |
 | UUID | `3f2c…-…-…` (8-4-4-4-12 hex) | excluir desta família | é ID, não nome; família de IDs/segredos |
 | Hash | `9fceb02` (7–64 hex puros) | excluir | hex sem separador; família de IDs |
-| Arquivo | `relatorio_final.xlsx`, `main.go` | excluir pela forma | extensão conhecida no último pedaço; mas o nome aprendido dentro dele é trocado: `tb_pedido_x9.sql` → `T_3gjogzbdwxox.sql` |
+| Arquivo | `relatorio_final.xlsx`, `main.go` | excluir pela forma | extensão conhecida no último pedaço; mas o nome aprendido dentro dele é trocado: `tb_pedido_x9.sql` → `T_3gjogzbd.sql` |
 | Hífen PT | `guarda-chuva`, `segunda-feira`, `pé-de-moleque`, `e-mail` | não é identificador | hífen só com letras não conta; acento derruba |
 | Sigla | `SQL`, `API`, `HTTP`, `JSON` | não | só maiúsculas, sem `_` nem dígito |
 | Sigla com dígito | `S3`, `EC2`, `UTF8`, `IPv4`, `OAuth2`, `K8s` | não por forma (≤ 6, sem separador) | mas se foi aprendido por chave, troca em contexto estrutural |
@@ -2799,12 +2772,12 @@ Hífen sozinho **não** é sinal (só conta com dígito ou junto de outro sinal)
 
 ```text
 ANTES                                           DEPOIS
-host: db-exemplo-01.interno                     host: HOST_tu6pvlhb6mve
+host: db-exemplo-01.interno                     host: HOST_tu6pvlhb
 port: 5432                                      port: 5432                 (modificador)
-Initial Catalog=vendas_x9;User ID=svc_relatorio Initial Catalog=DB_xoal5ygh5i5p;User ID=USR_j4ed3tyqdeaz
-SERVIDOR     db-exemplo-01                      SERVIDOR     HOST_tu6pvlhb6mve
---namespace ns-exemplo-02                       --namespace NS_xcykm4tbrktk
-bootstrap.servers=kfk-a1:9092,kfk-a2:9092       bootstrap.servers=HOST_3qmjbssv6tzv:9092,HOST_6vqnblkq4sws:9092
+Initial Catalog=vendas_x9;User ID=svc_relatorio Initial Catalog=DB_xoal5ygh;User ID=USR_j4ed3tyq
+SERVIDOR     db-exemplo-01                      SERVIDOR     HOST_tu6pvlhb
+--namespace ns-exemplo-02                       --namespace NS_xcykm4tb
+bootstrap.servers=kfk-a1:9092,kfk-a2:9092       bootstrap.servers=HOST_3qmjbssv:9092,HOST_6vqnblkq:9092
 schema: public                                  schema: public             (default público)
 tcp_user_timeout=30                             tcp_user_timeout=30        (trava de modificador)
 ```
@@ -2813,15 +2786,15 @@ Tabela alinhada (cabeçalho com núcleo `table` e `column` → colunas mascarada
 
 ```text
 table_name     column_name    data_type        TABLE_NAME   COLUMN_NAME  DATA_TYPE
-tb_pedido_x9   cd_cliente_7   NUMBER     →     T_3gjogzbdwxox    C_etwhmr4n5jvm    NUMBER
+tb_pedido_x9   cd_cliente_7   NUMBER     →     T_3gjogzbd    C_etwhmr4n    NUMBER
 ```
 
 Propagação para a prosa:
 
 ```text
-"a carga da tb_pedido_x9 falhou no db-exemplo-01"  → "a carga da T_3gjogzbdwxox falhou no HOST_tu6pvlhb6mve"
+"a carga da tb_pedido_x9 falhou no db-exemplo-01"  → "a carga da T_3gjogzbd falhou no HOST_tu6pvlhb"
 schema: cliente   (aprendido, mas sem cara de identificador)
-"o cliente reclamou do schema `cliente`"           → "o cliente reclamou do schema `SCH_7h7ved4bd7rc`"
+"o cliente reclamou do schema `cliente`"           → "o cliente reclamou do schema `SCH_7h7ved4b`"
 ```
 
 ### 6. Abordagens do mercado e o que serve para nós

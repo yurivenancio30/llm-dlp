@@ -88,9 +88,11 @@ func minusculo(k string, p [2]int, buf *[24]byte) []byte {
 	return b
 }
 
-// entChave: a entidade que o nome da chave indica e se a chave é exatamente o nome
-// ("host", "--host", "HOST") ou composta ("db_host", "spring.datasource.username").
-func entChave(k string) (ent string, exata bool) {
+// entChave: a entidade que o nome da chave indica e se isso é evidência forte. É forte quando o
+// último pedaço da chave é o próprio tipo: "host", "--host", "S3_BUCKET", "KAFKA_TOPIC",
+// "spring.datasource.username", "queueName", "bootstrap.servers" dizem explicitamente o que o
+// valor é. (Uma chave em que o tipo não é o último pedaço não indica entidade: "hostPort".)
+func entChave(k string) (ent string, forte bool) {
 	var ps [16][2]int
 	n, ok := pedacosChave(k, &ps)
 	if !ok || n == 0 {
@@ -102,22 +104,22 @@ func entChave(k string) (ent string, exata bool) {
 		return "", false
 	}
 	if e, ok := entPedaco[string(ult)]; ok {
-		return e, n == 1
+		return e, true
 	}
 	if n >= 2 {
 		pen := minusculo(k, ps[n-2], &b2)
 		switch string(ult) {
 		case "servers":
 			if string(pen) == "bootstrap" {
-				return "servidor", false
+				return "servidor", true
 			}
 		case "id":
 			if string(pen) == "project" {
-				return "conta_nuvem", false
+				return "conta_nuvem", true
 			}
 		case "name":
 			if e, ok := entAntesDeNome[string(pen)]; ok {
-				return e, false
+				return e, true
 			}
 		}
 	}

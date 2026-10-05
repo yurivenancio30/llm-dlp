@@ -61,14 +61,14 @@ func TestLeitorChaveValor(t *testing.T) {
 		{"database: vendas_x\nschema: financeiro\n", []string{"database:vendas_x!", "schema:financeiro!"}},
 		{`{"host": "db-exemplo-01", "user": "svc_relatorio", "timeout": 30}`, []string{"servidor:db-exemplo-01!", "usuario:svc_relatorio!"}},
 		{"[conexao]\nhost=db-exemplo-01\ndbname=vendas_x\n", []string{"database:vendas_x!", "servidor:db-exemplo-01!"}},
-		{"export DB_HOST=db-exemplo-01\nDB_USER=svc_relatorio\n", []string{"servidor:db-exemplo-01", "usuario:svc_relatorio"}},
-		{"spring.datasource.username=svc_relatorio\n", []string{"usuario:svc_relatorio"}},
-		{"bootstrap.servers=kafka-01:9092,kafka-02:9092\n", []string{"servidor:kafka-01", "servidor:kafka-02"}},
+		{"export DB_HOST=db-exemplo-01\nDB_USER=svc_relatorio\n", []string{"servidor:db-exemplo-01!", "usuario:svc_relatorio!"}},
+		{"spring.datasource.username=svc_relatorio\n", []string{"usuario:svc_relatorio!"}},
+		{"bootstrap.servers=kafka-01:9092,kafka-02:9092\n", []string{"servidor:kafka-01!", "servidor:kafka-02!"}},
 		{"queue: fila-pedidos-x9\nbucket = \"bkt-relatorios-demo\"\n", []string{"bucket:bkt-relatorios-demo!", "fila:fila-pedidos-x9!"}},
 		{"table: financeiro.tb_pedido_x9\n", []string{"schema:financeiro!", "tabela:tb_pedido_x9!"}},
 		{"namespace: vendas-prod\napp: pedidos-api\n", []string{"namespace:vendas-prod!", "servico:pedidos-api!"}},
-		{"project_id = \"proj-exemplo-01\"\n", []string{"conta_nuvem:proj-exemplo-01"}},
-		{`dbHost: "db-exemplo-02"`, []string{"servidor:db-exemplo-02"}},
+		{"project_id = \"proj-exemplo-01\"\n", []string{"conta_nuvem:proj-exemplo-01!"}},
+		{`dbHost: "db-exemplo-02"`, []string{"servidor:db-exemplo-02!"}},
 		// XML: elemento e atributo
 		{"<host>db-exemplo-01</host><database>vendas_x</database>", []string{"database:vendas_x!", "servidor:db-exemplo-01!"}},
 		{`<conexao host="db-exemplo-01" porta="1">`, []string{"servidor:db-exemplo-01!"}},
@@ -319,5 +319,28 @@ func TestChaveValorExpressaoNaoENome(t *testing.T) {
 	}
 	if out, _ := m.Mascarar("host = db-exemplo-01.interno\n"); strings.Contains(out, "db-exemplo-01") {
 		t.Errorf("valor simples deixou de ser mascarado: %q", out)
+	}
+}
+
+// Item 6: bucket e fila de chave explícita e metadata.name de Deployment/Service/StatefulSet
+// são evidência forte: o nome aprendido é mascarado também em outro texto.
+func TestChaveExplicitaEnsina(t *testing.T) {
+	for _, c := range []struct{ ensina, nome string }{
+		{"S3_BUCKET=bkt-relatorios-x9\n", "bkt-relatorios-x9"},
+		{"export ORDERS_BUCKET=bkt-pedidos-x9\n", "bkt-pedidos-x9"},
+		{"KAFKA_TOPIC=topico-eventos-x9\n", "topico-eventos-x9"},
+		{"PAYMENTS_QUEUE: fila-pagamentos-x9\n", "fila-pagamentos-x9"},
+		{"orders.topic=topico-pedidos-x9\n", "topico-pedidos-x9"},
+		{"apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: api-cobranca-x9\nspec:\n  replicas: 2\n", "api-cobranca-x9"},
+		{"apiVersion: v1\nkind: Service\nmetadata:\n  name: svc-cobranca-x9\nspec:\n  type: ClusterIP\n", "svc-cobranca-x9"},
+		{"apiVersion: apps/v1\nkind: StatefulSet\nmetadata:\n  name: pg-cobranca-x9\nspec:\n  serviceName: pg\n", "pg-cobranca-x9"},
+	} {
+		m := novoTeste(t)
+		if out, _ := m.Mascarar(c.ensina); strings.Contains(out, c.nome) {
+			t.Errorf("na posição: %q", out)
+		}
+		if out, _ := m.Mascarar("depois, em prosa: " + c.nome + " caiu"); strings.Contains(out, c.nome) {
+			t.Errorf("não aprendeu %q: %q", c.nome, out)
+		}
 	}
 }

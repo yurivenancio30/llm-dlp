@@ -24,9 +24,6 @@ Uso diário (normalmente você não precisa de nada disto)
   llm-dlp status                mostra se está no ar e em que modo
   llm-dlp importar-pessoas ARQ.csv --grupo COD:NOME:EMAIL [--separador-nome /]
                                 ensina nomes/e-mails de pessoas (guardados só como hash)
-  llm-dlp aprendidos            quantos nomes de objeto (tabela, servidor...) foram aprendidos, por tipo e mês
-  llm-dlp esquecer NOME|--tipo T|--desde D|--ate D|--tudo
-                                apaga nomes aprendidos (com o proxy parado)
   sudo llm-dlp emergencia [30m|sair]
                                 se o llm-dlp quebrar: libera o Claude SEM máscara por tempo limitado
 
@@ -87,10 +84,6 @@ func main() {
 		err = instalarTrava(false)
 	case "desinstalar-trava":
 		err = instalarTrava(true)
-	case "aprendidos":
-		err = aprendidos()
-	case "esquecer":
-		err = esquecer(args)
 	case "versao", "--version":
 		fmt.Println("llm-dlp", versao.Completa())
 	default:

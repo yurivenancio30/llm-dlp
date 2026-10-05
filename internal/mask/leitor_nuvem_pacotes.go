@@ -600,7 +600,7 @@ func acharTermos(s string, ts []string, add func(ObjAchado)) {
 			}
 			i = max(i, b-1)
 			id := s[a:b]
-			if len(id) <= len(t) || !caraDeIdentificador(id) || !temPedaco(id, t) || rePseudoObj.MatchString(id) {
+			if len(id) <= len(t) || !caraDeIdentificador(id) || !temPedaco(id, t) || ehPseudoObj(id) {
 				continue
 			}
 			add(ObjAchado{a, b, entPosicao(s, a), "termo-embutido", true})

@@ -171,48 +171,6 @@ func (v *Vistos) podarObj() {
 	}
 }
 
-// Esquecer apaga os nomes de objeto que satisfazem f (tipo, aprendido, visto) e devolve
-// quantos. id != "" apaga só esse.
-func (v *Vistos) Esquecer(id string, f func(ent string, aprendido, visto int) bool) int {
-	v.mu.Lock()
-	defer v.mu.Unlock()
-	n := 0
-	for k, t := range v.ids {
-		if id != "" && k != id {
-			continue
-		}
-		if e, a, d, ok := lerObj(t); ok && f(e, a, d) {
-			delete(v.ids, k)
-			v.n["obj."+e]--
-			v.nObj--
-			n++
-		}
-	}
-	if n > 0 {
-		v.sujo = true
-	}
-	return n
-}
-
-// Objetos: para cada nome de objeto guardado, chama f com o tipo e as datas.
-func (v *Vistos) Objetos(f func(ent string, aprendido, visto int)) {
-	v.mu.RLock()
-	defer v.mu.RUnlock()
-	for _, t := range v.ids {
-		if e, a, d, ok := lerObj(t); ok {
-			f(e, a, d)
-		}
-	}
-}
-
-// Salvar grava agora (comandos de linha; o proxy usa SalvarSeSujo).
-func (v *Vistos) Salvar() error {
-	v.mu.Lock()
-	v.salvo = time.Time{}
-	v.mu.Unlock()
-	return v.SalvarSeSujo()
-}
-
 // maxVistos: teto dos hashes guardados (~40 bytes cada). Passou disso, um décimo sai, ao
 // acaso; esses valores voltam a depender da palavra ao lado até serem vistos de novo.
 const maxVistos = 500_000

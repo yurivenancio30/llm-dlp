@@ -8,7 +8,7 @@ import (
 
 // Lote B (Dados): leitores de SQL, mensagens de erro, conexões e tabelas. Nomes fictícios.
 
-var rePseudoQualquer = regexp.MustCompile(`\b(?i:host|db|sch|t|c|proc|idx|usr|ns|svc|bkt|top)_[a-z2-7]{12}\b`)
+var rePseudoQualquer = regexp.MustCompile(`\b(?i:host|db|sch|t|c|proc|idx|usr|ns|svc|bkt|top)_[a-z2-7]{8}\b`)
 
 // mascara confere que cada nome de deve sumiu, que cada nome de fica ficou, e devolve a saída.
 func confere(t *testing.T, m *Masker, s string, some, fica []string) string {
@@ -198,5 +198,48 @@ func TestSQLMascaradoContinuaValido(t *testing.T) {
 	})
 	if n > 0 {
 		t.Errorf("sobrou nome legível na instrução mascarada: %q", out)
+	}
+}
+
+// Item 5: minúsculas com uma cláusula, quando a forma não deixa dúvida; prosa fica.
+func TestSQLMinusculoUmaClausula(t *testing.T) {
+	m := novoTeste(t)
+	for _, c := range []struct{ s, nome string }{
+		{"select * from tb_pedido", "tb_pedido"},
+		{"select id_x, vl_total from pedidos_x9;", "pedidos_x9"},
+		{"delete from tb_log_x1 where dt < now()", "tb_log_x1"},
+		{"insert into tb_auditoria (id) values (1)", "tb_auditoria"},
+		{"update tb_cliente_x2 set ativo = 0", "tb_cliente_x2"},
+		{"select count(*) from vendas", "vendas"},
+	} {
+		if out, _ := m.Mascarar(c.s); strings.Contains(out, c.nome) {
+			t.Errorf("não reconheceu %q -> %q", c.s, out)
+		}
+	}
+	for _, s := range []string{
+		"select from the list below",
+		"select the best option from the menu",
+		"please select one option from the dropdown menu and continue",
+		"delete from the list the items you do not need",
+		"update the docs and insert into the index the new page",
+	} {
+		if out, ents := m.Mascarar(s); len(ents) > 0 {
+			t.Errorf("prosa virou SQL: %q -> %q", s, out)
+		}
+	}
+}
+
+// Item 7: colunas e views públicas do information_schema e dos catálogos ficam.
+func TestVocabularioCatalogoFica(t *testing.T) {
+	m := novoTeste(t)
+	for _, s := range []string{
+		"SELECT table_schema, table_name, column_name, data_type FROM information_schema.columns WHERE table_schema = 'x'",
+		"SELECT schemaname, tablename FROM pg_tables",
+		"SELECT owner, table_name, num_rows FROM all_tables",
+		"select start_time, user_name, role_name, query_type from snowflake.account_usage.query_history where 1=1",
+	} {
+		if out, ents := m.Mascarar(s); len(ents) > 0 {
+			t.Errorf("vocabulário de catálogo mascarado: %q -> %q", s, out)
+		}
 	}
 }
