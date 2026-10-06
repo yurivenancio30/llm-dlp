@@ -56,6 +56,9 @@ func (c *TextoCtx) Decidir(ini, fim int, ent, regra string) {
 	if c.m != nil && !c.m.objMascara(ent) {
 		return
 	}
+	if !valorInteiro(c.S, ini, fim) || publicoSistema(semCitacao(c.S[ini:fim])) {
+		return // pedaço de uma expressão, ou vocabulário de sistema (ver rastreamento.go)
+	}
 	v := c.S[ini:fim]
 	if ehPseudoObj(v) {
 		return

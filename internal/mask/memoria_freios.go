@@ -234,7 +234,10 @@ func (l *Lote) ancorarBloco(s string, bloco [][][2]int, ts []trecho, cobre func(
 					continue
 				}
 				n++
-				if i := cobre(p[0], p[1]); i >= 0 && ehObjeto(ts[i].Tipo) && ts[i].Tipo != prefTipoObj+entGenerica {
+				// semente: o valor inteiro do campo (num nome qualificado, a última parte), com
+				// prova direta na mesma fonte; dedução não é semente (ver rastreamento.go)
+				if i := ultimoQueCobre(ts, p[0], p[1]); i >= 0 && ts[i].Fim == p[1] && ehObjeto(ts[i].Tipo) && ts[i].Tipo != prefTipoObj+entGenerica &&
+					!l.deduzido(s[ts[i].Ini:ts[i].Fim]) && l.provadoNaFonte(s[ts[i].Ini:ts[i].Fim]) {
 					if porTipo[ts[i].Tipo] == nil {
 						porTipo[ts[i].Tipo] = map[string]bool{}
 					}
@@ -276,7 +279,7 @@ func (l *Lote) ancorarBloco(s string, bloco [][][2]int, ts []trecho, cobre func(
 				ents := entQual(len(ps), strings.TrimPrefix(tipo, prefTipoObj))
 				a := p[0]
 				for k, x := range ps {
-					if palavraDecidivel(x) && !f.prog[hpal(x)] && cobre(a, a+len(x)) < 0 {
+					if palavraDecidivel(x) && !publicoSistema(x) && !f.prog[hpal(x)] && cobre(a, a+len(x)) < 0 {
 						novos = append(novos, trecho{Ini: a, Fim: a + len(x), Tipo: prefTipoObj + ents[k]})
 					}
 					a += len(x) + 1
@@ -312,7 +315,7 @@ func blocosPorCampo(s string, ls [][2]int) [][][][2]int {
 				break
 			}
 			l := s[ln[0]:ln[1]]
-			n := strings.Count(l, string(sep))
+			n := contaForaAspas(l, sep)
 			if n == 0 || len(l) > 4096 || n > maxPalavrasReg {
 				fechar()
 				continue
@@ -324,6 +327,12 @@ func blocosPorCampo(s string, ls [][2]int) [][][][2]int {
 			var r [][2]int
 			a := ln[0]
 			for i := ln[0]; i <= ln[1]; i++ {
+				if i < ln[1] && (s[i] == '"' || s[i] == '\'') {
+					if f := strings.IndexByte(s[i+1:ln[1]], s[i]); f >= 0 {
+						i += f + 1 // separador dentro de aspas não conta
+						continue
+					}
+				}
 				if i < ln[1] && s[i] != sep {
 					continue
 				}
@@ -332,6 +341,13 @@ func blocosPorCampo(s string, ls [][2]int) [][][][2]int {
 					x++
 				}
 				for y > x && (s[y-1] == ' ' || s[y-1] == '\t' || s[y-1] == '\r') {
+					y--
+				}
+				// o valor sem o que o embrulha: aspas, parênteses, colchetes
+				for x < y && strings.IndexByte("'\"`([{", s[x]) >= 0 {
+					x++
+				}
+				for y > x && strings.IndexByte("'\"`)]};", s[y-1]) >= 0 {
 					y--
 				}
 				if x == y || strings.ContainsAny(s[x:y], " \t") {

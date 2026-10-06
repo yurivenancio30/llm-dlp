@@ -146,8 +146,9 @@ func TestGenericaNoInventario(t *testing.T) {
 		t.Fatalf("decisão do nome distintivo: %+v", ds)
 	}
 	// o mesmo pelo decisor (TextoCtx.Decidir)
-	c := &TextoCtx{S: "ns default x", m: m}
-	c.Decidir(3, 10, "namespace", "teste")
+	// (com uma palavra da referência: "default" é vocabulário de sistema e nunca é decidido)
+	c := &TextoCtx{S: "ns " + gen + " x", m: m}
+	c.Decidir(3, 3+len(gen), "namespace", "teste")
 	if len(c.dec) != 1 || !c.dec[0].Generica || len(c.out) != 1 {
 		t.Fatalf("Decidir com palavra genérica: %+v %+v", c.dec, c.out)
 	}

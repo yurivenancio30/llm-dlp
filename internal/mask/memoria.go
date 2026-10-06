@@ -33,6 +33,7 @@ type memoria struct {
 	exata    map[string][]nomeMem // primeira palavra -> nomes (do maior para o menor)
 	semCaixa map[string][]nomeMem // primeira palavra em minúsculas -> nomes
 	n        int
+	tem      map[string]bool // chaves já na memória (adicionar)
 	// tamanhos das primeiras palavras (bit n = tamanho n; bit 63 = 63 ou mais): a palavra de
 	// outro tamanho nem é consultada
 	tamExata, tamSemCaixa uint64
@@ -55,7 +56,7 @@ func (m *Masker) novaMemoria(decs []Decisao) *memoria {
 	mm := &memoria{exata: map[string][]nomeMem{}, semCaixa: map[string][]nomeMem{}}
 	visto := map[string]bool{}
 	for _, d := range decs {
-		if d.Generica || len(d.Nome) < memMin {
+		if d.Generica || len(d.Nome) < memMin || publicoGeral(d.Nome) {
 			continue
 		}
 		k := d.Chave()
@@ -63,6 +64,10 @@ func (m *Masker) novaMemoria(decs []Decisao) *memoria {
 			continue
 		}
 		visto[k] = true
+		if mm.tem == nil {
+			mm.tem = map[string]bool{}
+		}
+		mm.tem[k] = true
 		if !m.objMascara(d.Ent) || ehPseudoObj(d.Nome) {
 			continue
 		}
@@ -191,12 +196,36 @@ func (mm *memoria) varrerF(s string, ts []trecho, f filtroMem) []trecho {
 // nas entradas e nos trechos, para a volta e para o congelamento).
 func (l *Lote) comMemoria(s string, r resultado, dica string) resultado {
 	if l.mem == nil {
-		return r
+		l.mem = &memoria{exata: map[string][]nomeMem{}, semCaixa: map[string][]nomeMem{}}
 	}
 	f := filtroDe(dica)
 	extra := l.mem.varrerF(s, r.trechos, f)
+	if !l.escrevendo && fonteArquivo(l.fonteAtual) {
+		// palavra comum provada numa fonte não contamina OUTRO arquivo lido (o vocabulário do
+		// arquivo é dele: "status" no app.js não é a coluna do schema.sql); a conversa e as
+		// saídas sem arquivo (kubectl logs, git branch) recebem o contágio
+		k := extra[:0]
+		for _, x := range extra {
+			if v := s[x.Ini:x.Fim]; caraDeIdentificador(v) || l.provadoNaFonte(v) {
+				k = append(k, x)
+			}
+		}
+		extra = k
+	}
 	ts := l.juntarTrechos(r.trechos, extra)
+	l.provAtual = map[string]bool{}
+	for _, d := range r.decididos {
+		if d.Regra != "âncora" {
+			l.provAtual[strings.ToLower(d.Nome)] = true
+		}
+	}
 	ts2 := l.ancorarPosicoes(s, ts, f)
+	if novas := l.aprenderAncora(s, ts, ts2); len(novas) > 0 {
+		// o valor deduzido vale nas outras ocorrências deste texto (regra 2)
+		ts2 = l.juntarTrechos(ts2, l.mem.varrerF(s, ts2, f))
+		r.decididos = append(append([]Decisao{}, r.decididos...), novas...)
+		extra = append(extra, trecho{})
+	}
 	if len(extra) == 0 && len(ts2) == len(r.trechos) && !mudouTipo(ts2, r.trechos) {
 		return r
 	}
@@ -205,6 +234,7 @@ func (l *Lote) comMemoria(s string, r resultado, dica string) resultado {
 			ts2[i].Pseudo = l.m.Pseudonimo(ts2[i].Tipo, s[ts2[i].Ini:ts2[i].Fim])
 		}
 	}
+	ts2 = semSobreporLongo(ts2) // conflito se resolve; nunca se descarta tudo
 	texto, entradas, ok := remontar(s, ts2)
 	if !ok {
 		return r
@@ -246,6 +276,12 @@ func (l *Lote) juntarTrechos(base, extra []trecho) []trecho {
 // de Aquecer, quando todo texto novo já está no memo) e nos trechos traduzidos dos textos do
 // assistente (extras). Conteúdo da internet não entra (é mascarado, mas não ensina).
 func (l *Lote) Memoria(itens []ItemLote, extras []Decisao) {
+	fontesIt := make([]string, len(itens))
+	for i := range itens {
+		fontesIt[i], _ = SepararFonte(itens[i].Dica)
+	}
+	itens = semFontes(itens)
+	defer func() { l.registrarFontes(itens, fontesIt) }()
 	m := l.m
 	decs := make([][]Decisao, len(itens))
 	var faltam []itemAquecer
@@ -299,6 +335,17 @@ func (l *Lote) Memoria(itens []ItemLote, extras []Decisao) {
 	todas = append(todas, extras...)
 	if len(todas) > 0 {
 		l.mem = m.novaMemoria(todas)
+		for _, d := range todas {
+			switch d.Regra {
+			case "âncora":
+				l.marcarDeduzido(d.Nome)
+			case "traduzida":
+				if l.traduzidas == nil {
+					l.traduzidas = map[string]bool{}
+				}
+				l.traduzidas[strings.ToLower(d.Nome)] = true
+			}
+		}
 	}
 }
 
@@ -383,6 +430,9 @@ func (l *Lote) MascararEscrito(des string, daWeb bool, pos Posicao, dica string)
 			}
 			return r.texto, r.entradas
 		}
+	}
+	if !daWeb {
+		return l.MascararContagio(des, daWeb, pos) // regra 1: o assistente não é fonte
 	}
 	return l.MascararDica(des, daWeb, pos, dica)
 }

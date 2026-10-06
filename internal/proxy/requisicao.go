@@ -273,6 +273,10 @@ func (w walker) escrito(v string) string {
 			w.col.extras = append(w.col.extras, d...)
 			return v
 		}
+		if !w.daWeb {
+			w.pos.doTexto() // o texto do assistente não é fonte de decisão (mask/rastreamento.go)
+			return v
+		}
 		w.col.itens = append(w.col.itens, mask.ItemLote{S: v, DaWeb: w.daWeb, Pos: w.pos.doTexto(), Dica: w.dica})
 		return v
 	}
@@ -336,6 +340,7 @@ func dicasDosComandos(msgs []any, m *mask.Masker) (dicas, dicasUso map[string]st
 		return papel, blocos
 	}
 	// os argumentos de todas as chamadas (o eco procura só por eles nas saídas)
+	escritos := map[string]string{} // arquivo que a conversa escreveu -> as fontes que ele cita
 	for _, mm := range msgs {
 		_, blocos := blocosDe(mm)
 		for _, b := range blocos {
@@ -344,6 +349,7 @@ func dicasDosComandos(msgs []any, m *mask.Masker) (dicas, dicasUso map[string]st
 					cmds[id] = comandoDe(bl["input"])
 					cs.Argumentos(cmds[id])
 				}
+				anotarEscrito(escritos, bl["input"])
 			}
 		}
 	}
@@ -377,7 +383,11 @@ func dicasDosComandos(msgs []any, m *mask.Masker) (dicas, dicasUso map[string]st
 				if cmd := cmds[rid]; cmd != "" {
 					d = cs.Dica(cmd, saida)
 				}
-				if d = mask.ComExtensao(d, cs.Resultado(chs[rid], saida)); d != "" {
+				d = mask.ComExtensao(d, cs.Resultado(chs[rid], saida))
+				if cmd := cmds[rid]; cmd != "" {
+					d = mask.ComFonte(fonteCom(escritos, cmd), d) // a fonte do resultado
+				}
+				if d != "" {
 					dicas[rid] = d
 				}
 			}
@@ -666,4 +676,42 @@ func (w walker) generico(v any) any {
 		}
 	}
 	return v
+}
+
+// anotarEscrito: um arquivo que a conversa escreveu (Write, Edit) cita as fontes que lê; rodá-lo
+// depois tem essas fontes também ("python3 gerar_tags.py" lê o catalogo.csv que o script cita).
+func anotarEscrito(escritos map[string]string, v any) {
+	in, _ := v.(map[string]any)
+	p, _ := in["file_path"].(string)
+	if p == "" {
+		return
+	}
+	var corpo string
+	for _, k := range []string{"content", "new_string"} {
+		if c, ok := in[k].(string); ok {
+			corpo += c + "\n"
+		}
+	}
+	if corpo == "" {
+		return
+	}
+	nome := strings.ToLower(p[strings.LastIndexAny(p, "/\\")+1:])
+	if f := mask.FonteDoComando(corpo); f != "" && !strings.HasPrefix(f, "cmd:") {
+		escritos[nome] = f
+	}
+}
+
+// fonteCom: a fonte do comando, com as fontes herdadas dos arquivos que a conversa escreveu.
+func fonteCom(escritos map[string]string, cmd string) string {
+	f := mask.FonteDoComando(cmd)
+	var extra []string
+	for _, x := range strings.Split(f, ",") {
+		if e := escritos[x]; e != "" {
+			extra = append(extra, e)
+		}
+	}
+	if len(extra) == 0 {
+		return f
+	}
+	return f + "," + strings.Join(extra, ",")
 }

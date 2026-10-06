@@ -179,6 +179,13 @@ type Lote struct {
 	saidas map[Posicao]resultado // o que saiu em cada posição
 	mem    *memoria              // a memória da conversa (ver memoria.go); nil = vazia
 	pre    map[Posicao]resultado // o resultado do memo de cada texto novo, já consultado em Memoria
+	// rastreamento (ver rastreamento.go)
+	deduzidos  map[string]bool            // valores marcados por dedução: não servem de semente
+	fontes     map[string]map[string]bool // valor (minúsculas) -> fontes em que teve prova direta
+	fonteAtual string                     // a fonte do texto sendo montado (vazia: sem comando)
+	provAtual  map[string]bool            // decididos com prova no próprio texto sendo montado
+	traduzidas map[string]bool            // palavras que o proxy traduziu (valem em qualquer fonte)
+	escrevendo bool                       // montando texto do assistente (recebe todo o contágio)
 }
 
 func (m *Masker) NovoLote() *Lote {
@@ -202,6 +209,7 @@ func (l *Lote) Mascarar(s string, daWeb bool, pos Posicao) (string, []Entrada) {
 
 // MascararDica: como Mascarar, com a dica do comando que produziu o texto.
 func (l *Lote) MascararDica(s string, daWeb bool, pos Posicao, dica string) (string, []Entrada) {
+	l.fonteAtual, dica = SepararFonte(dica)
 	if len(s) < 4 {
 		return s, nil
 	}
@@ -222,6 +230,7 @@ func (l *Lote) MascararDica(s string, daWeb bool, pos Posicao, dica string) (str
 // Aquecer mascara antes da montagem os textos da requisição que ainda não saíram, para que
 // todo valor aprendido nela já valha quando os textos forem montados em ordem.
 func (l *Lote) Aquecer(itens []ItemLote) {
+	itens = semFontes(itens)
 	pend := make([]itemAquecer, 0, len(itens))
 	for _, it := range itens {
 		if len(it.S) < 4 {
