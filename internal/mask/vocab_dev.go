@@ -66,7 +66,7 @@ var entPedaco = map[string]string{
 	"host": "servidor", "hostname": "servidor", "server": "servidor", "servidor": "servidor", "endpoint": "servidor",
 	"address": "servidor", "addr": "servidor", "fqdn": "servidor", "broker": "servidor", "bootstrap": "servidor",
 	"bootstrapservers": "servidor", "servername": "servidor",
-	"cluster": "servidor", "instance": "servidor", "warehouse": "servidor",
+	"cluster": "servidor", "instance": "servidor", "warehouse": "servico",
 	"database": "database", "db": "database", "dbname": "database", "databasename": "database", "catalog": "database",
 	"schema": "schema", "dataset": "schema", "schemaname": "schema",
 	"table": "tabela", "tabela": "tabela", "collection": "tabela", "tablename": "tabela",
@@ -88,7 +88,7 @@ var entAntesDeNome = map[string]string{"db": "database", "database": "database",
 	"host": "servidor", "server": "servidor", "user": "usuario", "service": "servico", "bucket": "bucket", "queue": "fila",
 	"topic": "fila", "group": "servico", "namespace": "namespace", "cluster": "servidor", "collection": "tabela",
 	"stream": "fila", "subject": "fila", "exchange": "fila", "repo": "repositorio", "container": "bucket",
-	"column": "coluna", "field": "coluna", "role": "usuario", "warehouse": "servidor", "account": "conta_nuvem", "owner": "usuario",
+	"column": "coluna", "field": "coluna", "role": "usuario", "warehouse": "servico", "account": "conta_nuvem", "owner": "usuario",
 	"view": "tabela", "procedure": "procedure", "function": "procedure", "index": "indice", "constraint": "indice", "catalog": "database"}
 
 // sufixos colados a uma palavra de tipo ("rolename", "warehousename", "fieldpath")

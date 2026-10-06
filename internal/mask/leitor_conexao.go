@@ -25,7 +25,7 @@ var (
 	reURIBanco   = regexp.MustCompile(`(?i)\b(?:jdbc:[a-z0-9]+(?::[a-z]+)*:|(?:postgres(?:ql)?|mysql|mariadb|mssql|sqlserver|oracle|redshift|snowflake|mongodb(?:\+srv)?|clickhouse|db2|teradata|presto|trino|hive|cockroachdb|sqlite)(?:\+[a-z0-9_]+)?:)//(?:([^\s:/@;?"']+)(?::[^\s@/"']*)?@)?([A-Za-z0-9_.\-,:\\]+)(?:/([A-Za-z_][\w$\-]*))?`)
 	reJDBCOracle = regexp.MustCompile(`(?i)\bjdbc:oracle:thin:(?:[^\s@/"']+@)?@?(?://)?([A-Za-z0-9_.\-]+)(?::\d+)?[:/]([A-Za-z_][\w.$\-]*)`)
 	reTNS        = regexp.MustCompile(`(?i)\(\s*(HOST|SERVICE_NAME|SID)\s*=\s*([A-Za-z0-9_.\-]+)\s*\)`)
-	reURN        = regexp.MustCompile(`urn:li:dataset:\(urn:li:dataPlatform:[\w-]+,([^,()\s]+),[A-Z]+\)`)
+	reURN        = regexp.MustCompile(`urn:li:dataset:\(urn:li:dataPlatform:[\w-]+,([^,()\n]+),[A-Z]+\)`)
 	reURNUsuario = regexp.MustCompile(`urn:li:corpuser:([\w.\-@]+)`)
 	reURNFluxo   = regexp.MustCompile(`urn:li:dataFlow:\([\w-]+,([\w.\-]+),[A-Za-z]+\)(?:,([\w.\-]+)\))?`)
 	reDbtRef     = regexp.MustCompile(`\{\{[^}]*?\bref\(\s*['"]([\w.\-]+)['"](?:\s*,\s*['"]([\w.\-]+)['"])?\s*\)`)
@@ -47,6 +47,20 @@ func addPartes(s string, a, b int, ult, regra string, add func(ObjAchado)) {
 	for k, p := range ps {
 		if p != "" && !publicoConexao(p) && reIdentSimples.MatchString(p) {
 			add(ObjAchado{a, a + len(p), ents[k], regra, true})
+		}
+		a += len(p) + 1
+	}
+}
+
+// addPartesURN: o nome do dataset de uma URN, com as partes preenchidas com espaços à direita
+// (colunas CHAR de catálogo, como no DB2: "ABCD    .TABELA").
+func addPartesURN(s string, a, b int, add func(ObjAchado)) {
+	ps := strings.Split(s[a:b], ".")
+	ents := entQual(len(ps), "tabela")
+	for k, p := range ps {
+		q := strings.TrimRight(p, " ")
+		if q != "" && !strings.Contains(q, " ") && !publicoConexao(q) && reIdentSimples.MatchString(q) {
+			add(ObjAchado{a, a + len(q), ents[k], "urn", true})
 		}
 		a += len(p) + 1
 	}
@@ -176,7 +190,7 @@ func acharConexoes(s string, add func(ObjAchado)) {
 	}
 	if strings.Contains(s, "urn:li:") {
 		for _, m := range reURN.FindAllStringSubmatchIndex(s, -1) {
-			addPartes(s, m[2], m[3], "tabela", "urn", add)
+			addPartesURN(s, m[2], m[3], add)
 		}
 		for _, m := range reURNUsuario.FindAllStringSubmatchIndex(s, -1) {
 			add(ObjAchado{m[2], m[3], "usuario", "urn", true})

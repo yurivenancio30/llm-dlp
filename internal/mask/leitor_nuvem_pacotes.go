@@ -200,6 +200,9 @@ var entTipoAzure = map[string]string{"servers": "servidor", "flexibleservers": "
 var servicoArmazenamento = map[string]string{"blob": "bucket", "dfs": "bucket", "file": "bucket", "queue": "fila", "table": "tabela"}
 
 func acharURLsNuvem(s string, add func(ObjAchado)) {
+	if strings.Contains(s, "snowflake") {
+		acharSnowflake(s, add)
+	}
 	if strings.Contains(s, ".core.windows.net") {
 		for i := strings.Index(s, ".core.windows.net"); i >= 0; {
 			// <conta>.<serviço>.core.windows.net
@@ -290,6 +293,49 @@ func acharURLsNuvem(s string, add func(ObjAchado)) {
 			}
 			i += 1 + j
 		}
+	}
+}
+
+// Snowflake: <conta>.snowflakecomputing.com (a conta pode vir como org-conta ou com a região
+// depois: xy12345.us-east-1) e app.snowflake.com/<org>/<conta>/.
+func acharSnowflake(s string, add func(ObjAchado)) {
+	for i := strings.Index(s, ".snowflakecomputing.com"); i >= 0; {
+		a := i
+		for a > 0 && (ehAlnum(s[a-1]) || s[a-1] == '-' || s[a-1] == '_' || s[a-1] == '.') {
+			a--
+		}
+		if d := strings.IndexByte(s[a:i], '.'); d >= 0 { // conta.região
+			i2 := a + d
+			if i2 > a {
+				add(ObjAchado{a, i2, "conta_nuvem", "snowflake", true})
+			}
+		} else if a < i && !publicoDev(s[a:i]) {
+			add(ObjAchado{a, i, "conta_nuvem", "snowflake", true})
+		}
+		j := strings.Index(s[i+1:], ".snowflakecomputing.com")
+		if j < 0 {
+			break
+		}
+		i += 1 + j
+	}
+	for i := strings.Index(s, "app.snowflake.com/"); i >= 0; {
+		a := i + len("app.snowflake.com/")
+		for k, ent := range []string{"organizacao", "conta_nuvem"} {
+			b := a
+			for b < len(s) && (ehAlnum(s[b]) || s[b] == '-' || s[b] == '_') {
+				b++
+			}
+			if b == a || k == 0 && (b >= len(s) || s[b] != '/') {
+				break
+			}
+			add(ObjAchado{a, b, ent, "snowflake", true})
+			a = b + 1
+		}
+		j := strings.Index(s[i+1:], "app.snowflake.com/")
+		if j < 0 {
+			break
+		}
+		i += 1 + j
 	}
 }
 

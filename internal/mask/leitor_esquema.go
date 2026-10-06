@@ -113,7 +113,7 @@ func acharNomePorContexto(s string, add func(ObjAchado)) {
 	if !strings.Contains(s, "name") {
 		return
 	}
-	if !temAlgum(s, []string{"columns", "fields", "tables", "models", "sources", "table", "dataset", "schema", "database",
+	if !temAlgum(s, []string{"columns", "fields", "tables", "models", "sources", "table", "dataset", "schema", "database", "_name",
 		"seeds", "views", "owner", "colunas", "tabelas"}) {
 		return
 	}
@@ -122,21 +122,38 @@ func acharNomePorContexto(s string, add func(ObjAchado)) {
 	if strings.Contains(s, `"name"`) {
 		w.lerJSON(s)
 	}
+	irmaos := map[int]map[string]bool{} // contêiner -> chaves
+	for i := range w.ents {
+		e := &w.ents[i]
+		if irmaos[e.pai()] == nil {
+			irmaos[e.pai()] = map[string]bool{}
+		}
+		irmaos[e.pai()][strings.ToLower(e.chave())] = true
+	}
 	visto := map[[2]int]bool{}
 	for i := range w.ents {
 		e := &w.ents[i]
-		if e.vi < 0 || e.tmpl || len(e.path) < 2 {
+		if e.vi < 0 || e.tmpl || len(e.path) < 1 {
 			continue
 		}
 		k := e.chave()
 		ent := ""
 		switch strings.ToLower(k) {
 		case "name", "nome":
-			c := e.path[len(e.path)-2]
-			if c == "-" && len(e.path) >= 3 {
-				c = e.path[len(e.path)-3]
+			if len(e.path) >= 2 {
+				c := e.path[len(e.path)-2]
+				if c == "-" && len(e.path) >= 3 {
+					c = e.path[len(e.path)-3]
+				}
+				ent = entConteiner(c)
 			}
-			ent = entConteiner(c)
+			// saída de listagem (SHOW em JSON): o nome ao lado do schema é tabela; ao lado só do
+			// banco, é schema
+			if ir := irmaos[e.pai()]; ir["schema_name"] || ir["table_schema"] {
+				ent = "tabela"
+			} else if ent == "" && (ir["database_name"] || ir["table_catalog"]) {
+				ent = "schema"
+			}
 		case "owner":
 			ent = "usuario"
 		}

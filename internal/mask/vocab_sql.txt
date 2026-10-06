@@ -42,3 +42,7 @@ tabschema tabname colname colno typename indschema indname
 query_history login_history access_history warehouse_metering_history storage_usage database_storage_usage_history task_history copy_history load_history functions procedures stages pipes query_id query_text query_type user_name role_name warehouse_name warehouse_size database_name start_time end_time total_elapsed_time execution_status error_code error_message bytes_scanned rows_produced compilation_time execution_time credits_used
 # codificações, collations e funções de hash (nomes públicos dos SGBDs)
 utf8 utf8mb3 utf8mb4 utf16 utf32 ucs2 latin1 latin2 ascii sql_ascii win1250 win1252 euc_jp euc_kr gbk big5 sjis koi8r iso_8859_1 c.utf-8 en_us.utf-8 pt_br.utf-8 utf8mb4_general_ci utf8mb4_unicode_ci utf8mb4_0900_ai_ci utf8_general_ci latin1_swedish_ci latin1_general_ci sql_latin1_general_cp1_ci_as latin1_general_ci_as icu libc md5 sha1 sha2 sha224 sha256 sha384 sha512 crc32 base64 hex
+# Snowflake: parâmetros de DDL (warehouse, stage, task, pipe, integração)
+schedule url auto_suspend auto_resume file_format storage_integration masking credentials pattern on_error integration
+warehouse_type initially_suspended min_cluster_count max_cluster_count scaling_policy statement_timeout_in_seconds
+storage_aws_role_arn storage_allowed_locations storage_blocked_locations allowed_ip_list blocked_ip_list

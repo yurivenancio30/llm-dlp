@@ -30,6 +30,13 @@ var vocabSQL = func() map[string]bool {
 
 func publicoSQL(v string) bool { return vocabSQL[strings.ToLower(v)] }
 
+// objetos de conta (papel, usuário, warehouse, integração) e de schema (políticas, stage,
+// stream, tarefa, pipe, sequência, formato de arquivo, tag, alerta) nas instruções DDL
+const (
+	reTiposConta  = `(?:DATABASE\s+)?ROLE|USER|WAREHOUSE|(?:STORAGE\s+|API\s+|NOTIFICATION\s+|SECURITY\s+)?INTEGRATION|RESOURCE\s+MONITOR`
+	reTiposSchema = `(?:MASKING|ROW\s+ACCESS|NETWORK|PASSWORD|SESSION|AGGREGATION|PROJECTION|AUTHENTICATION)\s+POLICY|TAG|FILE\s+FORMAT|SECRET|ALERT|DYNAMIC\s+TABLE|NOTEBOOK`
+)
+
 const (
 	reIdSQL   = "(?:\\[[^\\]\\n]{1,128}\\]|\"[^\"\\n]{1,128}\"|`[^`\\n]{1,128}`|[A-Za-z_][A-Za-z0-9_$#]*)"
 	reQualSQL = reIdSQL + "(?:\\." + reIdSQL + ")*"
@@ -40,8 +47,9 @@ var (
 	reFormaSQL = regexp.MustCompile(`(?is)^(?:SELECT\b[^;]*?\bFROM\s+` + reQualSQL + `|WITH\s+(?:RECURSIVE\s+)?` + reIdSQL + `\s*(?:\([^)]{0,500}\)\s*)?AS\s*\(` +
 		`|INSERT\s+(?:INTO\s+|OVERWRITE\s+(?:TABLE\s+)?)` + reQualSQL + `|UPDATE\s+` + reQualSQL + `(?:\s+(?:AS\s+)?\w+)?\s+SET\b|DELETE\s+FROM\s+` + reQualSQL +
 		`|MERGE\s+INTO\s+` + reQualSQL + `|(?:CREATE|ALTER|DROP)\s+(?:OR\s+(?:REPLACE|ALTER)\s+)?(?:(?:GLOBAL|LOCAL|SECURE|EXTERNAL|MATERIALIZED|TRANSIENT|TEMP(?:ORARY)?|UNIQUE|CLUSTERED|NONCLUSTERED)\s+)*` +
-		`(?:TABLE|VIEW|PROCEDURE|PROC|FUNCTION|TRIGGER|SCHEMA|DATABASE|SEQUENCE|INDEX|STAGE|TASK|PIPE|STREAM|SYNONYM|PACKAGE(?:\s+BODY)?)\s+(?:IF\s+(?:NOT\s+)?EXISTS\s+)?` + reQualSQL +
-		`|TRUNCATE\s+TABLE\s+` + reQualSQL + `|(?:EXEC|EXECUTE|CALL)\s+` + reQualSQL + `|USE\s+` + reQualSQL + `\s*(?:;|$|\n)` +
+		`(?:TABLE|VIEW|PROCEDURE|PROC|FUNCTION|TRIGGER|SCHEMA|DATABASE|SEQUENCE|INDEX|STAGE|TASK|PIPE|STREAM|SYNONYM|PACKAGE(?:\s+BODY)?|` + reTiposConta + `|` + reTiposSchema + `)\s+(?:IF\s+(?:NOT\s+)?EXISTS\s+)?` + reQualSQL +
+		`|TRUNCATE\s+TABLE\s+` + reQualSQL + `|COPY\s+INTO\s+'?@?` + reQualSQL + `|(?:EXEC|EXECUTE|CALL)\s+` + reQualSQL + `|USE\s+(?:ROLE\s+|WAREHOUSE\s+|DATABASE\s+|SCHEMA\s+|SECONDARY\s+ROLES\s+)?` + reQualSQL + `\s*(?:;|$|\n)` +
+		`|(?:GRANT|REVOKE)\s+(?:DATABASE\s+)?ROLE\s+` + reQualSQL + `\s+(?:TO|FROM)\s+` +
 		`|(?:GRANT|REVOKE)\s[^;]{0,300}?\bON\s+(?:TABLE\s+|SCHEMA\s+|DATABASE\s+|VIEW\s+)?` + reQualSQL +
 		`|(?:DESCRIBE|DESC)\s+(?:TABLE\s+)?` + reQualSQL + `\s*(?:;|$|\n)|SHOW\s+\w+(?:\s+\w+)?\s+(?:IN|FROM)\s+` + reQualSQL + `)`)
 	reClausulasSQL = regexp.MustCompile(`(?i)\b(FROM|WHERE|JOIN|GROUP\s+BY|ORDER\s+BY|SET|VALUES|INTO|HAVING|UNION|AS|ON|TABLE)\b`)
@@ -64,6 +72,11 @@ var (
 		{regexp.MustCompile(`(?i)\bSCHEMA\s+(?:IF\s+(?:NOT\s+)?EXISTS\s+)?(` + reQualSQL + `)`), "schema", []string{"SCHEMA"}},
 		{regexp.MustCompile(`(?i)\bINDEX\s+(?:IF\s+(?:NOT\s+)?EXISTS\s+)?(` + reIdSQL + `)`), "indice", []string{"INDEX"}},
 		{regexp.MustCompile(`(?i)\bCONSTRAINT\s+(` + reIdSQL + `)`), "indice", []string{"CONSTRAINT"}},
+		{regexp.MustCompile(`(?i)\b(?:ROLE|USER)\s+(?:IF\s+(?:NOT\s+)?EXISTS\s+)?(` + reIdSQL + `)`), "usuario", []string{"ROLE", "USER"}},
+		{regexp.MustCompile(`(?i)\bWAREHOUSE\s*(?:=\s*)?(?:IF\s+(?:NOT\s+)?EXISTS\s+)?(` + reIdSQL + `)`), "servico", []string{"WAREHOUSE"}},
+		{regexp.MustCompile(`(?i)\b(?:` + reTiposSchema + `|STAGE|STREAM|TASK|PIPE|SEQUENCE)\s+(?:IF\s+(?:NOT\s+)?EXISTS\s+)?(` + reQualSQL + `)`), "tabela",
+			[]string{"POLICY", "TAG", "FORMAT", "SECRET", "ALERT", "DYNAMIC", "NOTEBOOK", "STAGE", "STREAM", "TASK", "PIPE", "SEQUENCE"}},
+		{regexp.MustCompile(`(?i)(?:\bFROM|\bINTO|\bLIST|\bLS|\bREMOVE|\bRM|=)\s*'?@(` + reQualSQL + `)`), "tabela", []string{"@"}},
 	}
 	reOnObjSQL = regexp.MustCompile(`(?i)\bON\s+(` + reQualSQL + `)\s*(?:\(|TO\b|FROM\b|;|$)`)
 	reListaSQL = regexp.MustCompile(`^\s*(?:(?:AS\s+)?[A-Za-z_]\w*\s*)?,\s*(` + reQualSQL + `)`)
@@ -167,7 +180,7 @@ func fimInstrucao(s string, i, j int) int {
 // iniciosSQL: as palavras que começam uma instrução (em maiúsculas).
 var iniciosSQL = map[string]bool{"SELECT": true, "WITH": true, "INSERT": true, "UPDATE": true, "DELETE": true, "MERGE": true,
 	"CREATE": true, "ALTER": true, "DROP": true, "TRUNCATE": true, "EXEC": true, "EXECUTE": true, "CALL": true, "USE": true,
-	"GRANT": true, "REVOKE": true, "DESCRIBE": true, "SHOW": true}
+	"GRANT": true, "REVOKE": true, "DESCRIBE": true, "SHOW": true, "COPY": true}
 
 // palavrasInicio chama fn(i, j) para cada palavra de s que começa uma instrução SQL. Anda
 // palavra a palavra (bem mais rápido que uma regex sem diferença de caixa no texto inteiro).
@@ -203,7 +216,7 @@ func acharSQL(s string, add func(ObjAchado)) {
 		}
 		maiusc := strings.ToUpper(s[i:j]) == s[i:j]
 		kw := strings.ToUpper(s[i:j])
-		if !maiusc && (kw == "USE" || kw == "SHOW" || kw == "DESCRIBE" || kw == "CALL" || kw == "EXEC" || kw == "EXECUTE" || kw == "GRANT" || kw == "REVOKE") {
+		if !maiusc && (kw == "USE" || kw == "COPY" || kw == "SHOW" || kw == "DESCRIBE" || kw == "CALL" || kw == "EXEC" || kw == "EXECUTE" || kw == "GRANT" || kw == "REVOKE") {
 			return // palavras comuns em prosa: só em maiúsculas
 		}
 		fim := fimInstrucao(s, i, j)

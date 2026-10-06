@@ -70,7 +70,7 @@ func TestChaveValorFormas(t *testing.T) {
 
 func TestEntChaveNormalizada(t *testing.T) {
 	for k, e := range map[string]string{"dbname": "database", "dbName": "database", "db_name": "database", "database_name": "database",
-		"tableName": "tabela", "schemaname": "schema", "rolename": "usuario", "warehousename": "servidor", "accountname": "conta_nuvem",
+		"tableName": "tabela", "schemaname": "schema", "rolename": "usuario", "warehousename": "servico", "accountname": "conta_nuvem",
 		"HostName": "servidor", "fieldPath": "coluna", "column_name": "coluna", "COLUMN": "coluna", "role": "usuario", "serviceAccountName": "usuario"} {
 		if g, forte := entChave(k); g != e || !forte {
 			t.Errorf("%s: %q forte=%v, esperado %q", k, g, forte, e)

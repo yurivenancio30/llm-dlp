@@ -3119,6 +3119,21 @@ https://github.com/org-exemplo/repo-demo/issues/1   (fica: fora de contexto de g
 
 ## Recursos de nuvem e usuários de rede
 
+**Snowflake** (as mesmas regras genéricas, mais as formas do produto). Conta: chaves
+`account`/`account_id`/`accountname` em qualquer sintaxe (chave-valor e argumento nomeado); o
+host `<conta>.snowflakecomputing.com` (a conta, sem a região) e `app.snowflake.com/<org>/<conta>/`
+(`leitor_nuvem_pacotes.go`); depois, solta no texto, pela propagação. Papel (`role`, `rolename`,
+`SNOWFLAKE_ROLE`) é usuário; no SQL, o nome depois de `ROLE` ou `USER` (`USE ROLE`, `GRANT ... TO
+ROLE`, `REVOKE ... FROM ROLE`, `GRANT ROLE x TO USER y`, `CREATE/ALTER/DROP ROLE`) é usuário.
+Warehouse é serviço: chave `warehouse`, `USE WAREHOUSE x`, `WAREHOUSE = x`, `CREATE/ALTER
+WAREHOUSE x`. Listas allow/deny (`allowed_roles: [..]`, `blocked_users`) têm itens do tipo da
+chave. Nomes de MASKING/ROW ACCESS/NETWORK... POLICY, TAG, STAGE (também `@db.sch.stage`), STREAM,
+TASK, PIPE, SEQUENCE, FILE FORMAT, SECRET, ALERT, DYNAMIC TABLE são objetos de schema (nome
+qualificado, último pedaço como tabela); `COPY INTO` é instrução. Os parâmetros de DDL
+(`SCHEDULE`, `URL`, `AUTO_SUSPEND`...) estão no vocabulário do SQL. Saída de SHOW em JSON: `name`
+ao lado de `schema_name` é tabela (ao lado só de `database_name`, schema); `owner` é usuário. URN
+do DataHub com partes preenchidas com espaços (`db2,ABCD    .TABELA`) é lida sem os espaços.
+
 Ideia central: identificadores de recurso de nuvem têm gramática publicada (ARN, ID do Azure
 Resource Manager, nome de recurso do Google Cloud); usuário de rede tem duas formas fixas
 (`DOMINIO\usuario`, `usuario@host` depois de ssh/scp). A gramática diz o tipo de cada pedaço.
