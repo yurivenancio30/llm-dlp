@@ -61,7 +61,6 @@ var areasT2P = []areaT2P{
 		[]string{"notificacoes", "conciliacoes", "reprocessamento"}, ""},
 }
 
-
 func TestT2PontaAPonta(t *testing.T) {
 	total, claro := 0, 0
 	for _, ar := range areasT2P {

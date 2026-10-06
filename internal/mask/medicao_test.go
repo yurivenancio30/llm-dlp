@@ -1,7 +1,6 @@
 package mask
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"io/fs"
@@ -159,12 +158,25 @@ func TestMedirSessoesReais(t *testing.T) {
 	sort.Strings(arqs)
 	aprendidos := map[string]map[string]bool{} // regra -> valores aprendidos
 	textos := 0
+	var comuns []int
+	porRegra := map[string]int{}
+	trocas := map[string]int{}
+	var pu, tu, pa, ta int
 	for _, a := range arqs {
 		var c contRegra
 		c.ligar()
 		m := novoTeste(t)
 		m.cfg.DominiosInternos, m.cfg.Termos = nil, nil
-		textos += mascararSessao(m, a)
+		st := mascararSessao(m, a)
+		textos += st.textos
+		comuns = append(comuns, st.comunsNaMemoria)
+		for k, n := range st.porRegra {
+			porRegra[k] += n
+		}
+		for k, n := range st.trocasPorTipo {
+			trocas[k] += n
+		}
+		pu, tu, pa, ta = pu+st.palavrasUsuario, tu+st.trocadasUsuario, pa+st.palavrasAssist, ta+st.trocadasAssist
 		for k, vs := range c.valores {
 			for v := range vs {
 				if _, ok := m.entAprendido(v); ok {
@@ -199,65 +211,193 @@ func TestMedirSessoesReais(t *testing.T) {
 	if ruins > 0 {
 		t.Logf("%d regras acima de 2%%", ruins)
 	}
+	sort.Ints(comuns)
+	q := func(p float64) int {
+		if len(comuns) == 0 {
+			return 0
+		}
+		return comuns[int(float64(len(comuns)-1)*p)]
+	}
+	var rs []string
+	for k, n := range porRegra {
+		rs = append(rs, fmt.Sprintf("%s=%d", k, n))
+	}
+	sort.Strings(rs)
+	var tr []string
+	for k, n := range trocas {
+		tr = append(tr, fmt.Sprintf("%s=%d", k, n))
+	}
+	sort.Strings(tr)
+	t.Logf("trocas no texto do usuário, por tipo/forma: %s", strings.Join(tr, " "))
+	pct := func(a, b int) float64 { return 100 * float64(a) / float64(max(1, b)) }
+	t.Logf("memória da conversa: palavras comuns por conversa p50=%d p90=%d máx=%d (por regra, somando as conversas: %s)\n"+
+		"texto corrido trocado pela memória: usuário %d de %d palavras (%.3f%%); assistente, pior caso sem registro, %d de %d (%.3f%%)",
+		q(.5), q(.9), q(1), strings.Join(rs, " "), tu, pu, pct(tu, pu), ta, pa, pct(ta, pa))
 }
 
-// mascararSessao: os textos de um transcript na ordem, com a dica do comando de cada
-// resultado de ferramenta (como o proxy faz). Devolve quantos textos.
-func mascararSessao(m *Masker, arq string) int {
-	f, err := os.Open(arq)
+// statsSessao: as duas métricas da memória da conversa numa sessão (só contagens).
+type statsSessao struct {
+	textos          int
+	comunsNaMemoria int            // palavras comuns (sem cara de identificador) que entram na memória
+	porRegra        map[string]int // as mesmas, pela regra que decidiu
+	palavrasUsuario int            // palavras de texto corrido nas mensagens do usuário
+	trocadasUsuario int            // quantas a memória trocaria
+	palavrasAssist  int            // o mesmo nos textos do assistente (pior caso: sem registro)
+	trocadasAssist  int
+	trocasPorTipo   map[string]int // trocas no texto do usuário, pelo tipo do nome (forma, sem valor)
+}
+
+// mascararSessao: os textos de um transcript na ordem, com a dica de cada resultado de
+// ferramenta como o proxy monta (comando, pedido do usuário, extensão), e no fim a memória da
+// conversa da sessão inteira (o último pedido de uma conversa carrega o histórico todo).
+func mascararSessao(m *Masker, arq string) statsSessao {
+	var st statsSessao
+	b, err := os.ReadFile(arq)
 	if err != nil {
-		return 0
+		return st
 	}
-	defer f.Close()
-	sc := bufio.NewScanner(f)
-	sc.Buffer(make([]byte, 1<<20), 256<<20)
-	cs := NovosComandos()
-	cmds := map[string]string{}
-	n := 0
-	for sc.Scan() {
+	type item struct {
+		s, dica string
+		papel   string // "user", "assistant" ou "tool"
+	}
+	var msgs []map[string]any
+	for _, l := range strings.Split(string(b), "\n") {
 		var e map[string]any
-		if json.Unmarshal(sc.Bytes(), &e) != nil {
+		if json.Unmarshal([]byte(l), &e) != nil {
 			continue
 		}
-		msg, _ := e["message"].(map[string]any)
-		switch c := msg["content"].(type) {
-		case string:
-			m.Mascarar(c)
-			n++
-		case []any:
-			for _, b := range c {
-				bl, _ := b.(map[string]any)
-				switch bl["type"] {
-				case "text":
-					if s, ok := bl["text"].(string); ok {
-						m.Mascarar(s)
-						n++
-					}
-				case "tool_use":
-					id, _ := bl["id"].(string)
-					if in, ok := bl["input"].(map[string]any); ok {
-						for _, k := range []string{"command", "query", "sql", "file_path", "path", "pattern"} {
-							if v, ok := in[k].(string); ok {
-								cmds[id] = v
-								break
-							}
-						}
-					}
-				case "tool_result":
-					id, _ := bl["tool_use_id"].(string)
-					for _, s := range textosResultado(bl["content"]) {
-						d := ""
-						if cmd := cmds[id]; cmd != "" {
-							d = cs.Dica(cmd, s)
-						}
-						m.mascararD(s, true, d)
-						n++
-					}
-				}
+		if msg, ok := e["message"].(map[string]any); ok {
+			msgs = append(msgs, msg)
+		}
+	}
+	cs := NovosComandos()
+	cmds := map[string]string{}
+	chs := map[string]*Chamada{}
+	blocos := func(msg map[string]any) []map[string]any {
+		if t, ok := msg["content"].(string); ok {
+			return []map[string]any{{"type": "text", "text": t}}
+		}
+		var out []map[string]any
+		for _, x := range asSlice(msg["content"]) {
+			if bl, ok := x.(map[string]any); ok {
+				out = append(out, bl)
+			}
+		}
+		return out
+	}
+	for _, msg := range msgs {
+		for _, bl := range blocos(msg) {
+			if bl["type"] == "tool_use" {
+				id, _ := bl["id"].(string)
+				cmds[id] = comandoSessao(bl["input"])
+				cs.Argumentos(cmds[id])
 			}
 		}
 	}
-	return n
+	var itens []item
+	for _, msg := range msgs {
+		papel, _ := msg["role"].(string)
+		for _, bl := range blocos(msg) {
+			switch bl["type"] {
+			case "text":
+				if t, ok := bl["text"].(string); ok {
+					if papel == "user" {
+						cs.Usuario(t)
+					}
+					itens = append(itens, item{t, "", papel})
+				}
+			case "tool_use":
+				id, _ := bl["id"].(string)
+				chs[id] = cs.Uso(cmds[id], nil)
+			case "tool_result":
+				id, _ := bl["tool_use_id"].(string)
+				saida := strings.Join(textosResultado(bl["content"]), "\n")
+				d := ""
+				if cmd := cmds[id]; cmd != "" {
+					d = cs.Dica(cmd, saida)
+				}
+				d = ComExtensao(d, cs.Resultado(chs[id], saida))
+				for _, x := range textosResultado(bl["content"]) {
+					itens = append(itens, item{x, d, "tool"})
+				}
+			}
+		}
+		if papel == "assistant" {
+			cs.FimTurno()
+		}
+	}
+	var decs []Decisao
+	res := make([]resultado, len(itens))
+	for i, it := range itens {
+		res[i], _ = m.mascararD(it.s, true, it.dica)
+		decs = append(decs, res[i].decididos...)
+	}
+	st.textos = len(itens)
+	mm := m.novaMemoria(decs)
+	st.porRegra = map[string]int{}
+	if mm == nil {
+		return st
+	}
+	visto := map[string]bool{}
+	for _, d := range decs {
+		if d.Generica || len(d.Nome) < memMin || caraDeIdentificador(d.Nome) || visto[d.Chave()] {
+			continue
+		}
+		visto[d.Chave()] = true
+		st.comunsNaMemoria++
+		st.porRegra[d.Regra]++
+	}
+	for i, it := range itens {
+		if it.papel == "tool" {
+			continue
+		}
+		n := 0
+		varrerPalavras(it.s, func(a, b int) { n++ })
+		k := 0
+		for _, t := range mm.varrerF(it.s, res[i].trechos, filtroDe(it.dica)) {
+			k++
+			if it.papel == "user" {
+				if st.trocasPorTipo == nil {
+					st.trocasPorTipo = map[string]int{}
+				}
+				forma := "comum"
+				if caraDeIdentificador(it.s[t.Ini:t.Fim]) {
+					forma = "identificador"
+				}
+				st.trocasPorTipo[strings.TrimPrefix(t.Tipo, prefTipoObj)+"/"+forma]++
+			}
+		}
+		if it.papel == "user" {
+			st.palavrasUsuario += n
+			st.trocadasUsuario += k
+		} else {
+			st.palavrasAssist += n
+			st.trocadasAssist += k
+		}
+	}
+	return st
+}
+
+func asSlice(v any) []any { x, _ := v.([]any); return x }
+
+// comandoSessao: como o proxy (comandoDe): o comando do shell, ou as strings da entrada.
+func comandoSessao(v any) string {
+	in, _ := v.(map[string]any)
+	if c, ok := in["command"].(string); ok {
+		return c
+	}
+	ks := make([]string, 0, len(in))
+	for k := range in {
+		ks = append(ks, k)
+	}
+	sort.Strings(ks)
+	var b strings.Builder
+	for _, k := range ks {
+		if x, ok := in[k].(string); ok && k != "description" && len(x) <= 4<<10 {
+			b.WriteString(x + "\n")
+		}
+	}
+	return b.String()
 }
 
 func textosResultado(c any) []string {
