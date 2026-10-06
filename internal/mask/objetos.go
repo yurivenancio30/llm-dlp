@@ -2,6 +2,7 @@ package mask
 
 import (
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -225,12 +226,77 @@ func (m *Masker) aprenderObj(o ObjAchado, real string, publico func(string) bool
 	if publico != nil && publico(v) {
 		return
 	}
+	if ent, ok := m.entAprendido(v); ok {
+		o.Ent = ent // já aprendido: mantém o tipo (e o pseudônimo) da primeira vez
+	}
 	if !o.Forte && !m.fracos.marcar(canonObj(o.Ent, v), o.Regra) {
 		return // evidência fraca: mascara no lugar, mas não ensina
 	}
 	m.conh.aprender(prefTipoObj+o.Ent, v)
 	if m.vistos != nil {
 		m.vistos.MarcarObj(m.idObj(canonObj(o.Ent, v)), o.Ent, hoje())
+	}
+}
+
+// entAprendido: o tipo com que o nome v já foi aprendido (em RAM ou no vistos.json), se foi.
+func (m *Masker) entAprendido(v string) (string, bool) {
+	v = semCitacao(v)
+	low := strings.ToLower(v)
+	c := m.conh
+	c.mu.RLock()
+	tp, ok := c.canon["O:"+v]
+	if !ok {
+		tp, ok = c.canon["o:"+low]
+		ok = ok && entSQL[strings.TrimPrefix(tp, prefTipoObj)]
+	}
+	c.mu.RUnlock()
+	if ok && ehObjeto(tp) {
+		return strings.TrimPrefix(tp, prefTipoObj), true
+	}
+	if m.vistos == nil || !m.vistos.TemObj() {
+		return "", false
+	}
+	ent, visto, ok := m.vistos.Obj(m.idObj("O:" + v))
+	if !ok {
+		ent, visto, ok = m.vistos.Obj(m.idObj("o:" + low))
+		ok = ok && entSQL[ent]
+	}
+	return ent, ok && hoje()-visto <= validadeObj
+}
+
+// unificarObjetos: o mesmo nome real fica com UM tipo (e, portanto, um pseudônimo) no texto,
+// mesmo quando regras diferentes o acham com tipos diferentes ("dir_..." numa linha e
+// "svc_..." noutra para a mesma pasta). Vale o tipo com que o nome já foi aprendido; se não
+// foi, o da primeira ocorrência no texto (no mesmo trecho, a ordem do tipo, como em aplicarT).
+func (m *Masker) unificarObjetos(out []Achado) {
+	var ix []int
+	for i, a := range out {
+		if ehObjeto(a.Tipo) {
+			ix = append(ix, i)
+		}
+	}
+	if len(ix) < 2 && (len(ix) == 0 || m.conh.geracao() == 0 && (m.vistos == nil || !m.vistos.TemObj())) {
+		return
+	}
+	sort.SliceStable(ix, func(i, j int) bool {
+		a, b := out[ix[i]], out[ix[j]]
+		if a.Ini != b.Ini {
+			return a.Ini < b.Ini
+		}
+		return a.Tipo < b.Tipo
+	})
+	escolha := map[string]string{}
+	for _, i := range ix {
+		k := strings.ToLower(semCitacao(out[i].Real))
+		t, ok := escolha[k]
+		if !ok {
+			t = out[i].Tipo
+			if ent, ok := m.entAprendido(out[i].Real); ok && m.objMascara(ent) {
+				t = prefTipoObj + ent
+			}
+			escolha[k] = t
+		}
+		out[i].Tipo = t
 	}
 }
 
@@ -266,20 +332,32 @@ func (m *Masker) acharObjetos(s string, aprende bool, add func(ini, fim int, tip
 }
 
 // tokensObj chama fn para cada candidato a nome aprendido em s: [A-Za-z_][A-Za-z0-9_$#]*
-// com pedaços "-..." no meio (o mesmo que a regex `[A-Za-z_][\w$#]*(?:-[\w$#]+)*`, sem o
-// custo de uma regex no texto inteiro).
+// (com letras acentuadas) e pedaços "-..." no meio (o mesmo que a regex
+// `[\p{L}_][\p{L}\d_$#]*(?:-[\p{L}\d_$#]+)*`, sem o custo de uma regex no texto inteiro).
 func tokensObj(s string, fn func(a, b int)) {
 	ident := func(c byte) bool { return ehAlnum(c) || c == '_' || c == '$' || c == '#' }
 	for i := 0; i < len(s); {
 		c := s[i]
-		if !(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c == '_') {
+		n0 := 1
+		if c >= 0x80 {
+			if n0 = letraUTF8(s, i); n0 == 0 { // letra acentuada também começa um nome
+				i++
+				continue
+			}
+		} else if !(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c == '_') {
 			i++
 			continue
 		}
-		j := i + 1
+		j := i + n0
 		for {
-			for j < len(s) && ident(s[j]) {
-				j++
+			for j < len(s) {
+				if ident(s[j]) {
+					j++
+				} else if n := letraUTF8(s, j); n > 0 {
+					j += n
+				} else {
+					break
+				}
 			}
 			if j+1 < len(s) && s[j] == '-' && ident(s[j+1]) {
 				j++
@@ -313,44 +391,73 @@ func (m *Masker) acharObjetosConhecidos(s string, add func(ini, fim int, tipo st
 	}
 	d := hoje()
 	tokensObj(s, func(a0, b0 int) {
-		ix := [2]int{a0, b0}
-		v := s[ix[0]:ix[1]]
-		if !caraDeIdentificador(v) {
+		if a0 > 0 && (s[a0-1] == '-' || ehAlnum(s[a0-1])) && !escapeEm(s, a0-1) {
 			return
 		}
-		if ix[0] > 0 && (s[ix[0]-1] == '-' || ehAlnum(s[ix[0]-1])) && !escapeEm(s, ix[0]-1) {
-			return
-		}
-		c.mu.RLock()
-		tp, ok := c.canon["O:"+v] // grafia exata
-		if !ok {
-			tp, ok = c.canon["o:"+strings.ToLower(v)] // nome de SQL, em qualquer caixa
-			ok = ok && entSQL[strings.TrimPrefix(tp, prefTipoObj)]
-		}
-		c.mu.RUnlock()
-		if ok {
-			if ent := strings.TrimPrefix(tp, prefTipoObj); m.objPropaga(ent) {
-				add(ix[0], ix[1], tp)
+		// nome com ponto ("top_x.eventos", "app.config"): o token para no ponto, então tenta
+		// também as formas com os pedaços seguintes, da mais longa para a mais curta
+		fins := formasComPonto(s, a0, b0)
+		for k := len(fins) - 1; k >= 0; k-- {
+			if m.objConhecidoEm(s, a0, fins[k], c, disco, d, add) {
+				return
 			}
-			return
 		}
-		if !disco {
-			return
-		}
-		chave := "O:" + v
-		ent, visto, ok := m.vistos.Obj(m.idObj(chave))
-		if !ok {
-			chave = "o:" + strings.ToLower(v)
-			ent, visto, ok = m.vistos.Obj(m.idObj(chave))
-			ok = ok && entSQL[ent]
-		}
-		if !ok || d-visto > validadeObj || !m.objPropaga(ent) {
-			return
-		}
-		add(ix[0], ix[1], prefTipoObj+ent)
-		c.aprender(prefTipoObj+ent, v) // volta para a memória
-		m.vistos.MarcarObj(m.idObj(chave), ent, d)
 	})
+}
+
+// formasComPonto: os fins possíveis de um nome que começa em s[a:b] e continua com ".pedaço"
+// (até 3 pedaços a mais): [b, fim com 1 pedaço, fim com 2...].
+func formasComPonto(s string, a, b int) []int {
+	fins := []int{b}
+	ident := func(c byte) bool { return ehAlnum(c) || c == '_' || c == '$' || c == '#' }
+	for n := 0; n < 3 && b+1 < len(s) && s[b] == '.' && ident(s[b+1]); n++ {
+		e := b + 1
+		for e < len(s) && (ident(s[e]) || s[e] == '-' && e+1 < len(s) && ident(s[e+1])) {
+			e++
+		}
+		fins = append(fins, e)
+		b = e
+	}
+	return fins
+}
+
+// objConhecidoEm: s[a:b] é um nome aprendido (RAM ou vistos.json)? Se for, entrega o achado.
+func (m *Masker) objConhecidoEm(s string, a, b int, c *conhecidos, disco bool, d int, add func(ini, fim int, tipo string)) bool {
+	ix := [2]int{a, b}
+	v := s[ix[0]:ix[1]]
+	if !caraDeIdentificador(v) {
+		return false
+	}
+	c.mu.RLock()
+	tp, ok := c.canon["O:"+v] // grafia exata
+	if !ok {
+		tp, ok = c.canon["o:"+strings.ToLower(v)] // nome de SQL, em qualquer caixa
+		ok = ok && entSQL[strings.TrimPrefix(tp, prefTipoObj)]
+	}
+	c.mu.RUnlock()
+	if ok {
+		if ent := strings.TrimPrefix(tp, prefTipoObj); m.objPropaga(ent) {
+			add(ix[0], ix[1], tp)
+		}
+		return true
+	}
+	if !disco {
+		return false
+	}
+	chave := "O:" + v
+	ent, visto, ok := m.vistos.Obj(m.idObj(chave))
+	if !ok {
+		chave = "o:" + strings.ToLower(v)
+		ent, visto, ok = m.vistos.Obj(m.idObj(chave))
+		ok = ok && entSQL[ent]
+	}
+	if !ok || d-visto > validadeObj || !m.objPropaga(ent) {
+		return false
+	}
+	add(ix[0], ix[1], prefTipoObj+ent)
+	c.aprender(prefTipoObj+ent, v) // volta para a memória
+	m.vistos.MarcarObj(m.idObj(chave), ent, d)
+	return true
 }
 
 // UsarLeitores troca os leitores de estrutura (os testes usam leitores próprios).

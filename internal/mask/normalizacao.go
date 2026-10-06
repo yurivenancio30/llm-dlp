@@ -144,7 +144,9 @@ func talvezTransporte(s string) bool {
 // quebra de linha escapada vira um bloco próprio (o resto, a estrutura do JSON, os leitores já
 // leem no original); sem aspas em volta, o texto inteiro é decodificado.
 func desescaparJSON(s string) (string, []int, bool) {
-	if strings.Count(s, `\n`) < 2 && strings.Count(s, `\"`) < 4 && !(strings.Contains(s, `\n`) && pareceJSON(s)) {
+	// num objeto JSON, uma string de uma linha com aspas escapadas ("relation \"x\"") já basta
+	pj := pareceJSON(s)
+	if strings.Count(s, `\n`) < 2 && strings.Count(s, `\"`) < 4 && !(pj && (strings.Contains(s, `\n`) || strings.Count(s, `\"`) >= 2)) {
 		return s, nil, false
 	}
 	var m montador
@@ -195,7 +197,7 @@ func desescaparJSON(s string) (string, []int, bool) {
 				j++
 			}
 		}
-		nl = nl || aspas >= 4
+		nl = nl || aspas >= 4 || pj && aspas >= 2
 		if j >= len(s) || s[j] != '"' {
 			break
 		}

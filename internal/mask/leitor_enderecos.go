@@ -69,22 +69,40 @@ func fimURL(c byte) bool {
 func acharEnderecos(s string, add func(ObjAchado)) {
 	if strings.Contains(s, "://") {
 		for i := strings.Index(s, "://"); i >= 0; {
-			urlEm(s, i, add)
-			j := strings.Index(s[i+3:], "://")
-			if j < 0 {
+			// a URL termina, no máximo, onde começa o esquema da próxima: URLs coladas sem
+			// separador ("https://a/xhttps://b/y") não fazem cada uma varrer o resto da linha
+			// (era quadrático). E nunca passa de maxURL bytes.
+			lim, prox := min(len(s), i+3+maxURL), -1
+			if j := strings.Index(s[i+3:], "://"); j >= 0 {
+				prox = i + 3 + j
+				lim = min(lim, max(i+3, inicioEsquema(s, prox)))
+			}
+			urlEm(s[:lim], i, add)
+			if prox < 0 {
 				break
 			}
-			i += 3 + j
+			i = prox
 		}
 	}
 	acharHostsInternos(s, add)
 }
 
-func urlEm(s string, i int, add func(ObjAchado)) {
+// maxURL: até onde se lê uma URL depois do "://".
+const maxURL = 2 * janelaLinha
+
+// inicioEsquema: onde começa o esquema que termina no "://" em s[i].
+func inicioEsquema(s string, i int) int {
 	a := i
 	for a > 0 && i-a < 16 && (ehAlnum(s[a-1]) || s[a-1] == '+' || s[a-1] == '-' || s[a-1] == '.') {
 		a--
 	}
+	return a
+}
+
+// urlEm lê a URL cujo "://" está em s[i]. s termina onde a URL pode terminar (ver
+// acharEnderecos); o que vem antes de i é lido inteiro.
+func urlEm(s string, i int, add func(ObjAchado)) {
+	a := inicioEsquema(s, i)
 	// "${X:-http://...}": o "-" de ":-" não faz parte do esquema
 	for a < i && s[a] == '-' {
 		a++

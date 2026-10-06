@@ -334,8 +334,10 @@ func kvEm(s string, p int, add func(ObjAchado)) {
 				vb++
 			}
 		}
-		if vb == va || vb < len(s) && strings.IndexByte("([{\"'`", s[vb]) >= 0 {
-			return // chamada, índice, literal, f"..."
+		// chamada, índice, ou prefixo de literal (f"...", r'...'). Aspa depois de um valor maior
+		// é a que fecha a string em volta ("...table=x"}): o valor vale.
+		if vb == va || vb < len(s) && (strings.IndexByte("([{", s[vb]) >= 0 || strings.IndexByte("\"'`", s[vb]) >= 0 && vb-va <= 2) {
+			return
 		}
 		// seguido de operador: é expressão ("addr = arg0 + aux", "host = base + sufixo")
 		for r := vb; r < len(s) && r < vb+4; r++ {
@@ -526,8 +528,21 @@ func valorRecurso(v, ent string) bool {
 		return false // caminho, $VAR, ${...}, {{...}}, %s, <x>, @x
 	}
 	soNum := true
+	// nomes de SQL aceitam "$" no meio (V$SESSION, ped$hist) e letras acentuadas
+	sqlEnt := entSQL[ent] && ent != "servidor"
 	for i := 0; i < len(v); i++ {
 		c := v[i]
+		if sqlEnt && c >= 0x80 {
+			if n := letraUTF8(v, i); n > 0 {
+				i += n - 1
+				soNum = false
+				continue
+			}
+			return false
+		}
+		if sqlEnt && c == '$' && i+1 < len(v) && v[i+1] != '{' && v[i+1] != '(' {
+			continue
+		}
 		switch {
 		case c == ' ' || c == '\t' || c == '\n' || c == '/' || c == '@' || c == '$' || c == '%' || c == '{' || c == '}' ||
 			c == '<' || c == '>' || c == '(' || c == ')' || c == '[' || c == ']' || c == '*' || c == '?' || c == '!' ||

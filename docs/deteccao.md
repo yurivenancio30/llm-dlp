@@ -55,6 +55,10 @@ coluna), mas vem com o nome do campo ao lado. O nome do campo decide o que fazer
 | Conta e cartão | `account_number`, `conta_corrente`, `credit_card_number`, `iban` | `CONTA-…`, `CARTAO-…` |
 | Dado pessoal sensível (LGPD) | `religiao`, `raca_cor`, `orientacao_sexual`, `tipo_sanguineo`, `deficiencia`, `sindicato`, `doenca` | `SENSIVEL-…` |
 
+O valor não é o prefixo de um literal do Python (`r'...'`, `b"..."`, `f'...'`, `u'...'`: vale o
+que está entre as aspas), nem 1 ou 2 letras soltas, nem um padrão de regex (`(?!...)`, `\d+`) ou
+um modelo de texto (`{valor}`, `%s`).
+
 **Onde o nome do campo é reconhecido:**
 
 | Formato | Exemplo |
@@ -149,6 +153,12 @@ linha tem cara de erro. Nome com cara de exemplo (`my-bucket`) é mascarado como
 
 **Limite:** um nome que só aparece em frases, sem nunca ter passado por uma estrutura que o
 llm-dlp reconheça ("o problema é na tabela de pedidos do sistema X"), **não é pego**.
+
+Os leitores aceitam as variações de escrita de cada formato: qualquer caixa onde a linguagem não
+diferencia, espaços, tabs e quebras de linha, todas as citações e aspas escapadas, comentários
+no meio, pontuação colada, nomes qualificados de até 4 partes e nomes com `$`, `#`, `-` e acento
+(ver a última seção de [estruturas.md](estruturas.md)). O mesmo nome fica sempre com o mesmo
+pseudônimo, mesmo quando duas regras o acham com tipos diferentes.
 
 ## Na dúvida, mascara
 

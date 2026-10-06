@@ -82,8 +82,9 @@ func addServidor(s string, a, b int, regra string, add func(ObjAchado)) {
 }
 
 func acharConexoes(s string, add func(ObjAchado)) {
-	// string de conexão: pelo menos dois pares, um deles com chave de conexão
-	if strings.Count(s, "=") >= 2 {
+	// string de conexão: pelo menos dois pares, um deles com chave de conexão (ou um par que é
+	// propriedade de uma URI de banco)
+	if n := strings.Count(s, "="); n >= 2 || n == 1 && strings.Contains(s, "://") {
 		pares := paresConexao(s)
 		// agrupa pares próximos (mesma string): basta que haja 2 chaves conhecidas a menos de 300 bytes
 		for k, m := range pares {
@@ -108,7 +109,9 @@ func acharConexoes(s string, add func(ObjAchado)) {
 					break
 				}
 			}
-			if !vizinho {
+			// o par é uma propriedade de uma URI de banco ("jdbc:sqlserver://h:1433;databaseName=x",
+			// "postgresql://h/db?currentSchema=x"): a URI conta como o outro par
+			if !vizinho && !propriedadeDeURI(s, m[2]) {
 				continue
 			}
 			a, b := m[4], m[5]
@@ -208,6 +211,28 @@ func acharConexoes(s string, add func(ObjAchado)) {
 			}
 		}
 	}
+}
+
+// propriedadeDeURI: a chave em s[k] vem logo depois de ; ? ou & de uma URI de banco da mesma
+// linha (sem espaço nem aspas entre o "://" e a chave).
+func propriedadeDeURI(s string, k int) bool {
+	if k == 0 || strings.IndexByte(";?&", s[k-1]) < 0 {
+		return false
+	}
+	ini := max(inicioLinhaJ(s, k), k-300)
+	i := strings.LastIndex(s[ini:k], "://")
+	if i < 0 {
+		return false
+	}
+	i += ini
+	if strings.ContainsAny(s[i:k], " \t\"'`") {
+		return false
+	}
+	a := i
+	for a > ini && (ehAlnum(s[a-1]) || s[a-1] == '+' || s[a-1] == ':' || s[a-1] == '_') {
+		a--
+	}
+	return esquemaDeBanco(s[a:i])
 }
 
 // paresConexao: os pares chave=valor de s cuja chave é de conexão, no formato de índices de

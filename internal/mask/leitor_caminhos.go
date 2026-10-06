@@ -32,8 +32,35 @@ var pastasSistema = conj("bin", "sbin", "lib", "lib64", "share", "include", "loc
 	"homebrew", "anaconda3", "miniconda3", "conda", "venv", "env", "python", "java", "node", "go", "dotnet",
 	"windows", "program files", "program files (x86)", "programdata", "users", "temp")
 
+// fimPedacoCaminho: onde termina o pedaço de caminho que começa em s[a]: letras (também
+// acentuadas), dígitos, . _ - + e, no meio, $ e # ("ped$hist", "c#"). "$" no começo é variável.
+func fimPedacoCaminho(s string, a int) int {
+	b := a
+	for b < len(s) {
+		c := s[b]
+		switch {
+		case ehAlnum(c) || c == '.' || c == '_' || c == '-' || c == '+':
+			b++
+		case (c == '$' || c == '#') && b > a && b+1 < len(s) && s[b+1] != '{' && s[b+1] != '(':
+			b++
+		default:
+			if n := letraUTF8(s, b); n > 0 {
+				b += n
+				continue
+			}
+			return b
+		}
+	}
+	return b
+}
+
+// nomePasta: um pedaço de caminho que pode ser nome (ver fimPedacoCaminho).
+func nomePasta(v string) bool {
+	return v != "" && (ehAlnum(v[0]) || letraUTF8(v, 0) > 0) && fimPedacoCaminho(v, 0) == len(v)
+}
+
 func pastaFora(v string, estrito bool) bool {
-	if len(v) < 2 || v[0] == '.' || !nomeSimples(v) {
+	if len(v) < 2 || v[0] == '.' || !nomePasta(v) {
 		return false
 	}
 	l := strings.ToLower(v)
@@ -49,10 +76,7 @@ func pedacosCaminho(s string, a int, sep byte, estrito bool, add func(ObjAchado)
 		for a < len(s) && s[a] == sep {
 			a++
 		}
-		b := a
-		for b < len(s) && (ehAlnum(s[b]) || s[b] == '.' || s[b] == '_' || s[b] == '-' || s[b] == '+') {
-			b++
-		}
+		b := fimPedacoCaminho(s, a)
 		if b == a {
 			return
 		}

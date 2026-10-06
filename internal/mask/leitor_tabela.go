@@ -39,7 +39,7 @@ var rotulosSaida = map[string]bool{"name": true, "type": true, "null": true, "ke
 
 var (
 	reSeparador   = regexp.MustCompile(`^\s*[|+]?[\s|+:]*[-=─━]{3,}[-=─━+|:\s┼┬┴╋]*$`)
-	reCelulaIdent = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_$#.\-]*$`)
+	reCelulaIdent = regexp.MustCompile(`^[\p{L}_][\p{L}0-9_$#.\-]*$`)
 	// célula de cabeçalho: identificador, até 3 palavras ("primary key", "APP VERSION"), "null?"
 	reCelulaCab = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_$#.\-]*(?: [A-Za-z_][A-Za-z0-9_$#.\-]*){0,2}\??$`)
 	reTablesIn  = regexp.MustCompile(`(?i)^tables_in_([A-Za-z_][\w$]*)$`)

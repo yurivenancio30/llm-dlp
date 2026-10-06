@@ -104,10 +104,34 @@ func linhaCLI(s string, ini, fim int, add func(ObjAchado)) {
 		if b-a >= 2 && (s[a] == '"' || s[a] == '\'') && s[b-1] == s[a] { // "valor" entre aspas
 			a, b = a+1, b-1
 		}
+		b = semFechoSolto(s, a, b)
 		toks = append(toks, tokenCLI{a, b})
 		i = j
 	}
 	flush()
+}
+
+// semFechoSolto: tira do fim do token a pontuação colada que não abriu nele: o fecho da
+// string ou do objeto em volta (comando dentro de JSON: ...-U x"}), vírgula e ponto final.
+func semFechoSolto(s string, a, b int) int {
+	for b-a > 1 {
+		v := s[a : b-1]
+		switch c := s[b-1]; c {
+		case '"', '\'', '`':
+			if strings.Count(v, string(c))%2 == 1 {
+				return b
+			}
+		case ')', ']', '}':
+			if strings.IndexByte(v, map[byte]byte{')': '(', ']': '[', '}': '{'}[c]) >= 0 {
+				return b
+			}
+		case ',', '.':
+		default:
+			return b
+		}
+		b--
+	}
+	return b
 }
 
 func comandoCLI(s string, toks []tokenCLI, add func(ObjAchado)) {

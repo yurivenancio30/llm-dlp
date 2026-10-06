@@ -75,6 +75,7 @@ func (m *Masker) detectarInteiroA(s string, aprende bool) []Achado {
 	m.acharConhecidos(s, numLongo, func(ini, fim int, tipo string) {
 		out = append(out, Achado{ini, fim, tipo, s[ini:fim]})
 	})
+	m.unificarObjetos(out)
 	return out
 }
 
@@ -156,10 +157,12 @@ func (m *Masker) detectarGrande(s string, aprende bool) []Achado {
 			m.aprender(a.Tipo, a.Real)
 		}
 	}
-	return append(out, rodar(func(janela string, add func(ini, fim int, tipo string)) {
+	out = append(out, rodar(func(janela string, add func(ini, fim int, tipo string)) {
 		numLongo, _ := perfilNumerico(janela)
 		m.acharConhecidos(janela, numLongo, add)
 	})...)
+	m.unificarObjetos(out)
+	return out
 }
 
 // acharEstrutura: os leitores de estrutura e de tabela, no texto sem o transporte (ver

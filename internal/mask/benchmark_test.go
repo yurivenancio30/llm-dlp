@@ -121,6 +121,10 @@ func linhaLonga(tipo string, tam int) string {
 			fmt.Fprintf(&b, `{"de":"fulano%d`+"@"+`empresa-ficticia.com.br","n":%d},`, i%50, i)
 		case "k8sdns":
 			fmt.Fprintf(&b, `{"svc":"svc-x%d.ns-x.svc.cluster.local:8080"},`, i%50)
+		case "urlcolada": // URLs sem separador entre elas
+			b.WriteString("https://exemplo.com/a")
+		case "esquemas": // só o separador de esquema, repetido
+			b.WriteString("a://")
 		case "conexao":
 			fmt.Fprintf(&b, `{"c":"Server=srv-x%d;Database=db_x;User Id=u_x;"},`, i%50)
 		}
@@ -138,10 +142,12 @@ func benchLinhaLonga(b *testing.B, tipo string, tam int) {
 	}
 }
 
-func BenchmarkLinhaURL1MB(b *testing.B)      { benchLinhaLonga(b, "url", 1<<20) }
-func BenchmarkLinhaURL512K(b *testing.B)     { benchLinhaLonga(b, "url", 512<<10) }
-func BenchmarkLinhaSQLJSON512K(b *testing.B) { benchLinhaLonga(b, "sqljson", 512<<10) }
-func BenchmarkLinhaURN512K(b *testing.B)     { benchLinhaLonga(b, "urn", 512<<10) }
-func BenchmarkLinhaEmail512K(b *testing.B)   { benchLinhaLonga(b, "email", 512<<10) }
-func BenchmarkLinhaK8sDNS512K(b *testing.B)  { benchLinhaLonga(b, "k8sdns", 512<<10) }
-func BenchmarkLinhaConexao512K(b *testing.B) { benchLinhaLonga(b, "conexao", 512<<10) }
+func BenchmarkLinhaURL1MB(b *testing.B)        { benchLinhaLonga(b, "url", 1<<20) }
+func BenchmarkLinhaURL512K(b *testing.B)       { benchLinhaLonga(b, "url", 512<<10) }
+func BenchmarkLinhaSQLJSON512K(b *testing.B)   { benchLinhaLonga(b, "sqljson", 512<<10) }
+func BenchmarkLinhaURN512K(b *testing.B)       { benchLinhaLonga(b, "urn", 512<<10) }
+func BenchmarkLinhaEmail512K(b *testing.B)     { benchLinhaLonga(b, "email", 512<<10) }
+func BenchmarkLinhaK8sDNS512K(b *testing.B)    { benchLinhaLonga(b, "k8sdns", 512<<10) }
+func BenchmarkLinhaConexao512K(b *testing.B)   { benchLinhaLonga(b, "conexao", 512<<10) }
+func BenchmarkLinhaURLColada256K(b *testing.B) { benchLinhaLonga(b, "urlcolada", 256<<10) }
+func BenchmarkLinhaEsquemas1MB(b *testing.B)   { benchLinhaLonga(b, "esquemas", 1<<20) }

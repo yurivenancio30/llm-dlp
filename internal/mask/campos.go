@@ -159,6 +159,9 @@ func (m *Masker) acharCampos(s string, add func(ini, fim int, tipo string)) {
 		if j >= len(s) {
 			break
 		}
+		// prefixo de literal de string (r'...', b"...", f'...', rb'...', u'...'): não é o
+		// valor, o valor é o que está entre as aspas
+		j = depoisPrefixoLiteral(s, j)
 		ini, fim := j, j
 		if q := s[j]; q == '"' || q == '\'' || q == '`' {
 			ini = j + 1
@@ -197,10 +200,57 @@ func (m *Masker) acharCampos(s string, add func(ini, fim int, tipo string)) {
 			}
 		}
 		fim = apararValor(s, ini, fim)
-		if fim > ini {
+		if fim > ini && (classe == "quase" || !soLetrasCurto(s[ini:fim])) && !padraoOuModelo(s[ini:fim]) {
 			marcar(s, ini, fim, classe, add)
 		}
 	}
+}
+
+// depoisPrefixoLiteral: se s[j:] começa com um prefixo de literal de string do Python (r, b,
+// f, u, rb, br, fr, rf, em qualquer caixa) colado numa aspa, devolve a posição da aspa.
+func depoisPrefixoLiteral(s string, j int) int {
+	for n := 1; n <= 2 && j+n < len(s); n++ {
+		if q := s[j+n]; q != '"' && q != '\'' {
+			continue
+		}
+		switch strings.ToLower(s[j : j+n]) {
+		case "r", "b", "f", "u", "rb", "br", "fr", "rf":
+			if j == 0 || !ehIdent(s[j-1]) {
+				return j + n
+			}
+		}
+		return j
+	}
+	return j
+}
+
+// soLetrasCurto: 1 ou 2 letras e nada mais ("r", "pt", "M"): no "campo: valor" isso é sigla,
+// prefixo ou pedaço de código, não o dado. Os quase identificadores (sexo "F", UF "MG") são a
+// exceção: lá o valor é curto mesmo (e o detector é opcional).
+func soLetrasCurto(v string) bool {
+	if len(v) > 2 {
+		return false
+	}
+	for i := 0; i < len(v); i++ {
+		if !(v[i] >= 'a' && v[i] <= 'z' || v[i] >= 'A' && v[i] <= 'Z') {
+			return false
+		}
+	}
+	return true
+}
+
+// padraoOuModelo: o valor é um padrão de regex ("(?!x)\\b...", "\\d+") ou um modelo de texto
+// ("{valor}", "%s", "%(nome)s"): é código, não o dado do campo.
+func padraoOuModelo(v string) bool {
+	if strings.Contains(v, "(?") || len(v) >= 2 && v[0] == '{' && v[len(v)-1] == '}' || v == "%s" || strings.HasPrefix(v, "%(") {
+		return true
+	}
+	for i := 0; i+1 < len(v); i++ {
+		if v[i] == '\\' && strings.IndexByte("dDwWsSbB", v[i+1]) >= 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // apararValor tira do fim do valor o que é da frase ou da marcação em volta, e não do valor:
