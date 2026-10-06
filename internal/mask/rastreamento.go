@@ -259,7 +259,7 @@ func (l *Lote) registrarFontes(itens []ItemLote, fontes []string) {
 // provadoNaFonte: v foi decidido com prova no próprio texto ou numa fonte do texto atual.
 func (l *Lote) provadoNaFonte(v string) bool {
 	k := strings.ToLower(v)
-	if l.provAtual[k] || l.traduzidas[k] {
+	if l.provAtual[k] {
 		return true
 	}
 	if l.fonteAtual == "" {
@@ -314,3 +314,12 @@ func fonteArquivo(f string) bool {
 	}
 	return false
 }
+
+// FonteSistema: a fonte de uma saída que descreve ou lista um catálogo de sistema (DESC/SHOW em
+// SNOWFLAKE.ACCOUNT_USAGE, information_schema...). A estrutura listada é documentação pública:
+// a saída não é fonte de decisão (como o texto do assistente) e só recebe o contágio dos nomes
+// do cliente já conhecidos.
+const FonteSistema = "sistema"
+
+// AlvoDeSistema: o comando descreve ou lista um objeto de catálogo de sistema.
+func AlvoDeSistema(cmd string) bool { return alvoDeSistema(cmd) }

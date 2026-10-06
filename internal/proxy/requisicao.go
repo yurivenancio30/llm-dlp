@@ -255,6 +255,10 @@ func (w walker) s(v string) string {
 	if w.assist && !w.daWeb {
 		return w.escrito(v)
 	}
+	if f, _ := mask.SepararFonte(w.dica); w.col != nil && f == mask.FonteSistema {
+		w.pos.doTexto() // catálogo de sistema: não é fonte de decisão (mask/rastreamento.go)
+		return v
+	}
 	if w.col != nil {
 		w.col.itens = append(w.col.itens, mask.ItemLote{S: v, DaWeb: w.daWeb, Pos: w.pos.doTexto(), Dica: w.dica})
 		return v
@@ -386,6 +390,9 @@ func dicasDosComandos(msgs []any, m *mask.Masker) (dicas, dicasUso map[string]st
 				d = mask.ComExtensao(d, cs.Resultado(chs[rid], saida))
 				if cmd := cmds[rid]; cmd != "" {
 					d = mask.ComFonte(fonteCom(escritos, cmd), d) // a fonte do resultado
+					if mask.AlvoDeSistema(cmd) {
+						d = mask.ComFonte(mask.FonteSistema, "")
+					}
 				}
 				if d != "" {
 					dicas[rid] = d

@@ -336,14 +336,8 @@ func (l *Lote) Memoria(itens []ItemLote, extras []Decisao) {
 	if len(todas) > 0 {
 		l.mem = m.novaMemoria(todas)
 		for _, d := range todas {
-			switch d.Regra {
-			case "âncora":
+			if d.Regra == "âncora" {
 				l.marcarDeduzido(d.Nome)
-			case "traduzida":
-				if l.traduzidas == nil {
-					l.traduzidas = map[string]bool{}
-				}
-				l.traduzidas[strings.ToLower(d.Nome)] = true
 			}
 		}
 	}

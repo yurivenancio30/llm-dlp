@@ -329,8 +329,16 @@ var (
 func (m *Masker) acharConhecidos(s string, numLongo bool, add0 func(ini, fim int, tipo string)) {
 	c := m.conh
 	add := func(ini, fim int, tipo string) {
-		if ehObjeto(tipo) && !m.objPropaga(strings.TrimPrefix(tipo, prefTipoObj)) {
-			return // tipo desligado depois de aprendido
+		if ehObjeto(tipo) {
+			if !m.objPropaga(strings.TrimPrefix(tipo, prefTipoObj)) {
+				return // tipo desligado depois de aprendido
+			}
+			// o conhecimento acumulado (RAM, vistos.json) segue as regras do rastreamento:
+			// palavra comum não se espalha por ele e vocabulário público nunca é aplicado
+			// (um nome aprendido errado antes não volta em todo texto; ver rastreamento.go)
+			if v := s[ini:fim]; !caraDeIdentificador(v) || publicoGeral(v) {
+				return
+			}
 		}
 		add0(ini, fim, tipo)
 	}

@@ -184,7 +184,6 @@ type Lote struct {
 	fontes     map[string]map[string]bool // valor (minúsculas) -> fontes em que teve prova direta
 	fonteAtual string                     // a fonte do texto sendo montado (vazia: sem comando)
 	provAtual  map[string]bool            // decididos com prova no próprio texto sendo montado
-	traduzidas map[string]bool            // palavras que o proxy traduziu (valem em qualquer fonte)
 	escrevendo bool                       // montando texto do assistente (recebe todo o contágio)
 }
 
@@ -210,6 +209,9 @@ func (l *Lote) Mascarar(s string, daWeb bool, pos Posicao) (string, []Entrada) {
 // MascararDica: como Mascarar, com a dica do comando que produziu o texto.
 func (l *Lote) MascararDica(s string, daWeb bool, pos Posicao, dica string) (string, []Entrada) {
 	l.fonteAtual, dica = SepararFonte(dica)
+	if l.fonteAtual == FonteSistema {
+		return l.MascararContagio(s, daWeb, pos)
+	}
 	if len(s) < 4 {
 		return s, nil
 	}

@@ -242,3 +242,25 @@ func TestRastreamentoSQLDoAssistente(t *testing.T) {
 		}
 	}
 }
+
+// DESC/SHOW de um objeto de catálogo de sistema lista estrutura pública (as colunas de
+// SNOWFLAKE.ACCOUNT_USAGE.TAG_REFERENCES são documentação); o DESC de uma tabela do cliente
+// continua mascarando as colunas.
+func TestRastreamentoCatalogoDeSistema(t *testing.T) {
+	var corpos [][]byte
+	px := rtProxy(t, t.TempDir(), &corpos, func(b []byte, w http.ResponseWriter) { rtTexto("ok", w) })
+	rtEnviar(t, px, rtTurnos("de onde vem a tag de owner?",
+		[2]string{`snow sql -q "DESC VIEW SNOWFLAKE.ACCOUNT_USAGE.TAG_REFERENCES"`, "name             type    kind\nTAG_NAME         VARCHAR COLUMN\nTAG_VALUE        VARCHAR COLUMN\nAPPLY_METHOD     VARCHAR COLUMN\nOBJECT_DATABASE  VARCHAR COLUMN\n"},
+		[2]string{`snow sql -q "DESC TABLE DW_PRD.MART.TB_CLI_PJ"`, "name             type    kind\nNUM_CNPJ_MATRIZ  VARCHAR COLUMN\nDES_RAZAO_SOC    VARCHAR COLUMN\nDTA_ABERTURA     DATE    COLUMN\n"}))
+	api := string(corpos[0])
+	for _, p := range []string{"TAG_NAME", "TAG_VALUE", "APPLY_METHOD", "OBJECT_DATABASE"} {
+		if rtTok(api, p) == 0 {
+			t.Errorf("coluna pública %s (catálogo de sistema) foi mascarada", p)
+		}
+	}
+	for _, s := range []string{"NUM_CNPJ_MATRIZ", "DES_RAZAO_SOC", "DTA_ABERTURA"} {
+		if rtTok(api, s) > 0 {
+			t.Errorf("coluna do cliente %s foi em claro", s)
+		}
+	}
+}

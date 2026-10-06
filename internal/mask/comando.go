@@ -174,6 +174,9 @@ func dicaSQL(cmd string) *dicaSaida {
 			return d
 		}
 	}
+	if alvoDeSistema(cmd) {
+		return nil // descreve ou lista um catálogo de sistema: a estrutura listada é pública
+	}
 	if m := reShow.FindStringSubmatch(cmd); m != nil {
 		if e, ok := entPlural(m[1]); ok {
 			return &dicaSaida{nomes: map[string]string{"name": e}, name: e, forte: true}
@@ -626,4 +629,26 @@ func celulaDica(s string, c celula, e string, forte bool, add func(ObjAchado)) {
 		}
 		a += len(p) + 1
 	}
+}
+
+// catalogosSistema: namespaces que são de sistema em toda instalação (os nomes de dentro deles
+// são documentação pública). public e dbo ficam de fora: guardam os objetos do cliente.
+var catalogosSistema = conj("information_schema", "pg_catalog", "pg_toast", "performance_schema", "sys",
+	"sysibm", "syscat", "sysstat", "snowflake", "account_usage", "organization_usage", "data_sharing_usage",
+	"readers_account_usage", "master", "msdb", "mysql")
+
+var reAlvoDescShow = regexp.MustCompile(`(?i)\b(?:describe|desc)\s+(?:table\s+|view\s+)?([\w$."]+)|\bshow\b[^;\n]*?\bin\s+(?:account\s+|database\s+|schema\s+)?([\w$."]+)`)
+
+// alvoDeSistema: o comando descreve (DESC) ou lista (SHOW ... IN) um objeto que está num
+// catálogo de sistema (SNOWFLAKE.ACCOUNT_USAGE.TAG_REFERENCES, information_schema.columns).
+func alvoDeSistema(cmd string) bool {
+	for _, m := range reAlvoDescShow.FindAllStringSubmatch(cmd, -1) {
+		alvo := m[1] + m[2]
+		for _, p := range strings.Split(alvo, ".") {
+			if catalogosSistema[strings.ToLower(strings.Trim(p, `"`))] {
+				return true
+			}
+		}
+	}
+	return false
 }
