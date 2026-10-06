@@ -288,8 +288,16 @@ func tokensObj(s string, fn func(a, b int)) {
 			break
 		}
 		fn(i, j)
+		if escapeEm(s, i) && j > i+1 && (ehAlnum(s[i+1]) && !(s[i+1] >= '0' && s[i+1] <= '9') || s[i+1] == '_') {
+			fn(i+1, j) // "\nt_x" em texto escapado: o nome pode começar depois do escape
+		}
 		i = j
 	}
+}
+
+// escapeEm: s[i] é a letra de um escape \n, \t ou \r (texto de JSON escapado)?
+func escapeEm(s string, i int) bool {
+	return i > 0 && s[i-1] == '\\' && (s[i] == 'n' || s[i] == 't' || s[i] == 'r') && (i < 2 || s[i-2] != '\\')
 }
 
 // acharObjetosConhecidos: nomes aprendidos (em RAM ou, só o hash, no vistos.json) que
@@ -310,7 +318,7 @@ func (m *Masker) acharObjetosConhecidos(s string, add func(ini, fim int, tipo st
 		if !caraDeIdentificador(v) {
 			return
 		}
-		if ix[0] > 0 && (s[ix[0]-1] == '-' || ehAlnum(s[ix[0]-1])) {
+		if ix[0] > 0 && (s[ix[0]-1] == '-' || ehAlnum(s[ix[0]-1])) && !escapeEm(s, ix[0]-1) {
 			return
 		}
 		c.mu.RLock()

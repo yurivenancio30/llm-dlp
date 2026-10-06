@@ -2437,6 +2437,21 @@ SELECT * FROM vendas_demo.pedidos_x9 WHERE pedido_id = 1;   → SELECT * FROM DB
 
 ## Formatos de transporte (diff, grep, numeração, logs, markdown, heredoc)
 
+**Como está implementado** (`normalizacao.go`): uma camada antes de todos os leitores tira o
+transporte e mapeia cada posição do texto limpo de volta ao original. Tira: número de linha
+da ferramenta de leitura (`   12→`) e do `cat -n`/`nl`; prefixo do `grep -n` (`arq:12:`,
+`12:`, contexto `arq-12-`, separador `--`), só quando a maioria das linhas o tem; diff/patch
+(cabeçalhos e o 1º caractere `+`/`-`/espaço), quando há cabeçalho de diff; `git blame`;
+citação de markdown (`> `, aninhada); carimbo de data e nível no começo da linha de log;
+cerca de código; sequências ANSI; BOM; CRLF; espaços no fim da linha. Bordas de caixa
+(U+2500–U+257F) viram `|` e `-`, que o leitor de tabela já entende. String de JSON com
+`\n` escapado é decodificada (até 3 níveis), cada uma num bloco próprio. Os leitores de
+estrutura e de tabela rodam no texto limpo; só voltam os achados que correspondem byte a
+byte ao original (a troca e a volta ficam exatas). O original também é lido quando a
+limpeza tirou algo que traz nome (arquivo do grep, cabeçalho do diff) ou mudou a estrutura
+(JSON decodificado). Na propagação, um nome logo depois de `\n`/`\t` escapado também é
+procurado sem a letra do escape.
+
 Princípio: o proxy não mascara o invólucro, mascara o **conteúdo**. Cada invólucro vira
 uma lista de *segmentos* `(ini_original, ini_interno, comprimento)` e um *rótulo de tipo*
 (sql, yaml, json, desconhecido). O leitor do tipo acha os nomes no texto interno; o mapa

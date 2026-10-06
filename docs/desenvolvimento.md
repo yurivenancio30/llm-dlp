@@ -33,6 +33,7 @@ internal/mask/        detecção e troca por pseudônimos
   masker.go             o tipo Masker e a sua construção
   mascarar.go           Mascarar: porta de entrada, com memória de resultados; Lote congela o que saiu
   detectar.go           Detectar: junta os detectores; texto grande vai em pedaços
+  normalizacao.go       tira o transporte (número de linha, grep, diff, ANSI, caixa, JSON escapado)
   detectores_formato.go   e-mail, IP, hostname, CPF, CNPJ, telefone, cartão, tokens
   detectores_senhas.go    senhas comuns
   detectores_extras.go    cabeçalho HTTP, IBAN, processo, documentos com palavra por perto

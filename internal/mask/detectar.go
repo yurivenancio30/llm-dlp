@@ -62,11 +62,7 @@ func (m *Masker) detectarInteiro(s string) []Achado { return m.detectarInteiroA(
 
 func (m *Masker) detectarInteiroA(s string, aprende bool) []Achado {
 	out := m.detectarBase(s)
-	m.acharObjetos(s, aprende, func(ini, fim int, tipo string) { out = append(out, Achado{ini, fim, tipo, s[ini:fim]}) })
-	if !m.cfg.Desligado("campo") {
-		m.acharTabelas(s, func(ini, fim int, tipo string) { out = append(out, Achado{ini, fim, tipo, s[ini:fim]}) })
-		out = append(out, nomesNaLinha(s, out)...)
-	}
+	out = append(out, m.acharEstrutura(s, aprende, out)...)
 	// Valores que dependem de contexto são lembrados e reconhecidos depois em qualquer
 	// lugar (ver conhecidos.go): sem isto, vazariam quando o modelo os repete sem a
 	// palavra-chave por perto e o histórico é reenviado.
@@ -152,11 +148,7 @@ func (m *Masker) detectarGrande(s string, aprende bool) []Achado {
 		}
 	})
 	// estrutura (objetos) e tabelas: no texto inteiro (uma estrutura pode passar de um pedaço)
-	m.acharObjetos(s, aprende, func(ini, fim int, tipo string) { out = append(out, Achado{ini, fim, tipo, s[ini:fim]}) })
-	if !m.cfg.Desligado("campo") {
-		m.acharTabelas(s, func(ini, fim int, tipo string) { out = append(out, Achado{ini, fim, tipo, s[ini:fim]}) })
-		out = append(out, nomesNaLinha(s, out)...)
-	}
+	out = append(out, m.acharEstrutura(s, aprende, out)...)
 	// primeiro aprende TUDO, depois procura os valores conhecidos no texto inteiro: um valor
 	// ensinado no fim do texto é reconhecido também no começo
 	for _, a := range out {
@@ -168,4 +160,40 @@ func (m *Masker) detectarGrande(s string, aprende bool) []Achado {
 		numLongo, _ := perfilNumerico(janela)
 		m.acharConhecidos(janela, numLongo, add)
 	})...)
+}
+
+// acharEstrutura: os leitores de estrutura e de tabela, no texto sem o transporte (ver
+// normalizacao.go), com os achados de volta nas posições do original, e no original quando a
+// normalização tirou algo que traz nome. base: os achados dos detectores (para nomesNaLinha).
+func (m *Masker) acharEstrutura(s string, aprende bool, base []Achado) []Achado {
+	ler := func(s string, base []Achado) []Achado {
+		var out []Achado
+		add := func(ini, fim int, tipo string) { out = append(out, Achado{ini, fim, tipo, s[ini:fim]}) }
+		m.acharObjetos(s, aprende, add)
+		if !m.cfg.Desligado("campo") {
+			m.acharTabelas(s, add)
+			out = append(out, nomesNaLinha(s, append(base[:len(base):len(base)], out...))...)
+		}
+		return out
+	}
+	n, ok := normalizar(s)
+	if !ok {
+		return ler(s, base)
+	}
+	var out []Achado
+	if n.tambemCru {
+		out = ler(s, base)
+	}
+	var bt []Achado // os achados dos detectores, nas posições do texto limpo
+	for _, a := range base {
+		if la, lb, ok := n.limpo(s, a.Ini, a.Fim); ok {
+			bt = append(bt, Achado{la, lb, a.Tipo, a.Real})
+		}
+	}
+	for _, a := range ler(n.t, bt) {
+		if oa, ob, ok := n.original(s, a.Ini, a.Fim); ok {
+			out = append(out, Achado{oa, ob, a.Tipo, s[oa:ob]})
+		}
+	}
+	return out
 }
