@@ -47,7 +47,9 @@ internal/mask/        detecção e troca por pseudônimos
   objetos.go            nomes de recursos internos: tipos, pseudônimo, aprendizado com freios
   leitores.go           registro de todos os leitores de estrutura (fixos e da configuração)
   leitor_sql.go           SQL e DDL, mensagens de erro que citam objetos (vocab_sql.txt)
-  leitor_tabela.go        saídas de banco e tabelas de catálogo
+  leitor_tabela.go        tabelas em qualquer desenho (CSV, largura fixa, caixa, tuplas, HTML, vertical)
+  leitor_esquema.go       nome + tipo de dado (dtypes, printSchema, Arrow, protobuf); name pelo contêiner
+  vocab_tipos.go          tipos de dado das linguagens (SQL, pandas, Arrow, Spark, Avro, Protobuf, R)
   leitor_conexao.go       strings de conexão, URIs de banco, DSN, tnsnames, URNs, dbt, Airflow
   leitor_yaml.go          motor de YAML/JSON por caminho e o despachante das famílias
   leitor_kubernetes.go    Kubernetes, Helm, imagens, DNS de serviço, env em lista

@@ -274,7 +274,7 @@ var (
 	// git blame: "1a2b3c4d (Fulano 2024-01-02 10:11:12 -0300  12) "
 	reBlame = regexp.MustCompile(`^\^?[0-9a-f]{7,40}(?: [^\s(]+)? \([^)]*\d{4}-\d\d-\d\d[^)]*?\d+\) `)
 	// carimbo de log no começo da linha, com o nível depois
-	reCarimbo = regexp.MustCompile(`^\[?\d{4}-\d\d-\d\d[T ]\d\d:\d\d:\d\d(?:[.,]\d+)?(?:Z|[+-]\d\d:?\d\d)?\]?(?:\s+\[?(?:TRACE|DEBUG|INFO|NOTICE|WARN|WARNING|ERROR|FATAL|CRITICAL)\]?)?(?:\s+-)?[ \t]`)
+	reCarimbo = regexp.MustCompile(`^\[?\d{4}-\d\d-\d\d[T ]\d\d:\d\d:\d\d(?:[.,]\d+)?(?:Z|[+-]\d\d:?\d\d)?\]?(?:\s+\[?(?:TRACE|DEBUG|INFO|NOTICE|WARN|WARNING|ERROR|FATAL|CRITICAL)\]?)?[ \t]`)
 	reGrepArq = regexp.MustCompile(`(?m)^[^\s:]*[^\s:\d][^\s:]*(?::\d+:|-\d+-)`)
 	reDiffCab = regexp.MustCompile(`^(?:@@ .*@@|diff --git |index [0-9a-f]+\.\.|\+\+\+ |--- (?:a/|/dev/null|\S+\t)|new file mode|deleted file mode)`)
 )

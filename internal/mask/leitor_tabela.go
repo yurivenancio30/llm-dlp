@@ -50,12 +50,13 @@ type celula struct{ a, b int } // posição no texto
 // celulaCabecalho: a célula tem forma de cabeçalho de catálogo: um identificador ("null?"
 // aceito) ou, em tabela de "|", TAB ou traços (não em CSV, onde a vírgula também separa listas
 // de SQL), até 3 palavras todas em minúsculas ou todas em maiúsculas ("primary key", "APP
-// VERSION"), que é como as ferramentas escrevem. Título de documento ("Data Type") não.
-func celulaCabecalho(v string, sep byte) bool {
+// VERSION"), que é como as ferramentas escrevem. Título de documento ("Data Type") não. Sob uma
+// linha de traços, a faixa já delimita a célula: vale qualquer texto curto ("Non-Null Count").
+func celulaCabecalho(v string, sep byte, tracos bool) bool {
 	if !reCelulaCab.MatchString(v) {
 		return false
 	}
-	if !strings.Contains(v, " ") {
+	if !strings.Contains(v, " ") || tracos { // sob a linha de traços, a faixa já delimita a célula
 		return true
 	}
 	return (sep == '|' || sep == '\t' || sep == 0) && (strings.ToLower(v) == v || strings.ToUpper(v) == v)
@@ -334,7 +335,10 @@ func acharTabelasObj(s string, add func(ObjAchado)) {
 		for _, c := range cs {
 			// cabeçalho com forma de identificador: sem espaço, operador ou unidade ("Speed MiB/s",
 			// "for i := 0" são tabela de benchmark e trecho de código, não catálogo)
-			if c.a == c.b || fixas == nil && !celulaCabecalho(s[c.a:c.b], sep) {
+			if v := s[c.a:c.b]; v == "#" && len(faixas) > 0 { // coluna de índice (df.info())
+				continue
+			}
+			if c.a == c.b || fixas == nil && !celulaCabecalho(s[c.a:c.b], sep, faixas != nil) {
 				ok = false
 				break
 			}

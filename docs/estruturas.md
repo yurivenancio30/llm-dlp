@@ -1038,6 +1038,18 @@ e markdown sem alinhamento visual não precisam ser realinhados (só as células
 
 ## JSON, YAML, TOML, INI, .env, .properties, XML e linguagens de esquema
 
+**Esquemas: nome + tipo de dado** (`leitor_esquema.go`, leitor novo: nenhum outro lê essa
+forma). Onde um nome vem com um tipo de dado, o nome é coluna: `nome    int64` por linha (2+
+linhas, ou 1 com o rodapé `dtype: object`), `Index(['a', 'b'], dtype='object')`,
+` |-- nome: string` (printSchema), `nome: int64` no começo da linha (2+ linhas: anotação de
+código é recuada e não conta), `string nome = 1;` (protobuf) e tabela `name | type` com tipos
+de dado na coluna `type`. O vocabulário é só o de tipos de dado (SQL, pandas/numpy, Arrow,
+Polars, Spark, Avro, Protobuf, R: `vocab_tipos.go`). Em YAML/JSON, `name` vale pelo contêiner
+(o motor de YAML/JSON, `acharNomePorContexto`): sob `columns`/`fields` é coluna (dbt
+`schema.yml`, Avro), sob `tables`/`models`/`seeds`/`views` é tabela, sob `sources`/`datasets`
+é schema, e sob uma chave que é palavra de tipo (`table`, `dataset`, `database`...) é desse
+tipo; `owner` é usuário; valor qualificado (`db.schema.tabela`) é dividido nas partes.
+
 Ideia central: nesses formatos, quem diz o que um token é não é o token, e sim a **posição**
 (o valor de qual chave, ou o fato de ser chave de um mapa sob um pai conhecido). O detector
 analisa a estrutura e usa o vocabulário da especificação para separar o que é fixo e público
