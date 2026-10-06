@@ -33,7 +33,7 @@ func (p *Proxy) mascararCorpo(r *http.Request, corpo []byte) ([]byte, []mask.Ent
 	// antes, em paralelo quando são muitos. Assim, todo valor aprendido nesta requisição já
 	// vale quando ela é montada, e a requisição seguinte não muda nada do que esta enviou.
 	col := &coleta{}
-	wc := walker{cfg: p.cfg, col: col, pos: &posicao{}}
+	wc := walker{cfg: p.cfg, col: col, lote: lote, pos: &posicao{}}
 	if anthropic {
 		wc.requisicaoAnthropic(v)
 	} else {
@@ -41,6 +41,9 @@ func (p *Proxy) mascararCorpo(r *http.Request, corpo []byte) ([]byte, []mask.Ent
 		wc.generico(v)
 	}
 	lote.Aquecer(col.itens)
+	// memória da conversa: os nomes decididos em todos os textos valem para os textos ainda
+	// não enviados (ver mask/memoria.go)
+	lote.Memoria(col.itens, col.extras)
 
 	// 2ª passada: monta, em ordem
 	var ents []mask.Entrada
@@ -67,8 +70,12 @@ func (p *Proxy) mascararCorpo(r *http.Request, corpo []byte) ([]byte, []mask.Ent
 	return bytes.TrimRight(buf.Bytes(), "\n"), ents, lote, nil
 }
 
-// coleta: os textos que a montagem vai mascarar, com a posição e a origem de cada um.
-type coleta struct{ itens []mask.ItemLote }
+// coleta: os textos que a montagem vai mascarar, com a posição e a origem de cada um, e as
+// decisões dos trechos traduzidos dos textos do assistente que voltam como a API os mandou.
+type coleta struct {
+	itens  []mask.ItemLote
+	extras []mask.Decisao
+}
 
 // posicao: onde o walker está na conversa. Cada bloco (ferramenta, bloco do system, bloco
 // de mensagem) encadeia o hash do anterior, na ordem em que a API monta o cache: tools,
@@ -206,6 +213,8 @@ type walker struct {
 	pos  *posicao
 	// dentro: já dentro de um bloco (não encadeia de novo)
 	dentro bool
+	// assist: mensagem do assistente (texto e entrada de ferramenta escritos pelo modelo)
+	assist bool
 }
 
 // midia trata um bloco de imagem/PDF; devolve os blocos que o substituem.
@@ -240,11 +249,31 @@ func ehBase64(b map[string]any) bool {
 }
 
 func (w walker) s(v string) string {
+	if w.assist && !w.daWeb {
+		return w.escrito(v)
+	}
 	if w.col != nil {
 		w.col.itens = append(w.col.itens, mask.ItemLote{S: v, DaWeb: w.daWeb, Pos: w.pos.doTexto(), Dica: w.dica})
 		return v
 	}
 	out, e := w.lote.MascararDica(v, w.daWeb, w.pos.doTexto(), w.dica)
+	*w.ents = append(*w.ents, e...)
+	return out
+}
+
+// escrito: texto do assistente. Se o proxy o desmascarou (quem escreveu), volta como a API o
+// mandou; as palavras traduzidas entram na memória da conversa.
+func (w walker) escrito(v string) string {
+	if w.col != nil {
+		if d, ok := w.lote.Escrito(v); ok {
+			w.pos.doTexto()
+			w.col.extras = append(w.col.extras, d...)
+			return v
+		}
+		w.col.itens = append(w.col.itens, mask.ItemLote{S: v, DaWeb: w.daWeb, Pos: w.pos.doTexto(), Dica: w.dica})
+		return v
+	}
+	out, e := w.lote.MascararEscrito(v, w.daWeb, w.pos.doTexto(), w.dica)
 	*w.ents = append(*w.ents, e...)
 	return out
 }
@@ -392,7 +421,9 @@ func (w walker) requisicaoAnthropic(v any) any {
 					if msg, ok := mm.(map[string]any); ok {
 						// quem fala também faz parte da posição
 						w.pos.atual = depois(w.pos.atual, msg["role"])
-						msg["content"] = w.conteudo(msg["content"])
+						wm := w
+						wm.assist = msg["role"] == "assistant"
+						msg["content"] = wm.conteudo(msg["content"])
 					}
 				}
 			}

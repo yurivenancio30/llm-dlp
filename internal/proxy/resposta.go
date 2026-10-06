@@ -22,6 +22,10 @@ func (p *Proxy) desmascararSSE(w http.ResponseWriter, body io.Reader, tab *mask.
 	fluxos := map[int]*mask.Fluxo{}
 	tipos := map[int]string{}
 	crus := map[int]bool{} // blocos que passam sem desmascarar (ferramentas que vão para a internet)
+	// quem escreveu: o texto original de cada bloco (como a API mandou), registrado no fim do
+	// bloco pelo hash do desmascarado (ver mask/memoria.go)
+	orig := map[int]*strings.Builder{}
+	reg := func(s string) string { return p.m.RegistrarResposta(s, tab) }
 	var evento []string
 	escrever := func(nome string, dados []byte) {
 		if nome != "" {
@@ -54,19 +58,24 @@ func (p *Proxy) desmascararSSE(w http.ResponseWriter, body io.Reader, tab *mask.
 			cb, _ := ev["content_block"].(map[string]any)
 			tp, _ := cb["type"].(string)
 			tipos[idx] = tp
+			if tp == "text" || tp == "tool_use" {
+				orig[idx] = &strings.Builder{}
+			}
 			if tp == "text" {
 				if s, ok := cb["text"].(string); ok && s != "" {
+					orig[idx].WriteString(s)
 					cb["text"], mudou = tab.Desmascarar(s, false), true
 				}
 			}
 			if tp == "tool_use" {
 				if nomeF, _ := cb["name"].(string); p.cfg.SemDesmascarar(nomeF) {
 					crus[idx] = true // WebFetch/WebSearch: a entrada segue com pseudônimos
+					delete(orig, idx)
 					break
 				}
 				// entrada que já chega completa no início do bloco (sem deltas)
 				if in, ok := cb["input"].(map[string]any); ok && len(in) > 0 {
-					cb["input"], mudou = desmascararTudo(in, tab), true
+					cb["input"], mudou = registrarTudo(in, reg), true
 				}
 			}
 			fluxos[idx] = tab.NovoFluxo(tp == "tool_use")
@@ -85,6 +94,9 @@ func (p *Proxy) desmascararSSE(w http.ResponseWriter, body io.Reader, tab *mask.
 				fluxos[idx] = f
 			}
 			s, _ := d[campo].(string)
+			if o := orig[idx]; o != nil {
+				o.WriteString(s)
+			}
 			out := f.Empurrar(s)
 			if out == "" {
 				return // segurando um possível pseudônimo cortado
@@ -104,6 +116,10 @@ func (p *Proxy) desmascararSSE(w http.ResponseWriter, body io.Reader, tab *mask.
 					escrever("content_block_delta", extra)
 				}
 				delete(fluxos, idx)
+			}
+			if o := orig[idx]; o != nil {
+				registrarBloco(tipos[idx], o.String(), reg)
+				delete(orig, idx)
 			}
 		}
 		if !mudou {
@@ -151,6 +167,43 @@ func intDe(v any) int {
 	return -1
 }
 
+// registrarBloco: o fim de um bloco da resposta. Texto: registra o bloco inteiro. Entrada de
+// ferramenta: registra cada string dela (o Claude Code a reenvia como objeto, e o walker
+// mascara string por string).
+func registrarBloco(tipo, original string, reg func(string) string) {
+	switch tipo {
+	case "text":
+		reg(original)
+	case "tool_use":
+		if original == "" {
+			return
+		}
+		dec := json.NewDecoder(strings.NewReader(original))
+		dec.UseNumber()
+		var v any
+		if dec.Decode(&v) == nil {
+			registrarTudo(v, reg)
+		}
+	}
+}
+
+// registrarTudo: como desmascararTudo, registrando cada string (quem escreveu).
+func registrarTudo(v any, reg func(string) string) any {
+	switch x := v.(type) {
+	case string:
+		return reg(x)
+	case []any:
+		for i := range x {
+			x[i] = registrarTudo(x[i], reg)
+		}
+	case map[string]any:
+		for k := range x {
+			x[k] = registrarTudo(x[k], reg)
+		}
+	}
+	return v
+}
+
 // desmascararTudo troca pseudônimos em todas as strings de um valor JSON já decodificado.
 func desmascararTudo(v any, tab *mask.Tabela) any {
 	switch x := v.(type) {
@@ -169,24 +222,29 @@ func desmascararTudo(v any, tab *mask.Tabela) any {
 }
 
 // desmascararJSONResposta: respostas sem streaming (texto e entradas de ferramenta).
-// Entradas de ferramentas em semDesm (WebFetch, WebSearch) seguem com pseudônimos.
-func desmascararJSONResposta(b []byte, tab *mask.Tabela, semDesm func(string) bool) []byte {
+// Entradas de ferramentas em semDesm (WebFetch, WebSearch) seguem com pseudônimos. reg
+// (opcional) desmascara registrando quem escreveu: o texto de cada bloco de texto e cada
+// string da entrada de cada ferramenta.
+func desmascararJSONResposta(b []byte, tab *mask.Tabela, semDesm func(string) bool, reg func(string) string) []byte {
 	dec := json.NewDecoder(bytes.NewReader(b))
 	dec.UseNumber()
 	var v any
 	if dec.Decode(&v) != nil {
 		return b
 	}
-	var rec func(any, bool) any
-	rec = func(v any, dentro bool) any {
+	var rec func(any, bool, bool) any
+	rec = func(v any, dentro, escrito bool) any {
 		switch x := v.(type) {
 		case string:
+			if dentro && escrito && reg != nil {
+				return reg(x)
+			}
 			if dentro {
 				return tab.Desmascarar(x, false)
 			}
 		case []any:
 			for i := range x {
-				x[i] = rec(x[i], dentro)
+				x[i] = rec(x[i], dentro, escrito)
 			}
 		case map[string]any:
 			t, _ := x["type"].(string)
@@ -197,18 +255,19 @@ func desmascararJSONResposta(b []byte, tab *mask.Tabela, semDesm func(string) bo
 				return x
 			}
 			for k := range x {
+				esc := escrito || t == "text" && k == "text" || t == "tool_use" && k == "input"
 				if k == "text" || k == "input" || k == "content" || dentro {
 					if !chavesIntocaveis[k] {
-						x[k] = rec(x[k], true)
+						x[k] = rec(x[k], true, esc)
 					}
 				} else {
-					x[k] = rec(x[k], false)
+					x[k] = rec(x[k], false, esc)
 				}
 			}
 		}
 		return v
 	}
-	v = rec(v, false)
+	v = rec(v, false, false)
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	enc.SetEscapeHTML(false)

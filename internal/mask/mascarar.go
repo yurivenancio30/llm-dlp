@@ -102,6 +102,9 @@ func (m *Masker) mascararKE(s string, k [32]byte, aprende bool, d *dicaSaida, di
 		}
 	}
 	texto, entradas, ts := m.aplicarT(s, achados)
+	if decididos == nil {
+		decididos = []Decisao{} // calculado, sem decisões (nil = não se sabe: ver Lote.Memoria)
+	}
 
 	m.mu.Lock()
 	r = m.guardar(k, resultado{texto, entradas, ts, g, !aprende, decididos})
@@ -174,9 +177,13 @@ func (m *Masker) guardarCong(kc Posicao, r resultado) {
 type Lote struct {
 	m      *Masker
 	saidas map[Posicao]resultado // o que saiu em cada posição
+	mem    *memoria              // a memória da conversa (ver memoria.go); nil = vazia
+	pre    map[Posicao]resultado // o resultado do memo de cada texto novo, já consultado em Memoria
 }
 
-func (m *Masker) NovoLote() *Lote { return &Lote{m: m, saidas: map[Posicao]resultado{}} }
+func (m *Masker) NovoLote() *Lote {
+	return &Lote{m: m, saidas: map[Posicao]resultado{}, pre: map[Posicao]resultado{}}
+}
 
 // ItemLote: um texto da requisição, onde está e se veio da internet.
 type ItemLote struct {
@@ -201,7 +208,11 @@ func (l *Lote) MascararDica(s string, daWeb bool, pos Posicao, dica string) (str
 	if r, ok := l.m.congelado(pos, s); ok {
 		return r.texto, r.entradas
 	}
-	r, _ := l.m.mascararD(s, !daWeb, dica)
+	r, ok := l.pre[pos]
+	if !ok || r.semAprender && !daWeb {
+		r, _ = l.m.mascararD(s, !daWeb, dica)
+	}
+	r = l.comMemoria(s, r)
 	if _, ja := l.saidas[pos]; !ja {
 		l.saidas[pos] = r
 	}

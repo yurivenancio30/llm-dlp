@@ -13,7 +13,7 @@ import (
 
 var chaveTeste = []byte("0123456789abcdef0123456789abcdef")
 
-func novoTeste(t *testing.T) *Masker {
+func novoTeste(t testing.TB) *Masker {
 	t.Helper()
 	cfg := config.Padrao()
 	cfg.DominiosInternos = []string{"empresa-ficticia"}
