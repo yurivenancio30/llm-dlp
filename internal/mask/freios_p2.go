@@ -42,4 +42,3 @@ func nomeDeModelo(v string) bool {
 	}
 	return true
 }
-

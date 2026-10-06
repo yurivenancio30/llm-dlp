@@ -33,7 +33,7 @@ func (p *Proxy) mascararCorpo(r *http.Request, corpo []byte) ([]byte, []mask.Ent
 	// antes, em paralelo quando são muitos. Assim, todo valor aprendido nesta requisição já
 	// vale quando ela é montada, e a requisição seguinte não muda nada do que esta enviou.
 	col := &coleta{}
-	wc := walker{cfg: p.cfg, col: col, lote: lote, pos: &posicao{}}
+	wc := walker{cfg: p.cfg, m: p.m, col: col, lote: lote, pos: &posicao{}}
 	if anthropic {
 		wc.requisicaoAnthropic(v)
 	} else {
@@ -49,7 +49,7 @@ func (p *Proxy) mascararCorpo(r *http.Request, corpo []byte) ([]byte, []mask.Ent
 	var ents []mask.Entrada
 	var errMidia error
 	// as posições já foram calculadas na 1ª passada (os blocos ainda estavam intactos)
-	w := walker{cfg: p.cfg, lote: lote, md: p.midia, ents: &ents, err: &errMidia, pos: &posicao{seq: wc.pos.seq}}
+	w := walker{cfg: p.cfg, m: p.m, lote: lote, md: p.midia, ents: &ents, err: &errMidia, pos: &posicao{seq: wc.pos.seq}}
 	if anthropic {
 		v = w.requisicaoAnthropic(v)
 	} else {
@@ -196,6 +196,7 @@ func chaves(x map[string]any) []string {
 // dado do usuário, guardando as entradas pseudônimo -> real usadas.
 type walker struct {
 	cfg  config.Config
+	m    *mask.Masker // só para as palavras traduzidas de um tool_use (dicasDosComandos)
 	lote *mask.Lote
 	md   *Midia
 	ents *[]mask.Entrada
@@ -208,6 +209,8 @@ type walker struct {
 	daWeb bool
 	// dicas: tool_use_id -> o que o comando da chamada diz do resultado (mask.Comandos.Dica)
 	dicas map[string]string
+	// dicasUso: tool_use id -> o que se sabe da entrada da chamada (eco, palavras traduzidas)
+	dicasUso map[string]string
 	// dica: a do resultado atual
 	dica string
 	pos  *posicao
@@ -314,15 +317,38 @@ func (w walker) idsDaWeb(msgs []any) map[string]bool {
 
 // dicasDosComandos: para cada resultado de ferramenta, o que o comando da chamada (o tool_use
 // do mesmo id) diz dele: as colunas de um SELECT, o tipo pedido numa listagem, a coluna de um
-// arquivo cujo cabeçalho já passou (ver mask/comando.go). Calculado em ordem, antes de mascarar
-// (a entrada do tool_use ainda é a original), e igual nas duas passadas.
-func dicasDosComandos(msgs []any) map[string]string {
+// arquivo cujo cabeçalho já passou, as palavras do programa (ver mask/comando.go e
+// mask/chamada.go). E, para cada tool_use, o que se sabe da entrada (eco de uma saída anterior,
+// palavras que o proxy traduziu de um pseudônimo). Calculado em ordem, antes de mascarar (a
+// entrada do tool_use ainda é a original), e igual nas duas passadas.
+func dicasDosComandos(msgs []any, m *mask.Masker) (dicas, dicasUso map[string]string) {
 	cs := mask.NovosComandos()
 	cmds := map[string]string{}
-	dicas := map[string]string{}
-	for _, mm := range msgs {
+	chs := map[string]*mask.Chamada{}
+	dicas, dicasUso = map[string]string{}, map[string]string{}
+	blocosDe := func(mm any) (string, []any) {
 		msg, _ := mm.(map[string]any)
+		papel, _ := msg["role"].(string)
+		if t, ok := msg["content"].(string); ok {
+			return papel, []any{map[string]any{"type": "text", "text": t}}
+		}
 		blocos, _ := msg["content"].([]any)
+		return papel, blocos
+	}
+	// os argumentos de todas as chamadas (o eco procura só por eles nas saídas)
+	for _, mm := range msgs {
+		_, blocos := blocosDe(mm)
+		for _, b := range blocos {
+			if bl, _ := b.(map[string]any); bl != nil && bl["type"] == "tool_use" {
+				if id, _ := bl["id"].(string); id != "" {
+					cmds[id] = comandoDe(bl["input"])
+					cs.Argumentos(cmds[id])
+				}
+			}
+		}
+	}
+	for _, mm := range msgs {
+		papel, blocos := blocosDe(mm)
 		for _, b := range blocos {
 			bl, _ := b.(map[string]any)
 			if bl == nil {
@@ -330,21 +356,86 @@ func dicasDosComandos(msgs []any) map[string]string {
 			}
 			id, _ := bl["id"].(string)
 			switch bl["type"] {
+			case "text":
+				if papel == "user" {
+					if t, ok := bl["text"].(string); ok {
+						cs.Usuario(semLembretes(t))
+					}
+				}
 			case "tool_use":
 				if id != "" {
-					cmds[id] = comandoDe(bl["input"])
+					ch := cs.Uso(cmds[id], traduzidasEm(m, bl["input"]))
+					chs[id] = ch
+					if e := ch.ExtUso(); e != "" {
+						dicasUso[id] = mask.ComExtensao("", e)
+					}
 				}
 			case "tool_result":
 				rid, _ := bl["tool_use_id"].(string)
+				saida := textoDe(bl["content"])
+				d := ""
 				if cmd := cmds[rid]; cmd != "" {
-					if d := cs.Dica(cmd, textoDe(bl["content"])); d != "" {
-						dicas[rid] = d
-					}
+					d = cs.Dica(cmd, saida)
+				}
+				if d = mask.ComExtensao(d, cs.Resultado(chs[rid], saida)); d != "" {
+					dicas[rid] = d
 				}
 			}
 		}
+		if papel == "assistant" {
+			cs.FimTurno()
+		}
 	}
-	return dicas
+	return dicas, dicasUso
+}
+
+// semLembretes: o texto do usuário sem os blocos <system-reminder> que o Claude Code acrescenta
+// (não são o pedido do usuário).
+func semLembretes(t string) string {
+	const ab, fe = "<system-reminder>", "</system-reminder>"
+	if !strings.Contains(t, ab) {
+		return t
+	}
+	var b strings.Builder
+	for {
+		i := strings.Index(t, ab)
+		if i < 0 {
+			b.WriteString(t)
+			return b.String()
+		}
+		b.WriteString(t[:i])
+		j := strings.Index(t[i:], fe)
+		if j < 0 {
+			return b.String()
+		}
+		t = t[i+j+len(fe):]
+	}
+}
+
+// traduzidasEm: as palavras que o proxy traduziu de um pseudônimo nas strings da entrada de um
+// tool_use (ver mask.Masker.RegistrarResposta).
+func traduzidasEm(m *mask.Masker, v any) []mask.PalavraTraduzida {
+	if m == nil {
+		return nil
+	}
+	var out []mask.PalavraTraduzida
+	var f func(v any)
+	f = func(v any) {
+		switch x := v.(type) {
+		case string:
+			out = append(out, m.PalavrasTraduzidas(x)...)
+		case []any:
+			for _, e := range x {
+				f(e)
+			}
+		case map[string]any:
+			for _, k := range chaves(x) {
+				f(x[k])
+			}
+		}
+	}
+	f(v)
+	return out
 }
 
 // comandoDe: o texto da entrada de uma ferramenta que diz o que ela faz (o comando do shell,
@@ -416,7 +507,7 @@ func (w walker) requisicaoAnthropic(v any) any {
 		case "messages":
 			if msgs, ok := val.([]any); ok {
 				w.idsWeb = w.idsDaWeb(msgs)
-				w.dicas = dicasDosComandos(msgs)
+				w.dicas, w.dicasUso = dicasDosComandos(msgs, w.m)
 				for _, mm := range msgs {
 					if msg, ok := mm.(map[string]any); ok {
 						// quem fala também faz parte da posição
@@ -504,6 +595,8 @@ func (w walker) bloco(b map[string]any) map[string]any {
 		if nome, _ := b["name"].(string); w.web(nome) {
 			w.daWeb = true
 		}
+		id, _ := b["id"].(string)
+		w.dica = w.dicasUso[id]
 		b["input"] = w.tudo(b["input"])
 		return b
 	case "tool_result":

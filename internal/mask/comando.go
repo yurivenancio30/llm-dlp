@@ -125,6 +125,7 @@ func (d *dicaSaida) tipo(h string, k, n int) string {
 // cabeçalho dos arquivos lidos, para a extração de coluna por posição.
 type Comandos struct {
 	cabs map[string][]string // caminho (e nome do arquivo) -> células do cabeçalho
+	cv   conversaCmd         // proveniência, eco e tipo pedido (chamada.go)
 }
 
 func NovosComandos() *Comandos { return &Comandos{cabs: map[string][]string{}} }
