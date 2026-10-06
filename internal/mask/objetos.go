@@ -249,20 +249,25 @@ func (m *Masker) acharObjetos(s string, aprende bool, add func(ini, fim int, tip
 		return
 	}
 	for _, l := range m.leitores {
-		l.Achar(s, func(o ObjAchado) {
-			if o.Ini < 0 || o.Fim > len(s) || o.Fim <= o.Ini || !m.objMascara(o.Ent) {
-				return
-			}
-			v := s[o.Ini:o.Fim]
-			if ehPseudoObj(v) || (l.Publico != nil && l.Publico(strings.Trim(v, "[]\"`"))) {
-				return
-			}
-			add(o.Ini, o.Fim, prefTipoObj+o.Ent)
-			if aprende {
-				m.aprenderObj(o, v, l.Publico)
-			}
-		})
+		m.rodarLeitor(l, s, aprende, add)
 	}
+}
+
+// rodarLeitor: um leitor em s, com os freios comuns (tipo desligado, pseudônimo, vocabulário).
+func (m *Masker) rodarLeitor(l Leitor, s string, aprende bool, add func(ini, fim int, tipo string)) {
+	l.Achar(s, func(o ObjAchado) {
+		if o.Ini < 0 || o.Fim > len(s) || o.Fim <= o.Ini || !m.objMascara(o.Ent) {
+			return
+		}
+		v := s[o.Ini:o.Fim]
+		if ehPseudoObj(v) || (l.Publico != nil && l.Publico(strings.Trim(v, "[]\"`"))) {
+			return
+		}
+		add(o.Ini, o.Fim, prefTipoObj+o.Ent)
+		if aprende {
+			m.aprenderObj(o, v, l.Publico)
+		}
+	})
 }
 
 // tokensObj chama fn para cada candidato a nome aprendido em s: [A-Za-z_][A-Za-z0-9_$#]*

@@ -17,11 +17,14 @@ func (m *Masker) Detectar(s string) []Achado { return m.detectar(s, true) }
 
 // detectar com aprende=false não lembra nada do que achar (conteúdo da internet): só
 // mascara onde aparece.
-func (m *Masker) detectar(s string, aprende bool) []Achado {
+func (m *Masker) detectar(s string, aprende bool) []Achado { return m.detectarD(s, aprende, nil) }
+
+// detectarD: com a dica do comando que produziu o texto (nil = sem dica).
+func (m *Masker) detectarD(s string, aprende bool, d *dicaSaida) []Achado {
 	if len(s) > grandeMin && !blocoLongo(s, margemGrande) {
-		return m.detectarGrande(s, aprende)
+		return m.detectarGrande(s, aprende, d)
 	}
-	return m.detectarInteiroA(s, aprende)
+	return m.detectarInteiroD(s, aprende, d)
 }
 
 // Texto grande é examinado em pedaços, em paralelo. Cada pedaço é examinado junto com uma
@@ -61,8 +64,12 @@ func blocoLongo(s string, limite int) bool {
 func (m *Masker) detectarInteiro(s string) []Achado { return m.detectarInteiroA(s, true) }
 
 func (m *Masker) detectarInteiroA(s string, aprende bool) []Achado {
+	return m.detectarInteiroD(s, aprende, nil)
+}
+
+func (m *Masker) detectarInteiroD(s string, aprende bool, d *dicaSaida) []Achado {
 	out := m.detectarBase(s)
-	out = append(out, m.acharEstrutura(s, aprende, out)...)
+	out = append(out, m.acharEstrutura(s, aprende, out, d)...)
 	// Valores que dependem de contexto são lembrados e reconhecidos depois em qualquer
 	// lugar (ver conhecidos.go): sem isto, vazariam quando o modelo os repete sem a
 	// palavra-chave por perto e o histórico é reenviado.
@@ -81,7 +88,7 @@ func (m *Masker) detectarInteiroA(s string, aprende bool) []Achado {
 func branco(b byte) bool { return b == ' ' || b == '\n' || b == '\t' || b == '\r' }
 
 // detectarGrande examina s em pedaços paralelos (ver o comentário acima).
-func (m *Masker) detectarGrande(s string, aprende bool) []Achado {
+func (m *Masker) detectarGrande(s string, aprende bool, d *dicaSaida) []Achado {
 	type pedaco struct{ ini, fim, jIni, jFim int } // miolo [ini,fim) e janela [jIni,jFim)
 	// depois: primeira posição >= i que vem logo depois de um espaço em branco (ou o fim)
 	depois := func(i int) int {
@@ -111,7 +118,7 @@ func (m *Masker) detectarGrande(s string, aprende bool) []Achado {
 		ini = fim
 	}
 	if len(ps) < 2 {
-		return m.detectarInteiroA(s, aprende)
+		return m.detectarInteiroD(s, aprende, d)
 	}
 	rodar := func(f func(janela string, add func(ini, fim int, tipo string))) []Achado {
 		res := make([][]Achado, len(ps))
@@ -148,7 +155,7 @@ func (m *Masker) detectarGrande(s string, aprende bool) []Achado {
 		}
 	})
 	// estrutura (objetos) e tabelas: no texto inteiro (uma estrutura pode passar de um pedaço)
-	out = append(out, m.acharEstrutura(s, aprende, out)...)
+	out = append(out, m.acharEstrutura(s, aprende, out, d)...)
 	// primeiro aprende TUDO, depois procura os valores conhecidos no texto inteiro: um valor
 	// ensinado no fim do texto é reconhecido também no começo
 	for _, a := range out {
@@ -165,11 +172,18 @@ func (m *Masker) detectarGrande(s string, aprende bool) []Achado {
 // acharEstrutura: os leitores de estrutura e de tabela, no texto sem o transporte (ver
 // normalizacao.go), com os achados de volta nas posições do original, e no original quando a
 // normalização tirou algo que traz nome. base: os achados dos detectores (para nomesNaLinha).
-func (m *Masker) acharEstrutura(s string, aprende bool, base []Achado) []Achado {
+// d: a dica do comando que produziu o texto (comando.go), ou nil. Depois dos leitores, as
+// listas homogêneas (listas.go) usam o que já se sabe para tipar os itens que faltam.
+func (m *Masker) acharEstrutura(s string, aprende bool, base []Achado, d *dicaSaida) []Achado {
 	ler := func(s string, base []Achado) []Achado {
 		var out []Achado
 		add := func(ini, fim int, tipo string) { out = append(out, Achado{ini, fim, tipo, s[ini:fim]}) }
 		m.acharObjetos(s, aprende, add)
+		if d != nil && m.cfg.Objetos.Ligado {
+			m.rodarLeitor(Leitor{Nome: "comando", Publico: publicoDica,
+				Achar: func(s string, add func(ObjAchado)) { acharComDica(s, d, add) }}, s, aprende, add)
+		}
+		m.acharListas(s, aprende, out, add)
 		if !m.cfg.Desligado("campo") {
 			m.acharTabelas(s, add)
 			out = append(out, nomesNaLinha(s, append(base[:len(base):len(base)], out...))...)

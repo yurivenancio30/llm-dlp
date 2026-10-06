@@ -408,9 +408,128 @@ func acharErroObjeto(s string, add func(ObjAchado)) {
 		}
 		erroEm(s, i+1, b, e, add)
 	}
+	if strings.IndexByte(s, '.') >= 0 {
+		acharTipoQualificado(s, add)
+	}
 	if strings.Contains(s, ":") && (strings.Contains(s, "able ") || strings.Contains(s, "ataset ") || strings.Contains(s, "ABLE ") || strings.Contains(s, "ATASET ")) {
 		acharErroBQ(s, add)
 	}
+}
+
+// palavras de tipo em português (sem acento: o texto é lido em ASCII) que também citam objeto
+var entTipoPT = map[string]string{"tabela": "tabela", "objeto": "tabela", "esquema": "schema", "banco": "database",
+	"coluna": "coluna", "indice": "indice", "colecao": "tabela", "visao": "tabela"}
+
+// acharTipoQualificado: nome qualificado SEM aspas logo depois de palavra de tipo, em qualquer
+// frase ("tabela fin.t_x: 1200 linhas", "Loading table a.b.c", "created sql table model
+// fin.t_x"). Entre a palavra e o nome cabe uma palavra em minúsculas ("table model", "view
+// model"). Sem aspas, só o nome qualificado vale: "table x" sozinho é prosa demais. Evidência
+// forte com a palavra de tipo colada ao nome; com a palavra no meio, fraca.
+func acharTipoQualificado(s string, add func(ObjAchado)) {
+	letra := func(c byte) bool { return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' }
+	var buf [10]byte
+	for i := 0; i < len(s); i++ {
+		if !letra(s[i]) || i > 0 && (letra(s[i-1]) || s[i-1] == '_' || s[i-1] == '.' || s[i-1] >= '0' && s[i-1] <= '9') {
+			continue
+		}
+		j := i
+		for j < len(s) && letra(s[j]) && j-i < 10 {
+			j++
+		}
+		if j-i < 4 || j < len(s) && (letra(s[j]) || s[j] != ' ' && s[j] != '\t') {
+			i = j
+			continue
+		}
+		n := j - i
+		for x := 0; x < n; x++ {
+			buf[x] = s[i+x] | 0x20
+		}
+		w := string(buf[:n])
+		e, ok := entErro[w]
+		if !ok {
+			e, ok = entTipoPT[w]
+		}
+		if !ok {
+			i = j - 1
+			continue
+		}
+		p := j
+		for p < len(s) && (s[p] == ' ' || s[p] == '\t') {
+			p++
+		}
+		meio := false
+		if q := p; q < len(s) && s[q] >= 'a' && s[q] <= 'z' { // uma palavra no meio ("table model")
+			for q < len(s) && s[q] >= 'a' && s[q] <= 'z' {
+				q++
+			}
+			if q-p >= 2 && q-p <= 12 && q < len(s) && (s[q] == ' ' || s[q] == '\t') {
+				r := q
+				for r < len(s) && (s[r] == ' ' || s[r] == '\t') {
+					r++
+				}
+				if a, b := qualificadoEm(s, r); b > a {
+					meio = true
+					p = r
+				}
+			}
+		}
+		a, b := qualificadoEm(s, p)
+		if b <= a {
+			i = j - 1
+			continue
+		}
+		ps := strings.Split(s[a:b], ".")
+		if receptoresCodigo[strings.ToLower(ps[0])] || publicoDev(ps[0]) {
+			i = b
+			continue
+		}
+		forte := !meio && e != "coluna"
+		ents := entQual(len(ps), e)
+		for k, v := range ps {
+			if !publicoSQL(v) {
+				add(ObjAchado{a, a + len(v), ents[k], "tipo-qualificado", forte && len(v) >= 3})
+			}
+			a += len(v) + 1
+		}
+		i = b
+	}
+}
+
+// qualificadoEm: o nome qualificado (2 ou 3 partes, sem aspas) que começa em s[p], ou a == b.
+// Não vale arquivo (fin.csv), domínio público, chamada (a.b(), caminho (a.b/c) nem versão.
+func qualificadoEm(s string, p int) (int, int) {
+	ident := func(c byte) bool { return ehAlnum(c) || c == '_' || c == '$' }
+	if p >= len(s) || !(letraD(s[p]) || s[p] == '_') {
+		return p, p
+	}
+	q, partes := p, 0
+	for {
+		k := q
+		for k < len(s) && ident(s[k]) {
+			k++
+		}
+		if k == q {
+			return p, p
+		}
+		partes++
+		q = k
+		if q+1 < len(s) && s[q] == '.' && (letraD(s[q+1]) || s[q+1] == '_') && partes < 4 {
+			q++
+			continue
+		}
+		break
+	}
+	if partes < 2 || partes > 3 || q < len(s) && (ident(s[q]) || s[q] == '(' || s[q] == '/' || s[q] == '-' || s[q] == '.' && q+1 < len(s) && ehAlnum(s[q+1])) {
+		return p, p
+	}
+	ult := s[strings.LastIndexByte(s[p:q], '.')+p+1 : q]
+	if strings.IndexByte(s[p:q], '.') < 2 || len(ult) < 3 { // "i.e.", "e.g."
+		return p, p
+	}
+	if l := strings.ToLower(ult); extensoesArquivo[l] || tldsPublicos[l] {
+		return p, p
+	}
+	return p, q
 }
 
 // palavrasErro: a linha tem cara de mensagem de erro (só então o nome citado ensina)

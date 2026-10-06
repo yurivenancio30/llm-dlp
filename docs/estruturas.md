@@ -170,6 +170,7 @@ então a regra não depende dele; **[fase 2]** = saiu da 1ª fase.
 9. [Código](#código)
 10. [NoSQL e busca](#nosql-e-busca)
 11. [Formatos de transporte](#formatos-de-transporte-diff-grep-numeração-logs-markdown-heredoc)
+    - [Saídas soltas de script e de shell](#saídas-soltas-de-script-e-de-shell)
 12. [Reserva genérica](#reserva-genérica)
 
 
@@ -2695,6 +2696,69 @@ entre os `\"`, e as aspas escapadas ficam.
 Sem fonte oficial lida (marcados [VERIFICAR]): formato `N<tab>` do Read (conferido nas sessões: 605 de 640 resultados; nenhum com `N→`), largura do `cat -n`
 (coreutils deu 429), formato de linha do ERRORLOG, logs Airflow/Spark, forma literal
 `LOG:  statement:` do PostgreSQL, texto de linha omitida do rg.
+
+
+## Saídas soltas de script e de shell
+
+Saída de script e de shell não tem formato fixo. Valem quatro mecanismos genéricos, nenhum por
+ferramenta (os nomes de ferramenta abaixo são exemplos de onde a forma aparece):
+
+**1. O comando diz o que a saída é** (`comando.go`; o proxy liga o `tool_use` ao `tool_result`
+do mesmo id em `requisicao.go`, `dicasDosComandos`). A entrada da ferramenta (o `command` do
+shell, ou as strings da entrada, sem a descrição) vira uma *dica* com o tipo das colunas da
+saída, que vai junto do texto na chave da memória de resultados. A dica só é evidência para o
+leitor de tabela (`classificarTabelaD`, em modo dica: só as colunas que o cabeçalho não tipa) e
+para a saída sem cabeçalho (`linhasDica`: toda linha com o mesmo número de células, por `|`,
+TAB, `,`, `;` ou espaço; uma linha fora da forma desfaz tudo; o rodapé `(N rows)` e a linha que
+repete o cabeçalho ficam de fora; `uniq -c` tem a contagem tirada). Formas:
+- SQL no comando: a última `SELECT ... FROM` dá o tipo de cada coluna em ordem e pelo nome
+  (alias ou coluna, pelo cabeçalho de catálogo/palavra de tipo); `name` vale pelo catálogo do
+  FROM no plural (`sys.tables` → tabela); `SELECT *` não dá posição. `SHOW <tipos>` dá o tipo da
+  coluna `name` (`SHOW SCHEMAS` → schema); `DESCRIBE` dá coluna. Evidência forte.
+- extração de coluna por posição (`cut -d, -fN`, `awk -F, '{print $N}'`) sobre um arquivo cujo
+  cabeçalho já passou pela conversa (a saída de um comando que cita o arquivo começa com
+  `a,b,c` de identificadores, inclusive pela ferramenta de leitura): a coluna N tem o tipo do
+  cabeçalho N. Forte.
+- listagem de recurso: `<cli> get|list|ls <tipo>`, `<cli> <tipo> list`, `<cli> list-<tipo>`
+  (o verbo nunca é o programa: `ls` e `ps` do shell não contam) dão o tipo da coluna
+  `NAME`/`NAMES`; `<cli> ps` e `<cli> list` sem tipo, serviço (contêineres, releases). Tipos:
+  as palavras de tipo (`tables`, `topics`, `buckets`, `instances`...) e os recursos de
+  orquestrador e contêiner com as abreviações das CLIs (`pods`, `deploy`, `svc`, `ns`,
+  `nodes`...). Evidência fraca (mascara no lugar; ensina só com outra regra) e só valor com
+  cara de identificador fora do vocabulário de devops (`kube-system`, `bridge` ficam).
+
+**2. Nome qualificado depois de palavra de tipo, em qualquer frase** (leitor de erro,
+`acharTipoQualificado`, estendido de "palavra de tipo + nome entre aspas" para nome sem
+aspas): `tabela fin.t_x: 1200 linhas`, `Loading table a.b.c`, `created sql table model
+fin.t_x` (uma palavra em minúsculas cabe no meio, e então a evidência é fraca). Palavras de
+tipo em inglês e português (`tabela`, `esquema`, `banco`, `objeto`...). Sem aspas, só nome
+qualificado (2 ou 3 partes, a última com 3+ letras): não vale arquivo (`vendas.csv`), domínio
+público, chamada, caminho, versão, `i.e.`, nem receptor de código (`os.path`). Endereço de banco
+sem esquema `host:porta/banco` (EZConnect e mensagens de conexão) no leitor de conexão, só em
+linha que fala de conexão (`conect`, `connect`, `conex`), com `como|as <usuário>` logo depois;
+sem usuário, host público com banco sem cara de nome (`localhost:8080/api`) não vale.
+
+**3. Lista homogênea** (`listas.go`, roda depois dos leitores, porque depende do que já se
+sabe): numa coluna solta (um item por linha, com marcador `- `/`* `), em contagem + valor
+(`sort | uniq -c`, `value_counts`), em linha decorada de laço (`== t_x ==`, `--- t_x`, `## t_x`,
+agrupadas pela decoração) ou numa lista entre vírgulas (com ou sem aspas e colchetes:
+`json.dumps`, `print`), com 3+ itens e pelo menos metade já nomes de um mesmo tipo (aprendidos
+antes ou achados pelos leitores neste texto), os outros itens com cara de identificador são do
+mesmo tipo (mascara e aprende). Lista entre os parênteses de uma chamada (`f(a, b, c)`) não
+conta; arquivo e tipo de dado não viram item. Idem para nome qualificado com uma parte
+conhecida na posição de schema ou banco: `fin.<x>` com `fin` aprendido como schema faz de `<x>`
+uma tabela.
+
+**4. O resto é propagação** (vistos): um nome aprendido é mascarado dentro de qualquer forma
+(f-string, log, `B2=t_x`, texto extraído de .docx/.pdf, linha de `kubectl logs`).
+
+Limites: texto de .docx/.pdf (e prosa em geral) só é coberto pela propagação: um nome que
+aparece pela primeira vez ali, sem estrutura, passa. A dica vale só para o resultado da
+própria chamada; saída de script que não diz o que imprime (sem SQL, sem cabeçalho, sem lista
+com nomes já conhecidos) também passa. Na lista homogênea, um nome que só aparece em listas
+de nomes desconhecidos não é visto. Quando a primeira linha de uma saída sem cabeçalho é lida
+pelo leitor de tabela como cabeçalho, a célula sai mascarada como coluna (o tipo da dica não
+substitui o do cabeçalho).
 
 
 # 12 — Reserva genérica (formato estruturado desconhecido)
