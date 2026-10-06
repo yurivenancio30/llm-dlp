@@ -1050,6 +1050,19 @@ Polars, Spark, Avro, Protobuf, R: `vocab_tipos.go`). Em YAML/JSON, `name` vale p
 é schema, e sob uma chave que é palavra de tipo (`table`, `dataset`, `database`...) é desse
 tipo; `owner` é usuário; valor qualificado (`db.schema.tabela`) é dividido nas partes.
 
+**Chave → valor em qualquer sintaxe** (leitor de chave-valor, `leitor_chave_valor.go`, e de
+código, estendidos). A palavra de tipo é reconhecida em qualquer grafia: o nome da chave é
+dividido em pedaços (camelCase, snake_case, kebab, pontos) e também colado a `name`/`path`
+(`dbname`, `rolename`, `warehousename`, `accountname`, `fieldPath`); palavras de tipo novas:
+`column`/`coluna`/`field` (coluna), `role` (usuário), `view` (tabela), `procedure`/`routine`;
+`serviceAccountName` é usuário. Formas novas: vários `k=v` na mesma linha (2+ pares separados
+por espaço, sem `(` nem `, ` na linha, que seriam argumentos nomeados); valor em lista na
+mesma linha (`"tables": ["a", "b"]`, `tabelas: [a, b]`) e lista YAML logo abaixo da chave
+(cada item é do tipo da chave, no singular ou no plural, inclusive em português); `name=`
+dentro de uma tag XML vale pela tag (`<column name="x">`); chave com `__` em volta
+(`__tablename__`); `Chave Valor` por espaço num bloco de 2+ linhas assim (ssh config);
+linha `IP nome [nome...]` (/etc/hosts): os nomes são servidores.
+
 Ideia central: nesses formatos, quem diz o que um token é não é o token, e sim a **posição**
 (o valor de qual chave, ou o fato de ser chave de um mapa sob um pai conhecido). O detector
 analisa a estrutura e usa o vocabulário da especificação para separar o que é fixo e público

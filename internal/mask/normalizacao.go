@@ -114,7 +114,7 @@ func normalizar(s string) (*textoNorm, bool) {
 
 // talvezTransporte: teste barato antes do trabalho (o texto comum não paga nada).
 func talvezTransporte(s string) bool {
-	if strings.Contains(s, `\n`) || strings.IndexByte(s, 0x1b) >= 0 || strings.IndexByte(s, '\r') >= 0 ||
+	if strings.Contains(s, `\n`) || strings.Contains(s, `\"`) || strings.IndexByte(s, 0x1b) >= 0 || strings.IndexByte(s, '\r') >= 0 ||
 		strings.Contains(s, "\xe2\x94") || strings.Contains(s, "\xe2\x95") || strings.HasPrefix(s, "\ufeff") ||
 		strings.Contains(s, "→") || strings.Contains(s, "```") || strings.Contains(s, "\n@@ ") || strings.HasPrefix(s, "@@ ") ||
 		strings.Contains(s, "\n+++ ") || strings.Contains(s, "\n> ") || strings.HasPrefix(s, "> ") {
@@ -144,7 +144,7 @@ func talvezTransporte(s string) bool {
 // quebra de linha escapada vira um bloco próprio (o resto, a estrutura do JSON, os leitores já
 // leem no original); sem aspas em volta, o texto inteiro é decodificado.
 func desescaparJSON(s string) (string, []int, bool) {
-	if strings.Count(s, `\n`) < 2 && strings.Count(s, `\"`) < 4 {
+	if strings.Count(s, `\n`) < 2 && strings.Count(s, `\"`) < 4 && !(strings.Contains(s, `\n`) && pareceJSON(s)) {
 		return s, nil, false
 	}
 	var m montador
@@ -211,6 +211,12 @@ func desescaparJSON(s string) (string, []int, bool) {
 	}
 	t, mp := m.fim(len(s))
 	return t, mp, true
+}
+
+// pareceJSON: o texto é um objeto ou lista de JSON (uma só quebra de linha escapada já basta).
+func pareceJSON(s string) bool {
+	t := strings.TrimSpace(s)
+	return len(t) > 2 && (t[0] == '{' || t[0] == '[') && strings.Contains(t, `":`)
 }
 
 var reANSI = regexp.MustCompile(`\x1b(?:\[[0-9;?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\)|[@-Z\\-_])`)

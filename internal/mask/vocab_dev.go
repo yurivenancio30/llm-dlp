@@ -79,17 +79,26 @@ var entPedaco = map[string]string{
 	"repo": "repositorio", "repository": "repositorio",
 	"org": "organizacao", "organization": "organizacao",
 	"account": "conta_nuvem", "tenant": "conta_nuvem", "subscription": "conta_nuvem", "projectid": "conta_nuvem",
+	"column": "coluna", "coluna": "coluna", "field": "coluna", "role": "usuario",
+	"procedure": "procedure", "routine": "procedure", "view": "tabela",
 }
 
 // "<x>_name": o pedaço antes de "name" diz a entidade (db_name, table_name...)
 var entAntesDeNome = map[string]string{"db": "database", "database": "database", "table": "tabela", "schema": "schema",
 	"host": "servidor", "server": "servidor", "user": "usuario", "service": "servico", "bucket": "bucket", "queue": "fila",
 	"topic": "fila", "group": "servico", "namespace": "namespace", "cluster": "servidor", "collection": "tabela",
-	"stream": "fila", "subject": "fila", "exchange": "fila", "repo": "repositorio", "container": "bucket"}
+	"stream": "fila", "subject": "fila", "exchange": "fila", "repo": "repositorio", "container": "bucket",
+	"column": "coluna", "field": "coluna", "role": "usuario", "warehouse": "servidor", "account": "conta_nuvem", "owner": "usuario",
+	"view": "tabela", "procedure": "procedure", "function": "procedure", "index": "indice", "constraint": "indice", "catalog": "database"}
+
+// sufixos colados a uma palavra de tipo ("rolename", "warehousename", "fieldpath")
+var sufixosColados = []string{"names", "name", "nome", "path", "fqn"}
 
 // plurais aceitos como o tipo (o nome guarda uma lista desse tipo)
 var pluralTipo = conj("topics", "queues", "buckets", "hosts", "servers", "brokers", "tables", "databases", "schemas",
-	"namespaces", "clusters", "subjects", "streams", "exchanges")
+	"namespaces", "clusters", "subjects", "streams", "exchanges", "columns", "fields", "roles", "warehouses", "views",
+	"accounts", "repositories", "repos", "procedures", "routines", "users",
+	"tabelas", "colunas", "filas", "topicos", "servidores", "bancos", "usuarios")
 
 // atributos: último pedaço de chave que não é o nome do recurso ("db.port", "host.timeout")
 var atributoChave = conj("name", "names", "id", "ids", "port", "ports", "timeout", "timeouts", "count", "size", "enabled", "enable", "disabled", "max",

@@ -1,6 +1,9 @@
 package mask
 
-import "strings"
+import (
+	"regexp"
+	"strings"
+)
 
 // Leitor de chave-valor genérico (ver docs/estruturas.md, seção JSON, YAML, TOML, INI, .env,
 // .properties, XML): o valor de uma chave cujo ÚLTIMO pedaço do nome diz o que ele é
@@ -82,6 +85,14 @@ func entChave(k string) (ent string, forte bool) {
 	if e, ok := entPedaco[string(ult)]; ok {
 		return e, true
 	}
+	// colado: "rolename", "warehousename", "accountname", "fieldpath"
+	for _, suf := range sufixosColados {
+		if u := string(ult); len(u) > len(suf)+1 && strings.HasSuffix(u, suf) {
+			if e, ok := entAntesDeNome[u[:len(u)-len(suf)]]; ok {
+				return e, true
+			}
+		}
+	}
 	// plural: topics, queues, buckets, hosts, brokers
 	if u := string(ult); len(u) > 3 && u[len(u)-1] == 's' {
 		if e, ok := entPedaco[u[:len(u)-1]]; ok && pluralTipo[u] {
@@ -91,7 +102,10 @@ func entChave(k string) (ent string, forte bool) {
 	if n >= 2 {
 		pen := minusculo(k, ps[n-2], &b2)
 		// "<tipo>Name", "<tipo>_id", "groupId": o pedaço antes de name/id diz o tipo
-		if u := string(ult); u == "name" || u == "names" || u == "id" || u == "ids" {
+		if string(pen) == "account" && n >= 3 && strings.EqualFold(k[ps[n-3][0]:ps[n-3][1]], "service") {
+			return "usuario", true // serviceAccountName: conta de serviço é usuário
+		}
+		if u := string(ult); u == "name" || u == "names" || u == "id" || u == "ids" || u == "path" && (string(pen) == "field" || string(pen) == "column") {
 			if e, ok := entAntesDeNome[string(pen)]; ok {
 				return e, true
 			}
@@ -201,6 +215,9 @@ func acharChaveValor(s string, add func(ObjAchado)) {
 	if strings.Contains(s, "</") {
 		acharXMLValor(s, add)
 	}
+	if strings.Count(s, "\n") >= 1 {
+		acharChaveEspaco(s, add)
+	}
 	if strings.Contains(s, "--") {
 		acharOpcoesLongas(s, add)
 	}
@@ -240,7 +257,7 @@ func kvEm(s string, p int, add func(ObjAchado)) {
 		ka, kb, ini = a, k, a
 	}
 	// ":" de YAML/.properties pede espaço depois; JSON (chave entre aspas) não
-	if c == ':' && !aspasChave && nx != ' ' && nx != '\t' {
+	if c == ':' && !aspasChave && nx != ' ' && nx != '\t' && nx != '\n' && nx != '\r' {
 		return
 	}
 	if kb <= ka || kb-ka > 64 {
@@ -253,6 +270,9 @@ func kvEm(s string, p int, add func(ObjAchado)) {
 			cli = true
 		}
 	}
+	for !aspasChave && kb-ka > 4 && s[ka] == '_' && s[kb-1] == '_' { // __tablename__ (Python)
+		ka, kb = ka+1, kb-1
+	}
 	if ka >= kb || !letraD(s[ka]) || s[kb-1] == '.' {
 		return
 	}
@@ -261,6 +281,9 @@ func kvEm(s string, p int, add func(ObjAchado)) {
 	}
 	chave := s[ka:kb]
 	ent, exata := entChave(chave)
+	if ent == "" && c == '=' && (chave == "name" || chave == "nome") {
+		ent, exata = tagEnvolvente(s, ini), true // <column name="x">
+	}
 	if ent == "" {
 		return
 	}
@@ -285,6 +308,13 @@ func kvEm(s string, p int, add func(ObjAchado)) {
 		v++
 	}
 	if v >= len(s) || s[v] == '\n' || s[v] == '\r' {
+		if c == ':' && inicioLinha {
+			listaYAML(s, v, ent, add) // "tables:\n  - a\n  - b"
+		}
+		return
+	}
+	if s[v] == '[' {
+		listaEmLinha(s, v, ent, add) // "tables": ["a", "b"], tabelas: [a, b]
 		return
 	}
 	va, vb := v, v
@@ -332,7 +362,7 @@ func kvEm(s string, p int, add func(ObjAchado)) {
 			r++
 		}
 		fimLinha := r == len(s) || s[r] == '\n' || s[r] == '#' && r > vb
-		if !inicioLinha || !fimLinha {
+		if (!inicioLinha || !fimLinha) && !(c == '=' && pv != ' ' && nx != ' ' && paresNaLinha(s, p) >= 2) {
 			return
 		}
 		pontuada := strings.IndexByte(chave, '.') >= 0
@@ -366,6 +396,114 @@ func kvEm(s string, p int, add func(ObjAchado)) {
 		}
 	}
 	marcarValor(s, va, vb, ent, "chave-valor", exata, add)
+}
+
+// listaYAML: os itens "- x" logo abaixo de "chave:" (recuados) são do tipo da chave.
+func listaYAML(s string, v int, ent string, add func(ObjAchado)) {
+	i := v
+	for n := 0; n < 200; n++ {
+		nl := strings.IndexByte(s[i:], '\n')
+		if nl < 0 {
+			return
+		}
+		i += nl + 1
+		a := i
+		for a < len(s) && (s[a] == ' ' || s[a] == '\t') {
+			a++
+		}
+		if a == i || a+1 >= len(s) || s[a] != '-' || s[a+1] != ' ' {
+			return // fim da lista (ou item sem recuo)
+		}
+		a += 2
+		b := a
+		for b < len(s) && s[b] != '\n' && s[b] != '\r' && s[b] != '#' {
+			b++
+		}
+		for b > a && (s[b-1] == ' ' || s[b-1] == '\t') {
+			b--
+		}
+		if b-a >= 2 && (s[a] == '"' || s[a] == '\'') && s[b-1] == s[a] {
+			a, b = a+1, b-1
+		}
+		if v := s[a:b]; strings.ContainsAny(v, ":{}[] ") {
+			return // item que é mapa ou frase: não é lista de nomes
+		}
+		marcarValor(s, a, b, ent, "chave-valor", true, add)
+	}
+}
+
+// listaEmLinha: [a, b] ou ["a", "b"] numa linha só: cada item é do tipo da chave.
+func listaEmLinha(s string, v int, ent string, add func(ObjAchado)) {
+	f := strings.IndexByte(s[v:min(len(s), v+2000)], ']')
+	if f < 0 || strings.ContainsAny(s[v+1:v+f], "\n[{(") {
+		return
+	}
+	i := v + 1
+	for i < v+f {
+		for i < v+f && (s[i] == ' ' || s[i] == ',') {
+			i++
+		}
+		a, b := i, i
+		if i < v+f && (s[i] == '"' || s[i] == '\'') {
+			e := strings.IndexByte(s[i+1:v+f], s[i])
+			if e < 0 {
+				return
+			}
+			a, b = i+1, i+1+e
+			i = b + 1
+		} else {
+			for b < v+f && s[b] != ',' {
+				b++
+			}
+			i = b
+			for b > a && s[b-1] == ' ' {
+				b--
+			}
+		}
+		if b > a {
+			marcarValor(s, a, b, ent, "chave-valor", true, add)
+		}
+	}
+}
+
+// paresNaLinha: quantos "chave=valor" (sem espaço em volta do "=") separados por espaço há na
+// linha de s[p] (log em chave=valor, "db=x schema=y tabela=z"). Linha com "(" ou ", " é código
+// (argumentos nomeados) e não conta.
+func paresNaLinha(s string, p int) int {
+	l := s[inicioLinhaJ(s, p):fimLinhaJ(s, p)]
+	if strings.Contains(l, "(") || strings.Contains(l, ", ") {
+		return 0
+	}
+	n := 0
+	for _, t := range strings.Fields(l) {
+		if e := strings.IndexByte(t, '='); e > 0 && e+1 < len(t) && letraD(t[0]) && t[e+1] != '=' {
+			n++
+		}
+	}
+	return n
+}
+
+// tagEnvolvente: a entidade que a tag XML aberta antes de s[i] indica (<column name="x">,
+// <createTable tableName=...>): a palavra de tipo no nome da tag.
+func tagEnvolvente(s string, i int) string {
+	a := max(0, i-300)
+	lt := strings.LastIndexByte(s[a:i], '<')
+	if lt < 0 || strings.IndexByte(s[a+lt:i], '>') >= 0 {
+		return ""
+	}
+	t := a + lt + 1
+	e := t
+	for e < i && (ehAlnum(s[e]) || s[e] == '_' || s[e] == '-' || s[e] == ':') {
+		e++
+	}
+	if e == t {
+		return ""
+	}
+	tag := s[t:e]
+	if k := strings.LastIndexByte(tag, ':'); k >= 0 {
+		tag = tag[k+1:]
+	}
+	return entConteiner(tag)
 }
 
 func ultimoPedaco(k string) string {
@@ -580,3 +718,63 @@ func acharOpcoesLongas(s string, add func(ObjAchado)) {
 		i += 2 + j
 	}
 }
+
+// ---------------------------------------------------------------------------------------
+// "Chave Valor" separados por espaço, uma por linha (ssh config, arquivos de configuração no
+// estilo Apache): vale num bloco de 2+ linhas consecutivas nessa forma, com a chave sendo uma
+// palavra de tipo. "IP nome [nome...]" (/etc/hosts): os nomes são servidores.
+
+func acharChaveEspaco(s string, add func(ObjAchado)) {
+	ls := quebraLinhas(s)
+	forma := make([]bool, len(ls))
+	toks := make([][]celula, len(ls))
+	for k, l := range ls {
+		ts := tokensLinha(s, l[0], l[1])
+		toks[k] = ts
+		if len(ts) >= 2 && !strings.HasPrefix(s[ts[0].a:ts[0].b], "#") {
+			if ip := s[ts[0].a:ts[0].b]; ehIPv4(ip) || strings.Count(ip, ":") >= 2 && strings.Trim(ip, "0123456789abcdefABCDEF:") == "" {
+				ipNomes(s, ts[1:], add)
+				continue
+			}
+		}
+		forma[k] = len(ts) == 2 && reChaveEspaco.MatchString(s[ts[0].a:ts[0].b])
+	}
+	for k := range ls {
+		if !forma[k] || !(k > 0 && forma[k-1] || k+1 < len(ls) && forma[k+1]) {
+			continue
+		}
+		ch, v := toks[k][0], toks[k][1]
+		ent, forte := entChave(s[ch.a:ch.b])
+		if ent == "" || !forte {
+			continue
+		}
+		if val := s[v.a:v.b]; caraDeIdentificador(val) || tracoOuDigito(val) {
+			marcarValor(s, v.a, v.b, ent, "chave-espaço", true, add)
+		}
+	}
+}
+
+var reChaveEspaco = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_.-]*$`)
+
+// ipNomes: os nomes depois do IP numa linha de hosts (todos com forma de nome de servidor;
+// qualquer outra coisa na linha, como em log de acesso, desfaz).
+func ipNomes(s string, ts []celula, add func(ObjAchado)) {
+	if len(ts) > 8 {
+		return
+	}
+	for _, t := range ts {
+		if v := s[t.a:t.b]; strings.HasPrefix(v, "#") {
+			ts = ts[:0:0]
+			break
+		} else if !reNomeHost.MatchString(v) {
+			return
+		}
+	}
+	for _, t := range ts {
+		if v := s[t.a:t.b]; v != "localhost" && !strings.HasPrefix(v, "localhost.") && !strings.HasPrefix(v, "ip6-") {
+			addHost(s, t.a, t.b, "hosts", true, add)
+		}
+	}
+}
+
+var reNomeHost = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9.-]*[A-Za-z0-9]$`)
