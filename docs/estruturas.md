@@ -112,7 +112,8 @@ entre partes ou mistura de caixa), se o seu tipo estiver em `propagar` e se a ev
 
 - posição inequívoca: o nome de objeto depois de `CREATE`/`ALTER`/`FROM`/`JOIN`/`INTO`/`UPDATE`
   numa instrução reconhecida como SQL por pelo menos 2 sinais (a forma mínima da gramática e o
-  tipo do bloco, ou mais de uma cláusula); valor de coluna de catálogo (`table_name`,
+  tipo do bloco, ou mais de uma cláusula, ou uma cláusula só com forma inequívoca, em maiúsculas
+  ou minúsculas: `SELECT * FROM fin.tb_x`, `update tb_x set ...`); valor de coluna de catálogo (`table_name`,
   `TABSCHEMA`, `Key_name`…); chave de conexão (`Server=`, `host:`, `-S`, `jdbc:…//host`); URN;
 - ou o mesmo nome visto em **2 regras estruturais diferentes**.
 

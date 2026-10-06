@@ -195,8 +195,11 @@ func acharCodigoNome(s string, add func(ObjAchado)) {
 			nome = nomeAntes(s, k-1)
 			// "? 'x' : 'y'" (operador ternário) não é chave
 			if p := antesBranco(s, k); p >= 0 && ehAspa(s[p]) {
-				if q := antesBranco(s, strings.LastIndexByte(s[:p], s[p])); q >= 0 && s[q] == '?' {
-					nome = ""
+				a := max(0, p-janelaLinha)
+				if o := strings.LastIndexByte(s[a:p], s[p]); o >= 0 {
+					if q := antesBranco(s, a+o); q >= 0 && s[q] == '?' {
+						nome = ""
+					}
 				}
 			}
 		case c == ',':

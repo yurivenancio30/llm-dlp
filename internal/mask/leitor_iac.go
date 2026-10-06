@@ -168,6 +168,11 @@ func atribHCL(s string, v, fim int, attr, tipo string, pilha []string, add func(
 	}
 	prof := len(pilha)
 	bloco := pilha[len(pilha)-1]
+	// metadata { name = ... }: o bloco de metadados descreve o próprio recurso (provedor do
+	// Kubernetes), então vale como o nível do recurso
+	if prof == 2 && bloco == "metadata" {
+		prof = 1
+	}
 	tags := bloco == "tags" || bloco == "tags_all" || bloco == "labels"
 	if s[v] == '{' && (attr == "tags" || attr == "tags_all") {
 		if m := reTagNome.FindStringSubmatchIndex(s[v:fim]); m != nil {

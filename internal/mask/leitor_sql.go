@@ -52,20 +52,31 @@ var (
 	reQualTok  = regexp.MustCompile(reQualSQL)
 	reParteSQL = regexp.MustCompile(reIdSQL)
 	// posições de objeto: palavra-chave -> entidade do último pedaço
+	// tem: palavras (em maiúsculas) sem as quais a regex não casa; evita rodá-la à toa
 	rePosObjSQL = []struct {
 		re  *regexp.Regexp
 		ent string
+		tem []string
 	}{
-		{regexp.MustCompile(`(?i)\b(?:FROM|JOIN|INTO|UPDATE|TABLE|VIEW|REFERENCES|USING|OVERWRITE)\s+(?:IF\s+(?:NOT\s+)?EXISTS\s+|ONLY\s+)?(` + reQualSQL + `)`), "tabela"},
-		{regexp.MustCompile(`(?i)\b(?:PROCEDURE|PROC|FUNCTION|TRIGGER|PACKAGE(?:\s+BODY)?|EXEC|EXECUTE|CALL)\s+(?:IF\s+(?:NOT\s+)?EXISTS\s+)?(` + reQualSQL + `)`), "procedure"},
-		{regexp.MustCompile(`(?i)\b(?:USE|DATABASE)\s+(?:IF\s+(?:NOT\s+)?EXISTS\s+)?(` + reQualSQL + `)`), "database"},
-		{regexp.MustCompile(`(?i)\bSCHEMA\s+(?:IF\s+(?:NOT\s+)?EXISTS\s+)?(` + reQualSQL + `)`), "schema"},
-		{regexp.MustCompile(`(?i)\bINDEX\s+(?:IF\s+(?:NOT\s+)?EXISTS\s+)?(` + reIdSQL + `)`), "indice"},
-		{regexp.MustCompile(`(?i)\bCONSTRAINT\s+(` + reIdSQL + `)`), "indice"},
+		{regexp.MustCompile(`(?i)\b(?:FROM|JOIN|INTO|UPDATE|TABLE|VIEW|REFERENCES|USING|OVERWRITE)\s+(?:IF\s+(?:NOT\s+)?EXISTS\s+|ONLY\s+)?(` + reQualSQL + `)`), "tabela", nil},
+		{regexp.MustCompile(`(?i)\b(?:PROCEDURE|PROC|FUNCTION|TRIGGER|PACKAGE(?:\s+BODY)?|EXEC|EXECUTE|CALL)\s+(?:IF\s+(?:NOT\s+)?EXISTS\s+)?(` + reQualSQL + `)`), "procedure", []string{"PROC", "FUNCTION", "TRIGGER", "PACKAGE", "EXEC", "CALL"}},
+		{regexp.MustCompile(`(?i)\b(?:USE|DATABASE)\s+(?:IF\s+(?:NOT\s+)?EXISTS\s+)?(` + reQualSQL + `)`), "database", []string{"USE", "DATABASE"}},
+		{regexp.MustCompile(`(?i)\bSCHEMA\s+(?:IF\s+(?:NOT\s+)?EXISTS\s+)?(` + reQualSQL + `)`), "schema", []string{"SCHEMA"}},
+		{regexp.MustCompile(`(?i)\bINDEX\s+(?:IF\s+(?:NOT\s+)?EXISTS\s+)?(` + reIdSQL + `)`), "indice", []string{"INDEX"}},
+		{regexp.MustCompile(`(?i)\bCONSTRAINT\s+(` + reIdSQL + `)`), "indice", []string{"CONSTRAINT"}},
 	}
 	reOnObjSQL = regexp.MustCompile(`(?i)\bON\s+(` + reQualSQL + `)\s*(?:\(|TO\b|FROM\b|;|$)`)
 	reListaSQL = regexp.MustCompile(`^\s*(?:(?:AS\s+)?[A-Za-z_]\w*\s*)?,\s*(` + reQualSQL + `)`)
 )
+
+func temAlguma(s string, ps []string) bool {
+	for _, p := range ps {
+		if strings.Contains(s, p) {
+			return true
+		}
+	}
+	return false
+}
 
 // entQual: as entidades de cada parte de um nome qualificado a.b.c.d (ult = a do último).
 func entQual(n int, ult string) []string {
@@ -199,9 +210,11 @@ func acharSQL(s string, add func(ObjAchado)) {
 			return
 		}
 		claus := len(reClausulasSQL.FindAllStringIndex(corpo, 4))
+		// uma cláusula só: em minúsculas, só vale com forma inequívoca; em maiúsculas vale
+		// sempre, e ensina quando a forma também é inequívoca
 		inequivoca := false
-		if !maiusc && claus < 2 {
-			if inequivoca = formaInequivoca(corpo, kw); !inequivoca {
+		if claus < 2 {
+			if inequivoca = formaInequivoca(corpo, kw); !inequivoca && !maiusc {
 				return
 			}
 		}
@@ -266,7 +279,11 @@ func instrucaoSQL(s string, base int, corpo, kw string, forte bool, add func(Obj
 		}
 		objetos[strings.ToLower(strings.Trim(lit[vs[len(vs)-1][0]:vs[len(vs)-1][1]], "[]\"`"))] = true
 	}
+	up := strings.ToUpper(lit)
 	for _, p := range rePosObjSQL {
+		if p.tem != nil && !temAlguma(up, p.tem) {
+			continue
+		}
 		for _, m := range p.re.FindAllStringSubmatchIndex(lit, -1) {
 			marcarQual(m[2], m[3], p.ent)
 			if p.ent == "tabela" { // FROM a, b, c
@@ -399,11 +416,7 @@ var palavrasErro = []string{"error", "erro", "exist", "not found", "invalid", "u
 	"failed", "falhou", "inválid", "não encontrad", "msg ", "ora-", "sqlstate", "exception"}
 
 func linhaDeErro(s string, i int) bool {
-	a := strings.LastIndexByte(s[:i], '\n') + 1
-	z := len(s)
-	if k := strings.IndexByte(s[i:], '\n'); k >= 0 {
-		z = i + k
-	}
+	a, z := inicioLinhaJ(s, i), fimLinhaJ(s, i)
 	l := strings.ToLower(s[max(a, i-300):min(z, i+300)])
 	for _, p := range palavrasErro {
 		if strings.Contains(l, p) {

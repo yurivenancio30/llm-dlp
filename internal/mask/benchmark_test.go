@@ -104,3 +104,44 @@ func BenchmarkMascarar5KB(b *testing.B) {
 		m.Detectar(base + fmt.Sprint(i))
 	}
 }
+
+// Linha única longa (JSON minificado, resposta de API, HTML): o tempo tem que crescer de forma
+// linear com o tamanho. Cada item é fictício.
+func linhaLonga(tipo string, tam int) string {
+	var b strings.Builder
+	for i := 0; b.Len() < tam; i++ {
+		switch tipo {
+		case "url":
+			fmt.Fprintf(&b, "https://site%d.example.com/a/b?q=%d ", i, i)
+		case "sqljson":
+			fmt.Fprintf(&b, `{"id":%d,"sql":"SELECT a, b FROM sch_x.tb_x%d WHERE c = 1 AND d = 2","ok":true},`, i, i%50)
+		case "urn":
+			fmt.Fprintf(&b, `{"urn":"urn:li:dataset:(urn:li:dataPlatform:mssql,db_x.sch_x.tb_x%d,PROD)"},`, i%50)
+		case "email":
+			fmt.Fprintf(&b, `{"de":"fulano%d`+"@"+`empresa-ficticia.com.br","n":%d},`, i%50, i)
+		case "k8sdns":
+			fmt.Fprintf(&b, `{"svc":"svc-x%d.ns-x.svc.cluster.local:8080"},`, i%50)
+		case "conexao":
+			fmt.Fprintf(&b, `{"c":"Server=srv-x%d;Database=db_x;User Id=u_x;"},`, i%50)
+		}
+	}
+	return b.String()
+}
+
+func benchLinhaLonga(b *testing.B, tipo string, tam int) {
+	s := linhaLonga(tipo, tam)
+	b.SetBytes(int64(len(s)))
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		m, _ := NovoMasker(novoTeste(&testing.T{}).cfg, chaveTeste, nil, nil)
+		m.Mascarar(s)
+	}
+}
+
+func BenchmarkLinhaURL1MB(b *testing.B)      { benchLinhaLonga(b, "url", 1<<20) }
+func BenchmarkLinhaURL512K(b *testing.B)     { benchLinhaLonga(b, "url", 512<<10) }
+func BenchmarkLinhaSQLJSON512K(b *testing.B) { benchLinhaLonga(b, "sqljson", 512<<10) }
+func BenchmarkLinhaURN512K(b *testing.B)     { benchLinhaLonga(b, "urn", 512<<10) }
+func BenchmarkLinhaEmail512K(b *testing.B)   { benchLinhaLonga(b, "email", 512<<10) }
+func BenchmarkLinhaK8sDNS512K(b *testing.B)  { benchLinhaLonga(b, "k8sdns", 512<<10) }
+func BenchmarkLinhaConexao512K(b *testing.B) { benchLinhaLonga(b, "conexao", 512<<10) }

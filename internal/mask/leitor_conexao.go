@@ -341,6 +341,56 @@ func acharDSN(s string, add func(ObjAchado)) {
 			addPartes(s, m[4], m[5], "database", "dsn", add)
 		}
 	}
+	// PDO: new PDO('mysql:host=...;dbname=...', 'usuario', $senha): a string logo depois do
+	// DSN, no mesmo argumento seguinte, é o usuário
+	for i := strings.IndexByte(s, ':'); i >= 0; {
+		if u, a, ok := usuarioDepoisDSN(s, i); ok {
+			add(ObjAchado{a, a + len(u), "usuario", "dsn", true})
+		}
+		j := strings.IndexByte(s[i+1:], ':')
+		if j < 0 {
+			break
+		}
+		i += 1 + j
+	}
+}
+
+func usuarioDepoisDSN(s string, i int) (string, int, bool) {
+	if !prefixoPDO(s, i) {
+		return "", 0, false
+	}
+	a := i
+	for a > 0 && s[a-1] >= 'a' && s[a-1] <= 'z' {
+		a--
+	}
+	if a == 0 || s[a-1] != '\'' && s[a-1] != '"' {
+		return "", 0, false
+	}
+	e := strings.IndexByte(s[i:min(len(s), i+512)], s[a-1])
+	if e < 0 {
+		return "", 0, false
+	}
+	p := i + e + 1
+	for p < len(s) && (s[p] == ' ' || s[p] == '\t') {
+		p++
+	}
+	if p >= len(s) || s[p] != ',' {
+		return "", 0, false
+	}
+	for p++; p < len(s) && (s[p] == ' ' || s[p] == '\t'); p++ {
+	}
+	if p >= len(s) || s[p] != '\'' && s[p] != '"' {
+		return "", 0, false
+	}
+	f := strings.IndexByte(s[p+1:min(len(s), p+130)], s[p])
+	if f <= 0 {
+		return "", 0, false
+	}
+	u := s[p+1 : p+1+f]
+	if !valorRecurso(u, "usuario") || publicoConexao(u) {
+		return "", 0, false
+	}
+	return u, p + 1, true
 }
 
 func semEspacoIgual(s string, m []int) bool {

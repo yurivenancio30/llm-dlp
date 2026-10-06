@@ -170,9 +170,10 @@ func TestNomeAprendidoEmOutroFormato(t *testing.T) {
 	if out, _ := m.Mascarar("soma de vl_total_x7 no relatório"); !strings.Contains(out, "vl_total_x7") {
 		t.Errorf("coluna não deveria propagar: %q", out)
 	}
-	// um nome visto só numa instrução de uma cláusula (evidência fraca) não ensina
+	// um nome visto só numa instrução de uma cláusula sem forma inequívoca (evidência fraca)
+	// não ensina; "UPDATE tb_x SET a = 1" tem forma inequívoca e ensina, em qualquer caixa
 	m2 := novoTeste(t)
-	m2.Mascarar("UPDATE tb_fraca_x1 SET a = 1")
+	m2.Mascarar("SELECT nome total FROM tb_fraca_x1")
 	if out, _ := m2.Mascarar("depois: tb_fraca_x1"); !strings.Contains(out, "tb_fraca_x1") {
 		t.Errorf("evidência fraca ensinou: %q", out)
 	}

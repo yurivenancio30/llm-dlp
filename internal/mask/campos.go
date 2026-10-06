@@ -367,7 +367,11 @@ func (m *Masker) acharXML(s string, add func(ini, fim int, tipo string)) {
 			continue
 		}
 		// o valor é o que está entre o ">" da abertura e o "</"
-		ab := strings.LastIndexByte(s[:fecha], '>')
+		a0 := max(0, fecha-122)
+		ab := strings.LastIndexByte(s[a0:fecha], '>')
+		if ab >= 0 {
+			ab += a0
+		}
 		if ab < 0 || fecha-ab-1 > 120 || fecha-ab-1 < 1 || strings.ContainsAny(s[ab+1:fecha], "<\n") {
 			continue
 		}

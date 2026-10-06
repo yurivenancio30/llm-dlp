@@ -3,6 +3,7 @@ package mask
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 // Leitores de código, linha de comando, caminhos e URLs de nuvem (itens 9 a 14 da revisão).
@@ -180,4 +181,75 @@ func TestAjustesFinaisFormatos(t *testing.T) {
 			t.Errorf("mascarou sem precisar: %q -> %q", s, out)
 		}
 	}
+}
+
+// Revisão 68d44da, item 1: linha única longa (JSON minificado, resposta de API) cresce de
+// forma linear. Quadrático daria ~16x de 128 KB para 512 KB; o limite é 8x.
+func TestLinhaLongaLinear(t *testing.T) {
+	if testing.Short() {
+		t.Skip("mede tempo")
+	}
+	m := novoTeste(t)
+	tempo := func(s string) time.Duration {
+		melhor := time.Duration(1 << 62)
+		for k := 0; k < 2; k++ {
+			ini := time.Now()
+			m.Detectar(s)
+			melhor = min(melhor, time.Since(ini))
+		}
+		return melhor
+	}
+	for _, tipo := range []string{"url", "sqljson", "urn", "email", "k8sdns", "conexao"} {
+		p, g := tempo(linhaLonga(tipo, 128<<10)), tempo(linhaLonga(tipo, 512<<10))
+		if r := float64(g) / float64(p); r > 8 {
+			t.Errorf("%s: 512 KB levou %.1fx o tempo de 128 KB (%v / %v)", tipo, r, g, p)
+		}
+	}
+	// a janela não muda o resultado: git config com a seção acima do url e git clone no fim
+	// de uma linha longa
+	cfg := "[remote \"origin\"]\n\turl = https://git.ficticia.local/fin-x1/repo-x1\n"
+	confere(t, m, cfg, []string{"fin-x1", "repo-x1"}, []string{"[remote \"origin\"]"})
+	longa := strings.Repeat("x ", 3000) + "git clone https://git.ficticia.local/fin-x2/repo-x2"
+	confere(t, m, longa, []string{"repo-x2"}, nil)
+}
+
+// Item 2: SELECT em maiúsculas com uma cláusula ensina, como em minúsculas.
+func TestSQLMaiusculoUmaClausulaEnsina(t *testing.T) {
+	m := novoTeste(t)
+	confere(t, m, "SELECT * FROM fin.tb_nota_fiscal", []string{"tb_nota_fiscal"}, []string{"SELECT * FROM "})
+	if out, _ := m.Mascarar("a tb_nota_fiscal cresceu"); strings.Contains(out, "tb_nota_fiscal") {
+		t.Errorf("maiúsculas com uma cláusula não ensinou: %q", out)
+	}
+}
+
+// Item 3: tópico/fila com ponto vindo de chave de fila/tópico; atributo de código, domínio e
+// arquivo ficam.
+func TestTopicoComPonto(t *testing.T) {
+	m := novoTeste(t)
+	confere(t, m, "KAFKA_TOPIC=fin.notas.emitidas", []string{"fin.notas.emitidas"}, []string{"KAFKA_TOPIC="})
+	if out, _ := m.Mascarar("a fin.notas.emitidas parou"); strings.Contains(out, "fin.notas.emitidas") {
+		t.Errorf("tópico com ponto não ensinou: %q", out)
+	}
+	confere(t, m, "kafka.topic=fin.notas.pagas", []string{"fin.notas.pagas"}, nil)
+	confere(t, m, "  topic: fin.notas.canceladas", []string{"fin.notas.canceladas"}, nil)
+	for _, s := range []string{"topic = cfg.topic", "TOPIC=settings.queue_name", "QUEUE_URL=api.example.com", "KAFKA_TOPIC=notas.json"} {
+		if out, ents := m.Mascarar(s); len(ents) > 0 {
+			t.Errorf("mascarou sem precisar: %q -> %q", s, out)
+		}
+	}
+}
+
+// Item 4: usuário posicional depois do DSN do PDO e name no bloco metadata do Terraform.
+func TestPDOUsuarioETerraformMetadata(t *testing.T) {
+	m := novoTeste(t)
+	u := "svc" + "_pdo_x1"
+	confere(t, m, "$pdo = new PDO('mysql:host=db-x1;dbname=vendas_x1', '"+u+"', $senha);", []string{"db-x1", "vendas_x1", u}, []string{"', $senha);"})
+	// sem DSN literal antes, o argumento não tem dono; "root" é público
+	if out, ents := m.Mascarar("$pdo = new PDO($dsn, 'svc_pdo_x2', $senha);"); len(ents) > 0 {
+		t.Errorf("string sem DSN antes mascarada: %q", out)
+	}
+	confere(t, m, "new PDO('mysql:host=db-x3;dbname=vendas_x3', 'root', '')", []string{"db-x3", "vendas_x3"}, []string{"'root'"})
+	tf := "resource \"kubernetes_deployment\" \"d\" {\n  metadata {\n    name = \"api-tf-x5\"\n    namespace = \"ns-tf-x5\"\n  }\n" +
+		"  spec {\n    template {\n      spec {\n        container {\n          name = \"app\"\n        }\n      }\n    }\n  }\n}\n"
+	confere(t, m, tf, []string{"api-tf-x5", "ns-tf-x5"}, []string{"name = \"app\""})
 }

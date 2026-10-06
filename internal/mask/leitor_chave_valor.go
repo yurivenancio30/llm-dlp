@@ -159,6 +159,27 @@ func titulo(v string) bool {
 	return true
 }
 
+// topicoPontuado: nome de tópico/fila separado por pontos, em minúsculas (fin.notas.emitidas).
+// Não vale se um pedaço é receptor ou atributo de código (cfg.topic, settings.queue_name), se é
+// domínio público ou se termina em extensão de arquivo.
+func topicoPontuado(v string) bool {
+	ps := strings.Split(v, ".")
+	if len(ps) < 2 || dominioPublico(v) || extensoesArquivo[ps[len(ps)-1]] {
+		return false
+	}
+	for _, p := range ps {
+		if p == "" || receptoresCodigo[p] || atributoChave[p] || palavrasTipo[p] {
+			return false
+		}
+		for i := 0; i < len(p); i++ {
+			if c := p[i]; !(c >= 'a' && c <= 'z' || ehDig(c) || c == '_' || c == '-') {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 func maiusculasSo(v string) bool {
 	tem := false
 	for i := 0; i < len(v); i++ {
@@ -328,11 +349,14 @@ func kvEm(s string, p int, add func(ObjAchado)) {
 		if c == ':' && titulo(chave) {
 			return
 		}
+		// tópico/fila com ponto (fin.notas.emitidas) em chave de configuração (KAFKA_TOPIC=,
+		// kafka.topic=, topic:): nome de recurso, não acesso a atributo nem domínio
+		topico := ent == "fila" && (c == ':' || maiusculasSo(chave) || pontuada) && topicoPontuado(val)
 		if i := strings.IndexByte(val, '.'); i >= 0 && ent != "database" && ent != "schema" && ent != "tabela" &&
-			!sufixoInterno(strings.ToLower(val)) {
+			!topico && !sufixoInterno(strings.ToLower(val)) {
 			return
 		}
-		if i := strings.IndexByte(val, '.'); i >= 0 && (c != ':' || receptoresCodigo[strings.ToLower(val[:i])]) {
+		if i := strings.IndexByte(val, '.'); i >= 0 && !topico && (c != ':' || receptoresCodigo[strings.ToLower(val[:i])]) {
 			return
 		}
 		if c != ':' {

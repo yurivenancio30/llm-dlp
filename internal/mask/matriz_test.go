@@ -29,6 +29,8 @@ var matrizNomes = []string{
 	"sqlprd01", "SQLPRD01", "SqlPrd01", "erpprd01", "pedidos-criados", "pedidos-pagos", "cacheprd01", "Relatorios_x9",
 	// nuvem
 	"proj-vendas-x9", "rg-vendas-x9", "stvendasx9", "sb-vendas-x9", "123456789012",
+	// revisão 68d44da: tópico com ponto
+	"fin.notas.emitidas",
 }
 
 var matrizCasos = []struct{ nome, texto string }{
@@ -216,6 +218,15 @@ projects/proj-vendas-x9/topics/topico-eventos-x9
 	{"Azure", `https://stvendasx9.blob.core.windows.net/bkt-relatorios-x9/a.csv
 Endpoint=sb://sb-vendas-x9.servicebus.windows.net/;SharedAccessKeyName=x;EntityPath=fila-pedidos-x9
 /subscriptions/00000000-1111-2222-3333-444444444444/resourceGroups/rg-vendas-x9/providers/Microsoft.Sql/servers/pgsrv-vendas-01/databases/vendas_prd
+`},
+	{"Tópico com ponto", `KAFKA_TOPIC=fin.notas.emitidas
+kafka.topic=fin.notas.emitidas
+`},
+	{"Terraform aninhado", `resource "kubernetes_namespace" "pag" {
+  metadata {
+    name = "ns-pagamentos-x9"
+  }
+}
 `},
 }
 

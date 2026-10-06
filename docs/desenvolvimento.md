@@ -132,6 +132,10 @@ O `estresse_test.go` do proxy faz essas três conferências e serve de modelo.
    um texto grande.
 6. Rode `go test ./...` e os benchmarks (`go test ./internal/mask -bench Frio`) para ver se
    não pesou.
+7. Nunca procure o começo ou o fim da linha sem limite a cada ocorrência
+   (`strings.LastIndexByte(s[:i], '\n')`): numa linha única longa (JSON minificado) isso vira
+   quadrático. Use `inicioLinhaJ`/`fimLinhaJ` (`conhecidos.go`, janela de 1000 caracteres).
+   `TestLinhaLongaLinear` e os benchmarks `-bench Linha` conferem.
 
 ## Como foi testado
 

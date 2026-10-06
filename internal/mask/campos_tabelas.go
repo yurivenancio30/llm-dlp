@@ -643,14 +643,21 @@ func nomesNaLinha(s string, achados []Achado) []Achado {
 	linhas := map[int]bool{} // começo das linhas que têm um identificador de pessoa
 	for _, a := range achados {
 		if identificaPessoa[a.Tipo] {
-			linhas[strings.LastIndexByte(s[:a.Ini], '\n')+1] = true
+			// linha de mais de 2000 caracteres não é linha de tabela: a busca para aí
+			a0 := max(0, a.Ini-2001)
+			k := strings.LastIndexByte(s[a0:a.Ini], '\n')
+			if k < 0 && a0 > 0 {
+				continue
+			}
+			linhas[a0+k+1] = true
 		}
 	}
 	var out []Achado
 	for ini := range linhas {
-		fim := strings.IndexByte(s[ini:], '\n')
+		z := min(len(s), ini+2001)
+		fim := strings.IndexByte(s[ini:z], '\n')
 		if fim < 0 {
-			fim = len(s) - ini
+			fim = z - ini
 		}
 		l := s[ini : ini+fim]
 		if len(l) > 2000 {

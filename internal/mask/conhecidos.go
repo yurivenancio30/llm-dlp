@@ -268,6 +268,26 @@ func ehAlnum(b byte) bool {
 	return b >= '0' && b <= '9' || b >= 'a' && b <= 'z' || b >= 'A' && b <= 'Z'
 }
 
+// janelaLinha limita a busca do começo/fim da linha em volta de uma ocorrência. Sem limite,
+// numa linha única longa (JSON minificado, resposta de API, HTML) cada ocorrência percorre a
+// linha inteira e o custo vira quadrático.
+const janelaLinha = 1000
+
+// inicioLinhaJ: começo da linha de s[i], ou o começo da janela se a linha for mais longa.
+func inicioLinhaJ(s string, i int) int {
+	a := max(0, i-janelaLinha)
+	return a + strings.LastIndexByte(s[a:i], '\n') + 1
+}
+
+// fimLinhaJ: fim da linha de s[i] (o '\n' ou len(s)), ou o fim da janela.
+func fimLinhaJ(s string, i int) int {
+	z := min(len(s), i+janelaLinha)
+	if k := strings.IndexByte(s[i:z], '\n'); k >= 0 {
+		return i + k
+	}
+	return z
+}
+
 // separadores em que uma senha costuma estar grudada; maxCortes limita o trabalho por palavra
 const (
 	sepSenha  = "=&:/?@|#+"

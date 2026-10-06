@@ -244,7 +244,7 @@ func contextoGit(s string, a, pa, pb int) bool {
 	if strings.HasSuffix(s[pa:pb], ".git") || strings.HasSuffix(s[pa:pb], ".git/") {
 		return true
 	}
-	li := strings.LastIndexByte(s[:a], '\n') + 1
+	li := inicioLinhaJ(s, a)
 	pre := s[max(li, a-300):a]
 	if strings.Contains(pre, "git ") {
 		for _, c := range []string{"git clone ", "git remote ", "git push ", "git pull ", "git fetch ", "git submodule "} {
@@ -254,8 +254,10 @@ func contextoGit(s string, a, pa, pb int) bool {
 		}
 	}
 	t := strings.TrimSpace(pre)
-	if strings.HasPrefix(t, "url") && strings.HasSuffix(strings.TrimSpace(t[3:]), "=") && li > 0 && (s[li] == '\t' || s[li] == ' ') {
-		return strings.Contains(s[:a], "[remote \"") || strings.Contains(s[:a], "[submodule \"")
+	if strings.HasPrefix(t, "url") && strings.HasSuffix(strings.TrimSpace(t[3:]), "=") && li > 0 && s[li-1] == '\n' && (s[li] == '\t' || s[li] == ' ') {
+		// a seção [remote "..."] fica poucas linhas acima do "url ="
+		cfg := s[max(0, a-2000):a]
+		return strings.Contains(cfg, "[remote \"") || strings.Contains(cfg, "[submodule \"")
 	}
 	return false
 }

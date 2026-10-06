@@ -169,8 +169,7 @@ func acharEnvLista(s string, add func(ObjAchado)) {
 			continue
 		}
 		// a linha "value:" tem que estar dentro do item (mais recuada que o "-")
-		ini := strings.LastIndexByte(s[:m[8]], '\n') + 1
-		if ini-m[0] < 0 {
+		if m[0] > 0 && strings.LastIndexByte(s[m[0]-1:m[8]], '\n') < 0 {
 			continue
 		}
 		marcarValor(s, m[8], m[9], ent, "env-lista", forte, add)
