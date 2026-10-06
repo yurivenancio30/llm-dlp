@@ -212,7 +212,7 @@ func (l *Lote) MascararDica(s string, daWeb bool, pos Posicao, dica string) (str
 	if !ok || r.semAprender && !daWeb {
 		r, _ = l.m.mascararD(s, !daWeb, dica)
 	}
-	r = l.comMemoria(s, r)
+	r = l.comMemoria(s, r, dica)
 	if _, ja := l.saidas[pos]; !ja {
 		l.saidas[pos] = r
 	}

@@ -1,25 +1,30 @@
 # GERADO por TestGerarRefPublica (internal/mask/ref_publica_gerar_test.go). Não edite à mão.
 # Referência pública: palavras muito frequentes como nome de recurso no material público.
-# Gerado em 2026-10-06, no material público da máquina: ~/go/pkg/mod, /usr/lib/python3.10, /usr/share/doc, /usr/lib/python3/dist-packages, ~/.local/lib/python3.10/site-packages
-# (31555 arquivos, 367 MB, 977 projetos distintos).
-# Critério: palavra em posição de nome em pelo menos 8 projetos distintos. 289 palavras.
+# Gerado em 2026-10-06, no material público da máquina: ~/go/pkg/mod, /usr/lib/python3.10, /usr/share/doc, /usr/lib/python3/dist-packages, ~/.local/lib/python3.10/site-packages, /usr/share/man/pt_BR, /usr/share/vim/vim82/lang, /usr/share/gnupg, /usr/lib/systemd/catalog, /usr/share/i18n/locales
+# (33711 arquivos, 500 MB, 1435 projetos distintos).
+# Critério: palavra em posição de nome em pelo menos 8 projetos distintos. 339 palavras.
 # Posição de nome: valor de chave de tipo (entChave) ou "name" em YAML/JSON/TOML/INI/.env (em código, só
 # literal de texto); opção --tipo; nome depois de FROM/JOIN/INTO/UPDATE/TABLE/SCHEMA/DATABASE no SQL (em
 # minúsculas, só nome qualificado); primeiro rótulo do host e primeiro pedaço do caminho de uma URL.
 accounts
+address
 alice
 all
 android
 any
 api
 app
+apple
+application
 archive
 archives
 args
+article
 articles
 assignments
 auth
 aws
+azure
 badge
 bar
 base
@@ -28,17 +33,21 @@ blog
 blogs
 bob
 body
+book
 bugs
 bugzilla
 build
 category
 cdn
+cgi
 cgi-bin
 check
 checkout
 child
+chromium
 chunks
 ci
+cldr
 client
 cloud
 cls
@@ -48,18 +57,23 @@ collections
 column
 com
 command
+common
 community
 components
 config
+configuration
 consideration
 console
 content
+contents
 context
 core
 cpython
+creation
 cython
 data
 datatracker
+db
 dc
 default
 demo
@@ -67,6 +81,7 @@ description
 dev
 developer
 developers
+discovery
 distutils
 django
 dl
@@ -82,6 +97,8 @@ drafts
 email
 en
 en-us
+english
+error
 errors
 events
 example
@@ -95,6 +112,8 @@ foobar
 forum
 ftp
 func
+gcc
+general
 generic
 get
 gh
@@ -107,6 +126,7 @@ go
 golang
 golangci-lint
 google
+graph
 group
 groups
 hello
@@ -121,6 +141,7 @@ image
 images
 img
 info
+information
 initialize
 install
 instance
@@ -131,6 +152,7 @@ issues
 it
 items
 jaraco
+java
 john
 json
 jupyter
@@ -167,11 +189,17 @@ mypy
 name
 node
 none
+now
 ns
 numpy
 oauth2
 one
+onlinedat
+onlinepubs
+openssl
+operation
 option
+org
 os
 other
 package
@@ -185,10 +213,15 @@ people
 peps
 pipermail
 pkg
+place
 platform
 post
+process
 project
 projects
+properties
+proto
+protocols
 psf
 pub
 public
@@ -214,16 +247,21 @@ repos
 request
 requests
 resource
+resources
 response
 rfc
 root
 run
+sankt
 schema
 schemas
 scratch
+script
 search
 security
 self
+service
+session
 set
 setup
 setuptools
@@ -231,7 +269,9 @@ site
 sites
 socket
 software
+some
 source
+sources
 spec
 specifications
 specs
@@ -244,15 +284,21 @@ status
 stderr
 stdout
 storage
+str
 string
 strings
+subscription
 support
 svn
+system
 table
+tag
+tags
 target
 technet
 templates
 test
+testing
 tests
 text
 that
@@ -266,12 +312,14 @@ toml
 tools
 tr
 trac
+trans
 true
 txt
 type
 ubuntu
 understanding-json-schema
 unicode
+unicodedata
 unknown
 upload
 uri
@@ -286,7 +334,9 @@ util
 v1
 v2
 value
+versions
 view
+watch
 web
 wiki
 wikipedia

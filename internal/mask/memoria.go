@@ -124,7 +124,10 @@ func (nm nomeMem) casar(s string, ini int) bool {
 
 // varrer: os trechos de s em que a memória casa, fora dos trechos já trocados (ts, em ordem).
 // Uma passada: cada palavra de s é uma consulta no índice.
-func (mm *memoria) varrer(s string, ts []trecho) []trecho {
+func (mm *memoria) varrer(s string, ts []trecho) []trecho { return mm.varrerF(s, ts, filtroMem{}) }
+
+// varrerF: como varrer, com os freios do texto (memoria_freios.go).
+func (mm *memoria) varrerF(s string, ts []trecho, f filtroMem) []trecho {
 	var out []trecho
 	var buf []byte
 	k := 0
@@ -174,7 +177,7 @@ func (mm *memoria) varrer(s string, ts []trecho) []trecho {
 			k++
 		}
 		livre := (k >= len(ts) || ts[k].Ini >= fim) && (len(out) == 0 || out[len(out)-1].Fim <= ini)
-		if livre {
+		if livre && !f.pula(s, ini, fim, melhor) {
 			out = append(out, trecho{Ini: ini, Fim: fim, Tipo: prefTipoObj + melhor.ent})
 			i = fim
 			continue
@@ -186,17 +189,45 @@ func (mm *memoria) varrer(s string, ts []trecho) []trecho {
 
 // comMemoria: o resultado de s com a memória da conversa aplicada (os trechos novos entram
 // nas entradas e nos trechos, para a volta e para o congelamento).
-func (l *Lote) comMemoria(s string, r resultado) resultado {
+func (l *Lote) comMemoria(s string, r resultado, dica string) resultado {
 	if l.mem == nil {
 		return r
 	}
-	extra := l.mem.varrer(s, r.trechos)
-	if len(extra) == 0 {
+	f := filtroDe(dica)
+	extra := l.mem.varrerF(s, r.trechos, f)
+	ts := l.juntarTrechos(r.trechos, extra)
+	ts2 := l.ancorarPosicoes(s, ts, f)
+	if len(extra) == 0 && len(ts2) == len(r.trechos) && !mudouTipo(ts2, r.trechos) {
 		return r
 	}
-	for i := range extra {
-		extra[i].Pseudo = l.m.Pseudonimo(extra[i].Tipo, s[extra[i].Ini:extra[i].Fim])
+	for i := range ts2 {
+		if ts2[i].Pseudo == "" {
+			ts2[i].Pseudo = l.m.Pseudonimo(ts2[i].Tipo, s[ts2[i].Ini:ts2[i].Fim])
+		}
 	}
+	texto, entradas, ok := remontar(s, ts2)
+	if !ok {
+		return r
+	}
+	return resultado{texto: texto, entradas: entradas, trechos: ts2, gen: r.gen, semAprender: r.semAprender, decididos: r.decididos}
+}
+
+// mudouTipo: algum trecho mudou de tipo (âncora por posição corrigiu o genérico).
+func mudouTipo(a, b []trecho) bool {
+	if len(a) != len(b) {
+		return true
+	}
+	for i := range a {
+		if a[i].Tipo != b[i].Tipo || a[i].Pseudo != b[i].Pseudo {
+			return true
+		}
+	}
+	return false
+}
+
+// juntarTrechos: os trechos do memo e os da memória, em ordem (sem pseudônimo nos novos).
+func (l *Lote) juntarTrechos(base, extra []trecho) []trecho {
+	r := struct{ trechos []trecho }{base}
 	ts := make([]trecho, 0, len(r.trechos)+len(extra))
 	a, b := 0, 0
 	for a < len(r.trechos) || b < len(extra) {
@@ -208,11 +239,7 @@ func (l *Lote) comMemoria(s string, r resultado) resultado {
 			b++
 		}
 	}
-	texto, entradas, ok := remontar(s, ts)
-	if !ok {
-		return r
-	}
-	return resultado{texto: texto, entradas: entradas, trechos: ts, gen: r.gen, semAprender: r.semAprender, decididos: r.decididos}
+	return ts
 }
 
 // Memoria monta a memória da conversa com os nomes decididos nos textos da requisição (depois

@@ -1,7 +1,9 @@
 package mask
 
 import (
+	"compress/gzip"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -43,6 +45,23 @@ const (
 	minProjetosTipo = 5
 )
 
+// lerCorpus: o arquivo, descompactado se for .gz (no máximo 2 MB).
+func lerCorpus(p string, gz bool) ([]byte, error) {
+	if !gz {
+		return os.ReadFile(p)
+	}
+	f, err := os.Open(p)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	z, err := gzip.NewReader(f)
+	if err != nil {
+		return nil, err
+	}
+	return io.ReadAll(io.LimitReader(z, 2<<20))
+}
+
 func TestGerarRefPublica(t *testing.T) {
 	if os.Getenv("LLM_DLP_GERAR_REF") == "" || os.Getenv("LLM_DLP_CORPUS") == "" {
 		t.Skip("LLM_DLP_GERAR_REF e LLM_DLP_CORPUS não definidos")
@@ -66,13 +85,17 @@ func TestGerarRefPublica(t *testing.T) {
 				}
 				return nil
 			}
-			if !exts[strings.ToLower(filepath.Ext(p))] {
+			gz := strings.HasSuffix(p, ".gz")
+			ext := strings.ToLower(filepath.Ext(strings.TrimSuffix(p, ".gz")))
+			// páginas de manual (.1.gz, .8.gz...) e documentação compactada também contam
+			if !exts[ext] && !(gz && len(ext) == 2 && ext[1] >= '1' && ext[1] <= '9') && !(gz && (ext == ".md" || ext == ".txt")) &&
+				!strings.Contains(p, "/locales/") && !strings.HasSuffix(p, ".catalog") {
 				return nil
 			}
 			if i, err := e.Info(); err != nil || i.Size() >= 512<<10 {
 				return nil
 			}
-			b, err := os.ReadFile(p)
+			b, err := lerCorpus(p, gz)
 			if err != nil {
 				return nil
 			}

@@ -48,6 +48,9 @@ type conversaCmd struct {
 	usouPed  bool // já houve chamada neste turno
 	nSaidas  int
 	nVarrido int // bytes de saída varridos (teto)
+	// scripts: o texto dos tool_use pelo nome de arquivo que citam. Um script escrito numa
+	// chamada e executado noutra ("python3 scripts/x.py") é programa da segunda também.
+	scripts map[string]string
 }
 
 // Chamada: um tool_use, com o que se sabe dele.
@@ -130,7 +133,8 @@ func (c *Comandos) Uso(cmd string, trad []PalavraTraduzida) *Chamada {
 		tradu[hpal(t.Nome)] = true
 	}
 	ch.prog = map[uint32]bool{}
-	palavrasPrograma(cmd, func(p string) {
+	prog := c.programaCompleto(cmd)
+	palavrasPrograma(prog, func(p string) {
 		if h := hpal(p); !tradu[h] {
 			ch.prog[h] = true
 		}
@@ -318,6 +322,47 @@ func partesIdent(v string, f func(p string)) {
 		}
 	}
 	emite(ini, len(v))
+}
+
+// maxScript: teto do texto guardado por nome de arquivo (e do programa montado).
+const maxScript = 256 << 10
+
+// arquivosCitados: os nomes de arquivo (com extensão) que cmd cita, sem o caminho.
+func arquivosCitados(cmd string, f func(nome string)) {
+	for _, t := range strings.FieldsFunc(cmd, func(r rune) bool {
+		return r == ' ' || r == '\t' || r == '\n' || r == '\r' || r == '"' || r == '\'' || r == '`' || r == '=' || r == ';' || r == '(' || r == ')' || r == '<' || r == '>' || r == '|'
+	}) {
+		nome := t[strings.LastIndexByte(t, '/')+1:]
+		k := strings.LastIndexByte(nome, '.')
+		if k <= 0 || k == len(nome)-1 || len(nome) > 128 || !soLetras(nome[k+1:]) {
+			continue
+		}
+		f(nome)
+	}
+}
+
+// programaCompleto: o comando mais o texto dos tool_use anteriores que citam os mesmos
+// arquivos (o script que ele executa); e guarda este comando para os seguintes.
+func (c *Comandos) programaCompleto(cmd string) string {
+	prog := cmd
+	vistos := map[string]bool{}
+	arquivosCitados(cmd, func(nome string) {
+		if t := c.cv.scripts[nome]; t != "" && !vistos[nome] && len(prog) < maxScript {
+			vistos[nome] = true
+			prog += "\n" + t
+		}
+	})
+	if len(cmd) > 64 { // só um texto com conteúdo (não um comando curto que só cita o arquivo)
+		if c.cv.scripts == nil {
+			c.cv.scripts = map[string]string{}
+		}
+		arquivosCitados(cmd, func(nome string) {
+			if t := c.cv.scripts[nome]; len(t)+len(cmd) <= maxScript && !strings.Contains(t, cmd) {
+				c.cv.scripts[nome] = t + "\n" + cmd
+			}
+		})
+	}
+	return prog
 }
 
 // palavrasPrograma: B1, as palavras do programa (o comando ou o script): cada palavra inteira e

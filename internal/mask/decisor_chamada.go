@@ -180,7 +180,8 @@ func numerico(v string) bool { return v != "" && v[0] >= '0' && v[0] <= '9' }
 
 // segmentos: a palavra que é segmento de um nome de objeto já achado no texto ("payments" em
 // payments-api-7d9f, registry/acme/payments:1.2) e que aparece também solta no mesmo texto é
-// nome, do tipo do nome em que está.
+// nome, do tipo do nome em que está. Fora de comentário e de texto corrido, e nunca a partir de
+// um nome de coluna.
 func segmentos(c *TextoCtx, cob faixas) {
 	var segs map[string]string
 	for _, a := range c.Achados {
@@ -188,6 +189,9 @@ func segmentos(c *TextoCtx, cob faixas) {
 			continue
 		}
 		ent := strings.TrimPrefix(a.Tipo, prefTipoObj)
+		if ent == "coluna" || ent == "indice" {
+			continue // os pedaços de um nome de coluna (cd_cliente) são vocabulário do modelo de dados, não recurso
+		}
 		for _, p := range strings.FieldsFunc(a.Real, func(r rune) bool { return r < 0x80 && !letraD(byte(r)) }) {
 			if len(p) >= 4 && p != a.Real && palavraDecidivel(p) {
 				if segs == nil {
@@ -204,7 +208,7 @@ func segmentos(c *TextoCtx, cob faixas) {
 	}
 	s := c.S
 	varrerPalavras(s, func(a, b int) {
-		if ent, ok := segs[s[a:b]]; ok && !cob.cobre(a, b) {
+		if ent, ok := segs[s[a:b]]; ok && !cob.cobre(a, b) && !emComentario(s, a) && !emProsa(s, a, b) {
 			c.Decidir(a, b, entConhecida(c, s[a:b], ent), "segmento")
 		}
 	})
@@ -333,6 +337,9 @@ func identidadeBloco(c *TextoCtx, e extChamada, cob faixas, bloco []registro) {
 	// duas leituras das posições: da esquerda (k) e da direita (n-1-k); com o mesmo número de
 	// palavras em todas as linhas, são a mesma
 	ident := [2][]bool{make([]bool, maxN), make([]bool, maxN)}
+	// posAnc: posição com valores repetidos em que metade ou mais já são nomes (coluna de um
+	// catálogo: o mesmo nome se repete entre tabelas)
+	posAnc := [2][]bool{make([]bool, maxN), make([]bool, maxN)}
 	nIdent, nRep, ancora := [2]int{}, [2]int{}, [2]bool{}
 	vals := map[string]int{}
 	for lado := 0; lado < 2; lado++ {
@@ -373,6 +380,7 @@ func identidadeBloco(c *TextoCtx, e extChamada, cob faixas, bloco []registro) {
 				nRep[lado]++
 				if nConh*2 >= n {
 					ancora[lado] = true
+					posAnc[lado][pos] = true
 				}
 			case nDec*2 >= n:
 				ident[lado][pos] = true
@@ -380,6 +388,26 @@ func identidadeBloco(c *TextoCtx, e extChamada, cob faixas, bloco []registro) {
 			default:
 				if nConh*2 >= n {
 					ancora[lado] = true
+				}
+			}
+		}
+	}
+	// cara de identificador vinda dos dados, numa posição ancorada: duas pistas concordando,
+	// sem exigir que os valores sejam únicos
+	if anc {
+		for lado := 0; lado < 2; lado++ {
+			for i, r := range bloco {
+				for k, p := range r.ps {
+					pos := k
+					if lado == 1 {
+						pos = len(r.ps) - 1 - k
+					}
+					v := s[p.a:p.b]
+					if pos >= maxN || !posAnc[lado][pos] || !dec[i][k] || !caraDeIdentificador(v) || cob.cobre(p.a, p.b) {
+						continue
+					}
+					dec[i][k] = false
+					c.Decidir(p.a, p.b, entConhecida(c, v, entDaPosicao(c, bloco, lado, pos)), "identidade")
 				}
 			}
 		}
@@ -411,4 +439,29 @@ func identidadeBloco(c *TextoCtx, e extChamada, cob faixas, bloco []registro) {
 			}
 		}
 	}
+}
+
+// entDaPosicao: o tipo mais comum entre os valores já conhecidos de uma posição do bloco (genérico
+// se nenhum).
+func entDaPosicao(c *TextoCtx, bloco []registro, lado, pos int) string {
+	n := map[string]int{}
+	for _, r := range bloco {
+		k := pos
+		if lado == 1 {
+			k = len(r.ps) - 1 - pos
+		}
+		if k < 0 || k >= len(r.ps) {
+			continue
+		}
+		if e, ok := c.Conhecido(c.S[r.ps[k].a:r.ps[k].b]); ok {
+			n[e]++
+		}
+	}
+	melhor, max := entGenerica, 0
+	for e, k := range n {
+		if k > max || k == max && e < melhor {
+			melhor, max = e, k
+		}
+	}
+	return melhor
 }
