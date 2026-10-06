@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"regexp"
 	"strings"
+	"unicode"
 )
 
 // Leitor de SQL e DDL (ver docs/estruturas.md, seção SQL e DDL). Uma instrução só vale se tiver
@@ -38,14 +39,14 @@ const (
 )
 
 const (
-	reIdSQL   = "(?:\\[[^\\]\\n]{1,128}\\]|\"[^\"\\n]{1,128}\"|`[^`\\n]{1,128}`|[A-Za-z_][A-Za-z0-9_$#]*)"
+	reIdSQL   = "(?:\\[[^\\]\\n]{1,128}\\]|\"[^\"\\n]{1,128}\"|`[^`\\n]{1,128}`|[\\p{L}_][\\p{L}0-9_$#]*)"
 	reQualSQL = reIdSQL + "(?:\\." + reIdSQL + ")*"
 )
 
 var (
 	// forma mínima de cada instrução: a gramática exige essas peças, nessa ordem
 	reFormaSQL = regexp.MustCompile(`(?is)^(?:SELECT\b[^;]*?\bFROM\s+` + reQualSQL + `|WITH\s+(?:RECURSIVE\s+)?` + reIdSQL + `\s*(?:\([^)]{0,500}\)\s*)?AS\s*\(` +
-		`|INSERT\s+(?:INTO\s+|OVERWRITE\s+(?:TABLE\s+)?)` + reQualSQL + `|UPDATE\s+` + reQualSQL + `(?:\s+(?:AS\s+)?\w+)?\s+SET\b|DELETE\s+FROM\s+` + reQualSQL +
+		`|INSERT\s+(?:INTO\s+|OVERWRITE\s+(?:TABLE\s+)?)` + reQualSQL + `|UPDATE\s+` + reQualSQL + `(?:\s+(?:AS\s+)?\w+)?\s+SET\s+(?:\(|` + reQualSQL + `\s*=)|DELETE\s+FROM\s+` + reQualSQL +
 		`|MERGE\s+INTO\s+` + reQualSQL + `|(?:CREATE|ALTER|DROP)\s+(?:OR\s+(?:REPLACE|ALTER)\s+)?(?:(?:GLOBAL|LOCAL|SECURE|EXTERNAL|MATERIALIZED|TRANSIENT|TEMP(?:ORARY)?|UNIQUE|CLUSTERED|NONCLUSTERED)\s+)*` +
 		`(?:TABLE|VIEW|PROCEDURE|PROC|FUNCTION|TRIGGER|SCHEMA|DATABASE|SEQUENCE|INDEX|STAGE|TASK|PIPE|STREAM|SYNONYM|PACKAGE(?:\s+BODY)?|` + reTiposConta + `|` + reTiposSchema + `)\s+(?:IF\s+(?:NOT\s+)?EXISTS\s+)?` + reQualSQL +
 		`|TRUNCATE\s+TABLE\s+` + reQualSQL + `|COPY\s+INTO\s+'?@?` + reQualSQL + `|(?:EXEC|EXECUTE|CALL)\s+` + reQualSQL + `|USE\s+(?:ROLE\s+|WAREHOUSE\s+|DATABASE\s+|SCHEMA\s+|SECONDARY\s+ROLES\s+)?` + reQualSQL + `\s*(?:;|$|\n)` +
@@ -56,6 +57,7 @@ var (
 	// linha que já não é SQL (código em volta): para a instrução ali
 	reNaoSQL   = regexp.MustCompile(`^\s*(?:def |class |func |return\b|if\s*\(|for\s*\(|import |from \S+ import|package |\}|\)\s*$|#|//|print\(|echo |cd |\$ )`)
 	reFimSQL   = regexp.MustCompile("(?m);|\\n[ \\t]*\\n|```")
+	reComSQL   = regexp.MustCompile(`(?s)--[^\n]*|/\*.*?\*/`)
 	reLitSQL   = regexp.MustCompile(`(?s)'(?:[^']|'')*'|--[^\n]*|/\*.*?\*/`)
 	reQualTok  = regexp.MustCompile(reQualSQL)
 	reParteSQL = regexp.MustCompile(reIdSQL)
@@ -216,20 +218,30 @@ func acharSQL(s string, add func(ObjAchado)) {
 		}
 		maiusc := strings.ToUpper(s[i:j]) == s[i:j]
 		kw := strings.ToUpper(s[i:j])
-		if !maiusc && (kw == "USE" || kw == "COPY" || kw == "SHOW" || kw == "DESCRIBE" || kw == "CALL" || kw == "EXEC" || kw == "EXECUTE" || kw == "GRANT" || kw == "REVOKE") {
-			return // palavras comuns em prosa: só em maiúsculas
-		}
+		// palavras comuns em prosa (use, copy, show, call, exec...): fora de maiúsculas, só com
+		// forma inequívoca
+		prosa := !maiusc && (kw == "USE" || kw == "COPY" || kw == "SHOW" || kw == "DESCRIBE" || kw == "CALL" || kw == "EXEC" || kw == "EXECUTE" || kw == "GRANT" || kw == "REVOKE")
 		fim := fimInstrucao(s, i, j)
 		corpo := s[i:fim]
-		if !reFormaSQL.MatchString(corpo) {
+		// a forma é lida sem os comentários ("UPDATE t /* x */ SET", "FROM t -- x\nWHERE")
+		forma := corpo
+		if strings.Contains(corpo, "--") || strings.Contains(corpo, "/*") {
+			forma = reComSQL.ReplaceAllStringFunc(corpo, func(x string) string { return strings.Repeat(" ", len(x)) })
+		}
+		// a frase continua em prosa depois das palavras-chave ("o SELECT pega os dados FROM da
+		// tabela certa"): a instrução acaba onde começa a prosa
+		if k := inicioProsaSQL(forma); k >= 0 {
+			fim, corpo, forma = i+k, corpo[:k], forma[:k]
+		}
+		if !reFormaSQL.MatchString(forma) {
 			return
 		}
-		claus := len(reClausulasSQL.FindAllStringIndex(corpo, 4))
+		claus := len(reClausulasSQL.FindAllStringIndex(forma, 4))
 		// uma cláusula só: em minúsculas, só vale com forma inequívoca; em maiúsculas vale
 		// sempre, e ensina quando a forma também é inequívoca
 		inequivoca := false
-		if claus < 2 {
-			if inequivoca = formaInequivoca(corpo, kw); !inequivoca && !maiusc {
+		if claus < 2 || prosa {
+			if inequivoca = formaInequivoca(forma, kw); !inequivoca && (!maiusc || prosa) {
 				return
 			}
 		}
@@ -237,6 +249,50 @@ func acharSQL(s string, add func(ObjAchado)) {
 		forte := claus >= 2 || inequivoca
 		instrucaoSQL(s, i, corpo, kw, forte, add)
 	})
+}
+
+// inicioProsaSQL: onde, no corpo de uma instrução, começa uma sequência de 3 ou mais palavras
+// soltas lado a lado (só espaço entre elas): palavras em minúsculas, sem "_" nem dígito, que
+// não são do vocabulário do SQL, não são qualificadas (a.b) nem chamada de função. Na gramática
+// do SQL, no máximo duas ficam assim lado a lado (nome e apelido: "pedidos p", "a AS b"); três
+// são prosa. Devolve -1 se não houver.
+func inicioProsaSQL(corpo string) int {
+	lit := reLitSQL.ReplaceAllStringFunc(corpo, func(x string) string { return strings.Repeat(" ", len(x)) })
+	run, ini := 0, -1
+	for _, p := range reParteSQL.FindAllStringIndex(lit, -1) {
+		a, b := p[0], p[1]
+		v := lit[a:b]
+		solta := strings.ToLower(v) == v && !publicoSQL(v) && !caraDeIdentificador(v) && strings.IndexByte(v, '_') < 0 &&
+			!strings.ContainsAny(v, "[\"`$#") && !(a > 1 && lit[a-1] == '.' && ehIdent(lit[a-2])) &&
+			(b == len(lit) || lit[b] != '(' && !(lit[b] == '.' && b+1 < len(lit) && (ehIdent(lit[b+1]) || strings.IndexByte("[\"`*", lit[b+1]) >= 0)))
+		if !solta {
+			run = 0
+			continue
+		}
+		// só espaço (sem vírgula, operador ou quebra de linha) desde a palavra anterior
+		if run > 0 && !soEspacoEntrePalavras(lit[ini:a]) {
+			run = 0
+		}
+		if run == 0 {
+			ini = a
+		}
+		run++
+		if run >= 3 {
+			return ini
+		}
+	}
+	return -1
+}
+
+// soEspacoEntrePalavras: o trecho tem só letras, dígitos, "_" e espaço/tab (as palavras da
+// sequência e os espaços entre elas).
+func soEspacoEntrePalavras(t string) bool {
+	for _, r := range t {
+		if !(r == ' ' || r == '\t' || r == '_' || unicode.IsLetter(r) || unicode.IsDigit(r)) {
+			return false
+		}
+	}
+	return true
 }
 
 // Instrução em minúsculas com uma cláusula só ("select * from tb_pedido", "delete from
@@ -247,6 +303,10 @@ func acharSQL(s string, add func(ObjAchado)) {
 var (
 	reSelectMin = regexp.MustCompile(`(?is)^select\s+(?:distinct\s+|top\s+\d+\s+)?(\*|` + reQualSQL + `(?:\s*\([^)]{0,80}\))?(?:\s+as\s+\w+)?(?:\s*,\s*(?:\*|` + reQualSQL + `(?:\s*\([^)]{0,80}\))?(?:\s+as\s+\w+)?))*)\s+from\s+(` + reQualSQL + `)(.{0,12})`)
 	reAlvoMin   = regexp.MustCompile(`(?is)^(?:insert\s+into|delete\s+from|update)\s+(` + reQualSQL + `)(.{0,12})`)
+	// DDL, TRUNCATE, EXEC/CALL e USE fora de maiúsculas ("create table t_x (", "exec sp_x @a = 1")
+	reDDLMin = regexp.MustCompile(`(?is)^(?:(?:create|alter|drop)\s+(?:or\s+(?:replace|alter)\s+)?(?:(?:global|local|temp|temporary|unique|external|materialized|transient|secure|clustered|nonclustered)\s+)*` +
+		`(?:table|view|procedure|proc|function|schema|database|index|sequence)|truncate\s+table|exec|execute|call|use|describe|desc)\s+(?:if\s+(?:not\s+)?exists\s+)?(` + reQualSQL + `)(.{0,12})`)
+	reDepoisDDL = regexp.MustCompile(`^\s*(?:\(|;|@|\n|$)|^\s+as\s+(?:select|\()`)
 	reDepoisMin = regexp.MustCompile(`(?i)^(?:\s*(?:;|$)|\s+(?:where|join|inner|left|right|full|cross|limit|order|group|having|union|values|set|select|as\s+\w+\s+(?:where|join)|\(|[a-z]\w{0,2}\s+(?:where|join|on)\b)|\s*\n)`)
 )
 
@@ -262,6 +322,18 @@ func formaInequivoca(corpo, kw string) bool {
 		if m[1] == "*" || strings.Contains(m[1], ",") {
 			return reDepoisMin.MatchString(depois) || caraDeIdentificador(alvo)
 		}
+	case "CREATE", "ALTER", "DROP", "TRUNCATE", "EXEC", "EXECUTE", "CALL", "USE", "DESCRIBE":
+		// nome com cara de identificador, ou seguido do que só o SQL põe ali: "(", ";", "@"
+		// parâmetro, fim da linha. Prosa ("drop table permissions") não tem nenhum dos dois.
+		m := reDDLMin.FindStringSubmatch(corpo)
+		if m == nil {
+			return false
+		}
+		alvo := strings.Trim(m[1], "[]\"`")
+		if kw == "USE" || kw == "DESCRIBE" || kw == "EXEC" || kw == "EXECUTE" || kw == "CALL" {
+			return caraDeIdentificador(alvo) && reDepoisDDL.MatchString(m[2])
+		}
+		return caraDeIdentificador(alvo) || strings.HasPrefix(strings.TrimSpace(m[2]), "(") || strings.HasPrefix(strings.TrimSpace(m[2]), ";")
 	case "INSERT", "DELETE", "UPDATE":
 		m := reAlvoMin.FindStringSubmatch(corpo)
 		if m == nil {
@@ -588,4 +660,5 @@ func acharErroBQ(s string, add func(ObjAchado)) {
 	}
 }
 
-var reIdentSimples = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_$#-]*$`)
+// reIdentSimples: um identificador (com letras acentuadas: SQL e os catálogos aceitam).
+var reIdentSimples = regexp.MustCompile(`^[\p{L}_][\p{L}0-9_$#-]*$`)

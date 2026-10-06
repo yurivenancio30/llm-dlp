@@ -120,6 +120,15 @@ entre partes ou mistura de caixa), se o seu tipo estiver em `propagar` e se a ev
 Leitura duvidosa (a regra de origem, um cabeçalho de tabela qualquer) mascara no lugar, mas não
 ensina.
 
+### Um nome, um tipo
+
+O mesmo nome real fica sempre com o mesmo tipo e, portanto, o mesmo pseudônimo. Se já foi
+aprendido (em RAM ou no `vistos.json`) com um tipo, o achado de outra regra usa esse tipo (o
+caminho `/srv/x/` depois de `deployment/x` vira `svc_…`, não `dir_…`), também depois de um
+reinício. Num texto em que duas regras discordam e nada foi aprendido, vale o tipo da primeira
+ocorrência. Nome com ponto (`fila.eventos`) é procurado no `vistos.json` também com os pedaços
+seguintes unidos por ponto (até 4 pedaços), então é reconhecido em prosa depois do reinício.
+
 ### Validade
 
 um nome não visto há **90 dias** deixa de ser propagado (continua mascarado na
@@ -3287,3 +3296,33 @@ servidor em 34.120.10.5 (com ip_publico ligado)        →  servidor em HOST_...
 - NetBIOS — nomes de domínio: https://learn.microsoft.com/troubleshoot/windows-server/active-directory/naming-conventions-for-computer-domain-site-ou
 - IANA — IPv4 e IPv6 Special-Purpose Address Registry: https://www.iana.org/assignments/iana-ipv4-special-registry/ ; https://www.iana.org/assignments/iana-ipv6-special-registry/
 - RFC 5737 (IPv4 de documentação): https://www.rfc-editor.org/rfc/rfc5737 ; RFC 3849 (IPv6): https://www.rfc-editor.org/rfc/rfc3849
+
+## Variações que todo leitor aceita (seção G)
+
+`variacoes_test.go` gera, para cada caso de cada leitor, as variações abaixo (uma dimensão de
+cada vez) e confere que todo nome é mascarado e nenhuma palavra do modelo é mascarada a mais:
+caixa (MAIÚSCULAS, minúsculas, Inicial e, no SQL, aLtErNaDa), espaços, tabs e quebras entre
+tokens, citações (`"` `'` `` ` `` `[ ]`), comentários no meio (`--`, `/* */`, `#`, `//`, `;`),
+pontuação colada no fim, nomes com 2, 3 e 4 partes, nomes com `$`, `#`, `-` e acento, vários
+itens na mesma linha e o texto inteiro dentro de uma string JSON (aspas escapadas).
+
+O que passou a valer:
+
+| Leitor | Antes não cobria | Agora |
+|---|---|---|
+| SQL | comentário entre o nome e a cláusula (`UPDATE t /* x */ SET`); `create table`, `truncate table`, `exec` e `use` fora de maiúsculas; nome acentuado (`relatório_01`) | a forma é lida sem comentários; DDL, `truncate`, `exec`/`call`/`use`/`describe` em qualquer caixa valem com forma inequívoca (nome com cara de identificador, ou seguido de `(`, `;`, `@`, fim da linha); identificador com letras acentuadas |
+| SQL em prosa | frase com palavras-chave em maiúsculas (`o SELECT pega os dados FROM da tabela...`) virava colunas | 3 palavras soltas lado a lado (minúsculas, sem `_` nem dígito, fora do vocabulário) são prosa: a instrução acaba ali; `UPDATE` pede `SET coluna =` |
+| Mensagem de erro | nome acentuado; mensagem dentro de JSON numa linha só (`relation \"x\"`) | identificador acentuado; JSON com aspas escapadas é decodificado já com uma string |
+| Conexão | `databaseName=`/`currentSchema=` como único par depois de uma URI de banco (`jdbc:sqlserver://h;databaseName=x`) | o par logo depois de `;` `?` `&` de uma URI de banco da mesma linha conta como string de conexão |
+| Tabela, esquema | célula e nome de coluna acentuados | idem |
+| Chave-valor | valor acentuado ou com `$` no meio (para banco, schema e tabela); valor seguido da aspa que fecha a string em volta (`"...table=x"}`) | aceitos; só prefixo de 1–2 letras antes da aspa (`f"`, `r'`) é literal |
+| Código | nome acentuado ou com `$` no meio | idem |
+| Caminhos | pasta com `$`/`#` no meio ou acento cortava o caminho | aceitos (`$` no começo continua sendo variável) |
+| Linha de comando | valor com o fecho da string em volta colado (`-U x"}`) | fecho, vírgula e ponto que não abriram no token saem |
+| Endereços | URLs coladas sem separador e `a://` repetido eram quadráticos | cada URL vai no máximo até o esquema da próxima (e 2 KB) |
+| Campos (`campo: valor`) | prefixo de literal do Python (`r'...'`) virava o valor | prefixo pulado; valor de 1–2 letras, padrão de regex (`(?`, `\d`, `\b`) e modelo (`{x}`, `%s`) não são dado (os quase identificadores, opcionais, aceitam valor curto) |
+
+Limites conhecidos: nome de host, bucket, fila e namespace continua só ASCII (é o que DNS e as
+nuvens aceitam); `$` no meio só vale em nomes de SQL e caminhos; caixa alternada só é testada
+onde a linguagem não diferencia caixa (SQL); a sequência de 3 palavras soltas não é procurada
+quando há `_`, dígito ou palavra do vocabulário entre elas.

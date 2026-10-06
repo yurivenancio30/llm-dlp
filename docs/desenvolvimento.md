@@ -147,6 +147,7 @@ O `estresse_test.go` do proxy faz essas três conferências e serve de modelo.
 | Teste | O que faz | Como rodar |
 |---|---|---|
 | Suíte automática | Cada detector, ida e volta, streaming, e cada tipo de dado em todas as posições de corte de um texto grande | `make test` |
+| Variações dos leitores | Cada caso de cada leitor em todas as variações de escrita (caixa, espaços, citações, comentários, pontuação, 2–4 partes, `$ # -` e acento, vários na linha, dentro de JSON), mais prosa com SQL entre crases | `go test ./internal/mask -run Variacoes` |
 | Carga e estresse | Memória com 1,2 GB de texto, 120 mil valores aprendidos, conversas em paralelo, API fora do ar, requisição de 32 MB | `LLM_DLP_ESTRESSE=1 go test ./... -run Estresse` |
 | Sessões reais | Reproduz uma sessão antiga do Claude Code pelo llm-dlp, contra uma API falsa local (nada sai da máquina), e confere recusas, ida e volta, cache e tempo | `llm-dlp simular SESSAO.jsonl` |
 | Uso real | Claude Code de verdade, em cenários do dia a dia (CSV, planilha, segredos, log, texto colado, print, SQL, pesquisa na web, subagente), com dados fictícios e um espião gravando o que chega à API | Manual (ver abaixo) |

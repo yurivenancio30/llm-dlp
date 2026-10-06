@@ -4,6 +4,8 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"unicode"
+	"unicode/utf8"
 )
 
 // Valores já mascarados uma vez são reconhecidos depois em qualquer lugar (memória em RAM).
@@ -196,7 +198,7 @@ func (c *conhecidos) varrer(s string, desde int, fn func(ini, fim int, tipo stri
 			if ehAlnum(v[len(v)-1]) && fim < len(s) && ehAlnum(s[fim]) {
 				continue
 			}
-			if tp := c.tipo[v]; ehObjeto(tp) && (i > 0 && ehIdent(s[i-1]) || fim < len(s) && ehIdent(s[fim])) {
+			if tp := c.tipo[v]; ehObjeto(tp) && (i > 0 && (ehIdent(s[i-1]) || letraUTF8Antes(s, i)) || fim < len(s) && (ehIdent(s[fim]) || letraUTF8(s, fim) > 0)) {
 				continue // nome de objeto só vale inteiro ("tb_x" não é pedaço de "tb_x_hist")
 			}
 			if !fn(i, fim, c.tipo[v]) {
@@ -241,8 +243,10 @@ func (c *conhecidos) contemDesde(s string, g int) bool {
 	})
 	if !achou && c.nObj > 0 {
 		tokensObj(s, func(a, b int) {
-			if v := s[a:b]; !achou && (novo("O:"+v) || novo("o:"+strings.ToLower(v))) {
-				achou = true
+			for _, f := range formasComPonto(s, a, b) { // também com ponto ("top_x.eventos")
+				if v := s[a:f]; !achou && (novo("O:"+v) || novo("o:"+strings.ToLower(v))) {
+					achou = true
+				}
 			}
 		})
 		if achou {
@@ -263,6 +267,28 @@ func temDigito(s string) bool {
 
 // ehIdent: caractere que continua um identificador (letra, dígito, _ $ # -).
 func ehIdent(b byte) bool { return ehAlnum(b) || b == '_' || b == '$' || b == '#' || b == '-' }
+
+// letraUTF8: se s[i] começa uma letra fora do ASCII (á, ç, ñ...), o tamanho dela em bytes;
+// senão 0.
+func letraUTF8(s string, i int) int {
+	if s[i] < 0x80 {
+		return 0
+	}
+	r, n := utf8.DecodeRuneInString(s[i:])
+	if r == utf8.RuneError || !unicode.IsLetter(r) {
+		return 0
+	}
+	return n
+}
+
+// letraUTF8Antes: o caractere que termina em s[i-1] é uma letra fora do ASCII?
+func letraUTF8Antes(s string, i int) bool {
+	if i == 0 || s[i-1] < 0x80 {
+		return false
+	}
+	r, _ := utf8.DecodeLastRuneInString(s[:i])
+	return r != utf8.RuneError && unicode.IsLetter(r)
+}
 
 func ehAlnum(b byte) bool {
 	return b >= '0' && b <= '9' || b >= 'a' && b <= 'z' || b >= 'A' && b <= 'Z'

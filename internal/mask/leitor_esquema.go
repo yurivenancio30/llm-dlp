@@ -14,9 +14,9 @@ import (
 // com o motor de YAML/JSON (acharNomePorContexto).
 
 var (
-	reEsqEspaco   = regexp.MustCompile(`^[ \t]*([A-Za-z_][\w$#.\-]*)[ \t]{2,}(\S+)[ \t]*$`)
-	reEsqPrint    = regexp.MustCompile(`^[ |]*\|-- ([A-Za-z_][\w$#.\-]*): (\S+)`)
-	reEsqDoisPont = regexp.MustCompile(`^([A-Za-z_][\w$#.\-]*): (\S+(?: not null)?)[ \t]*$`)
+	reEsqEspaco   = regexp.MustCompile(`^[ \t]*([\p{L}_][\p{L}\w$#.\-]*)[ \t]{2,}(\S+)[ \t]*$`)
+	reEsqPrint    = regexp.MustCompile(`^[ |]*\|-- ([\p{L}_][\p{L}\w$#.\-]*): (\S+)`)
+	reEsqDoisPont = regexp.MustCompile(`^([\p{L}_][\p{L}\w$#.\-]*): (\S+(?: not null)?)[ \t]*$`)
 	reEsqProto    = regexp.MustCompile(`^[ \t]*(?:(?:repeated|optional|required)[ \t]+)?([A-Za-z_][\w.]*)[ \t]+([A-Za-z_]\w*)[ \t]*=[ \t]*\d+[ \t]*(?:\[[^\]]*\])?[ \t]*;`)
 	reIndexCols   = regexp.MustCompile(`Index\(\[((?:\s*'[^'\n]*',?)+)\s*\],\s*dtype='object'`)
 )

@@ -199,7 +199,7 @@ func TestLinhaLongaLinear(t *testing.T) {
 		}
 		return melhor
 	}
-	for _, tipo := range []string{"url", "sqljson", "urn", "email", "k8sdns", "conexao"} {
+	for _, tipo := range []string{"url", "sqljson", "urn", "email", "k8sdns", "conexao", "urlcolada", "esquemas"} {
 		p, g := tempo(linhaLonga(tipo, 128<<10)), tempo(linhaLonga(tipo, 512<<10))
 		if r := float64(g) / float64(p); r > 8 {
 			t.Errorf("%s: 512 KB levou %.1fx o tempo de 128 KB (%v / %v)", tipo, r, g, p)
