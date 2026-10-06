@@ -813,6 +813,27 @@ kafka://broker-01:9092/fila-pedidos-x9  →  kafka://host_...:9092/top_...
 
 ## Dados tabulares
 
+**Como está implementado** (`leitor_tabela.go`): a tabela é reconhecida pela forma. Separador
+`,` `;` TAB ou `|` com a mesma contagem fora de aspas no cabeçalho e na linha seguinte (CSV
+conforme a RFC 4180: a URN com vírgulas entre aspas é uma célula só); linha de traços (com ou
+sem bordas, `+---+`, `|===|`, `||` duplo); colunas alinhadas por espaços sem linha de traços
+(cada palavra do cabeçalho é uma coluna; cada valor vai para a coluna com que mais se sobrepõe,
+alinhado à direita ou à esquerda; o que fica antes da primeira coluna é índice; exige um vão de
+2+ espaços, TAB ou recuo, para prosa não virar tabela); bordas de caixa chegam como `|`/`-` pela
+normalização. Linha de tipos (`str`, `<chr>`, `varchar`), linhas truncadas (`...`) e rodapés
+(`[N rows x M columns]`, `(2 rows)`) não são valores. Também: linhas que são tuplas ou listas de
+literais (por linha, lista de tuplas, lista de listas), com a primeira como cabeçalho quando diz
+algum tipo; `<table><tr><th>/<td>`; registro vertical `-[ RECORD n ]-` + `chave | valor`; e
+linha TAB com um rótulo de tipo em maiúsculas na frente (`BUCKETS<TAB>data<TAB>nome`).
+
+O tipo de cada coluna vem do cabeçalho: os nomes de catálogo (`table_schema`, `relname`...) ou
+uma palavra de tipo em qualquer grafia (a mesma regra do leitor de chave-valor, `entChave`).
+`name` é tabela quando há coluna de schema, é do tipo do título da seção quando a linha acima é
+uma palavra de tipo (`Buckets`), e é coluna quando ao lado há `type` com tipos de dado
+(DESCRIBE). Célula de cabeçalho com mais de uma palavra só em tabela de `|`, TAB ou traços, e
+toda em minúsculas ou toda em maiúsculas (`primary key`, `APP VERSION`); `Data Type` não. Fora
+de CSV/TSV, o cabeçalho só vira coluna com `_` ou dígito (`CreationDate` é rótulo de ferramenta).
+
 Escopo: texto que é uma tabela impressa (CSV, TSV, saídas de pandas/Polars/DuckDB/pyarrow,
 tabela markdown). Ideia central: **a posição dentro da grade diz o que é a célula**. O cabeçalho
 pode trazer nomes de colunas reais. Uma célula de dado só vira nome de objeto quando o cabeçalho

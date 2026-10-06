@@ -144,7 +144,7 @@ func talvezTransporte(s string) bool {
 // quebra de linha escapada vira um bloco próprio (o resto, a estrutura do JSON, os leitores já
 // leem no original); sem aspas em volta, o texto inteiro é decodificado.
 func desescaparJSON(s string) (string, []int, bool) {
-	if strings.Count(s, `\n`) < 2 {
+	if strings.Count(s, `\n`) < 2 && strings.Count(s, `\"`) < 4 {
 		return s, nil, false
 	}
 	var m montador
@@ -165,6 +165,14 @@ func desescaparJSON(s string) (string, []int, bool) {
 			case 'r':
 			case '"', '\\', '/', '\'':
 				m.byte(s[i+1], i+1)
+			case 'u': // \u003c: só os de ASCII (o resto fica como está)
+				if i+5 < b && s[i+2] == '0' && s[i+3] == '0' && s[i+4] <= '7' && ehHex(s[i+4]) && ehHex(s[i+5]) {
+					m.byte(byte(hexVal(s[i+4])<<4|hexVal(s[i+5])), i)
+					i += 4
+				} else {
+					m.byte(c, i)
+					continue
+				}
 			default:
 				m.byte(c, i)
 				continue
@@ -177,13 +185,17 @@ func desescaparJSON(s string) (string, []int, bool) {
 		if s[i] != '"' {
 			continue
 		}
-		j, nl := i+1, false
+		j, nl, aspas := i+1, false, 0
 		for ; j < len(s) && s[j] != '"' && s[j] != '\n'; j++ {
 			if s[j] == '\\' && j+1 < len(s) {
 				nl = nl || s[j+1] == 'n'
+				if s[j+1] == '"' {
+					aspas++
+				}
 				j++
 			}
 		}
+		nl = nl || aspas >= 4
 		if j >= len(s) || s[j] != '"' {
 			break
 		}
@@ -366,4 +378,16 @@ func tirarPrefixos(s string) (string, []int, bool) {
 	}
 	t, mp := m.fim(len(s))
 	return t, mp, true
+}
+
+func ehHex(c byte) bool { return c >= '0' && c <= '9' || c >= 'a' && c <= 'f' || c >= 'A' && c <= 'F' }
+
+func hexVal(c byte) byte {
+	switch {
+	case c >= 'a':
+		return c - 'a' + 10
+	case c >= 'A':
+		return c - 'A' + 10
+	}
+	return c - '0'
 }

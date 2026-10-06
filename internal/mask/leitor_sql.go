@@ -81,7 +81,9 @@ func temAlguma(s string, ps []string) bool {
 // entQual: as entidades de cada parte de um nome qualificado a.b.c.d (ult = a do último).
 func entQual(n int, ult string) []string {
 	acima := []string{"schema", "database", "servidor"}
-	if ult == "schema" {
+	if ult == "coluna" {
+		acima = []string{"tabela", "schema", "database"}
+	} else if ult == "schema" {
 		acima = []string{"database", "servidor"}
 	} else if ult == "database" {
 		acima = []string{"servidor"}

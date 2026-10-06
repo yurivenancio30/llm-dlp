@@ -505,11 +505,17 @@ func acharUsuariosRede(s string, add func(ObjAchado)) {
 // DOMINIO\usuario: domínio NetBIOS (maiúsculas, 2 a 15 caracteres). O domínio fica com os
 // outros detectores; aqui só o usuário.
 func acharDominioUsuario(s string, add func(ObjAchado)) {
+	// texto de JSON escapado (várias quebras de linha "\\n"): "COMMAND\\nroot" é fim de linha,
+	// não domínio e usuário
+	escapado := strings.Count(s, `\n`) >= 2
 	for i := strings.IndexByte(s, '\\'); i >= 0; {
 		if i > 0 && s[i-1] != '\\' {
 			u := i + 1
 			if u < len(s) && s[u] == '\\' { // escapado: "CORP\\joao"
 				u++
+			}
+			if escapado && u+1 < len(s) && (s[u] == 'n' || s[u] == 't' || s[u] == 'r') && s[u-1] == '\\' && u == i+1 {
+				u = len(s) // "\\n": quebra de linha escapada
 			}
 			a := i
 			for a > 0 && i-a <= 15 && (s[a-1] >= 'A' && s[a-1] <= 'Z' || ehDig(s[a-1]) || s[a-1] == '-') {
