@@ -141,7 +141,8 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var b []byte
 		b, err = io.ReadAll(resp.Body)
 		if err == nil {
-			_, err = w.Write(desmascararJSONResposta(b, tab, p.cfg.SemDesmascarar))
+			_, err = w.Write(desmascararJSONResposta(b, tab, p.cfg.SemDesmascarar,
+				func(s string) string { return p.m.RegistrarResposta(s, tab) }))
 		}
 	default:
 		_, err = io.Copy(w, resp.Body)

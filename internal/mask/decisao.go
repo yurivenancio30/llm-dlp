@@ -151,17 +151,19 @@ func ehGenerica(v string) bool { return refPublica[strings.ToLower(semCitacao(v)
 
 // ---------------------------------------------------------------------------------------
 // Quem escreveu: o texto original (com pseudônimos) de cada texto do assistente, pelo hash do
-// texto desmascarado. Em RAM, com teto (a trilha A pode persistir no estilo de enviados.go).
+// texto desmascarado. Em RAM, com teto, e no enviados.log (só o HMAC do texto desmascarado e,
+// para cada trecho traduzido, onde está, o tipo e o pseudônimo: nenhum valor real).
 
 // Traducao: um trecho do texto desmascarado que veio de um pseudônimo.
 type Traducao struct {
 	Ini, Fim int
 	Pseudo   string
+	Tipo     string // o tipo do pseudônimo ("obj.namespace", "email"...)
 }
 
 type escrito struct {
 	original string
-	trad     []Traducao
+	ts       []trecho // os trechos traduzidos, em posições do texto desmascarado
 }
 
 type registroEscritos struct {
@@ -194,40 +196,78 @@ func (r *registroEscritos) buscar(k [32]byte) (escrito, bool) {
 	return e, ok
 }
 
+// idEscrito: como um texto do assistente é guardado em disco (HMAC do texto desmascarado).
+func (m *Masker) idEscrito(des string) string { return m.p.raw("escrito", des, 16) }
+
 // RegistrarResposta: o texto original que a API mandou e a tabela usada para desmascará-lo.
-// Devolve o texto desmascarado (o mesmo que tab.Desmascarar).
+// Devolve o texto desmascarado (o mesmo que tab.Desmascarar). Todo texto é registrado, mesmo
+// sem pseudônimo: o que o modelo escreveu sozinho é palavra comum (ele nunca viu o nome real).
 func (m *Masker) RegistrarResposta(original string, tab *Tabela) string {
 	des := tab.Desmascarar(original, false)
-	if des == original {
+	if len(des) < 4 { // texto curto nunca é mascarado (ver Lote.MascararDica)
 		return des
 	}
-	var b strings.Builder
-	var tr []Traducao
-	ult := 0
-	tab.varrer(original, func(ini, fim int) {
-		b.WriteString(original[ult:ini])
-		p := original[ini:fim]
-		a := b.Len()
-		b.WriteString(tab.m[p])
-		tr = append(tr, Traducao{a, b.Len(), p})
-		ult = fim
-	})
-	b.WriteString(original[ult:])
-	if b.String() != des { // a volta fez mais que trocar pseudônimos (sub-rede de IP): sem trechos
-		tr = nil
+	var ts []trecho
+	if des != original {
+		var b strings.Builder
+		ult := 0
+		tab.varrer(original, func(ini, fim int) {
+			b.WriteString(original[ult:ini])
+			p := original[ini:fim]
+			a := b.Len()
+			b.WriteString(tab.m[p])
+			ts = append(ts, trecho{a, b.Len(), tab.tipo[p], p})
+			ult = fim
+		})
+		b.WriteString(original[ult:])
+		if b.String() != des { // a volta fez mais que trocar pseudônimos (sub-rede de IP): sem registro
+			return des
+		}
 	}
-	m.escritos.guardar(sha256.Sum256([]byte(des)), escrito{original, tr})
+	m.escritos.guardar(sha256.Sum256([]byte(des)), escrito{original, ts})
+	if m.enviados != nil {
+		m.enviados.Gravar(m.idEscrito(des), ts)
+	}
 	return des
+}
+
+// escritoDe: o registro de des (da RAM, ou do enviados.log depois de um reinício).
+func (m *Masker) escritoDe(des string) (escrito, bool) {
+	k := sha256.Sum256([]byte(des))
+	if e, ok := m.escritos.buscar(k); ok {
+		return e, true
+	}
+	if m.enviados == nil {
+		return escrito{}, false
+	}
+	ts, ok := m.enviados.Buscar(m.idEscrito(des))
+	if !ok {
+		return escrito{}, false
+	}
+	orig, _, valido := remontar(des, ts)
+	if !valido {
+		return escrito{}, false
+	}
+	e := escrito{orig, ts}
+	m.escritos.guardar(k, e)
+	return e, true
 }
 
 // OriginalDe: o texto que a API mandou, se des é um texto do assistente desmascarado aqui.
 func (m *Masker) OriginalDe(des string) (string, bool) {
-	e, ok := m.escritos.buscar(sha256.Sum256([]byte(des)))
+	e, ok := m.escritoDe(des)
 	return e.original, ok
 }
 
 // Traduzidas: os trechos de des que o proxy traduziu de um pseudônimo (ok=false: sem registro).
 func (m *Masker) Traduzidas(des string) ([]Traducao, bool) {
-	e, ok := m.escritos.buscar(sha256.Sum256([]byte(des)))
-	return e.trad, ok
+	e, ok := m.escritoDe(des)
+	if !ok {
+		return nil, false
+	}
+	var tr []Traducao
+	for _, t := range e.ts {
+		tr = append(tr, Traducao{t.Ini, t.Fim, t.Pseudo, t.Tipo})
+	}
+	return tr, true
 }

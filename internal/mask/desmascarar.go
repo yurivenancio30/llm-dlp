@@ -18,6 +18,7 @@ import (
 // (um CSV de e-mails na conversa) já levavam segundos.
 type Tabela struct {
 	m      map[string]string
+	tipo   map[string]string    // pseudônimo -> tipo (quem escreveu: ver decisao.go)
 	pref   map[uint32][]int32   // 4 primeiros bytes -> tamanhos, do maior para o menor
 	par    [1 << 16 / 64]uint64 // filtro: algum pseudônimo começa com estes 2 bytes?
 	inicio map[string]bool      // começos de 1 a 3 bytes (para saber se um fim de texto pode ser um pseudônimo cortado)
@@ -31,7 +32,7 @@ type Tabela struct {
 var reIPFalso = regexp.MustCompile(`\b(2(?:4\d|5[0-5])\.\d{1,3}\.\d{1,3})\.(\d{1,3})\b`)
 
 func NovaTabela(entradas []Entrada) *Tabela {
-	t := &Tabela{m: map[string]string{}, pref: map[uint32][]int32{}, inicio: map[string]bool{}, ipPref: map[string]string{}}
+	t := &Tabela{m: map[string]string{}, tipo: map[string]string{}, pref: map[uint32][]int32{}, inicio: map[string]bool{}, ipPref: map[string]string{}}
 	// Colisão (dois valores reais com o mesmo pseudônimo — rara, mas possível, sobretudo na
 	// sub-rede falsa de IP): desmascarar escolheria um dos dois e poderia, p.ex., apontar um
 	// comando para o host errado. Nesses casos o pseudônimo fica sem desmascarar.
@@ -63,6 +64,7 @@ func NovaTabela(entradas []Entrada) *Tabela {
 			continue
 		}
 		t.m[e.Pseudo] = e.Real
+		t.tipo[e.Pseudo] = e.Tipo
 		if reIPFalso.MatchString(e.Pseudo) && strings.Count(e.Pseudo, ".") == 3 && strings.Count(e.Real, ".") == 3 {
 			f, r := e.Pseudo[:strings.LastIndex(e.Pseudo, ".")], e.Real[:strings.LastIndex(e.Real, ".")]
 			if atual, ok := t.ipPref[f]; ok && atual != r {
