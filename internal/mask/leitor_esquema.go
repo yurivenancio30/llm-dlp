@@ -10,12 +10,16 @@ import (
 // configuração, não é SQL, não é tabela): "nome    int64" por linha (dtypes), Index([...])
 // de colunas, " |-- nome: string" (printSchema), "nome: int64" por linha no começo da linha
 // (schema do Arrow), "string nome = 1;" (protobuf). O vocabulário é só o de tipos de dado
-// (vocab_tipos.go). "nome    tipo" vale só no começo da linha: recuado, é campo de struct ou
-// declaração em código (variável, que nunca é mascarada). As formas aninhadas em YAML/JSON (colunas de modelo, "fields" do Avro) ficam
+// (vocab_tipos.go). "nome    tipo" é decidido pelo TIPO, com ou sem recuo: o bloco é esquema
+// quando pelo menos um tipo é só de dado (object, category, datetime64[ns], VARCHAR(n),
+// TIMESTAMP...), ou quando vem o rodapé "dtype: object" do pandas. Tipo que também é tipo de
+// linguagem (string, int, bool, uint64, float64 — medido no código Go público,
+// tipos_linguagem.txt) não decide sozinho: um struct Go escreve "nome    tipo" igual. Tipo com
+// forma de código (*T, []T, pacote.Tipo, map[K]V) nunca é de esquema. As formas aninhadas em YAML/JSON (colunas de modelo, "fields" do Avro) ficam
 // com o motor de YAML/JSON (acharNomePorContexto).
 
 var (
-	reEsqEspaco   = regexp.MustCompile(`^([\p{L}_][\p{L}\w$#.\-]*)[ \t]{2,}(\S+)[ \t]*$`)
+	reEsqEspaco   = regexp.MustCompile(`^[ \t]*([\p{L}_][\p{L}\w$#.\-]*)[ \t]{2,}(\S+)[ \t]*$`)
 	reEsqPrint    = regexp.MustCompile(`^[ |]*\|-- ([\p{L}_][\p{L}\w$#.\-]*): (\S+)`)
 	reEsqDoisPont = regexp.MustCompile(`^([\p{L}_][\p{L}\w$#.\-]*): (\S+(?: not null)?)[ \t]*$`)
 	reEsqProto    = regexp.MustCompile(`^[ \t]*(?:(?:repeated|optional|required)[ \t]+)?([A-Za-z_][\w.]*)[ \t]+([A-Za-z_]\w*)[ \t]*=[ \t]*\d+[ \t]*(?:\[[^\]]*\])?[ \t]*;`)
@@ -46,19 +50,26 @@ func acharEsquema(s string, add func(ObjAchado)) {
 	type par struct{ a, b int }
 	var bloco []par
 	forma := 0
+	dado := false // "nome    tipo": algum tipo do bloco é só de dado
 	fechar := func(rodape bool) {
-		if len(bloco) >= 2 || rodape && len(bloco) == 1 || forma == 3 || forma == 4 {
+		if (len(bloco) >= 2 || rodape && len(bloco) == 1 || forma == 3 || forma == 4) && (forma != 1 || dado || rodape) {
 			for _, p := range bloco {
 				addColuna(s, p.a, p.b, add)
 			}
 		}
-		bloco, forma = bloco[:0], 0
+		bloco, forma, dado = bloco[:0], 0, false
 	}
 	for _, l := range quebraLinhas(s) {
 		linha := s[l[0]:l[1]]
+		if strings.HasPrefix(linha, "dtype: ") { // rodapé do pandas: fecha o bloco de cima
+			fechar(true)
+			continue
+		}
 		f, a, b := 0, -1, -1
-		if m := reEsqEspaco.FindStringSubmatchIndex(linha); m != nil && ehTipoDado(linha[m[4]:m[5]]) {
+		tl := false
+		if m := reEsqEspaco.FindStringSubmatchIndex(linha); m != nil && ehTipoDado(linha[m[4]:m[5]]) && !formaDeTipoDeCodigo(linha[m[4]:m[5]]) {
 			f, a, b = 1, m[2], m[3]
+			tl = !tipoSoDeDado(linha[m[4]:m[5]])
 		} else if m := reEsqDoisPont.FindStringSubmatchIndex(linha); m != nil && ehTipoDado(strings.TrimSuffix(linha[m[4]:m[5]], " not null")) {
 			f, a, b = 2, m[2], m[3]
 		} else if m := reEsqPrint.FindStringSubmatchIndex(linha); m != nil && ehTipoDado(linha[m[4]:m[5]]) {
@@ -67,16 +78,35 @@ func acharEsquema(s string, add func(ObjAchado)) {
 			f, a, b = 4, m[4], m[5]
 		}
 		if f == 0 {
-			fechar(strings.HasPrefix(linha, "dtype: "))
+			fechar(false)
 			continue
 		}
 		if forma != 0 && f != forma {
 			fechar(false)
 		}
 		forma = f
+		dado = dado || f == 1 && !tl
 		bloco = append(bloco, par{l[0] + a, l[0] + b})
 	}
 	fechar(false)
+}
+
+// formaDeTipoDeCodigo: o tipo tem forma que só o código escreve: ponteiro (*T), lista ([]T),
+// tipo qualificado por pacote (strings.Builder), mapa (map[K]V), canal.
+func formaDeTipoDeCodigo(t string) bool {
+	return t != "" && (t[0] == '*' || t[0] == '[' || strings.Contains(t, ".") || strings.HasPrefix(t, "map[") || strings.HasPrefix(t, "chan"))
+}
+
+// tipoSoDeDado: o tipo de dado não é também tipo de linguagem (tiposLinguagem, medido). Tipo
+// em maiúsculas (INT, TIMESTAMP) é SQL: linguagem nenhuma escreve tipo assim.
+func tipoSoDeDado(t string) bool {
+	if strings.ToUpper(t) == t && strings.ToLower(t) != t {
+		return true
+	}
+	if i := strings.IndexAny(t, "([<"); i > 0 {
+		t = t[:i]
+	}
+	return !tiposLinguagem[strings.ToLower(t)]
 }
 
 // addColuna: nome de coluna (não é propagado; vale no lugar).

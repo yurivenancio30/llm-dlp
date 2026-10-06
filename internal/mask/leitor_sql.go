@@ -237,6 +237,12 @@ func acharSQL(s string, add func(ObjAchado)) {
 		if !reFormaSQL.MatchString(forma) {
 			return
 		}
+		if !maiusc && !instrucaoForaDeProsa(s, i, forma, kw, prosa) {
+			return
+		}
+		if maiusc && !inicioDeInstrucao(s, i) {
+			return
+		}
 		claus := contarClausulas(forma, 4)
 		// uma cláusula só: em minúsculas, só vale com forma inequívoca; em maiúsculas vale
 		// sempre, e ensina quando a forma também é inequívoca

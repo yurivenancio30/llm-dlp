@@ -1057,8 +1057,9 @@ e markdown sem alinhamento visual não precisam ser realinhados (só as células
 ## JSON, YAML, TOML, INI, .env, .properties, XML e linguagens de esquema
 
 **Esquemas: nome + tipo de dado** (`leitor_esquema.go`, leitor novo: nenhum outro lê essa
-forma). Onde um nome vem com um tipo de dado, o nome é coluna: `nome    int64` por linha (2+
-linhas, ou 1 com o rodapé `dtype: object`), `Index(['a', 'b'], dtype='object')`,
+forma). Onde um nome vem com um tipo de dado, o nome é coluna: `nome    tipo` por linha (2+
+linhas, ou 1 com o rodapé `dtype: object`), decidido pelo tipo e não pelo recuo (ver
+[Freios](#freios)), `Index(['a', 'b'], dtype='object')`,
 ` |-- nome: string` (printSchema), `nome: int64` no começo da linha (2+ linhas: anotação de
 código é recuada e não conta), `string nome = 1;` (protobuf) e tabela `name | type` com tipos
 de dado na coluna `type`. O vocabulário é só o de tipos de dado (SQL, pandas/numpy, Arrow,
@@ -3334,3 +3335,212 @@ Limites conhecidos: nome de host, bucket, fila e namespace continua só ASCII (�
 nuvens aceitam); `$` no meio só vale em nomes de SQL e caminhos; caixa alternada só é testada
 onde a linguagem não diferencia caixa (SQL); a sequência de 3 palavras soltas não é procurada
 quando há `_`, dígito ou palavra do vocabulário entre elas.
+
+## Conhecer o nome: memória da conversa e as regras de nome
+
+Até aqui, um nome só era mascarado onde a estrutura dizia que era nome, e só era propagado se
+tivesse cara de identificador. Dois experimentos mostraram o limite disso:
+
+- um catálogo lido com `head` chegava mascarado, mas o mesmo conteúdo impresso por um script
+  como `tag | ordem | regex | plataforma | objeto | coluna | tipo`, sem cabeçalho, saía quase
+  todo em claro;
+- um `kubectl get ns` com namespaces de palavra comum (`payments`, `billing`) não mascarava
+  nada; o leitor de linha de comando mascarava `-n payments` no comando seguinte, mas a saída
+  trazia `payments` em claro, e o pseudônimo virava enfeite.
+
+O princípio desta rodada é não perseguir o formato da saída: o proxy precisa **conhecer** o
+nome e, depois de conhecer, procurar a palavra exata em qualquer formato. Nada disso usa lista
+de nomes internos, catálogo, dicionário do usuário ou regra por ferramenta: o código não sabe o
+que é `kubectl`, `aws`, `psql` ou `gh`. Toda decisão vem de gramática, estrutura, proveniência
+ou unicidade. O único vocabulário é a gramática fechada dos verbos de enumeração e consulta
+(`list`, `get`, `describe`, `show`, `ls`, `search`, `find`, `query`, `select`, `scan`, `enum`,
+`dump`, `export`, `fetch`, `inspect`, `info`, em qualquer convenção: `get_x`, `listX`, `Get-X`,
+`GET /x`), os tipos de `EntObjeto`, os vocabulários públicos que já existiam e a referência
+pública derivada por medição (abaixo).
+
+### As peças (decisao.go)
+
+- **Decisão:** um nome decidido num texto, com o nome, o tipo e a regra que decidiu
+  (`Decisao{Nome, Ent, Regra, Generica}`). Os nomes de objeto achados pelos leitores entram
+  como decisões da regra `leitor`; as regras novas entram com o próprio nome.
+- **Decisor:** uma regra que olha o texto inteiro e o que já foi achado nele, e decide nomes
+  (`TextoCtx.Decidir` mascara no lugar e registra). Os decisores rodam depois dos leitores, só
+  no texto novo; o resto vem do memo.
+- As decisões ficam no resultado do memo, em RAM, junto do texto mascarado. **Não vão para o
+  `vistos.json`**: o formato, a validade de 90 dias, o teto e as regras de aprendizado do
+  `vistos.json` são os mesmos de antes.
+- A dica do comando (o que o proxy sabe do `tool_use` que produziu um `tool_result`) pode levar
+  uma extensão depois do separador `\x1e`; o leitor de tabela lê só a parte antiga, os
+  decisores recebem a extensão. A dica inteira entra na chave do memo.
+
+### Memória da conversa
+
+Numa requisição, o proxy mascara todos os textos em paralelo (1ª passada) e depois monta o
+corpo (2ª passada). Entre as duas, junta os nomes decididos de **todos** os textos do pedido:
+é a memória da conversa. Ela é aplicada aos textos ainda não enviados, por palavra inteira,
+com a regra de caixa de cada tipo (nome de SQL e de servidor sem diferença de caixa; os outros
+exatos). Uma decisão tomada num texto novo vale também para os outros textos novos do mesmo
+pedido. Aplicar a memória é um passo depois do memo e não muda a chave do memo.
+
+- **Acaba sozinha.** Nada é guardado por conversa fora do memo: a memória é recalculada a
+  partir dos pedaços do próprio pedido. Numa conversa nova, sem o inventário no histórico, a
+  palavra comum volta a ser só palavra.
+- **Não reescreve o passado.** O que já foi enviado continua congelado (`enviados.go`): as
+  decisões novas valem só para texto que ainda não saiu. Um texto antigo que trazia a palavra
+  em claro continua igual, para o cache de prompt da API continuar valendo.
+- **Vale para** as mensagens do usuário e as saídas de comando. Não vale para os blocos de
+  thinking (intocados nos dois sentidos) nem para o texto do assistente (ver *Quem escreveu*).
+- **Palavra genérica não entra.** Uma palavra da referência pública derivada (`default`,
+  `public`, `api`...) decidida num inventário é mascarada ali, mas não entra na memória
+  (`Decisao.Generica`): propagar `default` para toda a conversa mascararia metade do texto.
+
+### Quem escreveu
+
+Ao desmascarar a resposta (JSON ou streaming SSE), o proxy guarda, por bloco de texto do
+assistente, o texto **original** que a API mandou (só com pseudônimos, nunca com o valor real),
+indexado pelo hash do texto desmascarado que o Claude Code vai reenviar no histórico, e os
+trechos que ele traduziu de um pseudônimo. Quando o bloco volta:
+
+- usa-se o original: voltam a ser pseudônimo **exatamente** as palavras que o proxy traduziu;
+- a memória da conversa **não** se aplica ao resto do texto do assistente: o Claude nunca viu o
+  nome real; se escreveu a palavra, é palavra comum (o modelo escreve "payments" porque é a
+  palavra, não porque conhece o namespace).
+
+Sem registro (o proxy reiniciou, outro processo atendeu) vale o comportamento anterior. O
+registro fica em RAM com teto; se for persistido, é no estilo de `enviados.go` (só pseudônimos
+e HMAC).
+
+### Regra de proveniência
+
+O proxy liga cada `tool_result` ao `tool_use` que o gerou. As palavras do **programa** são os
+tokens do comando ou do script, quebrados em camelCase, snake_case, kebab-case, caminho,
+Verbo-Substantivo e literais. Palavra da saída que não está no programa e não é da referência
+pública **veio dos dados**. Exceção obrigatória: a palavra que o próprio proxy pôs no
+`tool_use` ao traduzir um pseudônimo (o modelo escreveu `-n ns_x`, o proxy mandou
+`-n payments`) continua sendo nome, embora esteja no programa.
+
+Assim, um script com as tags e as regex como literais imprime essas tags e regex legíveis (são
+do programa), e o que ele leu do arquivo (tabelas, colunas) vem dos dados.
+
+### Regra de identidade
+
+A saída é segmentada em registros de forma genérica: linhas, depois da normalização do
+transporte (número de linha, grep, diff, ANSI, JSON escapado), e os registros de JSON e de
+lista que os leitores já segmentam. A posição de cada candidato é a sua **ordem** no registro,
+sem depender de separador. Num bloco de 3 ou mais registros paralelos (mesmo número de
+candidatos, com folga de 1), a posição em que todos os valores são distintos, ao lado de
+posições com valores repetidos, é **identidade**: é a chave do inventário. Uma lista com um
+item por linha, todos distintos, também é identidade. Ficam de fora números, datas, durações,
+versões e a referência pública.
+
+### Decisão para palavra comum e eco
+
+Palavra com cara de identificador segue as regras de antes. Palavra comum vira nome quando:
+
+- **veio dos dados** (proveniência) **e** está em **posição de identidade**; ou
+- há **eco**: apareceu numa saída anterior e volta como argumento num `tool_use` posterior.
+  "Argumento" é lido pela gramática, não por ferramenta: valor depois de palavra de tipo, opção
+  `--x valor`, atribuição, segmento de caminho REST, `FROM` / `INTO` / `TO ROLE`. Também é nome
+  a palavra que é pedaço de um nome distintivo já mascarado (`payments` em
+  `payments-api-7d9f`, em `registry/acme/payments:1.2`).
+
+**Tipo do pseudônimo:** o substantivo que o verbo de enumeração do pedido aponta
+(`list_findings` → `finding`, `Get-ADGroup` → `group`, `GET /queues` → `queue`). Se casar
+com um tipo de `EntObjeto`, usa esse prefixo; senão, o prefixo genérico que já existia. A
+mensagem do usuário também é pedido: "lista os grupos com acesso ao banco" dá o tipo da saída
+seguinte, pela mesma gramática.
+
+### Regra léxica (código e configuração)
+
+Uma varredura léxica em uma passada, igual para qualquer linguagem, separa literais de texto
+(aspas simples, duplas, crase, triplas), comentários (`#`, `//`, `/* */`, `--`, `<!-- -->`,
+`;` de INI) e valores de `chave: valor` / `chave = valor` (YAML, TOML, INI, .env, JSON,
+HCL). Palavra comum só é candidata se for o literal ou o valor **inteiro**, sem espaço
+(literal com frase é prosa); identificador de código (variável, função, import) nunca é;
+comentário é prosa. A candidata vira nome com mais uma pista:
+
+- a chave contém um tipo de `EntObjeto` (`namespace:`, `bucket=`, `table_name=`);
+- âncora: outro valor do mesmo bloco já é nome conhecido;
+- eco;
+- a palavra também aparece como dado numa saída de comando da conversa.
+
+`namespace = "payments"` vira nome; `payments = load()`, `# payments do dia` e
+`msg = "payments failed"` não.
+
+### Freios
+
+**Esquema pelo tipo, não pelo recuo.** No leitor de esquema, um bloco `nome    tipo` é
+esquema quando pelo menos um tipo é só de dado (`object`, `category`, `datetime64[ns]`,
+`VARCHAR(n)`, `NUMBER(p,s)`, tipo em maiúsculas como `TIMESTAMP` e `DATE`), com ou sem recuo,
+ou quando vem o rodapé `dtype: object` do pandas. Tipo que também é tipo de linguagem
+(`string`, `int`, `bool`, `uint64`, `float64`...) não decide sozinho, porque um struct Go
+escreve `nome    tipo` do mesmo jeito; e tipo com forma de código (`*T`, `[]T`,
+`strings.Builder`, `map[K]V`) nunca é de esquema. Quais tipos são "também de linguagem" não
+está escrito à mão: é medido no código Go público (`tipos_linguagem.txt`, abaixo). Limite: um
+bloco recuado só com `int64` e `float64`, sem rodapé, não é lido como esquema (é igual a um
+struct).
+
+**SQL citado em prosa e em comentário.** O leitor de SQL marcava 746 achados em 40 MB de
+código público. Pelas amostras, quase todos vinham de três formas, nenhuma delas SQL:
+comentário de código que fala do código (`// Use x.Errors`, `# delete FROM line`,
+`// Insert into hash table`), palavra-chave comum no meio de uma frase (`you can use x`,
+`would never call f(), so`, `Call data.encode(...) but`), palavra em maiúsculas no meio de outra
+frase em maiúsculas (`0x3B -> CUSTOMER USE THREE`) e campo de struct com nome de palavra-chave
+(`Use    uint32`, `call    ast.CallExpr`). Os freios (`leitor_sql_freios.go`) são de forma:
+
+- num comentário de código (`#`, `//`, `/*`, `*`, e o comentário no fim da linha), só vale a
+  instrução que abre o comentário, fora de maiúsculas só com alvo com cara de identificador, e
+  nunca com palavra comum (`use`, `call`, `exec`...) fora de maiúsculas;
+- palavra comum fora de maiúsculas logo depois de outra palavra na mesma linha é frase;
+- `CALL` pede parênteses, e depois deles vem `;` ou o fim da linha;
+- o alvo de uma instrução não é tipo de dado;
+- instrução em maiúsculas não começa logo depois de outra palavra em maiúsculas que não é do
+  vocabulário do SQL (`EXPLAIN SELECT` continua valendo).
+
+**Conexão de modelo.** Nas sessões reais, os valores públicos que `conexão/tnsnames` e
+`conexão/uri` aprendiam tinham todos a mesma forma: palavra de tipo ou de atributo seguida de
+número ou colada a outra (`host1`, `user2`, `db01`, `dbName`): nome de exemplo, não de
+recurso. Na URI de banco e no tnsnames, um valor de no máximo dois pedaços, todos do
+vocabulário que já existe, com ou sem número no fim, não é mascarado (`freios_p2.go`). Nas
+outras regras, `broker1` num `bootstrap.servers` continua nome.
+
+### Referência pública derivada
+
+`ref_publica.txt` e `tipos_linguagem.txt` são **gerados** por `TestGerarRefPublica`
+(`ref_publica_gerar_test.go`) no material público da máquina (os diretórios de
+`LLM_DLP_CORPUS`: módulos Go, bibliotecas Python, `/usr/share/doc`), nunca escritos à mão. O
+cabeçalho de cada arquivo diz de onde, quando e com que critério foi gerado:
+
+```
+LLM_DLP_GERAR_REF=1 LLM_DLP_CORPUS=~/go/pkg/mod:/usr/lib/python3.10:/usr/share/doc:... \
+  go test ./internal/mask -run TestGerarRefPublica -v
+```
+
+- **ref_publica.txt:** palavra em posição de nome em pelo menos 8 projetos distintos. Posição
+  de nome, pela gramática: valor de chave de tipo (`entChave`) ou `name` em YAML, JSON, TOML,
+  INI, .env e argumento nomeado (em código, só literal de texto); opção `--tipo`; nome depois
+  de `FROM`/`JOIN`/`INTO`/`UPDATE`/`TABLE`/`SCHEMA`/`DATABASE` (em minúsculas, só nome
+  qualificado); primeiro rótulo do host e primeiro pedaço do caminho de uma URL. Projeto é o
+  módulo Go (até o `@`) ou o primeiro diretório abaixo da raiz do corpus. Um nome que só um
+  projeto usa nunca entra, e um nome interno de empresa não aparece em projetos públicos
+  distintos. Na geração atual: 977 projetos, 367 MB, 289 palavras.
+- **tipos_linguagem.txt:** tipo do vocabulário de tipos de dado que aparece como tipo de campo
+  ou de variável (`\tnome    tipo`) em código Go de pelo menos 5 projetos distintos (16 tipos).
+
+`ehGenerica` consulta a referência. Uma palavra da referência decidida por qualquer regra é
+mascarada no lugar, com `Decisao.Generica = true`, e não entra na memória da conversa.
+
+### Limites
+
+- A memória dura o que dura o histórico: se o inventário saiu do contexto (compactação,
+  conversa nova), a palavra comum volta a ser só palavra até o próximo inventário.
+- O que foi enviado antes do inventário fica como saiu (não reescrevemos o passado).
+- Palavra comum que nunca aparece em inventário, eco ou chave de tipo não é conhecida: o nome
+  que só aparece em prosa, sem estrutura, continua legível.
+- A referência pública depende do material público instalado na máquina que a gerou. Na
+  geração atual, `kube-system` (nenhum manifesto de Kubernetes no corpus) e `dbo` (2
+  projetos) não entraram; os dois já eram públicos para os leitores (`vocabDev`), mas não são
+  marcados como genéricos nas decisões das regras novas.
+- Palavra genérica decidida num inventário é mascarada só ali; nas outras ocorrências da
+  conversa fica legível, de propósito.
+- A máscara protege identificadores, não a lógica: ver [Política](politica.md).

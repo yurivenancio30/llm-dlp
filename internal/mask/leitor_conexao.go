@@ -157,16 +157,20 @@ func acharConexoes(s string, add func(ObjAchado)) {
 					m[k] += ini
 				}
 			}
-			if m[2] >= 0 && !publicoConexao(s[m[2]:m[3]]) {
+			if m[2] >= 0 && !publicoConexao(s[m[2]:m[3]]) && !nomeDeModelo(s[m[2]:m[3]]) {
 				add(ObjAchado{m[2], m[3], "usuario", "uri", true})
 			}
 			// vários hosts: h1:p1,h2:p2
 			a := m[4]
 			for _, h := range strings.Split(s[m[4]:m[5]], ",") {
+				if nomeDeModelo(strings.SplitN(h, ":", 2)[0]) { // freios_p2.go
+					a += len(h) + 1
+					continue
+				}
 				addServidor(s, a, a+len(h), "uri", add)
 				a += len(h) + 1
 			}
-			if m[6] >= 0 && !publicoConexao(s[m[6]:m[7]]) {
+			if m[6] >= 0 && !publicoConexao(s[m[6]:m[7]]) && !nomeDeModelo(s[m[6]:m[7]]) {
 				add(ObjAchado{m[6], m[7], "database", "uri", true})
 			}
 		}
@@ -184,6 +188,9 @@ func acharConexoes(s string, add func(ObjAchado)) {
 	}
 	if strings.Contains(s, "(") {
 		for _, m := range reTNS.FindAllStringSubmatchIndex(s, -1) {
+			if nomeDeModelo(s[m[4]:m[5]]) { // freios_p2.go
+				continue
+			}
 			if strings.EqualFold(s[m[2]:m[3]], "HOST") {
 				addServidor(s, m[4], m[5], "tnsnames", add)
 			} else {
