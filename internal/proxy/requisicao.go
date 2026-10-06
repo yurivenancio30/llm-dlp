@@ -199,7 +199,11 @@ type walker struct {
 	idsWeb map[string]bool
 	// daWeb: o texto atual veio da internet (mascara, mas não aprende)
 	daWeb bool
-	pos   *posicao
+	// dicas: tool_use_id -> o que o comando da chamada diz do resultado (mask.Comandos.Dica)
+	dicas map[string]string
+	// dica: a do resultado atual
+	dica string
+	pos  *posicao
 	// dentro: já dentro de um bloco (não encadeia de novo)
 	dentro bool
 }
@@ -237,10 +241,10 @@ func ehBase64(b map[string]any) bool {
 
 func (w walker) s(v string) string {
 	if w.col != nil {
-		w.col.itens = append(w.col.itens, mask.ItemLote{S: v, DaWeb: w.daWeb, Pos: w.pos.doTexto()})
+		w.col.itens = append(w.col.itens, mask.ItemLote{S: v, DaWeb: w.daWeb, Pos: w.pos.doTexto(), Dica: w.dica})
 		return v
 	}
-	out, e := w.lote.Mascarar(v, w.daWeb, w.pos.doTexto())
+	out, e := w.lote.MascararDica(v, w.daWeb, w.pos.doTexto(), w.dica)
 	*w.ents = append(*w.ents, e...)
 	return out
 }
@@ -279,6 +283,78 @@ func (w walker) idsDaWeb(msgs []any) map[string]bool {
 	return ids
 }
 
+// dicasDosComandos: para cada resultado de ferramenta, o que o comando da chamada (o tool_use
+// do mesmo id) diz dele: as colunas de um SELECT, o tipo pedido numa listagem, a coluna de um
+// arquivo cujo cabeçalho já passou (ver mask/comando.go). Calculado em ordem, antes de mascarar
+// (a entrada do tool_use ainda é a original), e igual nas duas passadas.
+func dicasDosComandos(msgs []any) map[string]string {
+	cs := mask.NovosComandos()
+	cmds := map[string]string{}
+	dicas := map[string]string{}
+	for _, mm := range msgs {
+		msg, _ := mm.(map[string]any)
+		blocos, _ := msg["content"].([]any)
+		for _, b := range blocos {
+			bl, _ := b.(map[string]any)
+			if bl == nil {
+				continue
+			}
+			id, _ := bl["id"].(string)
+			switch bl["type"] {
+			case "tool_use":
+				if id != "" {
+					cmds[id] = comandoDe(bl["input"])
+				}
+			case "tool_result":
+				rid, _ := bl["tool_use_id"].(string)
+				if cmd := cmds[rid]; cmd != "" {
+					if d := cs.Dica(cmd, textoDe(bl["content"])); d != "" {
+						dicas[rid] = d
+					}
+				}
+			}
+		}
+	}
+	return dicas
+}
+
+// comandoDe: o texto da entrada de uma ferramenta que diz o que ela faz (o comando do shell,
+// a consulta, o caminho). A descrição livre fica de fora.
+func comandoDe(v any) string {
+	in, _ := v.(map[string]any)
+	if c, ok := in["command"].(string); ok {
+		return c
+	}
+	var b strings.Builder
+	for _, k := range chaves(in) {
+		if s, ok := in[k].(string); ok && k != "description" && len(s) <= 4<<10 {
+			b.WriteString(s)
+			b.WriteByte('\n')
+		}
+	}
+	return b.String()
+}
+
+// textoDe: o texto de um conteúdo de tool_result (string ou blocos de texto).
+func textoDe(v any) string {
+	switch c := v.(type) {
+	case string:
+		return c
+	case []any:
+		var b strings.Builder
+		for _, x := range c {
+			if bl, ok := x.(map[string]any); ok && bl["type"] == "text" {
+				if t, ok := bl["text"].(string); ok {
+					b.WriteString(t)
+					b.WriteByte('\n')
+				}
+			}
+		}
+		return b.String()
+	}
+	return ""
+}
+
 // Chaves que nunca carregam dado do usuário (ou que não podem mudar).
 var chavesIntocaveis = map[string]bool{"type": true, "id": true, "tool_use_id": true, "signature": true,
 	"media_type": true, "cache_control": true, "model": true, "role": true, "stop_reason": true,
@@ -311,6 +387,7 @@ func (w walker) requisicaoAnthropic(v any) any {
 		case "messages":
 			if msgs, ok := val.([]any); ok {
 				w.idsWeb = w.idsDaWeb(msgs)
+				w.dicas = dicasDosComandos(msgs)
 				for _, mm := range msgs {
 					if msg, ok := mm.(map[string]any); ok {
 						// quem fala também faz parte da posição
@@ -399,9 +476,11 @@ func (w walker) bloco(b map[string]any) map[string]any {
 		b["input"] = w.tudo(b["input"])
 		return b
 	case "tool_result":
-		if id, _ := b["tool_use_id"].(string); w.idsWeb[id] {
+		id, _ := b["tool_use_id"].(string)
+		if w.idsWeb[id] {
 			w.daWeb = true
 		}
+		w.dica = w.dicas[id]
 		b["content"] = w.conteudo(b["content"])
 		return b
 	case "document":

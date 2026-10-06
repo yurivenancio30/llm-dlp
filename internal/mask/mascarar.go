@@ -24,15 +24,34 @@ func (m *Masker) Mascarar(s string) (string, []Entrada) {
 }
 
 func (m *Masker) mascarar(s string, aprende bool) (resultado, [32]byte) {
+	return m.mascararD(s, aprende, "")
+}
+
+// mascararD: com a dica do comando que produziu o texto (ver comando.go; "" = sem dica).
+func (m *Masker) mascararD(s string, aprende bool, dica string) (resultado, [32]byte) {
 	if len(s) < 4 {
 		return resultado{texto: s}, [32]byte{}
 	}
-	k := sha256.Sum256([]byte(s))
-	return m.mascararK(s, k, aprende), k
+	k := chaveMemo(s, dica)
+	return m.mascararK(s, k, aprende, lerDica(dica)), k
+}
+
+// chaveMemo: a chave do texto na memória de resultados (com a dica, se houver: o mesmo texto
+// pode sair de comandos diferentes).
+func chaveMemo(s, dica string) [32]byte {
+	if dica == "" {
+		return sha256.Sum256([]byte(s))
+	}
+	h := sha256.New()
+	h.Write([]byte("dica\x00" + dica + "\x00"))
+	h.Write([]byte(s))
+	var k [32]byte
+	copy(k[:], h.Sum(nil))
+	return k
 }
 
 // mascararK: com o hash do texto já calculado (k).
-func (m *Masker) mascararK(s string, k [32]byte, aprende bool) resultado {
+func (m *Masker) mascararK(s string, k [32]byte, aprende bool, d *dicaSaida) resultado {
 	m.mu.Lock()
 	r, ok := m.memo[k]
 	if !ok {
@@ -55,7 +74,7 @@ func (m *Masker) mascararK(s string, k [32]byte, aprende bool) resultado {
 			return r
 		}
 	}
-	achados := m.detectar(s, aprende)
+	achados := m.detectarD(s, aprende, d)
 
 	// Até que geração este resultado vale? Se nada foi aprendido durante a detecção, até g.
 	// Se algo foi aprendido (por este texto ou por outro, em paralelo), confere: todo valor
@@ -158,19 +177,25 @@ type ItemLote struct {
 	S     string
 	DaWeb bool
 	Pos   Posicao
+	Dica  string // o que o comando que produziu o texto diz dele (Comandos.Dica)
 }
 
 // Mascarar: texto que já saiu nesta posição sai igual (reescrever não protegeria nada e
 // regravaria a conversa no cache da API). daWeb = conteúdo da internet (resultado de
 // WebFetch/WebSearch): é mascarado, mas nada dele é lembrado.
 func (l *Lote) Mascarar(s string, daWeb bool, pos Posicao) (string, []Entrada) {
+	return l.MascararDica(s, daWeb, pos, "")
+}
+
+// MascararDica: como Mascarar, com a dica do comando que produziu o texto.
+func (l *Lote) MascararDica(s string, daWeb bool, pos Posicao, dica string) (string, []Entrada) {
 	if len(s) < 4 {
 		return s, nil
 	}
 	if r, ok := l.m.congelado(pos, s); ok {
 		return r.texto, r.entradas
 	}
-	r, _ := l.m.mascarar(s, !daWeb)
+	r, _ := l.m.mascararD(s, !daWeb, dica)
 	if _, ja := l.saidas[pos]; !ja {
 		l.saidas[pos] = r
 	}
@@ -188,7 +213,7 @@ func (l *Lote) Aquecer(itens []ItemLote) {
 		if _, ok := l.m.congelado(it.Pos, it.S); ok {
 			continue
 		}
-		pend = append(pend, itemAquecer{it.S, !it.DaWeb})
+		pend = append(pend, itemAquecer{it.S, !it.DaWeb, it.Dica})
 	}
 	l.m.aquecer(pend)
 }
@@ -232,7 +257,7 @@ func (m *Masker) Persistir() {
 func (m *Masker) Aquecer(textos []string) {
 	itens := make([]itemAquecer, len(textos))
 	for i, t := range textos {
-		itens[i] = itemAquecer{t, true}
+		itens[i] = itemAquecer{t, true, ""}
 	}
 	m.aquecer(itens)
 }
@@ -240,6 +265,7 @@ func (m *Masker) Aquecer(textos []string) {
 type itemAquecer struct {
 	s       string
 	aprende bool
+	dica    string
 }
 
 func (m *Masker) aquecer(itens []itemAquecer) {
@@ -251,7 +277,7 @@ func (m *Masker) aquecer(itens []itemAquecer) {
 		if len(it.s) < 4 {
 			continue
 		}
-		k := sha256.Sum256([]byte(it.s))
+		k := chaveMemo(it.s, it.dica)
 		_, a := m.memo[k]
 		_, b := m.velho[k]
 		if !a && !b && !visto[k] {
@@ -264,7 +290,7 @@ func (m *Masker) aquecer(itens []itemAquecer) {
 	if len(pend) < 2 || total < aquecerMin {
 		// pouco texto: um por vez (mas antes da montagem, para todo aprendizado valer nela)
 		for _, it := range pend {
-			m.mascarar(it.s, it.aprende)
+			m.mascararD(it.s, it.aprende, it.dica)
 		}
 		return
 	}
@@ -285,7 +311,7 @@ func (m *Masker) aquecer(itens []itemAquecer) {
 				if i >= len(pend) {
 					return
 				}
-				m.mascarar(pend[i].s, pend[i].aprende)
+				m.mascararD(pend[i].s, pend[i].aprende, pend[i].dica)
 			}
 		}()
 	}

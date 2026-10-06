@@ -215,6 +215,9 @@ func acharConexoes(s string, add func(ObjAchado)) {
 			add(ObjAchado{m[4], m[5], "tabela", "dbt", true})
 		}
 	}
+	if strings.Contains(s, "onect") || strings.Contains(s, "onnect") || strings.Contains(s, "onex") || strings.Contains(s, "ONNECT") || strings.Contains(s, "ONECT") {
+		acharEnderecoBanco(s, add)
+	}
 	if strings.Contains(s, "conn_id") {
 		for _, m := range reConnID.FindAllStringSubmatchIndex(s, -1) {
 			if !publicoConexao(s[m[2]:m[3]]) {
@@ -326,6 +329,41 @@ func prefixoPDO(s string, i int) bool {
 		return a == 0 || !ehAlnum(s[a-1])
 	}
 	return false
+}
+
+// Endereço de banco sem esquema, host:porta/banco (a forma do EZConnect do Oracle e das
+// mensagens de conexão: "conectando em srv01:5432/dwprd como svc_x", "connecting to
+// srv01:5432/dwprd as svc_x"). Só numa linha que fala de conexão (conectar, connect, conexão),
+// para "localhost:8080/api" de uma URL sem esquema não virar banco; "como|as <usuário>" logo
+// depois é o usuário.
+var (
+	reEnderecoBanco = regexp.MustCompile(`(?:^|[\s"'=@(\[])([A-Za-z][\w.\-]*[A-Za-z0-9]):(\d{2,5})/([A-Za-z_][\w$\-]*)(?:\s+(?:como|as)\s+(?:(?:o\s+)?(?:usu[aá]rio|user|role)\s+)?([A-Za-z_][\w.$\-]*))?`)
+	reFalaConexao   = regexp.MustCompile(`(?i)\b(?:conect|connect|conex)`)
+)
+
+func acharEnderecoBanco(s string, add func(ObjAchado)) {
+	for _, m := range reEnderecoBanco.FindAllStringSubmatchIndex(s, -1) {
+		if f := m[7]; f < len(s) && (ehAlnum(s[f]) || s[f] == '/' || s[f] == '_') && m[8] < 0 {
+			continue // caminho mais longo: host:porta/a/b é URL
+		}
+		a, z := inicioLinhaJ(s, m[2]), fimLinhaJ(s, m[2])
+		if !reFalaConexao.MatchString(s[a:z]) {
+			continue
+		}
+		// "connecting to localhost:8080/api": sem usuário, só vale com host ou banco com cara de nome
+		if db := s[m[6]:m[7]]; m[8] < 0 && publicoConexao(s[m[2]:m[3]]) && !caraDeIdentificador(db) {
+			continue
+		}
+		addServidor(s, m[2], m[3], "conexão", add)
+		if db := s[m[6]:m[7]]; !publicoConexao(db) {
+			add(ObjAchado{m[6], m[7], "database", "conexão", true})
+		}
+		if m[8] >= 0 {
+			if u := s[m[8]:m[9]]; valorRecurso(u, "usuario") && !publicoConexao(u) {
+				add(ObjAchado{m[8], m[9], "usuario", "conexão", true})
+			}
+		}
+	}
 }
 
 // DSN do driver MySQL do Go: usuario[:senha]@protocolo(endereço)/banco[?parâmetros]

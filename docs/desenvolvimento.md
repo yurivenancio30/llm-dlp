@@ -25,7 +25,7 @@ internal/config/      leitura do config.json
 
 internal/proxy/       o servidor que fica entre o Claude Code e a API
   proxy.go              recebe a requisição, encaminha, devolve a resposta
-  requisicao.go         ida: mascara o corpo da requisição
+  requisicao.go         ida: mascara o corpo da requisição (com a dica do comando de cada resultado)
   resposta.go           volta: desmascara a resposta (streaming ou inteira)
   midia.go              imagens e PDFs (OCR e tarja preta)
 
@@ -45,8 +45,10 @@ internal/mask/        detecção e troca por pseudônimos
   vistos.go             os mesmos valores em disco, só como hash
   enviados.go           o que cada texto já enviado levou, por ponto da conversa (para sair igual nos reenvios)
   objetos.go            nomes de recursos internos: tipos, pseudônimo, aprendizado com freios
+  listas.go             listas homogêneas e nome qualificado com parte conhecida (depois dos leitores)
+  comando.go            o comando diz o que a saída é: dica do tool_use para o tool_result
   leitores.go           registro de todos os leitores de estrutura (fixos e da configuração)
-  leitor_sql.go           SQL e DDL, mensagens de erro que citam objetos (vocab_sql.txt)
+  leitor_sql.go           SQL e DDL, erros que citam objetos, nome qualificado depois de palavra de tipo
   leitor_tabela.go        tabelas em qualquer desenho (CSV, largura fixa, caixa, tuplas, HTML, vertical)
   leitor_esquema.go       nome + tipo de dado (dtypes, printSchema, Arrow, protobuf); name pelo contêiner
   vocab_tipos.go          tipos de dado das linguagens (SQL, pandas, Arrow, Spark, Avro, Protobuf, R)

@@ -244,9 +244,17 @@ func tituloTipo(s string, linhas []celula, i int) string {
 	return ""
 }
 
-func acharTabelasObj(s string, add func(ObjAchado)) {
-	acharTuplas(s, add)
-	acharTabelaHTML(s, add)
+func acharTabelasObj(s string, add func(ObjAchado)) { acharTabelasD(s, nil, add) }
+
+// acharTabelasD: com d != nil (a dica do comando, ver comando.go), só as colunas que o cabeçalho
+// não tipa e a dica tipa (o resto já saiu sem a dica).
+func acharTabelasD(s string, d *dicaSaida, add func(ObjAchado)) {
+	addSemDica := add
+	if d != nil {
+		addSemDica = func(ObjAchado) {}
+	}
+	acharTuplas(s, d, add)
+	acharTabelaHTML(s, d, add)
 	if strings.Count(s, "\n") < 2 {
 		return
 	}
@@ -262,7 +270,7 @@ func acharTabelasObj(s string, add func(ObjAchado)) {
 	}
 	rotulo := make([]bool, len(linhas))
 	for i, l := range linhas {
-		rotulo[i] = strings.IndexByte(s[l.a:l.b], '\t') > 0 && rotuloEValores(s, l, add)
+		rotulo[i] = strings.IndexByte(s[l.a:l.b], '\t') > 0 && rotuloEValores(s, l, addSemDica)
 	}
 	for i := 0; i+1 < len(linhas); i++ {
 		if rotulo[i] {
@@ -274,7 +282,7 @@ func acharTabelasObj(s string, add func(ObjAchado)) {
 			continue
 		}
 		if strings.HasPrefix(strings.TrimSpace(cab), "-[ RECORD ") {
-			i = registroVertical(s, linhas, i+1, add) - 1
+			i = registroVertical(s, linhas, i+1, addSemDica) - 1
 			continue
 		}
 		var sep byte
@@ -371,7 +379,7 @@ func acharTabelasObj(s string, add func(ObjAchado)) {
 		if fixas != nil && len(rows) == 0 {
 			continue
 		}
-		classificarTabela(s, cs, rows, tituloTipo(s, linhas, i), fixas != nil && len(rows) < 2, sep == 0 || sep == '|', add)
+		classificarTabelaD(s, cs, rows, tituloTipo(s, linhas, i), fixas != nil && len(rows) < 2, sep == 0 || sep == '|', d, add)
 		i = k - 1
 	}
 }
@@ -383,6 +391,16 @@ func acharTabelasObj(s string, add func(ObjAchado)) {
 // Fora de CSV/TSV, o cabeçalho só vira coluna com "_" ou dígito (cd_cliente, col1): rótulos de
 // ferramenta em PascalCase ("CreationDate", "LastModified") não são colunas do usuário.
 func classificarTabela(s string, cs []celula, rows [][]celula, titulo string, semCab, estrito bool, add func(ObjAchado)) {
+	classificarTabelaD(s, cs, rows, titulo, semCab, estrito, nil, add)
+}
+
+// classificarTabelaD: com a dica do comando (d != nil), só as colunas sem tipo pelo cabeçalho
+// que a dica tipa (SELECT a lista, SHOW e listagens a coluna NAME); o resto já saiu sem a dica.
+func classificarTabelaD(s string, cs []celula, rows [][]celula, titulo string, semCab, estrito bool, d *dicaSaida, add func(ObjAchado)) {
+	emitir := add
+	if d != nil {
+		add = func(ObjAchado) {}
+	}
 	ent := map[int]string{}
 	temSchema, nome, tipo := false, -1, -1
 	for k, c := range cs {
@@ -431,6 +449,10 @@ func classificarTabela(s string, cs []celula, rows [][]celula, titulo string, se
 			}
 		}
 	}
+	if d != nil {
+		porDica(s, cs, rows, ent, d, emitir)
+		return
+	}
 	if len(ent) == 0 {
 		return
 	}
@@ -446,6 +468,26 @@ func classificarTabela(s string, cs []celula, rows [][]celula, titulo string, se
 				continue
 			}
 			addPartesCelula(s, c.a, c.b, e, add)
+		}
+	}
+}
+
+// porDica: os valores das colunas que o cabeçalho não tipou (ent) e a dica do comando tipa.
+func porDica(s string, cs []celula, rows [][]celula, ent map[int]string, d *dicaSaida, add func(ObjAchado)) {
+	tipos := map[int]string{}
+	for k, c := range cs {
+		if _, ja := ent[k]; ja {
+			continue
+		}
+		if e := d.tipo(s[c.a:c.b], k, len(cs)); e != "" {
+			tipos[k] = e
+		}
+	}
+	for _, r := range rows {
+		for col, e := range tipos {
+			if col < len(r) {
+				celulaDica(s, r[col], e, d.forte, add)
+			}
 		}
 	}
 }
@@ -581,7 +623,7 @@ func tuplasEm(s string) [][]celula {
 	return out
 }
 
-func acharTuplas(s string, add func(ObjAchado)) {
+func acharTuplas(s string, d *dicaSaida, add func(ObjAchado)) {
 	if !strings.Contains(s, "', '") && !strings.Contains(s, `", "`) && !strings.Contains(s, "','") && !strings.Contains(s, `","`) {
 		return
 	}
@@ -600,14 +642,24 @@ func acharTuplas(s string, add func(ObjAchado)) {
 				todos = false
 				break
 			}
-			if _, ok := entCabecalho(s[c.a:c.b]); ok {
+			if _, ok := entCabecalho(s[c.a:c.b]); ok || d != nil && d.nomes[strings.ToLower(s[c.a:c.b])] != "" {
 				temTipo = true
 			}
+		}
+		if d != nil && !temTipo && len(d.cols) == len(cab) { // cursor.fetchall(): sem cabeçalho
+			for _, t := range grupo {
+				for k, c := range t {
+					if e := d.cols[k]; e != "" && c.a >= 0 {
+						celulaDica(s, c, e, d.forte, add)
+					}
+				}
+			}
+			continue
 		}
 		if !todos || !temTipo || len(grupo) < 2 {
 			continue
 		}
-		classificarTabela(s, cab, grupo[1:], "", false, false, add)
+		classificarTabelaD(s, cab, grupo[1:], "", false, false, d, add)
 	}
 }
 
@@ -619,7 +671,7 @@ var (
 	reCelulaHTML = regexp.MustCompile(`(?is)<t([hd])\b[^>]*>\s*(.*?)\s*</t[hd]>`)
 )
 
-func acharTabelaHTML(s string, add func(ObjAchado)) {
+func acharTabelaHTML(s string, d *dicaSaida, add func(ObjAchado)) {
 	if !strings.Contains(s, "<tr") && !strings.Contains(s, "<TR") {
 		return
 	}
@@ -627,7 +679,7 @@ func acharTabelaHTML(s string, add func(ObjAchado)) {
 	var rows [][]celula
 	fechar := func() {
 		if len(cab) >= 1 && len(rows) > 0 {
-			classificarTabela(s, cab, rows, "", false, true, add)
+			classificarTabelaD(s, cab, rows, "", false, true, d, add)
 		}
 		cab, rows = nil, nil
 	}
