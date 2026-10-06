@@ -81,6 +81,7 @@ Não há nada para rodar. O llm-dlp sobe ao abrir uma sessão e volta sozinho se
 | [O que é detectado](docs/deteccao.md) | Os quatro jeitos de reconhecer um dado e como ensinar pessoas e nomes de campo da sua empresa |
 | [Configuração e comandos](docs/configuracao.md) | Todos os campos do `config.json` e todos os comandos |
 | [Segurança e limites](docs/seguranca.md) | O que protege, o que não protege e o que passa sem máscara |
+| [Política](docs/politica.md) | Os quatro níveis de informação, o que o llm-dlp faz com cada um, as referências (LGPD, MITRE ATT&CK, CWE, NIST) e o limite declarado sobre código e regras de negócio |
 | [Para desenvolvedores](docs/desenvolvimento.md) | Mapa do código, como acoplar outra API de LLM, como acrescentar um detector, como foi testado |
 
 ## Licença

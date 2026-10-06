@@ -45,14 +45,20 @@ internal/mask/        detecção e troca por pseudônimos
   vistos.go             os mesmos valores em disco, só como hash
   enviados.go           o que cada texto já enviado levou, por ponto da conversa (para sair igual nos reenvios)
   objetos.go            nomes de recursos internos: tipos, pseudônimo, aprendizado com freios
+  decisao.go            nomes decididos por texto, decisores, referência pública, registro de quem escreveu
   listas.go             listas homogêneas e nome qualificado com parte conhecida (depois dos leitores)
   comando.go            o comando diz o que a saída é: dica do tool_use para o tool_result
   leitores.go           registro de todos os leitores de estrutura (fixos e da configuração)
   leitor_sql.go           SQL e DDL, erros que citam objetos, nome qualificado depois de palavra de tipo
+  leitor_sql_freios.go    SQL citado em prosa e em comentário de código não é instrução
   leitor_tabela.go        tabelas em qualquer desenho (CSV, largura fixa, caixa, tuplas, HTML, vertical)
   leitor_esquema.go       nome + tipo de dado (dtypes, printSchema, Arrow, protobuf); name pelo contêiner
   vocab_tipos.go          tipos de dado das linguagens (SQL, pandas, Arrow, Spark, Avro, Protobuf, R)
+  ref_publica.go          lê a referência pública derivada e os tipos de linguagem (arquivos gerados)
+  ref_publica.txt         GERADO: palavras frequentes como nome de recurso no material público
+  tipos_linguagem.txt     GERADO: tipos de dado que o código Go público usa como tipo de campo
   leitor_conexao.go       strings de conexão, URIs de banco, DSN, tnsnames, URNs, dbt, Airflow
+  freios_p2.go            freios medidos nas sessões (nome de modelo na URI de banco e no tnsnames)
   leitor_yaml.go          motor de YAML/JSON por caminho e o despachante das famílias
   leitor_kubernetes.go    Kubernetes, Helm, imagens, DNS de serviço, env em lista
   leitor_iac.go           Terraform/HCL, Bicep, ARM, CloudFormation
@@ -79,7 +85,9 @@ internal/versao/      versão e commit (o Makefile grava o commit no binário)
 Os testes ficam ao lado do código que testam, com o mesmo nome e `_test.go` no fim
 (`campos.go` e `campos_test.go`): é a convenção do Go, e é o que permite testar funções
 internas. À parte: `ajuda_test.go` (funções de apoio), `benchmark_test.go` (medições de
-tempo) e `estresse_test.go` (testes de carga).
+tempo) e `estresse_test.go` (testes de carga). `ref_publica_gerar_test.go` é o gerador de `ref_publica.txt` e
+`tipos_linguagem.txt` (só roda com `LLM_DLP_GERAR_REF=1` e `LLM_DLP_CORPUS`; ver
+[Referência pública derivada](estruturas.md#referência-pública-derivada)).
 
 ## Como um texto é mascarado
 
