@@ -37,6 +37,8 @@ type resultado struct {
 	gen      int // quantos "valores conhecidos" existiam quando foi calculado
 	// semAprender: calculado sem aprender (conteúdo da internet)
 	semAprender bool
+	// decididos: os nomes decididos neste texto (ver decisao.go). Só em RAM.
+	decididos []Decisao
 }
 
 // Masker detecta e troca dado sensível por pseudônimos. É seguro para uso concorrente.
@@ -48,7 +50,8 @@ type Masker struct {
 	vistos   *Vistos
 	enviados *Enviados
 	conh     *conhecidos
-	leitores []Leitor // leitores de estrutura (objetos.go)
+	leitores []Leitor         // leitores de estrutura (objetos.go)
+	escritos registroEscritos // quem escreveu (decisao.go)
 	fracos   fracos
 	extras   []*regexp.Regexp
 	rotExtra []string

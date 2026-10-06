@@ -21,10 +21,16 @@ func (m *Masker) detectar(s string, aprende bool) []Achado { return m.detectarD(
 
 // detectarD: com a dica do comando que produziu o texto (nil = sem dica).
 func (m *Masker) detectarD(s string, aprende bool, d *dicaSaida) []Achado {
+	out, _ := m.detectarDE(s, aprende, d, "")
+	return out
+}
+
+// detectarDE: também com a extensão da dica (para os decisores); devolve os nomes decididos.
+func (m *Masker) detectarDE(s string, aprende bool, d *dicaSaida, ext string) ([]Achado, []Decisao) {
 	if len(s) > grandeMin && !blocoLongo(s, margemGrande) {
-		return m.detectarGrande(s, aprende, d)
+		return m.detectarGrandeE(s, aprende, d, ext)
 	}
-	return m.detectarInteiroD(s, aprende, d)
+	return m.detectarInteiroE(s, aprende, d, ext)
 }
 
 // Texto grande é examinado em pedaços, em paralelo. Cada pedaço é examinado junto com uma
@@ -68,8 +74,16 @@ func (m *Masker) detectarInteiroA(s string, aprende bool) []Achado {
 }
 
 func (m *Masker) detectarInteiroD(s string, aprende bool, d *dicaSaida) []Achado {
+	out, _ := m.detectarInteiroE(s, aprende, d, "")
+	return out
+}
+
+func (m *Masker) detectarInteiroE(s string, aprende bool, d *dicaSaida, ext string) ([]Achado, []Decisao) {
 	out := m.detectarBase(s)
 	out = append(out, m.acharEstrutura(s, aprende, out, d)...)
+	novos, dec := m.rodarDecisores(s, out, aprende, ext)
+	out = append(out, novos...)
+	dec = append(decisoesDosAchados(out), dec...)
 	// Valores que dependem de contexto são lembrados e reconhecidos depois em qualquer
 	// lugar (ver conhecidos.go): sem isto, vazariam quando o modelo os repete sem a
 	// palavra-chave por perto e o histórico é reenviado.
@@ -83,13 +97,18 @@ func (m *Masker) detectarInteiroD(s string, aprende bool, d *dicaSaida) []Achado
 		out = append(out, Achado{ini, fim, tipo, s[ini:fim]})
 	})
 	m.unificarObjetos(out)
-	return out
+	return out, dec
 }
 
 func branco(b byte) bool { return b == ' ' || b == '\n' || b == '\t' || b == '\r' }
 
 // detectarGrande examina s em pedaços paralelos (ver o comentário acima).
 func (m *Masker) detectarGrande(s string, aprende bool, d *dicaSaida) []Achado {
+	out, _ := m.detectarGrandeE(s, aprende, d, "")
+	return out
+}
+
+func (m *Masker) detectarGrandeE(s string, aprende bool, d *dicaSaida, ext string) ([]Achado, []Decisao) {
 	type pedaco struct{ ini, fim, jIni, jFim int } // miolo [ini,fim) e janela [jIni,jFim)
 	// depois: primeira posição >= i que vem logo depois de um espaço em branco (ou o fim)
 	depois := func(i int) int {
@@ -119,7 +138,7 @@ func (m *Masker) detectarGrande(s string, aprende bool, d *dicaSaida) []Achado {
 		ini = fim
 	}
 	if len(ps) < 2 {
-		return m.detectarInteiroD(s, aprende, d)
+		return m.detectarInteiroE(s, aprende, d, ext)
 	}
 	rodar := func(f func(janela string, add func(ini, fim int, tipo string))) []Achado {
 		res := make([][]Achado, len(ps))
@@ -157,6 +176,9 @@ func (m *Masker) detectarGrande(s string, aprende bool, d *dicaSaida) []Achado {
 	})
 	// estrutura (objetos) e tabelas: no texto inteiro (uma estrutura pode passar de um pedaço)
 	out = append(out, m.acharEstrutura(s, aprende, out, d)...)
+	novos, dec := m.rodarDecisores(s, out, aprende, ext)
+	out = append(out, novos...)
+	dec = append(decisoesDosAchados(out), dec...)
 	// primeiro aprende TUDO, depois procura os valores conhecidos no texto inteiro: um valor
 	// ensinado no fim do texto é reconhecido também no começo
 	for _, a := range out {
@@ -169,7 +191,7 @@ func (m *Masker) detectarGrande(s string, aprende bool, d *dicaSaida) []Achado {
 		m.acharConhecidos(janela, numLongo, add)
 	})...)
 	m.unificarObjetos(out)
-	return out
+	return out, dec
 }
 
 // acharEstrutura: os leitores de estrutura e de tabela, no texto sem o transporte (ver

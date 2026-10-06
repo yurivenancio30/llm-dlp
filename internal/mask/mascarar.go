@@ -33,7 +33,7 @@ func (m *Masker) mascararD(s string, aprende bool, dica string) (resultado, [32]
 		return resultado{texto: s}, [32]byte{}
 	}
 	k := chaveMemo(s, dica)
-	return m.mascararK(s, k, aprende, lerDica(dica)), k
+	return m.mascararKE(s, k, aprende, lerDica(dica), dica), k
 }
 
 // chaveMemo: a chave do texto na memória de resultados (com a dica, se houver: o mesmo texto
@@ -52,6 +52,11 @@ func chaveMemo(s, dica string) [32]byte {
 
 // mascararK: com o hash do texto já calculado (k).
 func (m *Masker) mascararK(s string, k [32]byte, aprende bool, d *dicaSaida) resultado {
+	return m.mascararKE(s, k, aprende, d, "")
+}
+
+// mascararKE: com a dica crua (a extensão dela vai para os decisores).
+func (m *Masker) mascararKE(s string, k [32]byte, aprende bool, d *dicaSaida, dica string) resultado {
 	m.mu.Lock()
 	r, ok := m.memo[k]
 	if !ok {
@@ -74,7 +79,8 @@ func (m *Masker) mascararK(s string, k [32]byte, aprende bool, d *dicaSaida) res
 			return r
 		}
 	}
-	achados := m.detectarD(s, aprende, d)
+	_, ext := partesDica(dica)
+	achados, decididos := m.detectarDE(s, aprende, d, ext)
 
 	// Até que geração este resultado vale? Se nada foi aprendido durante a detecção, até g.
 	// Se algo foi aprendido (por este texto ou por outro, em paralelo), confere: todo valor
@@ -98,7 +104,7 @@ func (m *Masker) mascararK(s string, k [32]byte, aprende bool, d *dicaSaida) res
 	texto, entradas, ts := m.aplicarT(s, achados)
 
 	m.mu.Lock()
-	r = m.guardar(k, resultado{texto, entradas, ts, g, !aprende})
+	r = m.guardar(k, resultado{texto, entradas, ts, g, !aprende, decididos})
 	m.mu.Unlock()
 	return r
 }

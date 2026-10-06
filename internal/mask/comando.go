@@ -71,8 +71,20 @@ func (d *dicaSaida) codificar() string {
 	return b.String()
 }
 
-// lerDica: o inverso de codificar (nil se vazia ou inválida).
+// sepExt separa, na dica, a parte do leitor de tabela (codificar) da extensão que os decisores
+// leem (TextoCtx.Ext).
+const sepExt = "\x1e"
+
+// partesDica: a dica do leitor de tabela e a extensão.
+func partesDica(s string) (tabela, ext string) {
+	t, e, _ := strings.Cut(s, sepExt)
+	return t, e
+}
+
+// lerDica: o inverso de codificar (nil se vazia ou inválida). A extensão (depois de sepExt) é
+// ignorada aqui.
 func lerDica(s string) *dicaSaida {
+	s, _ = partesDica(s)
 	ps := strings.Split(s, "|")
 	if len(ps) != 4 {
 		return nil
