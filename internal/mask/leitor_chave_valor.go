@@ -373,7 +373,9 @@ func kvEm(s string, p int, add func(ObjAchado)) {
 				return
 			}
 		}
-		if !(c == ':' || maiusculasSo(chave) || pontuada || cli || pv != ' ' && nx != ' ') {
+		// "chave = valor" com espaços é atribuição de código, salvo dentro de uma seção de INI
+		// ("[db]\ntable_name = pedidos"): ver secaoINI (leitor_lexico.go)
+		if !(c == ':' || maiusculasSo(chave) || pontuada || cli || pv != ' ' && nx != ' ' || c == '=' && fimLinha && inicioLinha && secaoINI(s, ini)) {
 			return
 		}
 		// "Server: nginx", "User: alice": rótulo de prosa ou cabeçalho HTTP/e-mail (Título),
