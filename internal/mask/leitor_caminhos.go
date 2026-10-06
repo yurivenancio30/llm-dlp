@@ -1,6 +1,9 @@
 package mask
 
-import "strings"
+import (
+	"regexp"
+	"strings"
+)
 
 // Caminhos fora da pasta pessoal (item 12 da revisão). A pasta pessoal (/home/u, /Users/u,
 // C:\Users\u) fica com o leitor de caminhos de usuário. Aqui:
@@ -159,7 +162,7 @@ func acharCaminhosFora(s string, add func(ObjAchado)) {
 			continue
 		}
 		h := s[a:b]
-		if !letraD(h[0]) && !ehDig(h[0]) || publicoDev(h) || dominioPublico(strings.ToLower(h)) || len(h) < 2 {
+		if !letraD(h[0]) && !ehDig(h[0]) || publicoDev(h) || dominioPublico(strings.ToLower(h)) || len(h) < 2 || reEscapeTexto.MatchString(h) {
 			continue
 		}
 		add(ObjAchado{a, b, "servidor", "caminho", true})
@@ -167,6 +170,9 @@ func acharCaminhosFora(s string, add func(ObjAchado)) {
 		i = b
 	}
 }
+
+// escape de string escapado ("\\uD801", "\\U000003B4", "\\x0a", "\\012"): não é servidor nem pasta
+var reEscapeTexto = regexp.MustCompile(`^(?:u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8}|x[0-9A-Fa-f]{2}|[0-7]{3})`)
 
 // pedacosCaminhoBarra: como pedacosCaminho, com "\" (ou "\\" escapado) como separador.
 func pedacosCaminhoBarra(s string, a int, add func(ObjAchado)) {
@@ -182,6 +188,9 @@ func pedacosCaminhoBarra(s string, a int, add func(ObjAchado)) {
 			return
 		}
 		v := strings.TrimSuffix(s[a:b], "$") // compartilhamento administrativo: C$
+		if reEscapeTexto.MatchString(v) {
+			return // "\\u00e9", "\\x0a": escape de string, não pasta
+		}
 		dir := b < len(s) && s[b] == '\\'
 		if !dir && strings.IndexByte(v, '.') > 0 {
 			return

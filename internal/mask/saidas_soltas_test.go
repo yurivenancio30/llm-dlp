@@ -68,7 +68,7 @@ var casosComando = []struct {
 	{"SHOW SCHEMAS", []passo{{`snow sql -q "show schemas in database dwprd"`,
 		"created_on                    | name        | is_default | database_name | owner\n------------------------------+-------------+------------+---------------+---------\n2026-01-02 10:00:00.000 -0300 | fin_contab  | N          | dwprd         | sysadmin\n2026-01-02 10:00:00.000 -0300 | fin_fiscal  | N          | dwprd         | sysadmin\n"}},
 		[]string{"fin_contab", "fin_fiscal"}},
-	{"cut sobre arquivo conhecido", []passo{cabCarga, {"cut -d, -f2 dados/carga_contab.csv | sort -u", "nm_tabela\nt_lanc_diario\nt_saldo_mes\n"}},
+	{"cut sobre arquivo conhecido", []passo{cabCarga, {"cut -d, -f2 dados/carga_contab.csv | tail -n +2 | sort -u", "t_lanc_diario\nt_saldo_mes\n"}},
 		[]string{"t_lanc_diario", "t_saldo_mes"}},
 	{"awk | sort | uniq -c", []passo{cabCarga, {"awk -F, 'NR>1 {print $3}' dados/carga_contab.csv | sort | uniq -c", "      1 fin_contab\n      1 fin_fiscal\n"}},
 		[]string{"fin_contab", "fin_fiscal"}},

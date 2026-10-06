@@ -32,6 +32,21 @@ var entTipoNome = map[string]string{"ns": "namespace", "namespace": "namespace",
 var subcomandosOperacao = conj("get", "describe", "logs", "exec", "rollout", "scale", "delete", "apply", "edit",
 	"patch", "port-forward", "top", "create", "expose", "attach", "cp", "install", "upgrade", "uninstall", "status")
 
+// depoisDeComando: o token k vem depois de um verbo de operação (get, logs, rollout restart...),
+// de uma opção (-n x, --all) ou de outro tipo/nome, na mesma linha de comando.
+func depoisDeComando(s string, toks []tokenCLI, k int) bool {
+	for j := k - 1; j >= 0 && j >= k-4; j-- {
+		v := s[toks[j].a:toks[j].b]
+		if subcomandosOperacao[v] || strings.HasPrefix(v, "-") || tipoNomeCLI(v) != nil || v == "restart" || v == "history" || v == "undo" {
+			return true
+		}
+		if numeroCLI(v) {
+			return false
+		}
+	}
+	return false
+}
+
 // tipoNomeCLI: "deploy/x" (a regex só roda em token com "/" que começa com letra minúscula)
 func tipoNomeCLI(v string) []int {
 	i := strings.IndexByte(v, '/')
@@ -144,8 +159,9 @@ func comandoCLI(s string, toks []tokenCLI, add func(ObjAchado)) {
 	temTipoNome, temOperacao := false, false
 	for k, t := range toks {
 		v := s[t.a:t.b]
-		// "123 ns/op" (saída de benchmark) não é recurso: o tipo/nome vem depois de um comando
-		if m := tipoNomeCLI(v); m != nil && k > 0 && !numeroCLI(s[toks[k-1].a:toks[k-1].b]) {
+		// "123 ns/op", "benchmark ns/op" (saída de benchmark) não é recurso: o tipo/nome vem
+		// depois de um verbo de operação, de uma opção ou de outro tipo/nome
+		if m := tipoNomeCLI(v); m != nil && k > 0 && depoisDeComando(s, toks, k) {
 			temTipoNome = true
 			ent := entTipoNome[v[m[2]:m[3]]]
 			if ent == "" {

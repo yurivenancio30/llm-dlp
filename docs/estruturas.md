@@ -45,10 +45,14 @@ Um formato só, para todas as famílias:
   outros tipos (pasta, bucket, fila, serviço...) a grafia vale como está: `/dados/Relatorios` e
   `/dados/relatorios` são duas pastas, e cada uma volta com a própria grafia.
 - **Prefixo:** o do tipo de entidade (tabela abaixo); em minúsculas quando o nome é todo em
-  minúsculas (`t_…`). Onde o formato exige minúsculas e hífen (DNS-1123, bucket S3), vale a mesma
+  minúsculas (`t_…`), em maiúsculas quando é todo em maiúsculas (`T_…`). Nome de caixa mista
+  (`Pedido_Item`) recebe o prefixo com só a primeira maiúscula e as letras do ID na caixa que
+  um hash da própria grafia diz (`T_aBcDe…`): duas grafias do mesmo nome de SQL no mesmo texto
+  saem com dois pseudônimos, e cada uma volta como estava. Onde o formato exige minúsculas e hífen (DNS-1123, bucket S3), vale a mesma
   ideia.
 - **Volta:** o desmascaramento aceita o pseudônimo em qualquer caixa (`T_abc…`, `t_abc…`,
-  `T_ABC…`) e devolve o nome real.
+  `T_ABC…`) e devolve o nome real; o pseudônimo exato de uma grafia tem prioridade sobre a
+  variante de caixa de outra.
 - **Só o que nós geramos é pulado:** um nome do texto com a forma de um pseudônimo
   (`t_customer`) é mascarado como qualquer outro; só é deixado como está o pseudônimo que o
   próprio llm-dlp gerou.
@@ -834,7 +838,11 @@ normalização. Linha de tipos (`str`, `<chr>`, `varchar`), linhas truncadas (`.
 (`[N rows x M columns]`, `(2 rows)`) não são valores. Também: linhas que são tuplas ou listas de
 literais (por linha, lista de tuplas, lista de listas), com a primeira como cabeçalho quando diz
 algum tipo; `<table><tr><th>/<td>`; registro vertical `-[ RECORD n ]-` + `chave | valor`; e
-linha TAB com um rótulo de tipo em maiúsculas na frente (`BUCKETS<TAB>data<TAB>nome`).
+linha TAB com um rótulo de tipo em maiúsculas na frente (`BUCKETS<TAB>data<TAB>nome`). Coluna
+solta: uma palavra de tipo sozinha na linha (`bucket`, `table_name`) seguida de 2+ linhas de um
+item com forma de nome, até a linha vazia. Valor de uma letra não é nome. Colunas alinhadas por
+espaços não valem em linhas com pontuação de código (`{ } ; := // == ( `, ` = `): código
+recuado com vãos não é tabela.
 
 O tipo de cada coluna vem do cabeçalho: os nomes de catálogo (`table_schema`, `relname`...) ou
 uma palavra de tipo em qualquer grafia (a mesma regra do leitor de chave-valor, `entChave`).

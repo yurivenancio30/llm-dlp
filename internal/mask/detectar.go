@@ -186,7 +186,7 @@ func (m *Masker) acharEstrutura(s string, aprende bool, base []Achado, d *dicaSa
 			m.rodarLeitor(Leitor{Nome: "comando", Publico: publicoDica,
 				Achar: func(s string, add func(ObjAchado)) { acharComDica(s, d, add) }}, s, aprende, add)
 		}
-		m.acharListas(s, aprende, out, add)
+		m.acharListas(s, aprende, add)
 		if !m.cfg.Desligado("campo") {
 			m.acharTabelas(s, add)
 			out = append(out, nomesNaLinha(s, append(base[:len(base):len(base)], out...))...)

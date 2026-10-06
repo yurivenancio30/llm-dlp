@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 )
 
 // Leitor de SQL e DDL (ver docs/estruturas.md, seção SQL e DDL). Uma instrução só vale se tiver
@@ -119,7 +120,7 @@ func entQual(n int, ult string) []string {
 // estar entre crases com os pontos dentro (`projeto.dataset.tabela`): cada parte vale.
 func partesSQL(lit string, a, b int) [][2]int {
 	var out [][2]int
-	for _, p := range reParteSQL.FindAllStringIndex(lit[a:b], -1) {
+	for _, p := range partesSQLEm(lit[a:b]) {
 		x, y := a+p[0], a+p[1]
 		if lit[x] == '`' && strings.Contains(lit[x:y], ".") {
 			k := x + 1
@@ -236,7 +237,7 @@ func acharSQL(s string, add func(ObjAchado)) {
 		if !reFormaSQL.MatchString(forma) {
 			return
 		}
-		claus := len(reClausulasSQL.FindAllStringIndex(forma, 4))
+		claus := contarClausulas(forma, 4)
 		// uma cláusula só: em minúsculas, só vale com forma inequívoca; em maiúsculas vale
 		// sempre, e ensina quando a forma também é inequívoca
 		inequivoca := false
@@ -259,7 +260,7 @@ func acharSQL(s string, add func(ObjAchado)) {
 func inicioProsaSQL(corpo string) int {
 	lit := reLitSQL.ReplaceAllStringFunc(corpo, func(x string) string { return strings.Repeat(" ", len(x)) })
 	run, ini := 0, -1
-	for _, p := range reParteSQL.FindAllStringIndex(lit, -1) {
+	for _, p := range partesSQLEm(lit) {
 		a, b := p[0], p[1]
 		v := lit[a:b]
 		solta := strings.ToLower(v) == v && !publicoSQL(v) && !caraDeIdentificador(v) && strings.IndexByte(v, '_') < 0 &&
@@ -390,7 +391,7 @@ func instrucaoSQL(s string, base int, corpo, kw string, forte bool, add func(Obj
 			marcarQual(m[2], m[3], "tabela")
 		}
 	}
-	for _, q := range reQualTok.FindAllStringIndex(lit, -1) {
+	for _, q := range qualsSQLEm(lit) {
 		ps := partesSQL(lit, q[0], q[1])
 		for k, p := range ps {
 			a, b := p[0], p[1]
@@ -662,3 +663,135 @@ func acharErroBQ(s string, add func(ObjAchado)) {
 
 // reIdentSimples: um identificador (com letras acentuadas: SQL e os catálogos aceitam).
 var reIdentSimples = regexp.MustCompile(`^[\p{L}_][\p{L}0-9_$#-]*$`)
+
+// Varredura sem regex das peças de SQL (o leitor roda em cada instrução; numa linha longa com
+// milhares de instruções curtas, as regex sem caixa custavam a maior parte do tempo). Fazem o
+// mesmo que reParteSQL, reQualTok e reClausulasSQL.
+
+// parteSQLEm: o fim do identificador de SQL (reIdSQL) que começa em s[i], ou -1.
+func parteSQLEm(s string, i int) int {
+	switch c := s[i]; c {
+	case '[', '"', '`':
+		f := c
+		if c == '[' {
+			f = ']'
+		}
+		for k, n := i+1, 0; k < len(s) && n <= 128; n++ { // até 128 caracteres (não bytes)
+			if s[k] == '\n' {
+				return -1
+			}
+			if s[k] == f {
+				if k == i+1 {
+					return -1
+				}
+				return k + 1
+			}
+			_, sz := utf8.DecodeRuneInString(s[k:])
+			k += sz
+		}
+		return -1
+	}
+	k := i
+	if c := s[i]; c < 0x80 {
+		if !(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c == '_') {
+			return -1
+		}
+		k++
+	} else if r, n := utf8.DecodeRuneInString(s[i:]); unicode.IsLetter(r) {
+		k += n
+	} else {
+		return -1
+	}
+	for k < len(s) {
+		if c := s[k]; c < 0x80 {
+			if ehAlnum(c) || c == '_' || c == '$' || c == '#' {
+				k++
+				continue
+			}
+			break
+		}
+		r, n := utf8.DecodeRuneInString(s[k:])
+		if !unicode.IsLetter(r) {
+			break
+		}
+		k += n
+	}
+	return k
+}
+
+// partesSQLEm: as posições de cada identificador de s, como reParteSQL.FindAllStringIndex.
+func partesSQLEm(s string) [][2]int {
+	var out [][2]int
+	for i := 0; i < len(s); {
+		if f := parteSQLEm(s, i); f > i {
+			out = append(out, [2]int{i, f})
+			i = f
+			continue
+		}
+		_, n := utf8.DecodeRuneInString(s[i:])
+		i += n
+	}
+	return out
+}
+
+// qualsSQLEm: os nomes qualificados (a.b.c) de s, como reQualTok.FindAllStringIndex.
+func qualsSQLEm(s string) [][2]int {
+	var out [][2]int
+	for i := 0; i < len(s); {
+		f := parteSQLEm(s, i)
+		if f <= i {
+			_, n := utf8.DecodeRuneInString(s[i:])
+			i += n
+			continue
+		}
+		for f+1 < len(s) && s[f] == '.' {
+			g := parteSQLEm(s, f+1)
+			if g <= f+1 {
+				break
+			}
+			f = g
+		}
+		out = append(out, [2]int{i, f})
+		i = f
+	}
+	return out
+}
+
+var clausulasSQL = conj("FROM", "WHERE", "JOIN", "SET", "VALUES", "INTO", "HAVING", "UNION", "AS", "ON", "TABLE")
+
+// contarClausulas: quantas cláusulas (reClausulasSQL) há em s, até max.
+func contarClausulas(s string, max int) int {
+	n := 0
+	palavra := func(c byte) bool { return ehAlnum(c) || c == '_' }
+	var buf [6]byte
+	for i := 0; i < len(s) && n < max; {
+		if !palavra(s[i]) {
+			i++
+			continue
+		}
+		j := i
+		for j < len(s) && palavra(s[j]) {
+			j++
+		}
+		if l := j - i; l >= 2 && l <= 6 {
+			for k := 0; k < l; k++ {
+				buf[k] = s[i+k] &^ 0x20
+			}
+			w := string(buf[:l])
+			if clausulasSQL[w] {
+				n++
+			} else if w == "GROUP" || w == "ORDER" {
+				k := j
+				for k < len(s) && (s[k] == ' ' || s[k] == '\t' || s[k] == '\n' || s[k] == '\r' || s[k] == '\f' || s[k] == '\v') {
+					k++
+				}
+				if k > j && k+2 <= len(s) && s[k]&^0x20 == 'B' && s[k+1]&^0x20 == 'Y' && (k+2 == len(s) || !palavra(s[k+2])) {
+					n++
+					j = k + 2
+				}
+			}
+		}
+		i = j
+	}
+	return n
+}

@@ -763,11 +763,14 @@ func acharChaveEspaco(s string, add func(ObjAchado)) {
 		if ent == "" || !forte {
 			continue
 		}
-		if val := s[v.a:v.b]; caraDeIdentificador(val) || tracoOuDigito(val) {
+		// o valor não é tipo de dado nem tipo qualificado de código ("Name uint64", "B strings.Builder")
+		if val := s[v.a:v.b]; (caraDeIdentificador(val) || tracoOuDigito(val)) && !ehTipoDado(val) && !reTipoQualificado.MatchString(val) {
 			marcarValor(s, v.a, v.b, ent, "chave-espaço", true, add)
 		}
 	}
 }
+
+var reTipoQualificado = regexp.MustCompile(`[*\[\]()]|\.[A-Z]`)
 
 var reChaveEspaco = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_.-]*$`)
 

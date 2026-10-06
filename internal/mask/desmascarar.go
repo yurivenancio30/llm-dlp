@@ -36,7 +36,24 @@ func NovaTabela(entradas []Entrada) *Tabela {
 	// sub-rede falsa de IP): desmascarar escolheria um dos dois e poderia, p.ex., apontar um
 	// comando para o host errado. Nesses casos o pseudônimo fica sem desmascarar.
 	conflito, conflitoIP := map[string]bool{}, map[string]bool{}
+	// primeiro os pseudônimos como saíram, depois as variantes de caixa (que o modelo pode
+	// escrever): a variante de uma grafia nunca toma o lugar do pseudônimo de outra
+	ord := make([]Entrada, 0, len(entradas))
 	for _, e := range entradas {
+		if !ehObjeto(e.Tipo) || casePrincipal(e.Pseudo, e.Real) {
+			ord = append(ord, e)
+		}
+	}
+	nPrinc := len(ord)
+	for _, e := range entradas {
+		if ehObjeto(e.Tipo) && !casePrincipal(e.Pseudo, e.Real) {
+			ord = append(ord, e)
+		}
+	}
+	for k, e := range ord {
+		if _, ok := t.m[e.Pseudo]; ok && k >= nPrinc {
+			continue // variante de caixa que coincide com um pseudônimo já registrado
+		}
 		if r, ok := t.m[e.Pseudo]; ok {
 			// o mesmo número com outra pontuação ("12.345.678-9" e "123456789") não é
 			// colisão: é o mesmo valor. Fica a primeira grafia vista.
@@ -98,6 +115,24 @@ func NovaTabela(entradas []Entrada) *Tabela {
 }
 
 // casa devolve o fim do pseudônimo mais longo que começa em s[i], ou -1.
+// casePrincipal: o pseudônimo de objeto tem a caixa com que pseudoObjeto o gera para esta
+// grafia (e não é uma variante de caixa): minúsculo para nome minúsculo, prefixo em maiúsculas
+// e ID minúsculo para nome em maiúsculas, prefixo com a primeira maiúscula para caixa mista.
+func casePrincipal(ps, real string) bool {
+	i := strings.IndexByte(ps, '_')
+	if i <= 0 {
+		return true
+	}
+	pref, id := ps[:i], ps[i+1:]
+	switch {
+	case strings.ToLower(real) == real:
+		return ps == strings.ToLower(ps)
+	case strings.ToUpper(real) == real:
+		return pref == strings.ToUpper(pref) && id == strings.ToLower(id)
+	}
+	return pref == pref[:1]+strings.ToLower(pref[1:]) && pref[:1] == strings.ToUpper(pref[:1]) && id != strings.ToLower(id)
+}
+
 func (t *Tabela) casa(s string, i int) int {
 	if i+4 <= len(s) {
 		k2 := uint32(s[i])<<8 | uint32(s[i+1])

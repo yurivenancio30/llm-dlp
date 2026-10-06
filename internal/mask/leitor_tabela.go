@@ -162,6 +162,22 @@ func temVao(l string) bool {
 	return strings.Contains(strings.TrimLeft(t, " "), "  ") || strings.Contains(t, "\t")
 }
 
+// pareceCodigo: a linha tem pontuação de código (bloco, atribuição, fim de instrução,
+// comentário, operador, chamada em minúsculas): código recuado com espaços alinhados não é
+// tabela.
+func pareceCodigo(l string) bool {
+	if strings.ContainsAny(l, "{};") || strings.Contains(l, ":=") || strings.Contains(l, "//") || strings.Contains(l, "==") ||
+		strings.Contains(l, "!=") || strings.Contains(l, "&&") || strings.Contains(l, "||") || strings.Contains(l, " = ") {
+		return true
+	}
+	for i := 1; i < len(l); i++ {
+		if l[i] == '(' && (l[i-1] >= 'a' && l[i-1] <= 'z' || l[i-1] >= '0' && l[i-1] <= '9') {
+			return true // f(x), int64(v)
+		}
+	}
+	return false
+}
+
 var reCabFixo = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_$#.\-()/?]*$`)
 
 // colunasFixas: a linha s[l] como cabeçalho de colunas alinhadas por espaços (cada palavra é
@@ -173,7 +189,7 @@ func colunasFixas(s string, l celula) []celula {
 	}
 	// prosa não tem colunas: o cabeçalho tem um vão de 2+ espaços, um TAB ou começa recuado
 	// (índice do DataFrame); as linhas de dados também (ver alinharFixo)
-	if !temVao(s[l.a:l.b]) {
+	if !temVao(s[l.a:l.b]) || pareceCodigo(s[l.a:l.b]) {
 		return nil
 	}
 	for _, c := range cs {
@@ -189,7 +205,7 @@ func colunasFixas(s string, l celula) []celula {
 // à esquerda) ou, sem sobreposição, para a coluna em que começa; palavra antes da primeira
 // coluna é índice. ok=false se a linha não se alinha (menos da metade das colunas preenchida).
 func alinharFixo(s string, l celula, cab []celula, hIni int) ([]celula, bool) {
-	if !temVao(s[l.a:l.b]) || len(tokensLinha(s, l.a, l.b)) > 2*len(cab)+4 {
+	if !temVao(s[l.a:l.b]) || pareceCodigo(s[l.a:l.b]) || len(tokensLinha(s, l.a, l.b)) > 2*len(cab)+4 {
 		return nil, false
 	}
 	out := make([]celula, len(cab))
@@ -274,6 +290,10 @@ func acharTabelasD(s string, d *dicaSaida, add func(ObjAchado)) {
 	}
 	for i := 0; i+1 < len(linhas); i++ {
 		if rotulo[i] {
+			continue
+		}
+		if k := colunaSolta(s, linhas, i, add); k > i {
+			i = k - 1
 			continue
 		}
 		h, prox := linhas[i], linhas[i+1]
@@ -424,7 +444,7 @@ func classificarTabelaD(s string, cs []celula, rows [][]celula, titulo string, s
 			add(ObjAchado{c.a + m[2], c.a + m[3], "database", "tabela-catálogo", true})
 			continue
 		}
-		if !semCab && !rotulosSaida[v] && !publicoSQL(v) && !strings.Contains(h, " ") && caraDeIdentificador(h) && (!estrito || strings.ContainsAny(h, "_0123456789")) {
+		if !semCab && !rotulosSaida[v] && !publicoSQL(v) && !strings.ContainsAny(h, " ().") && caraDeIdentificador(h) && (!estrito || strings.ContainsAny(h, "_0123456789")) {
 			add(ObjAchado{c.a, c.b, "coluna", "cabeçalho", false})
 		}
 	}
@@ -463,7 +483,7 @@ func classificarTabelaD(s string, cs []celula, rows [][]celula, titulo string, s
 			}
 			c := r[col]
 			v := s[c.a:c.b]
-			if v == "" || !reCelulaIdent.MatchString(v) || strings.EqualFold(v, "null") || strings.EqualFold(v, "none") ||
+			if len(v) < 2 || !reCelulaIdent.MatchString(v) || strings.EqualFold(v, "null") || strings.EqualFold(v, "none") ||
 				ehTipoDado(v) || strings.Trim(v, ".-") == "" {
 				continue
 			}
@@ -490,6 +510,47 @@ func porDica(s string, cs []celula, rows [][]celula, ent map[int]string, d *dica
 			}
 		}
 	}
+}
+
+// colunaSolta: uma coluna só, com o cabeçalho sendo uma palavra de tipo ("bucket",
+// "table_name") e 2+ linhas de um item cada com forma de nome, até a linha vazia. Devolve a
+// linha em que parou (i se não é coluna solta).
+func colunaSolta(s string, linhas []celula, i int, add func(ObjAchado)) int {
+	h := strings.TrimSpace(s[linhas[i].a:linhas[i].b])
+	if h == "" || strings.ContainsAny(h, " \t,;|") {
+		return i
+	}
+	e, ok := entCabecalho(h)
+	if !ok {
+		return i
+	}
+	k := i + 1
+	var vs []celula
+	for ; k < len(linhas); k++ {
+		l := linhas[k]
+		a, b := l.a, l.b
+		for a < b && (s[a] == ' ' || s[a] == '\t') {
+			a++
+		}
+		for b > a && (s[b-1] == ' ' || s[b-1] == '\t' || s[b-1] == '\r') {
+			b--
+		}
+		if a == b {
+			break
+		}
+		v := s[a:b]
+		if !reCelulaIdent.MatchString(v) || !caraDeIdentificador(v) {
+			return i
+		}
+		vs = append(vs, celula{a, b})
+	}
+	if len(vs) < 2 {
+		return i
+	}
+	for _, c := range vs {
+		addPartesCelula(s, c.a, c.b, e, add)
+	}
+	return k
 }
 
 // rotuloEValores: linha separada por TAB cuja primeira célula é uma palavra de tipo em

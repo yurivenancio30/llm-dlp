@@ -156,7 +156,7 @@ func TestIdaEVoltaNomeDeTabela(t *testing.T) {
 // Item 4: a volta aceita o pseudônimo de objeto em qualquer caixa (inclusive todo em
 // maiúsculas), e uma pasta volta com a grafia exata dela.
 func TestIdaEVoltaObjetoQualquerCaixa(t *testing.T) {
-	re := regexp.MustCompile(`\b(?i:t|bkt)_[a-z2-7]{8}\b`)
+	re := regexp.MustCompile(`\b(?i:t|bkt)_[a-zA-Z2-7]{8}\b`)
 	for _, c := range []struct{ msg, real, comando string }{
 		{"SELECT vl_x FROM financeiro_x.tb_pedido_x9 WHERE id > 0 AND a = 1", "tb_pedido_x9", "psql -c 'SELECT 1 FROM %s'"},
 		{"aws s3 ls s3://Bkt-Dados-x1/hoje/", "Bkt-Dados-x1", "aws s3 ls s3://%s/"},

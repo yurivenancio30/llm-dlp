@@ -1,7 +1,9 @@
 package mask
 
 import (
+	"crypto/sha256"
 	"regexp"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -106,23 +108,48 @@ func canonObj(ent, v string) string {
 
 // pseudoObjeto: prefixo do tipo + o ID do HMAC da chave (o mesmo tamanho dos outros tipos).
 // Estável entre conversas e reinícios. Nome em minúsculas recebe o prefixo em minúsculas
-// ("t_..."), para combinar com o estilo do texto; a volta aceita qualquer caixa.
+// ("t_..."), para combinar com o estilo do texto; em maiúsculas, o prefixo em maiúsculas. Nome
+// de caixa mista (Pedido_Item) recebe o prefixo com só a primeira letra maiúscula e as letras
+// do ID na caixa que um hash da própria grafia diz: o mesmo nome de SQL em duas grafias no
+// mesmo texto ("ContAB" e "ContAb", que são o mesmo objeto) sai com dois pseudônimos, e a volta
+// devolve cada grafia como estava.
 func (m *Masker) pseudoObjeto(ent, real string) string {
 	pref := EntObjeto[ent]
 	if pref == "" {
 		pref = "OBJ"
 	}
-	if strings.ToLower(real) == real {
+	id := m.p.ID("objeto", ent+"\x00"+normObj(ent, real))
+	switch {
+	case strings.ToLower(real) == real:
 		pref = strings.ToLower(pref)
+	case strings.ToUpper(real) == real:
+	default:
+		pref = pref[:1] + strings.ToLower(pref[1:])
+		h := sha256.Sum256([]byte(real))
+		b := []byte(id)
+		maius := false
+		for i := range b {
+			if b[i] >= 'a' && b[i] <= 'z' && h[i]&1 == 1 {
+				b[i] -= 32
+				maius = true
+			}
+		}
+		for i := 0; !maius && i < len(b); i++ { // pelo menos uma: não confunde com a de maiúsculas
+			if b[i] >= 'a' && b[i] <= 'z' {
+				b[i] -= 32
+				maius = true
+			}
+		}
+		id = string(b)
 	}
-	ps := pref + "_" + m.p.ID("objeto", ent+"\x00"+normObj(ent, real))
+	ps := pref + "_" + id
 	registrarPseudo(ps)
 	return ps
 }
 
 // rePseudoObj: a FORMA de um pseudônimo de objeto. Só a forma não basta para pular um nome
 // ("t_customer" é uma tabela real com essa cara): ver ehPseudoObj.
-var rePseudoObj = regexp.MustCompile(`^(?i:host|db|sch|t|c|proc|idx|usr|ns|svc|bkt|top|repo|org|pkg|dir|acc|obj)_[a-z2-7]{8}$`)
+var rePseudoObj = regexp.MustCompile(`^(?i:host|db|sch|t|c|proc|idx|usr|ns|svc|bkt|top|repo|org|pkg|dir|acc|obj)_[a-zA-Z2-7]{8}$`)
 
 // pseudônimos de objeto gerados neste processo (em minúsculas): só esses são pulados.
 var (
@@ -314,27 +341,66 @@ func (m *Masker) acharObjetos(s string, aprende bool, add func(ini, fim int, tip
 	if !m.cfg.Objetos.Ligado || len(m.leitores) == 0 {
 		return
 	}
-	for _, l := range m.leitores {
-		m.rodarLeitor(l, s, aprende, add)
+	if len(s) < paraleloLeitores || runtime.GOMAXPROCS(0) < 2 {
+		for _, l := range m.leitores {
+			m.rodarLeitor(l, s, aprende, add)
+		}
+		return
+	}
+	// texto grande: os leitores (que só leem s) rodam em paralelo; os achados são aplicados e
+	// aprendidos depois, na ordem dos leitores, como se tivessem rodado um depois do outro
+	res := make([][]ObjAchado, len(m.leitores))
+	var prox atomic.Int64
+	var wg sync.WaitGroup
+	for w := 0; w < min(runtime.GOMAXPROCS(0), len(m.leitores)); w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				i := int(prox.Add(1)) - 1
+				if i >= len(m.leitores) {
+					return
+				}
+				m.leitores[i].Achar(s, func(o ObjAchado) { res[i] = append(res[i], o) })
+			}
+		}()
+	}
+	wg.Wait()
+	for i, l := range m.leitores {
+		for _, o := range res[i] {
+			m.aplicarAchado(l, s, o, aprende, add)
+		}
 	}
 }
 
+// paraleloLeitores: a partir deste tamanho, os leitores rodam em paralelo (variável para os testes).
+var paraleloLeitores = 64 << 10
+
 // rodarLeitor: um leitor em s, com os freios comuns (tipo desligado, pseudônimo, vocabulário).
 func (m *Masker) rodarLeitor(l Leitor, s string, aprende bool, add func(ini, fim int, tipo string)) {
-	l.Achar(s, func(o ObjAchado) {
-		if o.Ini < 0 || o.Fim > len(s) || o.Fim <= o.Ini || !m.objMascara(o.Ent) {
-			return
-		}
-		v := s[o.Ini:o.Fim]
-		if ehPseudoObj(v) || (l.Publico != nil && l.Publico(strings.Trim(v, "[]\"`"))) {
-			return
-		}
-		add(o.Ini, o.Fim, prefTipoObj+o.Ent)
-		if aprende {
-			m.aprenderObj(o, v, l.Publico)
-		}
-	})
+	l.Achar(s, func(o ObjAchado) { m.aplicarAchado(l, s, o, aprende, add) })
 }
+
+// aplicarAchado: um achado do leitor l, com os freios comuns.
+func (m *Masker) aplicarAchado(l Leitor, s string, o ObjAchado, aprende bool, add func(ini, fim int, tipo string)) {
+	if o.Ini < 0 || o.Fim > len(s) || o.Fim <= o.Ini || !m.objMascara(o.Ent) {
+		return
+	}
+	v := s[o.Ini:o.Fim]
+	if ehPseudoObj(v) || (l.Publico != nil && l.Publico(strings.Trim(v, "[]\"`"))) {
+		return
+	}
+	add(o.Ini, o.Fim, prefTipoObj+o.Ent)
+	if aprende {
+		m.aprenderObj(o, v, l.Publico)
+	}
+	if ganchoAchado != nil {
+		ganchoAchado(l.Nome, o, v)
+	}
+}
+
+// ganchoAchado: só para as medições (medicao_test.go): cada achado de cada leitor.
+var ganchoAchado func(leitor string, o ObjAchado, v string)
 
 // tokensObj chama fn para cada candidato a nome aprendido em s: [A-Za-z_][A-Za-z0-9_$#]*
 // (com letras acentuadas) e pedaços "-..." no meio (o mesmo que a regex

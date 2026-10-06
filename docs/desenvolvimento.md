@@ -137,7 +137,10 @@ O `estresse_test.go` do proxy faz essas três conferências e serve de modelo.
    um texto grande.
 6. Rode `go test ./...` e os benchmarks (`go test ./internal/mask -bench Frio`) para ver se
    não pesou.
-7. Nunca procure o começo ou o fim da linha sem limite a cada ocorrência
+7. Os leitores só leem o texto (não consultam o que foi aprendido): num texto grande eles rodam
+   em paralelo e os achados são aplicados depois, na ordem do registro. Um leitor que dependa
+   do aprendido (como as listas) roda à parte, depois dos outros.
+8. Nunca procure o começo ou o fim da linha sem limite a cada ocorrência
    (`strings.LastIndexByte(s[:i], '\n')`): numa linha única longa (JSON minificado) isso vira
    quadrático. Use `inicioLinhaJ`/`fimLinhaJ` (`conhecidos.go`, janela de 1000 caracteres).
    `TestLinhaLongaLinear` e os benchmarks `-bench Linha` conferem.
@@ -150,6 +153,9 @@ O `estresse_test.go` do proxy faz essas três conferências e serve de modelo.
 | Variações dos leitores | Cada caso de cada leitor em todas as variações de escrita (caixa, espaços, citações, comentários, pontuação, 2–4 partes, `$ # -` e acento, vários na linha, dentro de JSON), mais prosa com SQL entre crases | `go test ./internal/mask -run Variacoes` |
 | Carga e estresse | Memória com 1,2 GB de texto, 120 mil valores aprendidos, conversas em paralelo, API fora do ar, requisição de 32 MB | `LLM_DLP_ESTRESSE=1 go test ./... -run Estresse` |
 | Sessões reais | Reproduz uma sessão antiga do Claude Code pelo llm-dlp, contra uma API falsa local (nada sai da máquina), e confere recusas, ida e volta, cache e tempo | `llm-dlp simular SESSAO.jsonl` |
+| Matriz de transporte | Cada conteúdo (catálogo, conexão, config do Snowflake, manifesto, buckets, ORM) em 15 desenhos (CSV, `;`, TAB, `\|`, caixa, largura fixa, bordas, tuplas, HTML, vertical, JSON, JSONL, `k=v`, coluna solta, `uniq -c`) e 11 transportes (cru, Read, `cat -n`, `grep -n`, diff, markdown, JSON escapado, ANSI, CRLF, citação, log): os mesmos nomes mascarados em todas as células (meta 95%) e ida e volta exata; os negativos não têm nada mascarado em célula nenhuma | `go test ./internal/mask -run Matriz -v` |
+| Fuzz | Mapa da normalização, ida e volta pelos leitores e a varredura do SQL contra as regex que ela substituiu | `go test ./internal/mask -run '^$' -fuzz FuzzIdaVolta -fuzztime 60s` (e `FuzzNormalizar`, `FuzzVarreduraSQL`) |
+| Falso positivo | Por regra: achados num corpus público (código e documentação de terceiros) e, nas sessões reais, quantos nomes aprendidos existem no corpus público (limite 2%). Só contagens; chave e configuração de teste | `LLM_DLP_CORPUS=dir1:dir2 go test ./internal/mask -run MedirCorpus -v` e, com `LLM_DLP_SESSOES=~/.claude/projects`, `-run MedirSessoes` |
 | Uso real | Claude Code de verdade, em cenários do dia a dia (CSV, planilha, segredos, log, texto colado, print, SQL, pesquisa na web, subagente), com dados fictícios e um espião gravando o que chega à API | Manual (ver abaixo) |
 
 No teste de uso real, cada cenário roda duas vezes, direto e pelo llm-dlp, para comparar.

@@ -277,13 +277,14 @@ func tirarANSIeCaixa(s string) (string, []int, bool) {
 var (
 	// número de linha da ferramenta de leitura ("   12→") e do cat -n / nl ("    12\t")
 	reNumLinha = regexp.MustCompile(`^ *\d{1,7}(?:→|\t)`)
-	// grep -n com e sem arquivo ("a/b.py:12:", "12:"), linha de contexto ("a/b.py-12-")
-	reGrepN = regexp.MustCompile(`^(?:[^\s:]*[^\s:\d][^\s:]*(?::\d+:|-\d+-)|\d+[:-](?:\D|$))`)
+	// grep -n com e sem arquivo ("a/b.py:12:", "12:"), linha de contexto ("a/b.py-12-", só com
+	// caminho de arquivo: "x-2024-01-" de um CSV não é contexto); vírgula, ";" e "=" não são de arquivo
+	reGrepN = regexp.MustCompile(`^(?:[^\s:,;=]*[^\s:\d,;=][^\s:,;=]*:\d+:|[^\s:,;=]*[./][^\s:,;=]*?-\d+-|\d+[:-](?:\D|$))`)
 	// git blame: "1a2b3c4d (Fulano 2024-01-02 10:11:12 -0300  12) "
 	reBlame = regexp.MustCompile(`^\^?[0-9a-f]{7,40}(?: [^\s(]+)? \([^)]*\d{4}-\d\d-\d\d[^)]*?\d+\) `)
 	// carimbo de log no começo da linha, com o nível depois
 	reCarimbo = regexp.MustCompile(`^\[?\d{4}-\d\d-\d\d[T ]\d\d:\d\d:\d\d(?:[.,]\d+)?(?:Z|[+-]\d\d:?\d\d)?\]?(?:\s+\[?(?:TRACE|DEBUG|INFO|NOTICE|WARN|WARNING|ERROR|FATAL|CRITICAL)\]?)?[ \t]`)
-	reGrepArq = regexp.MustCompile(`(?m)^[^\s:]*[^\s:\d][^\s:]*(?::\d+:|-\d+-)`)
+	reGrepArq = regexp.MustCompile(`(?m)^(?:[^\s:,;=]*[^\s:\d,;=][^\s:,;=]*:\d+:|[^\s:,;=]*[./][^\s:,;=]*?-\d+-)`)
 	reDiffCab = regexp.MustCompile(`^(?:@@ .*@@|diff --git |index [0-9a-f]+\.\.|\+\+\+ |--- (?:a/|/dev/null|\S+\t)|new file mode|deleted file mode)`)
 )
 

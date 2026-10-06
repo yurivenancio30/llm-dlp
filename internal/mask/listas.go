@@ -214,31 +214,21 @@ func (m *Masker) tipoConhecido(v string) (string, bool) {
 // publicoLista: o vocabulário que nunca vira item de lista.
 func publicoLista(v string) bool { return publicoSQL(v) || publicoDev(v) || publicoDevops(v) }
 
-// acharListas: as listas homogêneas e os nomes qualificados com uma parte conhecida. achados:
-// o que os leitores já acharam neste texto.
-func (m *Masker) acharListas(s string, aprende bool, achados []Achado, add func(ini, fim int, tipo string)) {
+// acharListas: as listas homogêneas e os nomes qualificados com uma parte conhecida (aprendida).
+func (m *Masker) acharListas(s string, aprende bool, add func(ini, fim int, tipo string)) {
 	if !m.cfg.Objetos.Ligado {
 		return
-	}
-	daqui := map[string]string{} // nome (minúsculo) -> tipo, dos achados deste texto
-	for _, a := range achados {
-		if ehObjeto(a.Tipo) {
-			daqui[strings.ToLower(semCitacao(a.Real))] = strings.TrimPrefix(a.Tipo, prefTipoObj)
-		}
 	}
 	c := m.conh
 	c.mu.RLock()
 	nRAM := c.nObj
 	c.mu.RUnlock()
-	if nRAM == 0 && len(daqui) == 0 && (m.vistos == nil || !m.vistos.TemObj()) {
+	if nRAM == 0 && (m.vistos == nil || !m.vistos.TemObj()) {
 		return
 	}
-	conhecido := func(v string) (string, bool) {
-		if e, ok := daqui[strings.ToLower(v)]; ok {
-			return e, true
-		}
-		return m.tipoConhecido(v)
-	}
+	// só o que já foi APRENDIDO (com os freios: evidência forte ou duas regras), e não qualquer
+	// achado deste texto: um achado fraco errado puxaria a lista inteira junto
+	conhecido := m.tipoConhecido
 	m.rodarLeitor(Leitor{Nome: "lista", Publico: publicoLista, Achar: func(s string, add func(ObjAchado)) {
 		listasHomogeneas(s, conhecido, add)
 		qualificadosConhecidos(s, conhecido, add)

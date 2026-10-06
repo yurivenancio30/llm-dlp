@@ -10,11 +10,12 @@ import (
 // configuração, não é SQL, não é tabela): "nome    int64" por linha (dtypes), Index([...])
 // de colunas, " |-- nome: string" (printSchema), "nome: int64" por linha no começo da linha
 // (schema do Arrow), "string nome = 1;" (protobuf). O vocabulário é só o de tipos de dado
-// (vocab_tipos.go). As formas aninhadas em YAML/JSON (colunas de modelo, "fields" do Avro) ficam
+// (vocab_tipos.go). "nome    tipo" vale só no começo da linha: recuado, é campo de struct ou
+// declaração em código (variável, que nunca é mascarada). As formas aninhadas em YAML/JSON (colunas de modelo, "fields" do Avro) ficam
 // com o motor de YAML/JSON (acharNomePorContexto).
 
 var (
-	reEsqEspaco   = regexp.MustCompile(`^[ \t]*([\p{L}_][\p{L}\w$#.\-]*)[ \t]{2,}(\S+)[ \t]*$`)
+	reEsqEspaco   = regexp.MustCompile(`^([\p{L}_][\p{L}\w$#.\-]*)[ \t]{2,}(\S+)[ \t]*$`)
 	reEsqPrint    = regexp.MustCompile(`^[ |]*\|-- ([\p{L}_][\p{L}\w$#.\-]*): (\S+)`)
 	reEsqDoisPont = regexp.MustCompile(`^([\p{L}_][\p{L}\w$#.\-]*): (\S+(?: not null)?)[ \t]*$`)
 	reEsqProto    = regexp.MustCompile(`^[ \t]*(?:(?:repeated|optional|required)[ \t]+)?([A-Za-z_][\w.]*)[ \t]+([A-Za-z_]\w*)[ \t]*=[ \t]*\d+[ \t]*(?:\[[^\]]*\])?[ \t]*;`)
