@@ -82,8 +82,8 @@ func (m *Masker) detectarInteiroE(s string, aprende bool, d *dicaSaida, ext stri
 	out := m.detectarBase(s)
 	out = append(out, m.acharEstrutura(s, aprende, out, d)...)
 	novos, dec := m.rodarDecisores(s, out, aprende, ext)
+	dec = append(decisoesDosAchados(out), dec...) // as dos leitores (antes dos achados dos decisores)
 	out = append(out, novos...)
-	dec = append(decisoesDosAchados(out), dec...)
 	// Valores que dependem de contexto são lembrados e reconhecidos depois em qualquer
 	// lugar (ver conhecidos.go): sem isto, vazariam quando o modelo os repete sem a
 	// palavra-chave por perto e o histórico é reenviado.
@@ -177,8 +177,8 @@ func (m *Masker) detectarGrandeE(s string, aprende bool, d *dicaSaida, ext strin
 	// estrutura (objetos) e tabelas: no texto inteiro (uma estrutura pode passar de um pedaço)
 	out = append(out, m.acharEstrutura(s, aprende, out, d)...)
 	novos, dec := m.rodarDecisores(s, out, aprende, ext)
+	dec = append(decisoesDosAchados(out), dec...) // as dos leitores (antes dos achados dos decisores)
 	out = append(out, novos...)
-	dec = append(decisoesDosAchados(out), dec...)
 	// primeiro aprende TUDO, depois procura os valores conhecidos no texto inteiro: um valor
 	// ensinado no fim do texto é reconhecido também no começo
 	for _, a := range out {
