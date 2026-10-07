@@ -87,3 +87,8 @@ Não há nada para rodar. O llm-dlp sobe ao abrir uma sessão e volta sozinho se
 ## Licença
 
 MIT. Ver [LICENSE](LICENSE).
+
+O arquivo de dados `internal/mask/palavras_comuns.txt` é uma adaptação das listas de
+frequência do [FrequencyWords](https://github.com/hermitdave/FrequencyWords), de Hermit Dave
+(dados do OpenSubtitles 2018), distribuída sob [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/);
+origem e critério no cabeçalho do arquivo.

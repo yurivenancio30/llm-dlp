@@ -283,6 +283,11 @@ func (l *Lote) Memoria(itens []ItemLote, extras []Decisao) {
 	}
 	itens = semFontes(itens)
 	defer func() { l.registrarFontes(itens, fontesIt) }()
+	l.montarMemoria(l.decisoesDosItens(itens), extras)
+}
+
+// decisoesDosItens: as decisões de cada texto (do congelado, do memo ou recalculadas uma vez).
+func (l *Lote) decisoesDosItens(itens []ItemLote) [][]Decisao {
 	m := l.m
 	decs := make([][]Decisao, len(itens))
 	var faltam []itemAquecer
@@ -313,6 +318,12 @@ func (l *Lote) Memoria(itens []ItemLote, extras []Decisao) {
 		for _, i := range iFaltam {
 			it := itens[i]
 			decs[i], _ = m.decididosMemo(it.S, it.Dica)
+			if decs[i] == nil {
+				// saiu do memo enquanto os outros eram calculados (conversa maior que o memo):
+				// calcula de novo, sem depender do memo
+				r, _ := m.mascararD(it.S, true, it.Dica)
+				decs[i] = r.decididos
+			}
 			m.mu.Lock()
 			if r, ok := m.cong[it.Pos]; ok && r.decididos == nil {
 				r.decididos = decs[i]
@@ -324,6 +335,34 @@ func (l *Lote) Memoria(itens []ItemLote, extras []Decisao) {
 			m.mu.Unlock()
 		}
 	}
+	return decs
+}
+
+// DecididosPorTexto: para a anterioridade, os nomes que cada texto decidiu por si (leitores e
+// decisores daquele texto; nunca o que veio da memória da conversa ou do conhecimento
+// acumulado), por texto. Texto sem decisões calculadas (da internet) fica de fora.
+func (l *Lote) DecididosPorTexto(itens []ItemLote) map[string][]string {
+	itens = semFontes(itens)
+	decs := l.decisoesDosItens(itens)
+	out := make(map[string][]string, len(itens))
+	for i, it := range itens {
+		if decs[i] == nil {
+			continue
+		}
+		ns := out[it.S]
+		if ns == nil {
+			ns = []string{}
+		}
+		for _, d := range decs[i] {
+			ns = append(ns, d.Nome)
+		}
+		out[it.S] = ns
+	}
+	return out
+}
+
+// juntarDecisoes: as decisões de todos os textos, cada texto repetido uma vez só.
+func juntarDecisoes(decs [][]Decisao) []Decisao {
 	var todas []Decisao
 	vistas := map[*Decisao]bool{} // o mesmo texto repetido traz as mesmas decisões (do memo)
 	for _, d := range decs {
@@ -333,7 +372,12 @@ func (l *Lote) Memoria(itens []ItemLote, extras []Decisao) {
 		vistas[&d[0]] = true
 		todas = append(todas, d...)
 	}
-	todas = append(todas, extras...)
+	return todas
+}
+
+func (l *Lote) montarMemoria(decs [][]Decisao, extras []Decisao) {
+	m := l.m
+	todas := append(juntarDecisoes(decs), extras...)
 	if len(todas) > 0 {
 		if len(l.publicos) > 0 {
 			k := todas[:0:0]
@@ -413,6 +457,14 @@ func decisoesTraduzidas(des string, ts []trecho) []Decisao {
 		out = append(out, Decisao{Nome: v, Ent: strings.TrimPrefix(t.Tipo, prefTipoObj), Regra: "traduzida", Generica: ehGenerica(v)})
 	}
 	return out
+}
+
+// MascararProsa: como MascararEscrito, para um bloco de texto da resposta (não a entrada de
+// ferramenta): palavra comum decidida em outro lugar fica como palavra (palavras_comuns.go).
+func (l *Lote) MascararProsa(des string, daWeb bool, pos Posicao, dica string) (string, []Entrada) {
+	l.prosa = true
+	defer func() { l.prosa = false }()
+	return l.MascararEscrito(des, daWeb, pos, dica)
 }
 
 // MascararEscrito: como MascararDica, para um texto do assistente. Com registro (ver

@@ -327,27 +327,25 @@ const FonteSistema = "sistema"
 // AlvoDeSistema: o comando descreve ou lista um objeto de catálogo de sistema.
 func AlvoDeSistema(cmd string) bool { return alvoDeSistema(cmd) }
 
-// UsarPublicos: as palavras (minúsculas) que o modelo escreveu antes de qualquer dado nesta
+// UsarPublicos: as palavras (minúsculas) que o modelo escreveu antes de um dado trazê-las nesta
 // conversa (anterioridade, no proxy). São conhecimento dele: nenhum caminho as marca aqui.
 func (l *Lote) UsarPublicos(p map[string]bool) { l.publicos = p }
 
-// doModelo: v (ou cada parte de um nome qualificado) é conhecimento do modelo nesta conversa.
+// doModelo: v é conhecimento do modelo nesta conversa (e não contém termo cadastrado: o
+// cadastro sempre vence).
 func (l *Lote) doModelo(v string) bool {
 	if len(l.publicos) == 0 {
 		return false
 	}
-	return l.publicos[strings.ToLower(v)]
+	return l.publicos[strings.ToLower(v)] && !l.m.temTermo(v)
 }
 
-// semPublicos: os trechos de objeto cujo valor é conhecimento do modelo saem (os de formato,
-// como CPF e chave, ficam: valem por si).
+// semPublicos: os trechos de objeto cujo valor é conhecimento do modelo saem, e os de palavra
+// comum na prosa do modelo (os de formato, como CPF e chave, ficam: valem por si).
 func (l *Lote) semPublicos(s string, ts []trecho) []trecho {
-	if len(l.publicos) == 0 {
-		return ts
-	}
 	out := ts[:0:0]
 	for _, t := range ts {
-		if ehObjeto(t.Tipo) && l.doModelo(s[t.Ini:t.Fim]) {
+		if v := s[t.Ini:t.Fim]; ehObjeto(t.Tipo) && (l.doModelo(v) || l.prosa && l.m.comumLivre(v)) {
 			continue
 		}
 		out = append(out, t)

@@ -138,3 +138,40 @@ func TestAnterioridadeResultadoDentroDoModeloEDado(t *testing.T) {
 		t.Errorf("o que o modelo escreveu (a chamada) devia contar: %v", a.modelo)
 	}
 }
+
+// Uma saída que só MENCIONA a palavra (um changelog público que cita tag_name) não tira a autoria
+// do modelo: quando ele a escreve numa query, é dele, mesmo que depois um dado a decida. O nome
+// que o usuário digitou continua sendo do cliente (TestRastreamentoSQLDoAssistente).
+func TestAnterioridadeMencaoNaoTiraAutoria(t *testing.T) {
+	changelog := "## 0.12.1\n\n- #9244: o construtor de tag mudou; TagKey(\"x\", [\"tag_name\"]) não é mais aceito, use TagKey(\"tag_name\").\n"
+	q := "SELECT tag_name, tag_value, object_name FROM snowflake.account_usage.tag_references"
+	msgs := rtTurnos("o que mudou na versão nova?", [2]string{"cat CHANGELOG.md", changelog})
+	msgs = append(msgs, rtTurnos("", [2]string{"snow sql -q \"" + q + "\"", "TAG_NAME | TAG_VALUE | OBJECT_NAME\nOWNER    | squad_x   | TB_CLIENTE_PJ\n"})[1:]...)
+	msgs = append(msgs, rtTurnos("", [2]string{"cat consulta.py", "q = \"\"\"\n    SELECT tag_name AS \"TAG_NAME\",\n           object_name AS \"OBJETO\"\n    FROM snowflake.account_usage.tag_references\n\"\"\"\n"})[1:]...)
+	api := rtAPI(t, "", msgs)
+	if rtTok(api, "tag_name") < rtTok(q, "tag_name")+1 {
+		t.Errorf("tag_name (o modelo escreveu antes de um dado decidi-lo) foi mascarado")
+	}
+	if rtTok(api, "TB_CLIENTE_PJ") > 0 {
+		t.Errorf("TB_CLIENTE_PJ (do cliente) foi em claro")
+	}
+}
+
+// Palavra comum decidida como nome num dado (a tabela CONTA existe) continua nome no dado, mas
+// na prosa do modelo é a palavra; nome com cara de identificador continua mascarado na prosa.
+func TestPalavraComumNaProsaDoModelo(t *testing.T) {
+	ddl := "CREATE TABLE FIN.CONTA (ID INTEGER NOT NULL PRIMARY KEY, NM_TITULAR VARCHAR(10));\nCREATE TABLE FIN.TB_PEDIDO_X9 (ID INTEGER);\n"
+	msgs := rtTurnos("cria as tabelas do lab", [2]string{"cat ddl.sql", ddl})
+	msgs = append(msgs, rtAssist("Daqui só acesso a conta trial do laboratório; a TB_PEDIDO_X9 ficou vazia."))
+	msgs = append(msgs, map[string]any{"role": "user", "content": "ok"})
+	api := rtAPI(t, "", msgs)
+	if !strings.Contains(api, "acesso a conta trial") {
+		t.Errorf("palavra comum trocada na prosa do modelo")
+	}
+	if rtTok(api, "TB_PEDIDO_X9") > 0 {
+		t.Errorf("nome com cara de identificador em claro")
+	}
+	if strings.Contains(api, ".CONTA (") {
+		t.Errorf("CONTA no DDL (onde é nome) devia continuar mascarada")
+	}
+}

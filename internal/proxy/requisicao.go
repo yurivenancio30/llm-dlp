@@ -40,10 +40,11 @@ func (p *Proxy) mascararCorpo(r *http.Request, corpo []byte) ([]byte, []mask.Ent
 		wc.pos.bloco = depois(mask.Posicao{}, v)
 		wc.generico(v)
 	}
-	if anthropic {
-		lote.UsarPublicos(publicosDoModelo(v, p.m)) // anterioridade (anterioridade.go)
-	}
 	lote.Aquecer(col.itens)
+	if anthropic {
+		// anterioridade (anterioridade.go), com o que cada saída de ferramenta decidiu (já no memo)
+		lote.UsarPublicos(publicosDoModelo(v, p.m, lote.DecididosPorTexto(col.itens)))
+	}
 	// memória da conversa: os nomes decididos em todos os textos valem para os textos ainda
 	// não enviados (ver mask/memoria.go)
 	lote.Memoria(col.itens, col.extras)
@@ -221,6 +222,8 @@ type walker struct {
 	dentro bool
 	// assist: mensagem do assistente (texto e entrada de ferramenta escritos pelo modelo)
 	assist bool
+	// prosa: bloco de texto do assistente (não entrada de ferramenta)
+	prosa bool
 }
 
 // midia trata um bloco de imagem/PDF; devolve os blocos que o substituem.
@@ -287,7 +290,11 @@ func (w walker) escrito(v string) string {
 		w.col.itens = append(w.col.itens, mask.ItemLote{S: v, DaWeb: w.daWeb, Pos: w.pos.doTexto(), Dica: w.dica})
 		return v
 	}
-	out, e := w.lote.MascararEscrito(v, w.daWeb, w.pos.doTexto(), w.dica)
+	mascarar := w.lote.MascararEscrito
+	if w.prosa {
+		mascarar = w.lote.MascararProsa
+	}
+	out, e := mascarar(v, w.daWeb, w.pos.doTexto(), w.dica)
 	*w.ents = append(*w.ents, e...)
 	return out
 }
@@ -607,6 +614,7 @@ func (w walker) bloco(b map[string]any) map[string]any {
 		return b // gerados do lado da API
 	case "text":
 		if s, ok := b["text"].(string); ok {
+			w.prosa = w.assist
 			b["text"] = w.s(s)
 		}
 		return b
