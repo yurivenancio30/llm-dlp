@@ -188,9 +188,10 @@ func TestMemoriaTraduzidaNoComando(t *testing.T) {
 }
 
 // T4: resposta com um pseudônimo traduzido e a mesma palavra escrita pelo próprio modelo no
-// mesmo bloco. Ao voltar no histórico, só a traduzida vira pseudônimo; a mensagem nova do
-// usuário com a palavra sai mascarada (memória da conversa). Vale também depois de um
-// reinício (o registro está no enviados.log, só com HMAC e pseudônimos).
+// mesmo bloco. Ao voltar no histórico, só a traduzida vira pseudônimo; na mensagem nova do
+// usuário a palavra comum fica como palavra (o contágio não leva palavra comum para a prosa:
+// mask/palavras_comuns.go). Vale também depois de um reinício (o registro está no
+// enviados.log, só com HMAC e pseudônimos).
 func TestMemoriaQuemEscreveuPontaAPonta(t *testing.T) {
 	molde := "o namespace %s tem logs; " + nsPalavra + " tambem e uma palavra comum" // ASCII: o picote de 3 bytes não parte um caractere
 	for _, stream := range []bool{true, false} {
@@ -222,8 +223,8 @@ func TestMemoriaQuemEscreveuPontaAPonta(t *testing.T) {
 			if len(a.Content) != 2 || a.Content[1].Text != original || a.Content[0].Thinking != "pensando" {
 				t.Errorf("%s: o texto do assistente não voltou como a API mandou:\n%s\nesperado %q", caso, ms[1], original)
 			}
-			if strings.Contains(ms[2], nsPalavra) {
-				t.Errorf("%s: mensagem nova do usuário com a palavra saiu em claro: %s", caso, ms[2])
+			if !strings.Contains(ms[2], nsPalavra) {
+				t.Errorf("%s: palavra comum trocada na mensagem nova do usuário: %s", caso, ms[2])
 			}
 			if strings.Contains(ms[0], nsPalavra) {
 				t.Errorf("%s: o inventário saiu em claro: %s", caso, ms[0])
@@ -236,9 +237,11 @@ func TestMemoriaQuemEscreveuPontaAPonta(t *testing.T) {
 func TestMemoriaOutraConversa(t *testing.T) {
 	var corpos [][]byte
 	px := montarMem(t, t.TempDir(), &corpos, respTexto(false, "ok"))
-	enviarLer(t, px, false, []any{msg("user", inventario), msg("assistant", "certo"), msg("user", "o "+nsPalavra+" caiu")})
+	enviarLer(t, px, false, []any{msg("user", inventario),
+		msg("assistant", []any{map[string]any{"type": "tool_use", "id": "t5", "name": "Bash", "input": map[string]any{"command": "kubectl logs deploy/web --tail 5"}}}),
+		msg("user", []any{map[string]any{"type": "tool_result", "tool_use_id": "t5", "content": "o " + nsPalavra + " caiu"}})})
 	if ms := mensagens(t, corpos[0]); strings.Contains(ms[2], nsPalavra) {
-		t.Fatalf("premissa: com o inventário, a palavra devia sair mascarada: %s", ms[2])
+		t.Fatalf("premissa: com o inventário, a palavra devia sair mascarada na saída: %s", ms[2])
 	}
 	enviarLer(t, px, false, []any{msg("user", "o "+nsPalavra+" caiu")})
 	if ms := mensagens(t, corpos[1]); !strings.Contains(ms[0], nsPalavra) {
@@ -267,7 +270,9 @@ func TestMemoriaNaoReescreveOPassadoPontaAPonta(t *testing.T) {
 			t.Fatalf("reenvio mudou a mensagem %d:\n%s\n%s", j, r[1][j], r[2][j])
 		}
 	}
-	if strings.Contains(r[1][2], nsPalavra) || strings.Contains(r[2][4], nsPalavra) {
-		t.Fatalf("texto novo sem a memória: %s | %s", r[1][2], r[2][4])
+	// o inventário colado no texto novo continua nome (o leitor decide ali); a palavra comum na
+	// prosa fica como palavra (mask/palavras_comuns.go)
+	if strings.Contains(r[1][2], "-n "+nsPalavra) || !strings.Contains(r[2][4], nsPalavra) {
+		t.Fatalf("texto novo: %s | %s", r[1][2], r[2][4])
 	}
 }

@@ -7,7 +7,9 @@ import (
 )
 
 // T2 de ponta a ponta, com a memória da conversa de verdade: o pedido, o inventário e, numa
-// mensagem nova do usuário, o mesmo nome solto em 6 formatos. Alvo: 0 em claro.
+// saída de comando seguinte (sem arquivo: recebe o contágio), o mesmo nome solto em 6 formatos.
+// Alvo: 0 em claro. (Na prosa da mensagem do usuário a palavra comum fica como palavra:
+// mask/palavras_comuns.go.)
 
 func seisFormatosP(n string) []string {
 	return []string{
@@ -78,8 +80,8 @@ func TestT2PontaAPonta(t *testing.T) {
 			msg("user", pedido),
 			msg("assistant", []any{chamadaBash("c1", ar.cmd)}),
 			msg("user", []any{resultado("c1", ar.saida)}),
-			msg("assistant", "Vi o inventário."),
-			msg("user", strings.Join(fs, "\n")),
+			msg("assistant", []any{chamadaBash("c2", "kubectl logs deploy/web --tail 50")}),
+			msg("user", []any{resultado("c2", strings.Join(fs, "\n"))}),
 		})
 		r := mensagens(t, corpos[len(corpos)-1])
 		for _, n := range ar.nomes {

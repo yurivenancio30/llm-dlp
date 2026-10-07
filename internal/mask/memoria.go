@@ -212,6 +212,7 @@ func (l *Lote) comMemoria(s string, r resultado, dica string) resultado {
 		}
 		extra = k
 	}
+	extra = l.semComunsNaProsa(s, extra)
 	ts := l.juntarTrechos(r.trechos, extra)
 	l.provAtual = map[string]bool{}
 	for _, d := range r.decididos {
@@ -223,7 +224,7 @@ func (l *Lote) comMemoria(s string, r resultado, dica string) resultado {
 	ts2 := l.ancorarPosicoes(s, ts, f)
 	if novas := l.aprenderAncora(s, ts, ts2); len(novas) > 0 {
 		// o valor deduzido vale nas outras ocorrências deste texto (regra 2)
-		ts2 = l.juntarTrechos(ts2, l.mem.varrerF(s, ts2, f))
+		ts2 = l.juntarTrechos(ts2, l.semComunsNaProsa(s, l.mem.varrerF(s, ts2, f)))
 		r.decididos = append(append([]Decisao{}, r.decididos...), novas...)
 		extra = append(extra, trecho{})
 	}
@@ -241,6 +242,22 @@ func (l *Lote) comMemoria(s string, r resultado, dica string) resultado {
 		return r
 	}
 	return resultado{texto: texto, entradas: entradas, trechos: ts2, gen: r.gen, semAprender: r.semAprender, decididos: r.decididos}
+}
+
+// semComunsNaProsa: na prosa (texto da mensagem), os trechos que a memória da conversa trouxe e
+// que são palavra comum saem: lá ela é a palavra (palavras_comuns.go). Os que um leitor decidiu
+// no próprio texto não passam por aqui.
+func (l *Lote) semComunsNaProsa(s string, xs []trecho) []trecho {
+	if !l.prosa {
+		return xs
+	}
+	out := xs[:0:0]
+	for _, x := range xs {
+		if !l.m.comumLivre(s[x.Ini:x.Fim]) {
+			out = append(out, x)
+		}
+	}
+	return out
 }
 
 // mudouTipo: algum trecho mudou de tipo (âncora por posição corrigiu o genérico).
@@ -457,6 +474,15 @@ func decisoesTraduzidas(des string, ts []trecho) []Decisao {
 		out = append(out, Decisao{Nome: v, Ent: strings.TrimPrefix(t.Tipo, prefTipoObj), Regra: "traduzida", Generica: ehGenerica(v)})
 	}
 	return out
+}
+
+// MascararDicaProsa: como MascararDica, para o texto que o usuário escreveu na mensagem (não a
+// saída de ferramenta): palavra comum que chega por contágio fica como palavra; a que um leitor
+// decide ali mesmo (um DDL colado, kubectl -n) continua nome (palavras_comuns.go).
+func (l *Lote) MascararDicaProsa(s string, daWeb bool, pos Posicao, dica string) (string, []Entrada) {
+	l.prosa = true
+	defer func() { l.prosa = false }()
+	return l.MascararDica(s, daWeb, pos, dica)
 }
 
 // MascararProsa: como MascararEscrito, para um bloco de texto da resposta (não a entrada de

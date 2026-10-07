@@ -222,7 +222,9 @@ type walker struct {
 	dentro bool
 	// assist: mensagem do assistente (texto e entrada de ferramenta escritos pelo modelo)
 	assist bool
-	// prosa: bloco de texto do assistente (não entrada de ferramenta)
+	// mensagem: dentro do conteúdo de uma mensagem (fora de um resultado de ferramenta)
+	mensagem bool
+	// prosa: texto da mensagem, do usuário ou do assistente (não entrada nem saída de ferramenta)
 	prosa bool
 }
 
@@ -269,7 +271,11 @@ func (w walker) s(v string) string {
 		w.col.itens = append(w.col.itens, mask.ItemLote{S: v, DaWeb: w.daWeb, Pos: w.pos.doTexto(), Dica: w.dica})
 		return v
 	}
-	out, e := w.lote.MascararDica(v, w.daWeb, w.pos.doTexto(), w.dica)
+	mascarar := w.lote.MascararDica
+	if w.prosa {
+		mascarar = w.lote.MascararDicaProsa
+	}
+	out, e := mascarar(v, w.daWeb, w.pos.doTexto(), w.dica)
 	*w.ents = append(*w.ents, e...)
 	return out
 }
@@ -541,6 +547,7 @@ func (w walker) requisicaoAnthropic(v any) any {
 						w.pos.atual = depois(w.pos.atual, msg["role"])
 						wm := w
 						wm.assist = msg["role"] == "assistant"
+						wm.mensagem = true
 						msg["content"] = wm.conteudo(msg["content"])
 					}
 				}
@@ -577,7 +584,10 @@ func (w walker) conteudo(v any) any {
 	switch c := v.(type) {
 	case string:
 		var out string
-		w.unidade(c, func(w walker) { out = w.s(c) })
+		w.unidade(c, func(w walker) {
+			w.prosa = w.mensagem
+			out = w.s(c)
+		})
 		return out
 	case []any:
 		// uma imagem/PDF pode virar mais de um bloco (imagem coberta + nota, páginas)
@@ -614,7 +624,7 @@ func (w walker) bloco(b map[string]any) map[string]any {
 		return b // gerados do lado da API
 	case "text":
 		if s, ok := b["text"].(string); ok {
-			w.prosa = w.assist
+			w.prosa = w.mensagem
 			b["text"] = w.s(s)
 		}
 		return b
@@ -633,6 +643,7 @@ func (w walker) bloco(b map[string]any) map[string]any {
 			w.daWeb = true
 		}
 		w.dica = w.dicas[id]
+		w.mensagem = false // saída de ferramenta: dado, não prosa
 		b["content"] = w.conteudo(b["content"])
 		return b
 	case "document":

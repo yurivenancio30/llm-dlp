@@ -340,12 +340,12 @@ func (l *Lote) doModelo(v string) bool {
 	return l.publicos[strings.ToLower(v)] && !l.m.temTermo(v)
 }
 
-// semPublicos: os trechos de objeto cujo valor é conhecimento do modelo saem, e os de palavra
-// comum na prosa do modelo (os de formato, como CPF e chave, ficam: valem por si).
+// semPublicos: os trechos de objeto cujo valor é conhecimento do modelo saem (os de formato,
+// como CPF e chave, ficam: valem por si).
 func (l *Lote) semPublicos(s string, ts []trecho) []trecho {
 	out := ts[:0:0]
 	for _, t := range ts {
-		if v := s[t.Ini:t.Fim]; ehObjeto(t.Tipo) && (l.doModelo(v) || l.prosa && l.m.comumLivre(v)) {
+		if v := s[t.Ini:t.Fim]; ehObjeto(t.Tipo) && l.doModelo(v) {
 			continue
 		}
 		out = append(out, t)

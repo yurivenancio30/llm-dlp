@@ -185,7 +185,7 @@ type Lote struct {
 	fonteAtual string                     // a fonte do texto sendo montado (vazia: sem comando)
 	provAtual  map[string]bool            // decididos com prova no próprio texto sendo montado
 	escrevendo bool                       // montando texto do assistente (recebe todo o contágio)
-	prosa      bool                       // montando um bloco de texto da resposta (palavras_comuns.go)
+	prosa      bool                       // montando texto de mensagem, do usuário ou da resposta (palavras_comuns.go)
 	publicos   map[string]bool            // anterioridade: o modelo escreveu antes de qualquer dado
 }
 

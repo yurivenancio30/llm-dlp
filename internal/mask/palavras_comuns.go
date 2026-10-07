@@ -8,9 +8,11 @@ import (
 
 // Palavras comuns: uma palavra comum do português ou do inglês, sozinha ("tabela", "conta",
 // "linhagem", "status"), decidida como nome num dado (uma tabela CONTA existe) continua
-// mascarada onde é nome (no dado, no comando), mas o contágio não a leva para a prosa do modelo
-// (o bloco de texto da resposta): lá ela é a palavra, com o sentido dela ("só acesso a conta
-// trial"). Vale só para nome de objeto: segredo, documento, e-mail e os detectores de formato
+// mascarada onde um leitor a decide (no dado, no comando, num DDL ou kubectl -n colado na
+// mensagem), mas o contágio não a leva para a prosa (o texto da mensagem, do usuário ou da
+// resposta): lá ela é a palavra, com o sentido dela ("só acesso a conta trial", "em qual tabela
+// você rodaria?"). O nome do cliente que é uma palavra comum sozinha e que o usuário cita em
+// prosa vai como palavra (escolha do usuário; o que importa proteger vai em "termos"). Vale só para nome de objeto: segredo, documento, e-mail e os detectores de formato
 // não passam por aqui. Termo cadastrado (config "termos") sempre vence: palavra comum que
 // contém um termo continua mascarada.
 //

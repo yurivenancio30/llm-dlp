@@ -175,3 +175,19 @@ func TestPalavraComumNaProsaDoModelo(t *testing.T) {
 		t.Errorf("CONTA no DDL (onde é nome) devia continuar mascarada")
 	}
 }
+
+// O mesmo no texto do usuário: a palavra comum que chegou por contágio fica como palavra; no DDL
+// que ele cola na mesma mensagem, onde um leitor a decide, continua mascarada.
+func TestPalavraComumNaProsaDoUsuario(t *testing.T) {
+	ddl := "CREATE TABLE FIN.CONTA (ID INTEGER NOT NULL PRIMARY KEY, NM_TITULAR VARCHAR(10));\n"
+	msgs := rtTurnos("cria as tabelas do lab", [2]string{"cat ddl.sql", ddl})
+	msgs = append(msgs, rtAssist("Criei."))
+	msgs = append(msgs, map[string]any{"role": "user", "content": "em qual conta você rodaria? olha esse DDL:\nCREATE TABLE FIN.CONTA (ID INTEGER, NM_TITULAR VARCHAR(10));"})
+	api := rtAPI(t, "", msgs)
+	if !strings.Contains(api, "em qual conta você rodaria") {
+		t.Errorf("palavra comum trocada no texto do usuário")
+	}
+	if strings.Contains(api, ".CONTA (") {
+		t.Errorf("CONTA no DDL colado (onde é nome) devia continuar mascarada")
+	}
+}
