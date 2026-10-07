@@ -168,7 +168,7 @@ func fimInstrucao(s string, i, j int) int {
 	}
 	for o := strings.IndexByte(s[j:fim], '\n'); o >= 0; {
 		p := j + o + 1
-		if reNaoSQL.MatchString(s[p:min(fim, p+120)]) {
+		if reNaoSQL.MatchString(s[p:min(fim, p+120)]) || linhaSolta(s, j, p, fim) {
 			return p - 1
 		}
 		k := strings.IndexByte(s[p:fim], '\n')
@@ -800,4 +800,52 @@ func contarClausulas(s string, max int) int {
 		i = j
 	}
 	return n
+}
+
+// pedeContinuacao: palavras com que uma linha de SQL termina quando a instrução continua na
+// linha seguinte (a gramática exige um complemento depois delas).
+var pedeContinuacao = conj("select", "from", "join", "on", "and", "or", "where", "by", "into", "update",
+	"table", "view", "as", "set", "values", "using", "in", "not", "is", "like", "then", "when", "else",
+	"case", "union", "all", "distinct", "having", "with", "over", "partition", "merge", "delete", "insert",
+	"create", "replace", "alter", "drop", "exists", "between", "returning", "inner", "left", "right",
+	"full", "outer", "cross", "natural", "lateral", "limit", "offset", "qualify", "window", "match", "matched")
+
+// linhaSolta: a linha que começa em p não continua a instrução que começou em j: a linha de
+// antes está completa (não termina com vírgula, parêntese aberto, operador nem palavra que
+// pede complemento), esta é uma palavra solta, sem nada de SQL, e a seguinte também não começa
+// com palavra de SQL (um nome de arquivo de uma listagem logo depois de um SQL cortado sem
+// ";": "linhagem.sql" não é tabela.coluna).
+func linhaSolta(s string, j, p, fim int) bool {
+	e := strings.IndexByte(s[p:fim], '\n')
+	if e < 0 {
+		e = fim - p
+	}
+	l := strings.TrimSpace(s[p : p+e])
+	if l == "" || strings.ContainsAny(l, " \t,()=<>+*/|;'\"") || vocabSQL[strings.ToLower(l)] {
+		return false
+	}
+	a := strings.LastIndexByte(s[j:p-1], '\n')
+	ant := strings.TrimSpace(s[j+a+1 : p-1])
+	if ant == "" {
+		return false
+	}
+	switch ant[len(ant)-1] {
+	case ',', '(', '=', '<', '>', '+', '-', '*', '/', '|', '.':
+		return false
+	}
+	ws := strings.Fields(ant)
+	if pedeContinuacao[strings.ToLower(strings.Trim(ws[len(ws)-1], "(),"))] {
+		return false
+	}
+	// a linha seguinte também não pode continuar o SQL (num SQL com uma palavra por linha, o
+	// apelido solto é seguido de JOIN, ON, WHERE...; numa listagem, de outro nome de arquivo)
+	q := p + e + 1
+	for q < fim && (s[q] == ' ' || s[q] == '\t' || s[q] == '\n' || s[q] == '\r') {
+		q++
+	}
+	if q >= fim {
+		return true
+	}
+	prox := strings.Fields(s[q:min(fim, q+80)])
+	return len(prox) == 0 || !vocabSQL[strings.ToLower(strings.Trim(prox[0], "(),;"))]
 }
