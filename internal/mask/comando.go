@@ -641,14 +641,43 @@ var reAlvoDescShow = regexp.MustCompile(`(?i)\b(?:describe|desc)\s+(?:table\s+|v
 
 // alvoDeSistema: o comando descreve (DESC) ou lista (SHOW ... IN) um objeto que está num
 // catálogo de sistema (SNOWFLAKE.ACCOUNT_USAGE.TAG_REFERENCES, information_schema.columns).
+// Só quando TODAS as instruções do comando são isso: um DESC de sistema junto com um SELECT (ou
+// um SHOW sem IN, um DESC de tabela do cliente) no mesmo comando traz dado do cliente na saída.
 func alvoDeSistema(cmd string) bool {
-	for _, m := range reAlvoDescShow.FindAllStringSubmatch(cmd, -1) {
-		alvo := m[1] + m[2]
-		for _, p := range strings.Split(alvo, ".") {
-			if catalogosSistema[strings.ToLower(strings.Trim(p, `"`))] {
-				return true
+	sis := false
+	for _, inst := range strings.Split(cmd, ";") {
+		ms := reAlvoDescShow.FindAllStringSubmatchIndex(inst, -1)
+		resto := inst
+		for k := len(ms) - 1; k >= 0; k-- {
+			m := ms[k]
+			alvo := ""
+			for _, g := range [][2]int{{m[2], m[3]}, {m[4], m[5]}} {
+				if g[0] >= 0 {
+					alvo += inst[g[0]:g[1]]
+				}
 			}
+			if !objetoDeSistema(alvo) {
+				return false
+			}
+			resto = resto[:m[0]] + resto[m[1]:]
+		}
+		if reInstrucaoSQL.MatchString(resto) {
+			return false // outra instrução no mesmo trecho (SELECT, SHOW sem IN...)
+		}
+		sis = sis || len(ms) > 0
+	}
+	return sis
+}
+
+// objetoDeSistema: alguma parte do nome qualificado é um catálogo de sistema.
+func objetoDeSistema(alvo string) bool {
+	for _, p := range strings.Split(alvo, ".") {
+		if catalogosSistema[strings.ToLower(strings.Trim(p, `"`))] {
+			return true
 		}
 	}
 	return false
 }
+
+// reInstrucaoSQL: palavra que começa uma instrução que lê ou muda dado.
+var reInstrucaoSQL = regexp.MustCompile(`(?i)\b(?:select|with|insert|update|delete|merge|copy|call|execute|show|desc|describe|list|get|put|values)\b`)

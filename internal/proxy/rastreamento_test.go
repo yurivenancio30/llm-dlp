@@ -268,3 +268,32 @@ func TestRastreamentoCatalogoDeSistema(t *testing.T) {
 		}
 	}
 }
+
+// Um DESC de sistema no mesmo comando que um SELECT do cliente não torna a saída toda de
+// sistema: os nomes que o SELECT trouxe continuam mascarados.
+func TestRastreamentoCatalogoDeSistemaMisturado(t *testing.T) {
+	saida := "name             type    kind\nTABLE_NAME       VARCHAR COLUMN\nTABLE_SCHEMA     VARCHAR COLUMN\n\n" +
+		"TABLE_SCHEMA     | TABLE_NAME\ncomercial_sul_x  | clientes_vip_x\ncomercial_norte_x| metas_regionais_x\n"
+	for _, cmd := range []string{
+		`snow sql -q "DESC TABLE SNOWFLAKE.ACCOUNT_USAGE.TABLES; SELECT table_schema, table_name FROM dw_vendas_prd.information_schema.tables"`,
+		"snow sql -q \"DESC TABLE SNOWFLAKE.ACCOUNT_USAGE.TABLES\nSELECT table_schema, table_name FROM dw_vendas_prd.information_schema.tables\"",
+	} {
+		var corpos [][]byte
+		px := rtProxy(t, t.TempDir(), &corpos, func(b []byte, w http.ResponseWriter) { rtTexto("ok", w) })
+		rtEnviar(t, px, rtTurnos("quais tabelas tem no dw?", [2]string{cmd, saida}))
+		api := string(corpos[0])
+		for _, s := range []string{"comercial_sul_x", "clientes_vip_x", "comercial_norte_x", "metas_regionais_x"} {
+			if rtTok(api, s) > 0 {
+				t.Errorf("%s (do cliente) foi em claro com um DESC de sistema no mesmo comando", s)
+			}
+		}
+	}
+	if !mask.AlvoDeSistema(`snow sql -q "DESC VIEW SNOWFLAKE.ACCOUNT_USAGE.TAG_REFERENCES; DESC VIEW SNOWFLAKE.ACCOUNT_USAGE.OBJECT_DEPENDENCIES"`) {
+		t.Error("só DESC de sistema devia continuar sendo de sistema")
+	}
+	for _, c := range []string{`snow sql -q "DESC VIEW SNOWFLAKE.ACCOUNT_USAGE.TABLES; SHOW TABLES"`, `snow sql -q "DESC TABLE SNOWFLAKE.ACCOUNT_USAGE.TABLES; DESC TABLE DW_PRD.MART.TB_X"`} {
+		if mask.AlvoDeSistema(c) {
+			t.Errorf("comando com instrução do cliente tratado como sistema: %s", c)
+		}
+	}
+}
