@@ -185,6 +185,7 @@ type Lote struct {
 	fonteAtual string                     // a fonte do texto sendo montado (vazia: sem comando)
 	provAtual  map[string]bool            // decididos com prova no próprio texto sendo montado
 	escrevendo bool                       // montando texto do assistente (recebe todo o contágio)
+	publicos   map[string]bool            // anterioridade: o modelo escreveu antes de qualquer dado
 }
 
 func (m *Masker) NovoLote() *Lote {

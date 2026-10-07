@@ -57,11 +57,15 @@ func rtTexto(texto string, w http.ResponseWriter) {
 	w.Write(b)
 }
 
+var rtSeq int
+
 // rtTurnos: user, depois pares (comando Bash, saída).
 func rtTurnos(pedido string, pares ...[2]string) []any {
 	msgs := []any{map[string]any{"role": "user", "content": pedido}}
 	for i, p := range pares {
-		id := fmt.Sprintf("c%d", i+1)
+		rtSeq++
+		id := fmt.Sprintf("c%d", rtSeq) // único entre chamadas (o proxy liga resultado a comando pelo id)
+		_ = i
 		msgs = append(msgs,
 			map[string]any{"role": "assistant", "content": []any{map[string]any{"type": "tool_use", "id": id, "name": "Bash", "input": map[string]any{"command": p[0]}}}},
 			map[string]any{"role": "user", "content": []any{map[string]any{"type": "tool_result", "tool_use_id": id, "content": p[1]}}})

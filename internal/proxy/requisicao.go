@@ -40,6 +40,9 @@ func (p *Proxy) mascararCorpo(r *http.Request, corpo []byte) ([]byte, []mask.Ent
 		wc.pos.bloco = depois(mask.Posicao{}, v)
 		wc.generico(v)
 	}
+	if anthropic {
+		lote.UsarPublicos(publicosDoModelo(v, p.m)) // anterioridade (anterioridade.go)
+	}
 	lote.Aquecer(col.itens)
 	// memória da conversa: os nomes decididos em todos os textos valem para os textos ainda
 	// não enviados (ver mask/memoria.go)

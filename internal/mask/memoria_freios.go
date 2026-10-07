@@ -40,11 +40,14 @@ func filtroDe(dica string) filtroMem {
 // pula: a memória não troca s[a:b] (o nome nm) aqui.
 func (f filtroMem) pula(s string, a, b int, nm *nomeMem) bool {
 	v := s[a:b]
+	if caraDeIdentificador(v) {
+		// nome do cliente que o programa cita (o modelo o copiou de um dado) sai mascarado
+		// também na saída dele; o que o modelo escreveu por conta própria já é público
+		// (anterioridade)
+		return false
+	}
 	if f.prog != nil && f.prog[hpal(v)] {
 		return true
-	}
-	if caraDeIdentificador(v) {
-		return false
 	}
 	if emComentario(s, a) {
 		return true

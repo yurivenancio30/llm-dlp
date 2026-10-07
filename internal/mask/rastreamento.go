@@ -73,6 +73,9 @@ func (l *Lote) aprenderAncora(s string, antes, ts2 []trecho) []Decisao {
 			continue
 		}
 		v := s[t.Ini:t.Fim]
+		if l.doModelo(v) {
+			continue
+		}
 		d := Decisao{Nome: v, Ent: t.Tipo[len(prefTipoObj):], Regra: "âncora", Generica: ehGenerica(v)}
 		l.marcarDeduzido(v)
 		if l.mem.adicionar(l.m, d) {
@@ -323,3 +326,31 @@ const FonteSistema = "sistema"
 
 // AlvoDeSistema: o comando descreve ou lista um objeto de catálogo de sistema.
 func AlvoDeSistema(cmd string) bool { return alvoDeSistema(cmd) }
+
+// UsarPublicos: as palavras (minúsculas) que o modelo escreveu antes de qualquer dado nesta
+// conversa (anterioridade, no proxy). São conhecimento dele: nenhum caminho as marca aqui.
+func (l *Lote) UsarPublicos(p map[string]bool) { l.publicos = p }
+
+// doModelo: v (ou cada parte de um nome qualificado) é conhecimento do modelo nesta conversa.
+func (l *Lote) doModelo(v string) bool {
+	if len(l.publicos) == 0 {
+		return false
+	}
+	return l.publicos[strings.ToLower(v)]
+}
+
+// semPublicos: os trechos de objeto cujo valor é conhecimento do modelo saem (os de formato,
+// como CPF e chave, ficam: valem por si).
+func (l *Lote) semPublicos(s string, ts []trecho) []trecho {
+	if len(l.publicos) == 0 {
+		return ts
+	}
+	out := ts[:0:0]
+	for _, t := range ts {
+		if ehObjeto(t.Tipo) && l.doModelo(s[t.Ini:t.Fim]) {
+			continue
+		}
+		out = append(out, t)
+	}
+	return out
+}

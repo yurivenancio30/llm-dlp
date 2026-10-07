@@ -219,6 +219,7 @@ func (l *Lote) comMemoria(s string, r resultado, dica string) resultado {
 			l.provAtual[strings.ToLower(d.Nome)] = true
 		}
 	}
+	ts = l.semPublicos(s, ts)
 	ts2 := l.ancorarPosicoes(s, ts, f)
 	if novas := l.aprenderAncora(s, ts, ts2); len(novas) > 0 {
 		// o valor deduzido vale nas outras ocorrências deste texto (regra 2)
@@ -234,7 +235,7 @@ func (l *Lote) comMemoria(s string, r resultado, dica string) resultado {
 			ts2[i].Pseudo = l.m.Pseudonimo(ts2[i].Tipo, s[ts2[i].Ini:ts2[i].Fim])
 		}
 	}
-	ts2 = semSobreporLongo(ts2) // conflito se resolve; nunca se descarta tudo
+	ts2 = semSobreporLongo(l.semPublicos(s, ts2)) // conflito se resolve; nunca se descarta tudo
 	texto, entradas, ok := remontar(s, ts2)
 	if !ok {
 		return r
@@ -334,6 +335,15 @@ func (l *Lote) Memoria(itens []ItemLote, extras []Decisao) {
 	}
 	todas = append(todas, extras...)
 	if len(todas) > 0 {
+		if len(l.publicos) > 0 {
+			k := todas[:0:0]
+			for _, d := range todas {
+				if !l.doModelo(d.Nome) {
+					k = append(k, d)
+				}
+			}
+			todas = k
+		}
 		l.mem = m.novaMemoria(todas)
 		for _, d := range todas {
 			if d.Regra == "âncora" {
