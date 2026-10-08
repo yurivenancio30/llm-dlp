@@ -151,16 +151,10 @@ func tirarCitacao(s string, a, b int) (int, int) {
 // fimInstrucao: onde termina a instrução que começa em i.
 func fimInstrucao(s string, i, j int) int {
 	lim := min(len(s), i+8000)
-	// dentro de uma string de código: termina na aspa que fecha a string
-	antes := strings.TrimRight(s[max(0, i-6):i], " \t(")
-	antes = strings.TrimRight(antes, "fFrRbBuU")
-	for _, q := range []string{`"""`, `'''`, `"`, `'`, "`"} {
-		if strings.HasSuffix(antes, q) {
-			if k := strings.Index(s[j:lim], q); k >= 0 {
-				return j + k
-			}
-			return lim
-		}
+	// SQL dentro de uma string de código, de qualquer linguagem: a instrução não passa do fim
+	// da string (da última, numa concatenação)
+	if a, ok := aberturaString(s, i); ok {
+		lim = fimString(s, j, lim, a)
 	}
 	fim := lim
 	if loc := reFimSQL.FindStringIndex(s[j:lim]); loc != nil {
@@ -848,4 +842,163 @@ func linhaSolta(s string, j, p, fim int) bool {
 	}
 	prox := strings.Fields(s[q:min(fim, q+80)])
 	return len(prox) == 0 || !vocabSQL[strings.ToLower(strings.Trim(prox[0], "(),;"))]
+}
+
+// SQL embutido em código. A string que contém a instrução é reconhecida pela forma dos
+// delimitadores, não pela linguagem: aspas simples, duplas e crases ("...", '...', `...`),
+// aspas triplas (Python, Java, Kotlin, Scala, C#), string crua (Rust r#"..."#, C++ R"x(...)x"),
+// heredoc (shell, Ruby, PHP: <<FIM, <<-FIM, <<~FIM, <<'FIM', <<<FIM) e concatenação ("a" + "b",
+// "a" . "b", "a" & "b", "a" || "b", "a" "b"). Vale para linguagem que não está nesta lista e usa
+// as mesmas formas.
+
+// janelaAbertura: quanto da linha antes da instrução aberturaString olha.
+const janelaAbertura = 2048
+
+// aberturaStr: como fecha a string em que a instrução começou.
+type aberturaStr struct {
+	fecha   string // o delimitador que fecha (no heredoc, a palavra da linha final)
+	heredoc bool
+}
+
+var (
+	reHeredoc  = regexp.MustCompile(`<<<?[-~]?[ \t]*(['"]?)([A-Za-z_]\w*)['"]?`)
+	reRustCrua = regexp.MustCompile(`\br(#+)"$`)
+	reCppCrua  = regexp.MustCompile(`\bu?8?R"([^()\\\s"]{0,16})$`)
+)
+
+// aberturaString: a instrução que começa em i está dentro de uma string de código? Olha para
+// trás por cima de espaços, quebras de linha e "(" (cur.execute(\n    """\n    SELECT ...). A
+// aspa só é abertura se, na linha dela, as anteriores do mesmo tipo forem pares (x = "abc" na
+// linha de cima fecha uma string, não abre).
+func aberturaString(s string, i int) (aberturaStr, bool) {
+	k := i
+	for n := 0; k > 0 && n < 400; n++ {
+		if c := s[k-1]; c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '(' {
+			k--
+			continue
+		}
+		break
+	}
+	// a linha da abertura, até janelaAbertura bytes para trás: numa linha única longa (JSON
+	// minificado) olhar a linha inteira a cada instrução seria quadrático
+	j0 := max(0, k-janelaAbertura)
+	ini := j0 + strings.LastIndexByte(s[j0:k], '\n') + 1
+	cortada := ini == j0 && j0 > 0 && s[j0-1] != '\n'
+	ant := s[ini:k]
+	fimAnt := ant[max(0, len(ant)-24):] // as aberturas cruas cabem no fim da linha
+	// heredoc: a linha da abertura termina antes, e a instrução começa numa linha seguinte
+	if strings.Contains(s[k:i], "\n") {
+		if ms := reHeredoc.FindAllStringSubmatch(ant, -1); ms != nil {
+			return aberturaStr{fecha: ms[len(ms)-1][2], heredoc: true}, true
+		}
+	}
+	if m := reRustCrua.FindStringSubmatch(fimAnt); m != nil {
+		return aberturaStr{fecha: `"` + m[1]}, true
+	}
+	if m := reCppCrua.FindStringSubmatch(fimAnt); m != nil {
+		return aberturaStr{fecha: ")" + m[1] + `"`}, true
+	}
+	for _, q := range []string{`"""`, `'''`, `"`, `'`, "`"} {
+		if strings.HasSuffix(ant, q) {
+			// na linha cortada a paridade não é conhecida: a aspa colada na instrução abre
+			if cortada || contarAspas(ant[:len(ant)-len(q)], q)%2 == 0 {
+				return aberturaStr{fecha: q}, true
+			}
+			return aberturaStr{}, false
+		}
+	}
+	return aberturaStr{}, false
+}
+
+// contarAspas: ocorrências de q em s, sem as escapadas (\").
+func contarAspas(s, q string) int {
+	n := 0
+	for p := 0; p+len(q) <= len(s); {
+		switch {
+		case s[p] == '\\':
+			p += 2
+		case s[p:p+len(q)] == q:
+			n++
+			p += len(q)
+		default:
+			p++
+		}
+	}
+	return n
+}
+
+// fimString: onde fecha a string aberta (a), a partir de j; numa concatenação, a última.
+func fimString(s string, j, lim int, a aberturaStr) int {
+	if a.heredoc {
+		// a linha que só tem a palavra (com recuo; ";" depois, no PHP)
+		for p := j; p < lim; {
+			e := strings.IndexByte(s[p:lim], '\n')
+			if e < 0 {
+				e = lim - p
+			}
+			if strings.TrimRight(strings.TrimSpace(s[p:p+e]), ";") == a.fecha && p > j {
+				return p
+			}
+			p += e + 1
+		}
+		return lim
+	}
+	for p := j; p < lim; {
+		k := indiceFecha(s[p:lim], a.fecha)
+		if k < 0 {
+			return lim
+		}
+		f := p + k
+		if q, n := continuacaoString(s, f+len(a.fecha), lim); n > 0 {
+			a.fecha, p = q, n
+			continue
+		}
+		return f
+	}
+	return lim
+}
+
+// indiceFecha: onde está o delimitador d em s; aspa simples, dupla e crase escapadas com \ não
+// fecham.
+func indiceFecha(s, d string) int {
+	if len(d) > 1 {
+		return strings.Index(s, d)
+	}
+	for p := 0; p < len(s); p++ {
+		switch s[p] {
+		case '\\':
+			p++
+		case d[0]:
+			return p
+		}
+	}
+	return -1
+}
+
+// continuacaoString: depois de uma string fechada em p, vem outra que a continua (operador de
+// concatenação, ou só espaço, como no Python e no C)? Devolve o delimitador e onde começa o
+// conteúdo dela.
+func continuacaoString(s string, p, lim int) (string, int) {
+	pular := func(p int) int {
+		for p < lim && (s[p] == ' ' || s[p] == '\t' || s[p] == '\n' || s[p] == '\r' || s[p] == '\\') {
+			p++
+		}
+		return p
+	}
+	p = pular(p)
+	for _, op := range []string{"||", "+", ".", "&", ".."} {
+		if strings.HasPrefix(s[p:min(lim, p+len(op))], op) {
+			p = pular(p + len(op))
+			break
+		}
+	}
+	for n := 0; n < 2 && p < lim && strings.IndexByte("fFrRbBuU@$", s[p]) >= 0; n++ {
+		p++
+	}
+	for _, q := range []string{`"""`, `'''`, `"`, `'`, "`"} {
+		if strings.HasPrefix(s[p:min(lim, p+len(q))], q) {
+			return q, p + len(q)
+		}
+	}
+	return "", 0
 }

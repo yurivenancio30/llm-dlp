@@ -106,6 +106,7 @@ func normalizar(s string) (*textoNorm, bool) {
 	if t != antes && (reDiffCab.MatchString(antes) || strings.Contains(antes, "\n@@ ") || reGrepArq.MatchString(antes)) {
 		cru = true
 	}
+	etapa(cortarStrings)
 	if mp == nil || t == s {
 		return nil, false
 	}
@@ -117,7 +118,8 @@ func talvezTransporte(s string) bool {
 	if strings.Contains(s, `\n`) || strings.Contains(s, `\"`) || strings.IndexByte(s, 0x1b) >= 0 || strings.IndexByte(s, '\r') >= 0 ||
 		strings.Contains(s, "\xe2\x94") || strings.Contains(s, "\xe2\x95") || strings.HasPrefix(s, "\ufeff") ||
 		strings.Contains(s, "→") || strings.Contains(s, "```") || strings.Contains(s, "\n@@ ") || strings.HasPrefix(s, "@@ ") ||
-		strings.Contains(s, "\n+++ ") || strings.Contains(s, "\n> ") || strings.HasPrefix(s, "> ") {
+		strings.Contains(s, "\n+++ ") || strings.Contains(s, "\n> ") || strings.HasPrefix(s, "> ") ||
+		strings.Contains(s, `"""`) || strings.Contains(s, "'''") || strings.IndexByte(s, '`') >= 0 {
 		return true
 	}
 	// prefixo numérico ou de arquivo nas primeiras linhas (cat -n, grep -n, blame, log)
@@ -399,4 +401,72 @@ func hexVal(c byte) byte {
 		return c - 'A' + 10
 	}
 	return c - '0'
+}
+
+// cortarStrings: o conteúdo de uma string de várias linhas no código (aspas triplas de Python,
+// Java, Kotlin, Scala e C#; crase de JS, TS e Go) começa e termina numa linha própria. A primeira
+// linha do conteúdo divide a linha com o código que abre a string (dados = """tabela,coluna,tipo)
+// e a última com o que fecha (col_x VARCHAR(14)`); os leitores de estrutura (tabela, esquema,
+// YAML) leem linhas inteiras. Só se quebra a linha: o código e o delimitador continuam no texto
+// (o leitor de SQL usa o delimitador para saber onde a instrução acaba). O delimitador só abre
+// quando é ímpar na linha (aberto e fechado na mesma linha não muda nada).
+func cortarStrings(s string) (string, []int, bool) {
+	ls := quebraLinhas(s)
+	aberta := ""
+	mudou := false
+	var m montador
+	m.b = make([]byte, 0, len(s))
+	m.mp = make([]int, 0, len(s)+1)
+	for _, l := range ls {
+		a, b := l[0], l[1]
+		linha := s[a:b]
+		corte := -1 // onde a linha é quebrada (posição na linha)
+		if aberta == "" {
+			for _, q := range []string{`"""`, "'''", "`"} {
+				if n := contarAspas(linha, q); n%2 == 1 {
+					aberta = q
+					if p := ultimaAspa(linha, q) + len(q); strings.TrimSpace(linha[p:]) != "" {
+						corte = p
+					}
+					break
+				}
+			}
+		} else if p := ultimaAspa(linha, aberta); p >= 0 && contarAspas(linha, aberta)%2 == 1 {
+			if strings.TrimSpace(linha[:p]) != "" {
+				corte = p
+			}
+			aberta = ""
+		}
+		if corte > 0 {
+			m.trecho(s, a, a+corte)
+			m.byte('\n', a+corte-1) // a quebra nova fica no lugar do último byte antes dela
+			a, mudou = a+corte, true
+		}
+		m.trecho(s, a, b)
+		if l[1] < len(s) {
+			m.byte('\n', l[1])
+		}
+	}
+	if !mudou {
+		return s, nil, false
+	}
+	t, mp := m.fim(len(s))
+	return t, mp, true
+}
+
+// ultimaAspa: a posição da última ocorrência não escapada de q em s (-1 se não há).
+func ultimaAspa(s, q string) int {
+	u := -1
+	for p := 0; p+len(q) <= len(s); {
+		switch {
+		case s[p] == '\\':
+			p += 2
+		case s[p:p+len(q)] == q:
+			u = p
+			p += len(q)
+		default:
+			p++
+		}
+	}
+	return u
 }

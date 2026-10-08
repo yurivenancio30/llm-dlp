@@ -116,10 +116,15 @@ func linhaCLI(s string, ini, fim int, add func(ObjAchado)) {
 			j++
 		}
 		a, b := i, j
+		b = semFechoSolto(s, a, b)
+		// lista de argumentos (["kubectl", "-n", "x"]) e chamada (exec.Command("kubectl", ...),
+		// ProcessBuilder("kubectl", ...)): o token é a string, sem o que abre a lista ou a chamada
+		if k := strings.LastIndexAny(s[a:b], "[("); k >= 0 && a+k+1 < b && (s[a+k+1] == '"' || s[a+k+1] == '\'') {
+			a += k + 1
+		}
 		if b-a >= 2 && (s[a] == '"' || s[a] == '\'') && s[b-1] == s[a] { // "valor" entre aspas
 			a, b = a+1, b-1
 		}
-		b = semFechoSolto(s, a, b)
 		toks = append(toks, tokenCLI{a, b})
 		i = j
 	}
