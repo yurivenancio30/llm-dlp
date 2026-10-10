@@ -1,4 +1,5 @@
 /bin/
+/dist/
 *.test
 *.out
 # nunca versionar dados locais do llm-dlp

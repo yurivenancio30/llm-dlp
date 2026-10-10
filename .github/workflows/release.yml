@@ -1,0 +1,34 @@
+name: release
+
+# Ao receber a tag vX.Y.Z (criada por "make release"): testa, compila os binários e publica a
+# release com as notas da seção X.Y.Z do CHANGELOG.md. Ver docs/versoes.md.
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: a tag é a versão do código
+        run: |
+          V="${GITHUB_REF_NAME#v}"
+          test "$V" = "$(make -s versao | cut -d' ' -f1)" || { echo "a tag $GITHUB_REF_NAME não bate com internal/versao/versao.go"; exit 1; }
+          echo "VERSAO=$V" >> "$GITHUB_ENV"
+      - name: testes
+        run: make test
+      - name: binários
+        run: make dist
+      - name: publica
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ./scripts/notas-da-versao.sh "$VERSAO" > notas.md
+          gh release create "$GITHUB_REF_NAME" dist/* --title "llm-dlp $VERSAO" --notes-file notas.md
