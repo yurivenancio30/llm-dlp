@@ -13,7 +13,7 @@ LLM_DLP_ESTRESSE=1 go test ./... -run Estresse -v -timeout 60m
 ```
 
 Versions and releasing: [versioning.md](versioning.md). How to contribute:
-[CONTRIBUTING.md](../CONTRIBUTING.md).
+[CONTRIBUTING.md](../.github/CONTRIBUTING.md).
 
 ## The code is in Portuguese
 
@@ -48,10 +48,10 @@ install.sh              installer: downloads the release binary and runs the set
 scripts/                release.sh and notas-da-versao.sh (used by make release)
 .github/workflows/      tests on every push (ci.yml) and release publishing (release.yml)
 docs/                   this documentation, in English
-docs/pt-BR/             the same documentation, in Portuguese
+docs/pt-BR/             the same documentation, in Portuguese (README.md included)
 CHANGELOG.md            what changed in each version
-CONTRIBUTING.md         how to contribute (commits, tests, documentation)
-SECURITY.md             how to report a vulnerability
+.github/CONTRIBUTING.md how to contribute (commits, tests, documentation)
+.github/SECURITY.md     how to report a vulnerability
 ```
 
 ### cmd/llm-dlp and internal/proxy

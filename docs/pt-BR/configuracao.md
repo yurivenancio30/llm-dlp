@@ -1,6 +1,6 @@
 # Configuração e comandos
 
-[← voltar ao README](../../README.pt-BR.md) · [English](../configuration.md)
+[← voltar ao README](README.md) · [English](../configuration.md)
 
 ## Configuração
 

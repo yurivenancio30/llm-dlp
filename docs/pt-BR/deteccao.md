@@ -1,6 +1,6 @@
 # O que é detectado
 
-[← voltar ao README](../../README.pt-BR.md) · [English](../detection.md)
+[← voltar ao README](README.md) · [English](../detection.md)
 
 São cinco jeitos de reconhecer um dado. Qualquer um basta.
 

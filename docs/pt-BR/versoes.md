@@ -1,6 +1,6 @@
 # Versões e lançamentos
 
-[← voltar ao README](../../README.pt-BR.md) · [English](../versioning.md)
+[← voltar ao README](README.md) · [English](../versioning.md)
 
 ## Como saber a versão
 

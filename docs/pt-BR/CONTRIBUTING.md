@@ -1,6 +1,6 @@
 # Como contribuir com o llm-dlp
 
-[English](../../CONTRIBUTING.md)
+[English](../../.github/CONTRIBUTING.md)
 
 Obrigado por ajudar. Esta página diz como o projeto é organizado e o que uma mudança precisa
 ter antes de entrar.
@@ -46,7 +46,7 @@ Vazar é pior do que mascarar a mais: **na dúvida, mascara**.
 |---|---|
 | Código: identificadores, comentários, nomes de comando, mensagens do programa | Português |
 | Mensagens de commit, pull requests, issues | Inglês |
-| Documentação | Inglês em `README.md` e `docs/`, português em `README.pt-BR.md` e `docs/pt-BR/`. Mude os dois no mesmo pull request |
+| Documentação | Inglês em `README.md` e `docs/`, português em `docs/pt-BR/`. Mude os dois no mesmo pull request |
 
 ## Commits
 

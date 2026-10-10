@@ -1,6 +1,6 @@
 # Contributing to llm-dlp
 
-[Português](docs/pt-BR/CONTRIBUTING.md)
+[Português](../docs/pt-BR/CONTRIBUTING.md)
 
 Thank you for helping. This page says how the project is organized and what a change needs
 before it is merged.
@@ -24,7 +24,7 @@ gofmt -l cmd internal   # must print nothing
 ```
 
 The code map, what each file family does and how the project was tested are in
-[docs/development.md](docs/development.md).
+[docs/development.md](../docs/development.md).
 
 ## The rule for masking changes
 
@@ -35,7 +35,7 @@ A leak is worse than masking too much: **when in doubt, mask**.
 - A rule that **leaves a name in the clear** needs a structural guarantee that the name is
   public (never "it looks public"), must fail closed, and needs a case in
   `internal/mask/casos_publicos_test.go`. The rules that were tried and rejected, and why,
-  are listed under "Public only with proof" in [docs/structures.md](docs/structures.md).
+  are listed under "Public only with proof" in [docs/structures.md](../docs/structures.md).
 - Compare before and after on the same texts: what the previous version masked and yours
   leaves in the clear is what matters most.
 - If the change costs time, run the benchmarks (`go test ./internal/mask -bench Frio`).
@@ -44,9 +44,9 @@ A leak is worse than masking too much: **when in doubt, mask**.
 
 | What | Language |
 |---|---|
-| Code: identifiers, comments, command names, program messages | Portuguese (there is a small glossary in [docs/development.md](docs/development.md#the-code-is-in-portuguese)) |
+| Code: identifiers, comments, command names, program messages | Portuguese (there is a small glossary in [docs/development.md](../docs/development.md#the-code-is-in-portuguese)) |
 | Commit messages, pull requests, issues | English |
-| Documentation | English in `README.md` and `docs/`, Portuguese in `README.pt-BR.md` and `docs/pt-BR/`. Change both in the same pull request |
+| Documentation | English in `README.md` and `docs/`, Portuguese in `docs/pt-BR/`. Change both in the same pull request |
 
 ## Commits
 
@@ -87,7 +87,7 @@ docs: explain what each field of the log means
 ## Releases
 
 Versions follow `MAJOR.MINOR.PATCH`. What each number means and the steps of a release are
-in [docs/versioning.md](docs/versioning.md).
+in [docs/versioning.md](../docs/versioning.md).
 
 ## Security
 

@@ -1,6 +1,6 @@
 # Segurança e limites
 
-[← voltar ao README](../../README.pt-BR.md) · [English](../security.md)
+[← voltar ao README](README.md) · [English](../security.md)
 
 Para relatar uma vulnerabilidade, veja [SECURITY.md](SECURITY.md).
 

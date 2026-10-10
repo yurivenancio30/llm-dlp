@@ -1,6 +1,6 @@
 # Para desenvolvedores
 
-[← voltar ao README](../../README.pt-BR.md) · [English](../development.md)
+[← voltar ao README](README.md) · [English](../development.md)
 
 ```bash
 make build   # binário estático em bin/llm-dlp
@@ -30,10 +30,10 @@ install.sh              instalador: baixa o binário da release e roda a configu
 scripts/                release.sh e notas-da-versao.sh (usados pelo make release)
 .github/workflows/      testes a cada envio (ci.yml) e publicação da release (release.yml)
 docs/                   a documentação em inglês
-docs/pt-BR/             esta documentação, em português
+docs/pt-BR/             esta documentação, em português (com o README)
 CHANGELOG.md            o que mudou em cada versão (em português: docs/pt-BR/CHANGELOG.md)
-CONTRIBUTING.md         como contribuir (commits, testes, documentação)
-SECURITY.md             como relatar uma vulnerabilidade
+.github/CONTRIBUTING.md como contribuir (commits, testes, documentação)
+.github/SECURITY.md     como relatar uma vulnerabilidade
 ```
 
 ### cmd/llm-dlp e internal/proxy

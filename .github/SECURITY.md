@@ -1,6 +1,6 @@
 # Security policy
 
-[Português](docs/pt-BR/SECURITY.md)
+[Português](../docs/pt-BR/SECURITY.md)
 
 ## Supported versions
 
@@ -35,7 +35,7 @@ reproduce a detection problem.
 
 ## What is already known
 
-The limits described in [docs/security.md](docs/security.md#known-limits) (for example, a
+The limits described in [docs/security.md](../docs/security.md#known-limits) (for example, a
 name that only appears in running text, or a program run by the agent that takes the data
 out) are documented behavior. Ideas to reduce them are welcome as ordinary issues, with
 invented data.

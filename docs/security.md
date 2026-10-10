@@ -2,7 +2,7 @@
 
 [← back to the README](../README.md) · [Português](pt-BR/seguranca.md)
 
-To report a vulnerability, see [SECURITY.md](../SECURITY.md).
+To report a vulnerability, see [SECURITY.md](../.github/SECURITY.md).
 
 **What it protects:**
 

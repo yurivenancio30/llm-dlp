@@ -1,6 +1,6 @@
 # Estruturas: onde ficam nomes de objetos em cada formato
 
-[← voltar ao README](../../README.pt-BR.md) · [English](../structures.md)
+[← voltar ao README](README.md) · [English](../structures.md)
 
 Este documento é a base dos **leitores de estrutura** do llm-dlp: as regras que reconhecem, pela
 gramática de cada formato, onde há um nome de servidor, banco, schema, tabela, coluna,

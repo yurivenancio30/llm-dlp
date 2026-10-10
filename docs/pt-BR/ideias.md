@@ -1,6 +1,6 @@
 # Ideias para depois
 
-[← voltar ao README](../../README.pt-BR.md) · [English](../ideas.md)
+[← voltar ao README](README.md) · [English](../ideas.md)
 
 Uma linha por ideia: o que foi visto e ainda não foi feito. Nada aqui é promessa.
 

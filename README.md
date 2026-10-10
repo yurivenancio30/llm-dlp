@@ -4,7 +4,7 @@
 [![release](https://img.shields.io/github/v/release/yurivenancio30/llm-dlp)](https://github.com/yurivenancio30/llm-dlp/releases/latest)
 [![license](https://img.shields.io/github/license/yurivenancio30/llm-dlp)](LICENSE)
 
-**English** · [Português](README.pt-BR.md)
+**English** · [Português](docs/pt-BR/README.md)
 
 A local proxy that **masks sensitive data between you and the LLM**. Today it works with
 Claude Code.
@@ -162,7 +162,7 @@ goes down.
 | [Structures](docs/structures.md) | The research behind the structure rules: where internal resource names live in each format, and the rules for when a name is public |
 | [Versions and releases](docs/versioning.md) | What each version number means, what a release contains and how to make one |
 | [Changes](CHANGELOG.md) | What changed in each version |
-| [Contributing](CONTRIBUTING.md) · [Security policy](SECURITY.md) | How to contribute and how to report a vulnerability |
+| [Contributing](.github/CONTRIBUTING.md) · [Security policy](.github/SECURITY.md) | How to contribute and how to report a vulnerability |
 
 ## License
 

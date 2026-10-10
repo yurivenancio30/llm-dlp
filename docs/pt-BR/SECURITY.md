@@ -1,6 +1,6 @@
 # Política de segurança
 
-[English](../../SECURITY.md)
+[English](../../.github/SECURITY.md)
 
 ## Versões com suporte
 

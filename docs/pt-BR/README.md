@@ -2,9 +2,9 @@
 
 [![ci](https://github.com/yurivenancio30/llm-dlp/actions/workflows/ci.yml/badge.svg)](https://github.com/yurivenancio30/llm-dlp/actions/workflows/ci.yml)
 [![release](https://img.shields.io/github/v/release/yurivenancio30/llm-dlp)](https://github.com/yurivenancio30/llm-dlp/releases/latest)
-[![license](https://img.shields.io/github/license/yurivenancio30/llm-dlp)](LICENSE)
+[![license](https://img.shields.io/github/license/yurivenancio30/llm-dlp)](../../LICENSE)
 
-[English](README.md) · **Português**
+[English](../../README.md) · **Português**
 
 Proxy local que **mascara dado sensível entre você e a LLM**. Hoje funciona com o Claude Code.
 
@@ -59,7 +59,7 @@ instalar o Go:
 curl -fsSL https://raw.githubusercontent.com/yurivenancio30/llm-dlp/main/install.sh | sh
 ```
 
-O [script](install.sh) baixa o binário da versão mais recente para a sua máquina (amd64 ou
+O [script](../../install.sh) baixa o binário da versão mais recente para a sua máquina (amd64 ou
 arm64), confere a soma SHA-256 com a publicada na release e roda o `llm-dlp instalar`.
 
 <details>
@@ -122,7 +122,7 @@ Depois, feche e abra o Claude Code (no VS Code, recarregue a janela).
    trocado quando o processo antigo para.
 3. Abra o Claude Code e confira com `llm-dlp status`.
 
-O que mudou em cada versão está no [CHANGELOG.md](docs/pt-BR/CHANGELOG.md). Depois de
+O que mudou em cada versão está no [CHANGELOG.md](CHANGELOG.md). Depois de
 atualizar, a primeira mensagem de cada conversa regrava o cache da API uma vez.
 
 ## No dia a dia
@@ -132,7 +132,7 @@ Não há nada para rodar. O llm-dlp sobe ao abrir uma sessão e volta sozinho se
 | Situação | O que acontece / o que fazer |
 |---|---|
 | Quero ver se está tudo certo | `llm-dlp status` |
-| Quero saber qual versão tenho | `llm-dlp versao` (o que mudou em cada uma: [CHANGELOG.md](docs/pt-BR/CHANGELOG.md)) |
+| Quero saber qual versão tenho | `llm-dlp versao` (o que mudou em cada uma: [CHANGELOG.md](CHANGELOG.md)) |
 | O llm-dlp caiu | Volta sozinho em ~1 s. Enquanto estiver fora, nenhuma mensagem sai |
 | Ele não volta, e preciso do Claude para consertar | `sudo llm-dlp emergencia 30m` libera o Claude **sem máscara** por tempo limitado. Use uma sessão nova, sem dados de cliente. Volta ao normal no fim do prazo, ou com `sudo llm-dlp emergencia sair`. Cada mensagem mostra um aviso |
 | Imagem ou PDF bloqueado | Falta o OCR: a mensagem de erro traz o comando de instalação |
@@ -144,20 +144,20 @@ Não há nada para rodar. O llm-dlp sobe ao abrir uma sessão e volta sozinho se
 
 | Documento | O que tem |
 |---|---|
-| [Como funciona](docs/pt-BR/como-funciona.md) | O caminho de uma mensagem, os pseudônimos, o que é lembrado, falha fechada, imagens, desempenho e quanto usa da máquina |
-| [O que é detectado](docs/pt-BR/deteccao.md) | Os jeitos de reconhecer um dado e como ensinar pessoas e nomes de campo da sua empresa |
-| [Configuração e comandos](docs/pt-BR/configuracao.md) | Todos os campos do `config.json` e todos os comandos |
-| [Segurança e limites](docs/pt-BR/seguranca.md) | O que protege, o que não protege e o que passa sem máscara |
-| [Política](docs/pt-BR/politica.md) | Os quatro níveis de informação, o que o llm-dlp faz com cada um, as referências (LGPD, MITRE ATT&CK, CWE, NIST) e o limite declarado sobre código e regras de negócio |
-| [Para desenvolvedores](docs/pt-BR/desenvolvimento.md) | Mapa do código, o que fica guardado em memória e em disco, como acoplar outra API de LLM, como acrescentar um detector, como foi testado |
-| [Estruturas](docs/pt-BR/estruturas.md) | A pesquisa por trás das regras de estrutura: onde ficam os nomes de recursos internos em cada formato, e as regras de quando um nome é público |
-| [Versões e lançamentos](docs/pt-BR/versoes.md) | O que cada número da versão significa, o que vem numa release e como lançar uma |
-| [Mudanças](docs/pt-BR/CHANGELOG.md) | O que mudou em cada versão |
-| [Como contribuir](docs/pt-BR/CONTRIBUTING.md) · [Política de segurança](docs/pt-BR/SECURITY.md) | Como contribuir e como relatar uma vulnerabilidade |
+| [Como funciona](como-funciona.md) | O caminho de uma mensagem, os pseudônimos, o que é lembrado, falha fechada, imagens, desempenho e quanto usa da máquina |
+| [O que é detectado](deteccao.md) | Os jeitos de reconhecer um dado e como ensinar pessoas e nomes de campo da sua empresa |
+| [Configuração e comandos](configuracao.md) | Todos os campos do `config.json` e todos os comandos |
+| [Segurança e limites](seguranca.md) | O que protege, o que não protege e o que passa sem máscara |
+| [Política](politica.md) | Os quatro níveis de informação, o que o llm-dlp faz com cada um, as referências (LGPD, MITRE ATT&CK, CWE, NIST) e o limite declarado sobre código e regras de negócio |
+| [Para desenvolvedores](desenvolvimento.md) | Mapa do código, o que fica guardado em memória e em disco, como acoplar outra API de LLM, como acrescentar um detector, como foi testado |
+| [Estruturas](estruturas.md) | A pesquisa por trás das regras de estrutura: onde ficam os nomes de recursos internos em cada formato, e as regras de quando um nome é público |
+| [Versões e lançamentos](versoes.md) | O que cada número da versão significa, o que vem numa release e como lançar uma |
+| [Mudanças](CHANGELOG.md) | O que mudou em cada versão |
+| [Como contribuir](CONTRIBUTING.md) · [Política de segurança](SECURITY.md) | Como contribuir e como relatar uma vulnerabilidade |
 
 ## Licença
 
-MIT. Ver [LICENSE](LICENSE).
+MIT. Ver [LICENSE](../../LICENSE).
 
 Os arquivos de dados `internal/mask/dados/palavras_comuns.txt` e `palavras_dicionario.txt` são
 adaptações das listas de frequência do [FrequencyWords](https://github.com/hermitdave/FrequencyWords),

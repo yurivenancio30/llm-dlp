@@ -9,6 +9,13 @@ In each version: **Masking** is what started (or stopped) being masked; **Progra
 commands, installation, configuration, performance and documentation; **Code** is what only
 matters to whoever changes the code.
 
+## [Unreleased]
+
+### Program
+
+- Fewer files at the root of the repository: `CONTRIBUTING.md` and `SECURITY.md` moved to
+  `.github/` (GitHub still shows them), and the Portuguese README to `docs/pt-BR/README.md`.
+
 ## [0.2.1] - 2026-10-10
 
 Installation with one command and releases packaged the way large projects do it. Nothing

@@ -33,7 +33,7 @@ archives:
     files:
       - LICENSE
       - README.md
-      - README.pt-BR.md
+      - docs/pt-BR/README.md
       - CHANGELOG.md
 
 checksum:

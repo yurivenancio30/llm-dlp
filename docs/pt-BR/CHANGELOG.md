@@ -9,6 +9,14 @@ Em cada versão: **Mascaramento** é o que passou a ser (ou deixou de ser) masca
 **Programa** é comando, instalação, configuração, desempenho e documentação; **Código** é o
 que só interessa a quem mexe no código.
 
+## [Não lançado]
+
+### Programa
+
+- Menos arquivos na raiz do repositório: `CONTRIBUTING.md` e `SECURITY.md` foram para
+  `.github/` (o GitHub continua mostrando os dois), e o README em português para
+  `docs/pt-BR/README.md`.
+
 ## [0.2.1] - 2026-10-10
 
 Instalação com um comando e releases empacotadas como os projetos grandes fazem. Nada muda no
