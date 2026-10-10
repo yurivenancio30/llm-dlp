@@ -55,13 +55,25 @@ do Claude Code e o supervisor.
 Instalar o binário novo não troca o que está no ar: o processo antigo continua rodando até
 ser parado.
 
-1. Compile e instale (o anterior fica guardado):
+1. Instale o binário novo (guarde o anterior, se quiser poder voltar):
 
    ```bash
-   make build
    cp ~/.local/bin/llm-dlp ~/.local/bin/llm-dlp.bak-$(date +%Y%m%d-%H%M%S)
-   install -m 755 bin/llm-dlp ~/.local/bin/llm-dlp.new && mv ~/.local/bin/llm-dlp.new ~/.local/bin/llm-dlp
-   ~/.local/bin/llm-dlp versao        # mostra o commit novo
+   ```
+
+   Com o binário da release (o caminho comum; os comandos de download estão no
+   [README](../README.md#instalação)):
+
+   ```bash
+   ./llm-dlp instalar                 # troca o programa e pula o que já está pronto
+   ~/.local/bin/llm-dlp versao        # mostra a versão e o commit novos
+   ```
+
+   Ou compilando do código:
+
+   ```bash
+   make instalar
+   ~/.local/bin/llm-dlp versao
    ```
 
 2. **Feche o Claude Code** (todas as janelas e sessões) e, num terminal, rode

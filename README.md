@@ -23,6 +23,16 @@ você lê:        verifique se maria.lopes@empresa.com.br tem permissão em mysq
 
 - **Mascara tudo que vai para a API:** o que você digita, arquivos lidos, saída de comandos,
   dados de MCP, subagentes, anexos e até o título da sessão.
+- **Mascara três tipos de dado:**
+  - dado pessoal (CPF, CNPJ, e-mail, telefone, nome de pessoa, endereço, cartão);
+  - segredo (senha, token, chave de API);
+  - nome que identifica a empresa ou o cliente: servidor, banco, schema, tabela, coluna,
+    serviço, bucket, fila, usuário, pasta, função num traceback. São reconhecidos
+    pela estrutura do texto (SQL, YAML, JSON, `.env`, strings de conexão, Kubernetes,
+    Terraform, código, saída de comando), sem lista por cliente.
+- **Deixa legível o que é público:** `postgres`, `redis`, `my-bucket`, `org.apache.kafka`, a
+  linha do `pandas` num traceback. Um nome só fica em claro com prova de que é público; na
+  dúvida, é mascarado.
 - **Desmascara tudo que volta:** você lê os valores reais; comandos rodam e arquivos são
   gravados com os valores reais.
 - **Mantém a referência:** o mesmo valor vira sempre o mesmo pseudônimo, então o modelo
@@ -36,19 +46,38 @@ você lê:        verifique se maria.lopes@empresa.com.br tem permissão em mysq
 
 ## Instalação
 
-Funciona em qualquer Linux, inclusive WSL no Windows. No macOS compila, mas ainda não foi
-testado por completo.
-
-Compilando (precisa do [Go](https://go.dev/dl/)):
+Funciona em qualquer Linux, inclusive WSL no Windows. Não precisa clonar o repositório nem
+instalar o Go: baixe o binário da versão mais recente e rode o `instalar`.
 
 ```bash
-git clone git@github.com:yurivenancio30/llm-dlp.git && cd llm-dlp && make build
+arq=$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')
+url=$(curl -s https://api.github.com/repos/yurivenancio30/llm-dlp/releases/latest | grep -o "https://[^\"]*linux_$arq")
+curl -L -o llm-dlp "$url" && chmod +x llm-dlp
+./llm-dlp instalar
+```
+
+As duas primeiras linhas descobrem a sua máquina (amd64 ou arm64) e o endereço da versão mais
+recente. Se preferir baixar pelo navegador, os arquivos e as somas SHA-256 estão na página de
+[Releases](https://github.com/yurivenancio30/llm-dlp/releases).
+
+<details>
+<summary>Outras formas: compilar do código, macOS, conferir o download</summary>
+
+**Compilar do código** (precisa do [Go](https://go.dev/dl/)). É o caminho no macOS, onde
+compila mas ainda não foi testado por completo, e para quem vai mexer no código:
+
+```bash
+git clone https://github.com/yurivenancio30/llm-dlp.git && cd llm-dlp && make build
 ./bin/llm-dlp instalar
 ```
 
-Ou com o binário pronto: cada versão publicada tem os binários de Linux (amd64 e arm64) e as
-somas SHA-256 na página de [Releases](https://github.com/yurivenancio30/llm-dlp/releases).
-Baixe o da sua máquina, dê permissão de execução (`chmod +x`) e rode `./llm-dlp_... instalar`.
+**Conferir o download** com a soma publicada na release:
+
+```bash
+curl -sL "${url%/*}/SHA256SUMS" | grep "$(sha256sum llm-dlp | cut -c1-64)" && echo confere
+```
+
+</details>
 
 O `instalar` faz tudo, em 5 passos, perguntando o que precisa:
 
@@ -64,6 +93,17 @@ No fim, ele mostra um resumo com ✓ e ✗. Se algo ficar com ✗, é só rodar
 `llm-dlp instalar` de novo: ele pula o que já está pronto.
 
 Depois, feche e abra o Claude Code (no VS Code, recarregue a janela).
+
+### Atualizar para uma versão nova
+
+1. Baixe o binário novo com os mesmos comandos de cima e rode `./llm-dlp instalar`. Ele troca
+   o programa e pula o que já está pronto; a sua configuração e a sua chave não mudam.
+2. Feche o Claude Code (todas as janelas) e rode `llm-dlp parar`. O que está no ar só é
+   trocado quando o processo antigo para.
+3. Abra o Claude Code e confira com `llm-dlp status`.
+
+O que mudou em cada versão está no [CHANGELOG.md](CHANGELOG.md). Depois de atualizar, a
+primeira mensagem de cada conversa regrava o cache da API uma vez.
 
 ## No dia a dia
 
