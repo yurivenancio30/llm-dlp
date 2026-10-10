@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// Leitor de traceback (ver docs/estruturas.md, seção Público só com prova). Num erro, cada linha
+// Leitor de traceback (ver docs/pt-BR/estruturas.md, seção Público só com prova). Num erro, cada linha
 // do traceback diz de onde veio, como os caminhos de include de um compilador separam o cabeçalho
 // do sistema do cabeçalho do projeto: a linha que aponta para uma dependência ou para a
 // biblioteca padrão (site-packages, node_modules, go/pkg/mod, .m2, /usr/lib/python3.x, o runtime

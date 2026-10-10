@@ -5,7 +5,7 @@ import (
 )
 
 // Pacotes internos: módulo do go.mod, groupId do Maven/Gradle e escopo do npm (ver
-// docs/estruturas.md, seção Repositórios, pacotes e caminhos).
+// docs/pt-BR/estruturas.md, seção Repositórios, pacotes e caminhos).
 
 func acharPacotes(s string, add func(ObjAchado)) {
 	if strings.Contains(s, "module ") {

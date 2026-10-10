@@ -1,6 +1,6 @@
 # Configuração e comandos
 
-[← voltar ao README](../README.md)
+[← voltar ao README](../../README.pt-BR.md) · [English](../configuration.md)
 
 ## Configuração
 
@@ -61,11 +61,11 @@ ser parado.
    cp ~/.local/bin/llm-dlp ~/.local/bin/llm-dlp.bak-$(date +%Y%m%d-%H%M%S)
    ```
 
-   Com o binário da release (o caminho comum; os comandos de download estão no
-   [README](../README.md#instalação)):
+   Com o binário da release (o caminho comum), rode o instalador de novo; ele troca o
+   programa e pula o que já está pronto:
 
    ```bash
-   ./llm-dlp instalar                 # troca o programa e pula o que já está pronto
+   curl -fsSL https://raw.githubusercontent.com/yurivenancio30/llm-dlp/main/install.sh | sh
    ~/.local/bin/llm-dlp versao        # mostra a versão e o commit novos
    ```
 

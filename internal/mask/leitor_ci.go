@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// Pipelines de CI: runners, ambientes e o Jenkinsfile (ver docs/estruturas.md, Pipelines de CI).
+// Pipelines de CI: runners, ambientes e o Jenkinsfile (ver docs/pt-BR/estruturas.md, Pipelines de CI).
 
 // regraCI: GitHub Actions, GitLab CI, Azure Pipelines.
 func regraCI(s string, ents []yEnt, e *yEnt, v string, filho func(int, string) *yEnt, add func(ObjAchado)) {

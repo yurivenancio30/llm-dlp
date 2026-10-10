@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// Listas homogêneas (ver docs/estruturas.md, seção Saídas soltas de script e de shell): numa
+// Listas homogêneas (ver docs/pt-BR/estruturas.md, seção Saídas soltas de script e de shell): numa
 // lista de nomes, se pelo menos metade dos itens já são nomes de um mesmo tipo (aprendidos
 // antes ou achados pelos leitores neste texto), os outros itens com cara de identificador são
 // do mesmo tipo. Não é um leitor: depende do que já se sabe, e por isso roda depois dos

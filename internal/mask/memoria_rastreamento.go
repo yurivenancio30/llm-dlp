@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// Rastreamento (ver docs/estruturas.md): cada nome do cliente é decidido onde ENTRA na conversa
+// Rastreamento (ver docs/pt-BR/estruturas.md): cada nome do cliente é decidido onde ENTRA na conversa
 // e, a partir daí, é mascarado em todo lugar. Três regras:
 //
 //  1. Entrada: só os dados (saída de comando, arquivo lido) e o texto do usuário trazem nome do

@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// Decisor das saídas de comando e das entradas de tool_use (ver chamada.go e docs/estruturas.md):
+// Decisor das saídas de comando e das entradas de tool_use (ver chamada.go e docs/pt-BR/estruturas.md):
 //
 //   - B1 proveniência: palavra da saída que está no programa (o comando ou o script) não veio
 //     dos dados e nunca é decidida aqui;

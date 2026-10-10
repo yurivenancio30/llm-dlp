@@ -6,7 +6,7 @@ import (
 	"unicode"
 )
 
-// Referência pública derivada (ver docs/estruturas.md). Dois arquivos de dados
+// Referência pública derivada (ver docs/pt-BR/estruturas.md). Dois arquivos de dados
 // GERADOS por medição no material público da máquina (TestGerarRefPublica, em
 // vocab_gerar_test.go), nunca escritos à mão. O cabeçalho de cada um diz de onde, quando
 // e com que critério foi gerado.

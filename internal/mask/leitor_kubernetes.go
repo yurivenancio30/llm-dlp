@@ -6,7 +6,7 @@ import (
 )
 
 // Kubernetes, Helm e contêineres: manifestos, kubeconfig, imagens de registro privado, nome
-// DNS de serviço e variável de ambiente em lista (ver docs/estruturas.md).
+// DNS de serviço e variável de ambiente em lista (ver docs/pt-BR/estruturas.md).
 
 // registros públicos: no Docker Hub, ghcr.io, quay.io e public.ecr.aws qualquer um publica (a
 // organização pode ser do cliente, ver caminhoPublico); nos de fornecedor (registrosFornecedor)

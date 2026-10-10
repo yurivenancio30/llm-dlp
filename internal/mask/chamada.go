@@ -8,7 +8,7 @@ import (
 	"unicode/utf8"
 )
 
-// O que o proxy sabe de uma chamada de ferramenta (ver docs/estruturas.md, seções
+// O que o proxy sabe de uma chamada de ferramenta (ver docs/pt-BR/estruturas.md, seções
 // Proveniência, Identidade e Eco). Nenhuma regra é por ferramenta: tudo vem da gramática do
 // pedido (verbo de enumeração + substantivo), da proveniência das palavras (o programa que o
 // modelo escreveu x os dados que a saída trouxe) e da ordem da conversa (eco).

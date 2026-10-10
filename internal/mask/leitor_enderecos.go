@@ -2,7 +2,7 @@ package mask
 
 import "strings"
 
-// Endereços (ver docs/estruturas.md): host interno, armazenamento e filas em URLs, remoto do
+// Endereços (ver docs/pt-BR/estruturas.md): host interno, armazenamento e filas em URLs, remoto do
 // git, pasta pessoal (/home/u, C:\Users\u) e usuário de rede (DOMÍNIO\usuário). No começo, as
 // regras de domínio que os outros leitores de desenvolvimento também usam (chave-valor,
 // pacotes, caminhos, nuvem).

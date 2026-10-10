@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// Leitor de esquema (ver docs/estruturas.md, seção Esquemas): onde um nome vem com um tipo de
+// Leitor de esquema (ver docs/pt-BR/estruturas.md, seção Esquemas): onde um nome vem com um tipo de
 // dado ao lado, o nome é coluna. Nenhum leitor existente lê essa forma (não é chave-valor de
 // configuração, não é SQL, não é tabela): "nome    int64" por linha (dtypes), Index([...])
 // de colunas, " |-- nome: string" (printSchema), "nome: int64" por linha no começo da linha

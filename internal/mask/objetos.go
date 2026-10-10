@@ -13,7 +13,7 @@ import (
 
 // Objetos: nomes de recursos internos (servidor, banco, schema, tabela, coluna, procedure,
 // índice, usuário, namespace, serviço, bucket, fila), reconhecidos pela estrutura do conteúdo
-// (ver docs/estruturas.md). Este arquivo é a base comum: tipos, pseudônimo, aprendizado com
+// (ver docs/pt-BR/estruturas.md). Este arquivo é a base comum: tipos, pseudônimo, aprendizado com
 // freios e liga/desliga por tipo. Os leitores de cada formato entregam os achados por
 // m.leitores.
 

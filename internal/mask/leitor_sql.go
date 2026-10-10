@@ -8,7 +8,7 @@ import (
 	"unicode/utf8"
 )
 
-// Leitor de SQL e DDL (ver docs/estruturas.md, seção SQL e DDL). Uma instrução só vale se tiver
+// Leitor de SQL e DDL (ver docs/pt-BR/estruturas.md, seção SQL e DDL). Uma instrução só vale se tiver
 // a forma mínima da gramática (SELECT ... FROM x, INSERT INTO x, CREATE TABLE x...). Dentro
 // dela, o nome depois de FROM, JOIN, INTO, UPDATE, TABLE, VIEW, PROCEDURE, DATABASE, SCHEMA,
 // INDEX... é objeto (tabela, procedure, banco, schema, índice), com as partes de um nome

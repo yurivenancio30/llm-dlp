@@ -6,7 +6,7 @@ import (
 	"unicode"
 )
 
-// Leitor de chave-valor genérico (ver docs/estruturas.md, seção JSON, YAML, TOML, INI, .env,
+// Leitor de chave-valor genérico (ver docs/pt-BR/estruturas.md, seção JSON, YAML, TOML, INI, .env,
 // .properties, XML): o valor de uma chave cujo ÚLTIMO pedaço do nome diz o que ele é
 // ("host", "db_host", "spring.datasource.username", "bootstrap.servers"). Vale para
 // "chave: valor" (YAML, .properties, JSON com aspas), "chave=valor" (INI, TOML, .env,

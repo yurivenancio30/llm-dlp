@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// Leitores de conexão (ver docs/estruturas.md, seção Strings de conexão e endereços): strings
+// Leitores de conexão (ver docs/pt-BR/estruturas.md, seção Strings de conexão e endereços): strings
 // de conexão ODBC/ADO.NET/JDBC, DSN do libpq, URIs de banco, tnsnames.ora, URNs do DataHub e
 // as referências do dbt e do Airflow. Só padrões estáveis (especificação de cada formato).
 

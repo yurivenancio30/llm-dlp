@@ -405,7 +405,7 @@ func tipoDeCampoGo(l string) string {
 
 // Software público (TestGerarSoftwarePublico): os repositórios públicos populares do GitHub,
 // numa lista JSONL ({"r": "dono/nome", "s": estrelas}) baixada com a busca da API (gh api
-// search/repositories, fatiada por faixa de estrelas; ver docs/estruturas.md). Grava:
+// search/repositories, fatiada por faixa de estrelas; ver docs/pt-BR/estruturas.md). Grava:
 //   - software_publico.txt: o nome de cada repositório com pelo menos minEstrelasSoftware
 //     estrelas (airflow, datahub, minio, kube-rbac-proxy), normalizado (normSoftware);
 //   - fornecedores.txt: o dono de cada um (apache, bitnami, confluentinc, grafana), normalizado.

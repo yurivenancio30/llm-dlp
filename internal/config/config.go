@@ -64,7 +64,7 @@ type Config struct {
 	FerramentasSemDesmascarar []string `json:"ferramentas_sem_desmascarar"`
 
 	// Nomes de recursos internos (servidor, banco, schema, tabela, coluna...), reconhecidos
-	// pela estrutura do conteúdo. Ver docs/configuracao.md.
+	// pela estrutura do conteúdo. Ver docs/pt-BR/configuracao.md.
 	Objetos Objetos `json:"objetos"`
 }
 

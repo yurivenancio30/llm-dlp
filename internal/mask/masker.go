@@ -18,7 +18,7 @@ import (
 )
 
 // Masker: o objeto que mascara. Este arquivo tem os tipos e a construção; cada etapa está
-// num arquivo próprio (ver o mapa do código em docs/desenvolvimento.md).
+// num arquivo próprio (ver o mapa do código em docs/pt-BR/desenvolvimento.md).
 
 // Achado é um trecho sensível encontrado num texto.
 type Achado struct {
@@ -45,7 +45,7 @@ type resultado struct {
 //
 // Os campos vêm em três grupos: o que é fixo depois da construção (configuração e regras), o
 // que o Masker lembra (cada memória com o seu teto; a tabela completa está em
-// docs/desenvolvimento.md, "O que fica guardado") e os caches.
+// docs/pt-BR/desenvolvimento.md, "O que fica guardado") e os caches.
 type Masker struct {
 	// ---- fixo depois da construção ----
 	cfg      config.Config

@@ -1,5 +1,7 @@
 # Estruturas: onde ficam nomes de objetos em cada formato
 
+[← voltar ao README](../../README.pt-BR.md) · [English](../structures.md)
+
 Este documento é a base dos **leitores de estrutura** do llm-dlp: as regras que reconhecem, pela
 gramática de cada formato, onde há um nome de servidor, banco, schema, tabela, coluna,
 procedure, usuário, namespace, bucket ou fila, e o que nunca deve ser mascarado (palavras
@@ -20,7 +22,9 @@ Cada seção traz, nesta ordem: sinais de detecção, tabela "posição → enti
 público, regras de identificador, exemplos antes/depois (dados fictícios), casos difíceis e
 limites, e links.
 
-**Situação:** pesquisa; nada disto está implementado ainda. Os pontos da 1ª fase foram
+**Situação:** este documento começou como a pesquisa que veio antes das regras, e partes dele
+ainda descrevem o plano, não o código. Onde uma seção diz "Como está implementado" ou "O que está
+implementado", é o que o código faz hoje. Os pontos da 1ª fase foram
 conferidos (ver [Conferência](#conferência-dos-pontos-verificar-da-1ª-fase)). Os que restam marcados `[VERIFICAR]` são das fases seguintes e não
 foram confirmados na página oficial e precisam ser conferidos antes de virar regra. Também
 precisam de conferência, embora não estejam marcados: na seção de chave-valor, as listas de
@@ -1428,14 +1432,14 @@ Caminhos em notação do OpenAPI (`[]` = qualquer item da lista). `PodSpec` apar
 | kubeconfig: `contexts[].context.namespace` | `NS_` | — |
 | kubeconfig: `clusters[].cluster.server` | host da URL → `HOST_` | esquema, porta e caminho ficam |
 | nome DNS `<svc>.<ns>.svc.cluster.local` (em qualquer texto) | `SVC_` + `NS_` | o sufixo fica; o rótulo antes do serviço (pod de StatefulSet) fica |
+| `kubectl get`: colunas `NAME`, `NAMESPACE`, `NODE`, `NOMINATED NODE` | conforme o recurso pedido | `READY`, `STATUS`, `AGE`, `TYPE` ficam |
+| `docker ps`: `NAMES`, `IMAGE` | `CTR_`, `IMG_` | `CONTAINER ID` é hash: fica ou vira `ID_` |
 
 Na implementação os tipos acima caem nas entidades da base: `metadata.name` de `Namespace` → namespace,
 de `ServiceAccount` → usuário, dos outros `kind` → serviço; `SECRET_`, `CM_`, `PVC_`, `SA_` → serviço/usuário;
 `IMG_` → registro como servidor e cada pedaço do caminho como serviço (a tag e o digest ficam). O
 manifesto só é reconhecido com `apiVersion` (na forma `grupo/vN`) e `kind` no mesmo objeto; dentro de
 `{{ }}` nada é tocado.
-| `kubectl get`: colunas `NAME`, `NAMESPACE`, `NODE`, `NOMINATED NODE` | conforme o recurso pedido | `READY`, `STATUS`, `AGE`, `TYPE` ficam |
-| `docker ps`: `NAMES`, `IMAGE` | `CTR_`, `IMG_` | `CONTAINER ID` é hash: fica ou vira `ID_` |
 
 ### 3. Vocabulário público (o que nunca se mascara)
 
@@ -2992,6 +2996,37 @@ Comprehend PII não tem tipo para host, database, tabela ou coluna (tem `USERNAM
 - SemVer (regex de versão): https://semver.org/ [DOC ✓] — não consultado nesta rodada
 
 
+### 8. O que está implementado
+
+A reserva de chave-valor é o leitor `chave-valor` (ver a seção JSON, YAML, TOML..., §8). Além
+dele, dois leitores genéricos sem formato:
+
+**Host interno em URL e endereço solto** (leitor `endereço`, regras `url-interna` e
+`host-interno`). Em `http(s)://`, `ws(s)://`, `grpc://`, `ftp://`, `redis://`... (qualquer
+esquema que não seja de banco, armazenamento, fila ou git), o host é servidor **forte** quando é
+interno: rótulo único sem ponto (`http://wiki-interna/`) ou terminado em `.local` (RFC 6762),
+`.internal` (reserva da ICANN, 2024), `.home.arpa` (RFC 8375), `.svc`/`.cluster.local` (DNS do
+Kubernetes), `.intra`, `.intranet`, `.interno`, `.corp`, `.lan`, `.localdomain`. O usuário antes do
+`@` também. Domínio público fica (os do cliente vão em `dominios_internos`). Fora de URL, um nome
+com esses sufixos (`db01.corp:5432`, `redis.vendas.svc.cluster.local`) também é servidor, se tiver
+dígito ou hífen, ou dois rótulos antes do sufixo, e não for atributo de código (`threading.local()`)
+nem pacote Java (`org.foo.internal`).
+
+**Termo cadastrado dentro de um identificador** (leitor `termo-embutido`, ligado quando há
+`termos` de uma palavra só). O detector de termos troca a palavra inteira; este troca o
+identificador com cara de identificador que tem o termo como pedaço inteiro (separado por
+`_ . -` ou camelCase): termo `acmex` pega `acmex_pedidos`, `dbAcmexVendas01`, `svc-acmex-carga`,
+mas não `acmexvendas` nem `macmex_x`. O tipo vem da posição (depois de `FROM`/`JOIN` → tabela,
+de `DATABASE`/`USE` → database, valor de chave conhecida → a entidade da chave, host de URL →
+servidor); sem posição, servico. Sempre forte.
+
+| Regra | Pega | Forte? |
+|---|---|---|
+| `url-interna` | host interno em URL; usuário da URL | sim |
+| `host-interno` | `nome.sufixo-interno` fora de URL | sim |
+| `termo-embutido` | identificador com um termo cadastrado como pedaço | sim |
+
+
 ## Pipelines de CI
 
 Num pipeline quase tudo é vocabulário da ferramenta (chaves, ações públicas, rótulos de runner
@@ -3065,36 +3100,28 @@ jobs:                                            jobs:
 pipeline {                                         pipeline {
   agent { label 'agente-build-x6' }                  agent { label 'svc_...' }   // HOST
   ...                                                ...
+}                                                  }
+```
 
-### 8. O que está implementado
+### 6. Casos difíceis e limites
 
-A reserva de chave-valor é o leitor `chave-valor` (ver a seção JSON, YAML, TOML..., §8). Além
-dele, dois leitores genéricos sem formato:
+- **Matriz e expressões.** `runs-on: ${{ matrix.os }}` não tem valor literal: fica.
+- **Runner com nome genérico** (`build`, `linux-grande`): mascarado no lugar, não propaga (não tem
+  cara de identificador ou é evidência fraca).
+- **Ações de terceiros** (`uses: org/acao@v1`) e `include:` do GitLab apontam para repositórios; ficam
+  com as regras de URL/repositório, não com estas.
+- **Variáveis de ambiente** (`env:`, `variables:`) são chave-valor comum (reserva genérica).
+- **Jenkins scripted** com lógica Groovy arbitrária: só `node('x')` e `docker.image('x')` são estáveis.
 
-**Host interno em URL e endereço solto** (leitor `endereço`, regras `url-interna` e
-`host-interno`). Em `http(s)://`, `ws(s)://`, `grpc://`, `ftp://`, `redis://`... (qualquer
-esquema que não seja de banco, armazenamento, fila ou git), o host é servidor **forte** quando é
-interno: rótulo único sem ponto (`http://wiki-interna/`) ou terminado em `.local` (RFC 6762),
-`.internal` (reserva da ICANN, 2024), `.home.arpa` (RFC 8375), `.svc`/`.cluster.local` (DNS do
-Kubernetes), `.intra`, `.intranet`, `.interno`, `.corp`, `.lan`, `.localdomain`. O usuário antes do
-`@` também. Domínio público fica (os do cliente vão em `dominios_internos`). Fora de URL, um nome
-com esses sufixos (`db01.corp:5432`, `redis.vendas.svc.cluster.local`) também é servidor, se tiver
-dígito ou hífen, ou dois rótulos antes do sufixo, e não for atributo de código (`threading.local()`)
-nem pacote Java (`org.foo.internal`).
+### 7. Links usados
 
-**Termo cadastrado dentro de um identificador** (leitor `termo-embutido`, ligado quando há
-`termos` de uma palavra só). O detector de termos troca a palavra inteira; este troca o
-identificador com cara de identificador que tem o termo como pedaço inteiro (separado por
-`_ . -` ou camelCase): termo `acmex` pega `acmex_pedidos`, `dbAcmexVendas01`, `svc-acmex-carga`,
-mas não `acmexvendas` nem `macmex_x`. O tipo vem da posição (depois de `FROM`/`JOIN` → tabela,
-de `DATABASE`/`USE` → database, valor de chave conhecida → a entidade da chave, host de URL →
-servidor); sem posição, servico. Sempre forte.
+- GitHub Actions, sintaxe de workflow: https://docs.github.com/actions/reference/workflows-and-actions/workflow-syntax
+- GitHub-hosted runners (rótulos): https://docs.github.com/actions/reference/runners/github-hosted-runners
+- GitLab CI/CD YAML: https://docs.gitlab.com/ci/yaml/
+- Azure Pipelines YAML schema: https://learn.microsoft.com/azure/devops/pipelines/yaml-schema/
+- Jenkins Pipeline syntax: https://www.jenkins.io/doc/book/pipeline/syntax/
+- não consultados nesta rodada [VERIFICAR]: os links acima foram escritos de memória
 
-| Regra | Pega | Forte? |
-|---|---|---|
-| `url-interna` | host interno em URL; usuário da URL | sim |
-| `host-interno` | `nome.sufixo-interno` fora de URL | sim |
-| `termo-embutido` | identificador com um termo cadastrado como pedaço | sim |
 
 ## Repositórios, pacotes e caminhos
 
@@ -3164,23 +3191,6 @@ https://github.com/org-exemplo/repo-demo/issues/1   (fica: fora de contexto de g
 ```
 
 ### 6. Casos difíceis e limites
-
-- **Matriz e expressões.** `runs-on: ${{ matrix.os }}` não tem valor literal: fica.
-- **Runner com nome genérico** (`build`, `linux-grande`): mascarado no lugar, não propaga (não tem
-  cara de identificador ou é evidência fraca).
-- **Ações de terceiros** (`uses: org/acao@v1`) e `include:` do GitLab apontam para repositórios; ficam
-  com as regras de URL/repositório, não com estas.
-- **Variáveis de ambiente** (`env:`, `variables:`) são chave-valor comum (reserva genérica).
-- **Jenkins scripted** com lógica Groovy arbitrária: só `node('x')` e `docker.image('x')` são estáveis.
-
-### 7. Links usados
-
-- GitHub Actions, sintaxe de workflow: https://docs.github.com/actions/reference/workflows-and-actions/workflow-syntax
-- GitHub-hosted runners (rótulos): https://docs.github.com/actions/reference/runners/github-hosted-runners
-- GitLab CI/CD YAML: https://docs.gitlab.com/ci/yaml/
-- Azure Pipelines YAML schema: https://learn.microsoft.com/azure/devops/pipelines/yaml-schema/
-- Jenkins Pipeline syntax: https://www.jenkins.io/doc/book/pipeline/syntax/
-- não consultados nesta rodada [VERIFICAR]: os links acima foram escritos de memória
 
 - `git clone https://github.com/golang/go.git` num README é mascarado (está em contexto de git):
   o leitor não sabe se o projeto é público. Nomes simples (`golang`) não propagam.

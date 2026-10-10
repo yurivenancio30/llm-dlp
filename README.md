@@ -1,144 +1,175 @@
 # llm-dlp
 
-Proxy local que **mascara dado sensível entre você e a LLM**. Hoje funciona com o Claude Code.
+[![ci](https://github.com/yurivenancio30/llm-dlp/actions/workflows/ci.yml/badge.svg)](https://github.com/yurivenancio30/llm-dlp/actions/workflows/ci.yml)
+[![release](https://img.shields.io/github/v/release/yurivenancio30/llm-dlp)](https://github.com/yurivenancio30/llm-dlp/releases/latest)
+[![license](https://img.shields.io/github/license/yurivenancio30/llm-dlp)](LICENSE)
 
-Você e o seu disco veem tudo real. A API do modelo só vê pseudônimos.
+**English** · [Português](README.pt-BR.md)
+
+A local proxy that **masks sensitive data between you and the LLM**. Today it works with
+Claude Code.
+
+You and your disk see everything real. The model's API only sees pseudonyms.
 
 ```
-você ─► Claude Code ─► [ llm-dlp ] ─► API da Anthropic
- real       real        mascara ►      só vê pseudônimos
- real   ◄── real    ◄── desmascara ◄── responde com pseudônimos
+you ─► Claude Code ─► [ llm-dlp ] ─► Anthropic API
+real      real         masks ►        only sees pseudonyms
+real  ◄── real     ◄── unmasks ◄──    answers with pseudonyms
 ```
 
-Exemplo do que acontece com uma mensagem:
+An example of what happens to a message:
 
 ```
-você escreve:   o cliente de cpf 529.982.247-25 (maria.lopes@empresa.com.br) não acessa mysql.empresa.intra
-a API recebe:   o cliente de cpf CPF-irvikcpk (p.k3f9x2ab@d7q2m.invalid) não acessa mysql-x7k2.invalid
-a API responde: verifique se p.k3f9x2ab@d7q2m.invalid tem permissão em mysql-x7k2.invalid
-você lê:        verifique se maria.lopes@empresa.com.br tem permissão em mysql.empresa.intra
+you write:        the customer with cpf 529.982.247-25 (maria.lopes@empresa.com.br) cannot reach mysql.empresa.intra
+the API receives: the customer with cpf CPF-irvikcpk (p.k3f9x2ab@d7q2m.invalid) cannot reach mysql-x7k2.invalid
+the API answers:  check whether p.k3f9x2ab@d7q2m.invalid has permission on mysql-x7k2.invalid
+you read:         check whether maria.lopes@empresa.com.br has permission on mysql.empresa.intra
 ```
 
-## O que ele faz
+llm-dlp was built in Brazil: besides the universal formats (e-mail, tokens, cards, IPs), it
+knows Brazilian documents (CPF, CNPJ, RG, CNH) and Portuguese field names. The program
+itself (commands, questions, messages) speaks Portuguese; this documentation says what each
+command does.
 
-- **Mascara tudo que vai para a API:** o que você digita, arquivos lidos, saída de comandos,
-  dados de MCP, subagentes, anexos e até o título da sessão.
-- **Mascara três tipos de dado:**
-  - dado pessoal (CPF, CNPJ, e-mail, telefone, nome de pessoa, endereço, cartão);
-  - segredo (senha, token, chave de API);
-  - nome que identifica a empresa ou o cliente: servidor, banco, schema, tabela, coluna,
-    serviço, bucket, fila, usuário, pasta, função num traceback. São reconhecidos
-    pela estrutura do texto (SQL, YAML, JSON, `.env`, strings de conexão, Kubernetes,
-    Terraform, código, saída de comando), sem lista por cliente.
-- **Deixa legível o que é público:** `postgres`, `redis`, `my-bucket`, `org.apache.kafka`, a
-  linha do `pandas` num traceback. Um nome só fica em claro com prova de que é público; na
-  dúvida, é mascarado.
-- **Desmascara tudo que volta:** você lê os valores reais; comandos rodam e arquivos são
-  gravados com os valores reais.
-- **Mantém a referência:** o mesmo valor vira sempre o mesmo pseudônimo, então o modelo
-  continua entendendo que duas menções são da mesma pessoa, do mesmo servidor, da mesma conta.
-- **Lê imagens e PDFs** (OCR) e cobre de preto o que for sensível.
-- **Falha fechada:** se o llm-dlp cair ou não souber tratar algo, a mensagem **não sai**. Não
-  existe vazamento silencioso.
-- **Não pesa:** uma mensagem custa 5–30 ms, quase não muda o número de tokens e não atrapalha
-  o cache da API.
-- **Não exige nada no dia a dia:** sobe sozinho com a sessão e volta sozinho se cair.
+## What it does
 
-## Instalação
+- **Masks everything that goes to the API:** what you type, files that are read, command
+  output, MCP data, subagents, attachments and even the session title.
+- **Masks three kinds of data:**
+  - personal data (CPF, CNPJ, e-mail, phone, a person's name, address, card);
+  - secrets (password, token, API key);
+  - names that identify the company or the client: server, database, schema, table, column,
+    service, bucket, queue, user, folder, a function in a traceback. They are recognized by
+    the structure of the text (SQL, YAML, JSON, `.env`, connection strings, Kubernetes,
+    Terraform, code, command output), with no per-client list.
+- **Leaves what is public readable:** `postgres`, `redis`, `my-bucket`, `org.apache.kafka`,
+  the `pandas` line in a traceback. A name only stays in the clear with proof that it is
+  public; when in doubt, it is masked.
+- **Unmasks everything that comes back:** you read the real values; commands run and files
+  are written with the real values.
+- **Keeps the reference:** the same value always becomes the same pseudonym, so the model
+  still understands that two mentions are the same person, the same server, the same account.
+- **Reads images and PDFs** (OCR) and covers in black whatever is sensitive.
+- **Fail-closed:** if llm-dlp goes down or does not know how to handle something, the message
+  **does not go out**. There is no silent leak.
+- **Is light:** a message costs 5–30 ms, the number of tokens hardly changes and the API
+  cache is not disturbed.
+- **Asks nothing of you day to day:** it starts with the session and comes back by itself if
+  it goes down.
 
-Funciona em qualquer Linux, inclusive WSL no Windows. Não precisa clonar o repositório nem
-instalar o Go: baixe o binário da versão mais recente e rode o `instalar`.
+## Installation
+
+It works on any Linux, including WSL on Windows. You do not need to clone the repository or
+install Go:
 
 ```bash
-arq=$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')
-url=$(curl -s https://api.github.com/repos/yurivenancio30/llm-dlp/releases/latest | grep -o "https://[^\"]*linux_$arq")
-curl -L -o llm-dlp "$url" && chmod +x llm-dlp
+curl -fsSL https://raw.githubusercontent.com/yurivenancio30/llm-dlp/main/install.sh | sh
+```
+
+The [script](install.sh) downloads the binary of the latest release for your machine (amd64
+or arm64), checks its SHA-256 against the published checksums and runs `llm-dlp instalar`.
+
+<details>
+<summary>Other ways: read the script first, download by hand, a specific version, build from source</summary>
+
+**Read the script before running it:**
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/yurivenancio30/llm-dlp/main/install.sh
+less install.sh
+sh install.sh
+```
+
+**Download by hand** from the [Releases](https://github.com/yurivenancio30/llm-dlp/releases)
+page (`llm-dlp_X.Y.Z_linux_amd64.tar.gz` or `..._arm64.tar.gz`, and `checksums.txt`):
+
+```bash
+sha256sum -c checksums.txt --ignore-missing     # must print "OK"
+tar -xzf llm-dlp_*_linux_*.tar.gz llm-dlp
 ./llm-dlp instalar
 ```
 
-As duas primeiras linhas descobrem a sua máquina (amd64 ou arm64) e o endereço da versão mais
-recente. Se preferir baixar pelo navegador, os arquivos e as somas SHA-256 estão na página de
-[Releases](https://github.com/yurivenancio30/llm-dlp/releases).
+**A specific version, or only the binary** (without running the setup):
 
-<details>
-<summary>Outras formas: compilar do código, macOS, conferir o download</summary>
+```bash
+curl -fsSL https://raw.githubusercontent.com/yurivenancio30/llm-dlp/main/install.sh | sh -s -- --version 0.2.1
+curl -fsSL https://raw.githubusercontent.com/yurivenancio30/llm-dlp/main/install.sh | sh -s -- --no-setup
+```
 
-**Compilar do código** (precisa do [Go](https://go.dev/dl/)). É o caminho no macOS, onde
-compila mas ainda não foi testado por completo, e para quem vai mexer no código:
+**Build from source** (needs [Go](https://go.dev/dl/)). This is the path on macOS, where it
+builds but has not been fully tested yet, and for whoever is going to change the code:
 
 ```bash
 git clone https://github.com/yurivenancio30/llm-dlp.git && cd llm-dlp && make build
 ./bin/llm-dlp instalar
 ```
 
-**Conferir o download** com a soma publicada na release:
-
-```bash
-curl -sL "${url%/*}/SHA256SUMS" | grep "$(sha256sum llm-dlp | cut -c1-64)" && echo confere
-```
-
 </details>
 
-O `instalar` faz tudo, em 5 passos, perguntando o que precisa:
+`instalar` does everything, in 5 steps, asking what it needs (in Portuguese; answer `s` for
+yes):
 
-| Passo | O que acontece | Você responde |
+| Step | What happens | You answer |
 |---|---|---|
-| 1. Programa | Copia o llm-dlp para `~/.local/bin` | Nada |
-| 2. Configuração | Cria `~/.config/llm-dlp` com a configuração e a chave secreta | O domínio interno, que aparece no nome dos servidores (ex.: `empresa`, para `mysql.empresa.intra`), e os nomes que nunca podem sair (empresa, cliente, projetos). E-mails são mascarados sempre |
-| 3. OCR | Instala o tesseract e o poppler, se faltarem | Sim e a senha do `sudo` |
-| 4. Claude Code | Liga o Claude Code ao llm-dlp (com backup do `~/.claude/settings.json`) | Sim |
-| 5. Trava | Faz o Claude Code se recusar a funcionar fora do llm-dlp | Sim e a senha do `sudo` |
+| 1. Program | Copies llm-dlp to `~/.local/bin` | Nothing |
+| 2. Configuration | Creates `~/.config/llm-dlp` with the configuration and the secret key | The internal domain, which appears in the server names (e.g. `empresa`, for `mysql.empresa.intra`), and the names that must never go out (company, client, projects). E-mails are always masked |
+| 3. OCR | Installs tesseract and poppler, if missing | Yes, and the `sudo` password |
+| 4. Claude Code | Connects Claude Code to llm-dlp (with a backup of `~/.claude/settings.json`) | Yes |
+| 5. Lock | Makes Claude Code refuse to work outside llm-dlp | Yes, and the `sudo` password |
 
-No fim, ele mostra um resumo com ✓ e ✗. Se algo ficar com ✗, é só rodar
-`llm-dlp instalar` de novo: ele pula o que já está pronto.
+At the end it shows a summary with ✓ and ✗. If something is left with ✗, just run
+`llm-dlp instalar` again: it skips what is already done.
 
-Depois, feche e abra o Claude Code (no VS Code, recarregue a janela).
+Then close and open Claude Code (in VS Code, reload the window).
 
-### Atualizar para uma versão nova
+### Updating to a new version
 
-1. Baixe o binário novo com os mesmos comandos de cima e rode `./llm-dlp instalar`. Ele troca
-   o programa e pula o que já está pronto; a sua configuração e a sua chave não mudam.
-2. Feche o Claude Code (todas as janelas) e rode `llm-dlp parar`. O que está no ar só é
-   trocado quando o processo antigo para.
-3. Abra o Claude Code e confira com `llm-dlp status`.
+1. Run the installation command above again. It replaces the program and skips what is
+   already done; your configuration and your key do not change.
+2. Close Claude Code (every window) and run `llm-dlp parar`. What is running is only replaced
+   when the old process stops.
+3. Open Claude Code and check with `llm-dlp status`.
 
-O que mudou em cada versão está no [CHANGELOG.md](CHANGELOG.md). Depois de atualizar, a
-primeira mensagem de cada conversa regrava o cache da API uma vez.
+What changed in each version is in the [CHANGELOG.md](CHANGELOG.md). After updating, the
+first message of each conversation rewrites the API cache once.
 
-## No dia a dia
+## Day to day
 
-Não há nada para rodar. O llm-dlp sobe ao abrir uma sessão e volta sozinho se cair.
+There is nothing to run. llm-dlp starts when a session opens and comes back by itself if it
+goes down.
 
-| Situação | O que acontece / o que fazer |
+| Situation | What happens / what to do |
 |---|---|
-| Quero ver se está tudo certo | `llm-dlp status` |
-| Quero saber qual versão tenho | `llm-dlp versao` (o que mudou em cada uma: [CHANGELOG.md](CHANGELOG.md)) |
-| O llm-dlp caiu | Volta sozinho em ~1 s. Enquanto estiver fora, nenhuma mensagem sai |
-| Ele não volta, e preciso do Claude para consertar | `sudo llm-dlp emergencia 30m` libera o Claude **sem máscara** por tempo limitado. Use uma sessão nova, sem dados de cliente. Volta ao normal no fim do prazo, ou com `sudo llm-dlp emergencia sair`. Cada mensagem mostra um aviso |
-| Imagem ou PDF bloqueado | Falta o OCR: a mensagem de erro traz o comando de instalação |
-| Mudei o `config.json` | `llm-dlp parar` (ele volta na próxima mensagem, com a configuração nova) |
-| Quero ver o que foi feito em cada mensagem | `~/.config/llm-dlp/llm-dlp.log` (só contagens e tempos, nunca valores) |
-| Quero desfazer tudo | `llm-dlp desinstalar` (e `sudo llm-dlp desinstalar-trava`, se instalou a trava). Depois, feche e abra o Claude Code e rode `llm-dlp parar` |
+| I want to see whether everything is fine | `llm-dlp status` |
+| I want to know which version I have | `llm-dlp versao` (what changed in each one: [CHANGELOG.md](CHANGELOG.md)) |
+| llm-dlp went down | It comes back by itself in ~1 s. While it is out, no message goes out |
+| It does not come back, and I need Claude to fix it | `sudo llm-dlp emergencia 30m` lets Claude through **unmasked** for a limited time. Use a new session, with no client data. It goes back to normal when the time is up, or with `sudo llm-dlp emergencia sair`. Every message shows a warning |
+| Image or PDF blocked | OCR is missing: the error message brings the installation command |
+| I changed `config.json` | `llm-dlp parar` (it comes back on the next message, with the new configuration) |
+| I want to see what was done on each message | `~/.config/llm-dlp/llm-dlp.log` (counts and times only, never values) |
+| I want to undo everything | `llm-dlp desinstalar` (and `sudo llm-dlp desinstalar-trava`, if you installed the lock). Then close and open Claude Code and run `llm-dlp parar` |
 
-## Mais detalhes
+## More details
 
-| Documento | O que tem |
+| Document | What is in it |
 |---|---|
-| [Como funciona](docs/como-funciona.md) | O caminho de uma mensagem, os pseudônimos, o que é lembrado, falha fechada, imagens, desempenho e quanto usa da máquina |
-| [O que é detectado](docs/deteccao.md) | Os quatro jeitos de reconhecer um dado e como ensinar pessoas e nomes de campo da sua empresa |
-| [Configuração e comandos](docs/configuracao.md) | Todos os campos do `config.json` e todos os comandos |
-| [Segurança e limites](docs/seguranca.md) | O que protege, o que não protege e o que passa sem máscara |
-| [Política](docs/politica.md) | Os quatro níveis de informação, o que o llm-dlp faz com cada um, as referências (LGPD, MITRE ATT&CK, CWE, NIST) e o limite declarado sobre código e regras de negócio |
-| [Para desenvolvedores](docs/desenvolvimento.md) | Mapa do código, o que fica guardado em memória e em disco, como acoplar outra API de LLM, como acrescentar um detector, como foi testado |
-| [Versões e lançamentos](docs/versoes.md) | O que cada número da versão significa e como lançar uma |
-| [Mudanças](CHANGELOG.md) | O que mudou em cada versão |
+| [How it works](docs/how-it-works.md) | The path of a message, the pseudonyms, what is remembered, fail-closed, images, performance and how much of the machine it uses |
+| [What is detected](docs/detection.md) | The ways of recognizing a piece of data and how to teach it your company's people and field names |
+| [Configuration and commands](docs/configuration.md) | Every field of `config.json` and every command |
+| [Security and limits](docs/security.md) | What it protects, what it does not protect and what goes through unmasked |
+| [Policy](docs/policy.md) | The four levels of information, what llm-dlp does with each one, the references (LGPD, MITRE ATT&CK, CWE, NIST) and the declared limit on code and business rules |
+| [For developers](docs/development.md) | Code map, what is stored in memory and on disk, how to plug in another LLM API, how to add a detector, how it was tested |
+| [Structures](docs/structures.md) | The research behind the structure rules: where internal resource names live in each format, and the rules for when a name is public |
+| [Versions and releases](docs/versioning.md) | What each version number means, what a release contains and how to make one |
+| [Changes](CHANGELOG.md) | What changed in each version |
+| [Contributing](CONTRIBUTING.md) · [Security policy](SECURITY.md) | How to contribute and how to report a vulnerability |
 
-## Licença
+## License
 
-MIT. Ver [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).
 
-Os arquivos de dados `internal/mask/dados/palavras_comuns.txt` e `palavras_dicionario.txt` são
-adaptações das listas de frequência do [FrequencyWords](https://github.com/hermitdave/FrequencyWords),
-de Hermit Dave (dados do OpenSubtitles 2018), distribuídas sob
-[CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/); origem e critério no cabeçalho
-de cada arquivo.
+The data files `internal/mask/dados/palavras_comuns.txt` and `palavras_dicionario.txt` are
+adaptations of the frequency lists of
+[FrequencyWords](https://github.com/hermitdave/FrequencyWords), by Hermit Dave (OpenSubtitles
+2018 data), distributed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/);
+origin and criterion are in the header of each file.

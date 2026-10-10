@@ -1,6 +1,8 @@
 # Segurança e limites
 
-[← voltar ao README](../README.md)
+[← voltar ao README](../../README.pt-BR.md) · [English](../security.md)
+
+Para relatar uma vulnerabilidade, veja [SECURITY.md](SECURITY.md).
 
 **O que protege:**
 
@@ -31,6 +33,7 @@ não existe.
 | `config.json` | A configuração |
 | `pessoas.json` | Hashes de nomes, e-mails e códigos de pessoas |
 | `vistos.json` | Hashes de valores já mascarados |
+| `enviados.log` | De cada texto já enviado: hashes, posições, tipos e pseudônimos, nunca valores |
 | `llm-dlp.log` | Uma linha por requisição: contagens e tempos, nunca valores |
 
 ## Limites conhecidos
@@ -40,8 +43,10 @@ não existe.
 - Nome de pessoa que não é conhecido e aparece sem nome de campo (texto corrido, ou um
   pedaço de CSV lido sem a linha de cabeçalho).
 - Campo com nome fora do vocabulário, até você acrescentar em `campos_extras`.
-- **Nomes de bancos, schemas, tabelas, colunas e sistemas.** São metadados, não dados
-  pessoais. Para mascarar alguns, use `termos`.
+- **Nome de recurso interno (banco, schema, tabela, sistema) que só aparece em frases**, sem
+  nunca ter passado por uma estrutura que o llm-dlp reconheça (ver
+  [O que é detectado](deteccao.md#5-nomes-de-recursos-internos-pela-estrutura)). Para mascarar
+  um nome sempre, use `termos`.
 - Dado pessoal sensível (saúde, religião, etnia) em texto corrido. Só é detectado num campo
   com esse nome.
 - Valores financeiros (saldo, renda, limite). O que os liga a uma pessoa (nome, CPF, conta)

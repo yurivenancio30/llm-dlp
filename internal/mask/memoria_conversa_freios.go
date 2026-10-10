@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// Freios e âncora da memória da conversa (ver docs/estruturas.md, seção Conhecer o nome).
+// Freios e âncora da memória da conversa (ver docs/pt-BR/estruturas.md, seção Conhecer o nome).
 //
 //   - Programa: na saída de um comando, a palavra que está no texto do programa (o comando ou o
 //     script que ele executa) não é trocada pela memória; a exceção é a palavra que o proxy

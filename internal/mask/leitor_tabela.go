@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// Leitor de tabelas (ver docs/estruturas.md, seções Saídas de clientes de banco e Dados
+// Leitor de tabelas (ver docs/pt-BR/estruturas.md, seções Saídas de clientes de banco e Dados
 // tabulares). A tabela é reconhecida pela forma, não pela ferramenta: cabeçalho seguido de uma
 // linha de traços (psql, sqlcmd, sqlplus, mysql, snowsql, bq, db2, markdown), linhas com o
 // mesmo número de separadores fora de aspas (CSV conforme a RFC 4180, TSV, ";", "|"; as bordas

@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-// O comando diz o que a saída é (ver docs/estruturas.md, seção Saídas soltas de script e de
+// O comando diz o que a saída é (ver docs/pt-BR/estruturas.md, seção Saídas soltas de script e de
 // shell). O proxy vê a chamada de ferramenta (tool_use) e o resultado (tool_result) do mesmo id:
 // o comando tipa as colunas do resultado. Nenhum leitor pode fazer isso, porque um leitor só vê
 // o próprio texto; a dica entra como evidência no leitor de tabela que já existe

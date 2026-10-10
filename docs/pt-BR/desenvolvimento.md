@@ -1,6 +1,6 @@
 # Para desenvolvedores
 
-[← voltar ao README](../README.md)
+[← voltar ao README](../../README.pt-BR.md) · [English](../development.md)
 
 ```bash
 make build   # binário estático em bin/llm-dlp
@@ -12,7 +12,8 @@ make versao  # versão e commit do código
 LLM_DLP_ESTRESSE=1 go test ./... -run Estresse -v -timeout 60m
 ```
 
-Versões e lançamento: [versoes.md](versoes.md).
+Versões e lançamento: [versoes.md](versoes.md). Como contribuir:
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Mapa do repositório
 
@@ -24,10 +25,15 @@ internal/mask/dados/    listas embutidas no binário (quase todas geradas)
 internal/config/        leitura do config.json
 internal/ocr/           leitura de texto em imagem e PDF (tesseract, poppler)
 internal/versao/        o número da versão e o commit
+install.sh              instalador: baixa o binário da release e roda a configuração
+.goreleaser.yaml        como os pacotes da release são montados
 scripts/                release.sh e notas-da-versao.sh (usados pelo make release)
 .github/workflows/      testes a cada envio (ci.yml) e publicação da release (release.yml)
-docs/                   esta documentação
-CHANGELOG.md            o que mudou em cada versão
+docs/                   a documentação em inglês
+docs/pt-BR/             esta documentação, em português
+CHANGELOG.md            o que mudou em cada versão (em português: docs/pt-BR/CHANGELOG.md)
+CONTRIBUTING.md         como contribuir (commits, testes, documentação)
+SECURITY.md             como relatar uma vulnerabilidade
 ```
 
 ### cmd/llm-dlp e internal/proxy

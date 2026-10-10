@@ -6,7 +6,7 @@ import (
 	"sync"
 )
 
-// Interface comum das regras que decidem nomes (ver docs/estruturas.md, seção Memória da
+// Interface comum das regras que decidem nomes (ver docs/pt-BR/estruturas.md, seção Memória da
 // conversa). Três peças:
 //
 //   - Decisao: um nome que uma regra decidiu num texto (nome, tipo, regra). Fica no resultado

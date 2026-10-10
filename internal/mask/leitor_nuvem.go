@@ -5,7 +5,7 @@ import (
 )
 
 // Recursos de nuvem: ARN da AWS, IDs do Azure Resource Manager e nomes de recurso do Google
-// Cloud (ver docs/estruturas.md, seção Recursos de nuvem e usuários de rede). Os hosts de
+// Cloud (ver docs/pt-BR/estruturas.md, seção Recursos de nuvem e usuários de rede). Os hosts de
 // serviço gerenciado ficam em leitor_nuvem_hosts.go.
 
 func acharNuvem(s string, add func(ObjAchado)) {

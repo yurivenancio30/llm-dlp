@@ -6,7 +6,7 @@ import (
 	"unicode"
 )
 
-// Prova de software (ver docs/estruturas.md, seção Público só com prova): o banco do DataHub se
+// Prova de software (ver docs/pt-BR/estruturas.md, seção Público só com prova): o banco do DataHub se
 // chama "datahub", o do Airflow "airflow". O nome padrão de um software público não diz nada do
 // cliente, mas decidido como nome (a DSN .../datahub) a memória da conversa o espalhava por toda
 // a conversa, inclusive onde é a ferramenta ("o datahub ingere metadados").

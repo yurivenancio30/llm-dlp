@@ -1,6 +1,6 @@
 # Vocabulário público do SQL: palavras-chave, tipos, funções nativas e schemas/bancos de
 # sistema dos dialetos ANSI/ISO, T-SQL, PL/SQL, PostgreSQL, MySQL, Db2, Snowflake, BigQuery,
-# SQLite, DuckDB e Spark SQL (fontes em docs/estruturas.md, seção SQL e DDL). Nunca é mascarado nem aprendido.
+# SQLite, DuckDB e Spark SQL (fontes em docs/pt-BR/estruturas.md, seção SQL e DDL). Nunca é mascarado nem aprendido.
 # Uma palavra que falte aqui é mascarada a mais (custa legibilidade, nunca vaza).
 abort abs absolute access account accounts action add admin after aggregate alias all allocate alter always analyse analyze and any apply are array array_agg as asc ascii asensitive assertion assignment asymmetric at atomic attach attribute authorization auto_increment autoincrement avg
 backup before begin between bigint bignumeric binary bit bit_length blob bool boolean both breadth break browse btree bucket buckets bulk by bytea bytes

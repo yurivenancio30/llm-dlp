@@ -1,8 +1,8 @@
 # O que é detectado
 
-[← voltar ao README](../README.md)
+[← voltar ao README](../../README.pt-BR.md) · [English](../detection.md)
 
-São quatro jeitos de reconhecer um dado. Qualquer um basta.
+São cinco jeitos de reconhecer um dado. Qualquer um basta.
 
 ## 1. Pelo formato (sempre, em qualquer lugar)
 
@@ -123,7 +123,6 @@ de cada formato estão descritas em [estruturas.md](estruturas.md). Já ligadas:
 | Mensagem de erro | Palavra do tipo seguida do nome entre aspas ou colchetes (`relation "x"`, `object name 'x'`, `Table 'db.x'`), ou `Table/Dataset projeto:dataset` |
 | Conexão | Strings de conexão (`Server=…;Database=…;User Id=…`, ODBC, JDBC, DSN do libpq), URIs de banco (`postgresql://usuario@host/banco`, `jdbc:…`, `mongodb://`), `tnsnames.ora`, URNs do DataHub, `ref()`/`source()` do dbt e `conn_id` do Airflow |
 | Tabela | Saída de cliente de banco e CSV/TSV: valores das colunas de catálogo (`table_name`, `table_schema`, `column_name`, `TABNAME`, `owner`, `Tables_in_…`…) e nomes de coluna do cabeçalho que têm cara de identificador |
-
 | Kubernetes, Helm, docker-compose | Manifestos (pelo par `apiVersion` + `kind`): `metadata.name` conforme o tipo, `namespace`, referências a secret, configmap e service account, hosts do Ingress, kubeconfig; nome DNS `serviço.namespace.svc.cluster.local`; `Chart.yaml`; serviços, `container_name` e `hostname` do compose; imagens de registro privado (o registro e o caminho; a tag fica) e, no Docker Hub ou em registro público, a organização que não é pública (`vendashx/api`) |
 | Terraform, Ansible, CloudFormation, ARM/Bicep, CI | Valores literais de atributos que são nomes (`name`, `bucket`, `identifier`, `*Name`…; o nome local do recurso, referências e região ficam), conta da nuvem, hosts do inventário, runners próprios. `name` de bloco aninhado só vale no bloco `metadata` (provedor do Kubernetes: `metadata { name = ... }`) |
 | Chave-valor | Em YAML, JSON, TOML, INI, `.env`, `.properties`, XML e opções `--chave valor`: o valor de uma chave cujo último pedaço indica nome de recurso (`host`, `database`, `schema`, `user`, `bucket`, `topic`, `namespace`, `service`, `repo`, `account`…). Tópico/fila com ponto (`KAFKA_TOPIC=fin.notas.emitidas`, `kafka.topic=`, `topic:`) vale quando todos os pedaços são minúsculos e nenhum é receptor ou atributo de código (`cfg.topic`), domínio público ou extensão de arquivo. Valor que é expressão de código fica |

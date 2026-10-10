@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// Infraestrutura como código: Terraform/HCL, Bicep, ARM e CloudFormation (ver docs/estruturas.md).
+// Infraestrutura como código: Terraform/HCL, Bicep, ARM e CloudFormation (ver docs/pt-BR/estruturas.md).
 
 // entAzure: entidade pelo tipo do recurso (Microsoft.Sql/servers/databases -> último pedaço).
 func entAzure(seg string) string {

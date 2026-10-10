@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// Memória da conversa (ver docs/estruturas.md): os nomes decididos em TODOS os textos de uma
+// Memória da conversa (ver docs/pt-BR/estruturas.md): os nomes decididos em TODOS os textos de uma
 // requisição valem para os outros textos ainda não enviados dela. Um nome que um leitor ou um
 // decisor reconheceu num texto (o inventário de namespaces, o cabeçalho de um CSV) é mascarado
 // também onde aparece solto (na prosa, numa saída sem estrutura), palavra inteira.
