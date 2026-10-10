@@ -9,6 +9,32 @@ In each version: **Masking** is what started (or stopped) being masked; **Progra
 commands, installation, configuration, performance and documentation; **Code** is what only
 matters to whoever changes the code.
 
+## [0.2.1] - 2026-10-10
+
+Installation with one command and releases packaged the way large projects do it. Nothing
+changes in what is masked.
+
+### Program
+
+- **One-line installation:** `install.sh` (the command is in the README) downloads the binary
+  of the latest release for the machine (amd64 or arm64), checks its SHA-256 against the
+  published checksums and runs `llm-dlp instalar`. Options: `--version X.Y.Z`, `--no-setup`,
+  `--bin-dir DIR`.
+- **Release archives:** each release now has one `.tar.gz` per architecture (the binary, the
+  LICENSE, the README and the CHANGELOG) and a `checksums.txt`, built by GoReleaser. Releases
+  up to 0.2.0 published the bare binary and a `SHA256SUMS` file.
+- **Documentation in English and Portuguese:** `README.md` and `docs/` are in English;
+  `README.pt-BR.md` and `docs/pt-BR/` are in Portuguese.
+- `CONTRIBUTING.md` and `SECURITY.md` (how to contribute and how to report a vulnerability).
+
+### Code
+
+- The commit history was rewritten in English, following
+  [Conventional Commits](https://www.conventionalcommits.org). The content of every commit is
+  the same; the commit hashes from before this version changed.
+- `make dist` rehearses the release with GoReleaser; the CI also validates `install.sh`
+  (shellcheck) and the GoReleaser configuration.
+
 ## [0.2.0] - 2026-10-10
 
 A public name only stays in the clear with proof. Every rule that lets a name through now

@@ -9,6 +9,31 @@ Em cada versão: **Mascaramento** é o que passou a ser (ou deixou de ser) masca
 **Programa** é comando, instalação, configuração, desempenho e documentação; **Código** é o
 que só interessa a quem mexe no código.
 
+## [0.2.1] - 2026-10-10
+
+Instalação com um comando e releases empacotadas como os projetos grandes fazem. Nada muda no
+que é mascarado.
+
+### Programa
+
+- **Instalação em uma linha:** o `install.sh` (o comando está no README) baixa o binário da
+  versão mais recente para a máquina (amd64 ou arm64), confere a soma SHA-256 com a publicada
+  e roda o `llm-dlp instalar`. Opções: `--version X.Y.Z`, `--no-setup`, `--bin-dir DIR`.
+- **Pacotes da release:** cada release passa a ter um `.tar.gz` por arquitetura (o binário, a
+  LICENSE, o README e o CHANGELOG) e um `checksums.txt`, montados pelo GoReleaser. As releases
+  até a 0.2.0 publicavam o binário solto e um arquivo `SHA256SUMS`.
+- **Documentação em inglês e em português:** `README.md` e `docs/` estão em inglês;
+  `README.pt-BR.md` e `docs/pt-BR/`, em português.
+- `CONTRIBUTING.md` e `SECURITY.md` (como contribuir e como relatar uma vulnerabilidade).
+
+### Código
+
+- O histórico de commits foi reescrito em inglês, seguindo o
+  [Conventional Commits](https://www.conventionalcommits.org). O conteúdo de cada commit é o
+  mesmo; os hashes dos commits anteriores a esta versão mudaram.
+- `make dist` ensaia a release com o GoReleaser; o CI também valida o `install.sh`
+  (shellcheck) e a configuração do GoReleaser.
+
 ## [0.2.0] - 2026-10-10
 
 Nome público só fica em claro com prova. Toda regra que deixa um nome passar exige agora uma
