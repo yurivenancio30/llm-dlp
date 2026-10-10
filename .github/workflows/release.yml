@@ -1,7 +1,8 @@
 name: release
 
-# Ao receber a tag vX.Y.Z (criada por "make release"): testa, compila os binários e publica a
-# release com as notas da seção X.Y.Z do CHANGELOG.md. Ver docs/versoes.md.
+# Ao receber a tag vX.Y.Z (criada por "make release"): testa e o GoReleaser (.goreleaser.yaml)
+# monta os pacotes e publica a release com as notas da seção X.Y.Z do CHANGELOG.md.
+# Ver docs/versioning.md (em português: docs/pt-BR/versoes.md).
 on:
   push:
     tags: ["v[0-9]+.[0-9]+.[0-9]+"]
@@ -14,6 +15,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
@@ -24,11 +27,13 @@ jobs:
           echo "VERSAO=$V" >> "$GITHUB_ENV"
       - name: testes
         run: make test
-      - name: binários
-        run: make dist
-      - name: publica
+      - name: notas da versão
+        run: ./scripts/notas-da-versao.sh "$VERSAO" > "$RUNNER_TEMP/notas.md"
+      - name: pacotes e publicação
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --clean --release-notes ${{ runner.temp }}/notas.md
         env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          ./scripts/notas-da-versao.sh "$VERSAO" > notas.md
-          gh release create "$GITHUB_REF_NAME" dist/* --title "llm-dlp $VERSAO" --notes-file notas.md
+          GITHUB_TOKEN: ${{ github.token }}

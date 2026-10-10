@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Lança a versão que está em internal/versao/versao.go: confere, testa e cria a tag vX.Y.Z.
-# Não envia nada: no fim, mostra o comando de envio. Ver docs/versoes.md.
+# Não envia nada: no fim, mostra o comando de envio. Ver docs/pt-BR/versoes.md.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -13,15 +13,21 @@ TAG="v$V"
 [[ $(git branch --show-current) == main ]] || erro "a versão sai da branch main (você está em $(git branch --show-current))"
 [[ -z $(git status --porcelain) ]] || erro "há mudança não commitada"
 git rev-parse -q --verify "refs/tags/$TAG" >/dev/null && erro "a tag $TAG já existe: aumente a versão em versao.go"
-grep -q "^## \[$V\] - [0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}$" CHANGELOG.md || erro "CHANGELOG.md sem a seção '## [$V] - AAAA-MM-DD'"
+# o CHANGELOG existe em inglês (o que vira as notas da release) e em português
+for c in CHANGELOG.md docs/pt-BR/CHANGELOG.md; do
+  grep -q "^## \[$V\] - [0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}$" "$c" || erro "$c sem a seção '## [$V] - AAAA-MM-DD'"
+done
 [[ -n $(./scripts/notas-da-versao.sh "$V") ]] || erro "a seção $V do CHANGELOG.md está vazia"
 
 echo "== testes"
 make test
-echo "== binários"
-make dist
+# quem monta e publica os pacotes é o GitHub; aqui só se confere a configuração, se der
+if command -v goreleaser >/dev/null; then
+  echo "== goreleaser check"
+  goreleaser check
+fi
 
 git tag -s "$TAG" -m "llm-dlp $V"
 echo
-echo "Tag $TAG criada. Para publicar (o GitHub monta a release com os binários):"
+echo "Tag $TAG criada. Para publicar (o GitHub monta a release com os pacotes):"
 echo "  git push origin main $TAG"

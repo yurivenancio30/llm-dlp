@@ -1,0 +1,50 @@
+# Como os binários de uma versão são montados (GoReleaser). Quem roda é o GitHub, em
+# .github/workflows/release.yml, ao receber a tag vX.Y.Z; "make dist" faz o mesmo na sua máquina,
+# sem publicar. Ver docs/versioning.md (em português: docs/pt-BR/versoes.md).
+version: 2
+
+project_name: llm-dlp
+
+builds:
+  - id: llm-dlp
+    main: ./cmd/llm-dlp
+    binary: llm-dlp
+    # CGO_ENABLED=0: binário estático, roda em qualquer Linux (glibc ou musl/Alpine)
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    flags:
+      - -trimpath
+    # o commit vai dentro do binário ("llm-dlp versao"); a versão é a de internal/versao/versao.go
+    ldflags:
+      - -s -w -X github.com/yurivenancio30/llm-dlp/internal/versao.Commit={{ .ShortCommit }}
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+archives:
+  - id: llm-dlp
+    formats:
+      - tar.gz
+    # llm-dlp_0.2.1_linux_amd64.tar.gz (o install.sh monta este nome)
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
+      - README.pt-BR.md
+      - CHANGELOG.md
+
+checksum:
+  name_template: checksums.txt
+
+snapshot:
+  version_template: "{{ .Version }}-next"
+
+# as notas da release são a seção da versão no CHANGELOG.md (--release-notes), não a lista de commits
+changelog:
+  disable: true
+
+release:
+  name_template: "llm-dlp {{ .Version }}"

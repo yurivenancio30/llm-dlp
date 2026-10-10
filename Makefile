@@ -1,13 +1,11 @@
 GO ?= go
 BIN := bin/llm-dlp
 PACOTE := github.com/yurivenancio30/llm-dlp
-# a versão é a de internal/versao/versao.go (ver docs/versoes.md)
+# a versão é a de internal/versao/versao.go (ver docs/pt-BR/versoes.md)
 VERSAO := $(shell sed -n 's/^const Versao = "\(.*\)"$$/\1/p' internal/versao/versao.go)
 # o commit vai dentro do binário ("llm-dlp versao"); "-mod": havia mudança não commitada
 COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo desconhecido)$(shell git diff --quiet HEAD 2>/dev/null || echo -mod)
 LDFLAGS := -s -w -X $(PACOTE)/internal/versao.Commit=$(COMMIT)
-# plataformas dos binários de uma versão (sistema/arquitetura)
-PLATAFORMAS := linux/amd64 linux/arm64
 
 .PHONY: build test instalar versao dist release
 
@@ -27,16 +25,12 @@ instalar: build
 versao:
 	@echo $(VERSAO) "($(COMMIT))"
 
-# os binários de uma versão, um por plataforma, e as somas SHA-256 (em dist/)
+# ensaio da release na sua máquina, sem publicar: os pacotes .tar.gz de cada plataforma e o
+# checksums.txt em dist/, montados pelo GoReleaser (.goreleaser.yaml) como o GitHub faz
 dist:
-	rm -rf dist && mkdir -p dist
-	@for p in $(PLATAFORMAS); do \
-		so=$${p%/*}; arq=$${p#*/}; saida=dist/llm-dlp_$(VERSAO)_$${so}_$${arq}; \
-		echo "compilando $$saida"; \
-		CGO_ENABLED=0 GOOS=$$so GOARCH=$$arq $(GO) build -trimpath -ldflags="$(LDFLAGS)" -o $$saida ./cmd/llm-dlp || exit 1; \
-	done
-	cd dist && sha256sum llm-dlp_* > SHA256SUMS
+	@command -v goreleaser >/dev/null || { echo "make dist precisa do goreleaser: https://goreleaser.com/install/"; exit 1; }
+	goreleaser release --snapshot --clean
 
-# confere, testa e cria a tag da versão que está em versao.go (não envia nada: ver docs/versoes.md)
+# confere, testa e cria a tag da versão que está em versao.go (não envia nada: ver docs/pt-BR/versoes.md)
 release:
 	./scripts/release.sh

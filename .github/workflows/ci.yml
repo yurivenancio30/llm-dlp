@@ -22,3 +22,11 @@ jobs:
         run: make test
       - name: compila
         run: make build && ./bin/llm-dlp versao
+      - name: install.sh
+        run: sh -n install.sh && shellcheck install.sh scripts/*.sh
+      - name: configuração da release
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: check
