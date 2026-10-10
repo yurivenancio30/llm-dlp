@@ -121,7 +121,7 @@ Medido em sessões reais e em testes de carga.
 | Imagem | 0,7–2 s na primeira vez; ~1 ms quando reenviada |
 | Tokens | ~1,4 token a mais por valor mascarado; nada é acrescentado ao contexto. Num teste real com um arquivo em que quase todo campo é sensível (245 valores), a requisição ficou 0,6% maior |
 | Cache da API | Igual ao uso sem o llm-dlp |
-| Memória | 40–100 MB no uso normal; no pior caso medido, estabilizou em ~170 MB |
+| Memória | 40–100 MB no uso normal; no pior caso medido, estabilizou em 150–210 MB (ver [Quanto usa da máquina](#quanto-usa-da-máquina)) |
 | CPU parado | Zero |
 
 - **Quantidade não pesa:** o tempo não cresce com o número de valores aprendidos nem de
@@ -133,6 +133,35 @@ Medido em sessões reais e em testes de carga.
   tiver. O corte é sempre num espaço em branco, para nunca dividir uma senha ou token. Por
   isso um bloco gigante sem nenhum espaço (2 MB de base64 ou de JSON minificado) não é
   dividido e leva de 1 a 5 s.
+
+## Quanto usa da máquina
+
+Em resumo: parado não usa CPU; em uso, fica em torno de 100 MB de memória e alguns segundos de
+CPU por hora; em disco, de 30 a 60 MB. Não precisa de GPU nem de rede própria.
+
+| Recurso | No uso normal | No pior caso medido | O que faz crescer |
+|---|---|---|---|
+| CPU | ~0,1% de um núcleo, em média. Numa sessão real de 1 h 49 min, com conversa longa, o llm-dlp gastou 7 s de CPU ao todo | Um núcleo ocupado por 3,5 ms a cada KB de texto **novo** (2 núcleos, prioridade baixa): ler 21 MB de arquivos nunca vistos custou 77 s | Texto novo. Texto reenviado sai do cache de resultados e custa quase nada |
+| Memória | 25 MB ao subir; 40–100 MB em uso (95 MB na sessão real acima) | Estabiliza em 150–210 MB com 60 mil textos todos diferentes, porque tudo que é lembrado tem teto ([a tabela](desenvolvimento.md#o-que-fica-guardado)) | Quantidade de texto e de valores diferentes na sessão |
+| Memória do supervisor | ~23 MB (o processo que religa o llm-dlp se ele cair) | Igual | Nada |
+| Disco: programa | 14 MB (`~/.local/bin/llm-dlp`) | Igual | Nada |
+| Disco: dados | ~20 MB depois de uma semana de uso (`~/.config/llm-dlp`) | `enviados.log` guarda até 400 mil textos; `llm-dlp.log`, até 20 MB (troca aos 10 MB e guarda um anterior); `vistos.json`, até ~40 MB (1 milhão de hashes) | Quantidade de texto enviado |
+| Tempo por mensagem | 5–30 ms | Arquivo novo: mediana de 6,5 ms; 1 em 10 passa de 65 ms; 1 em 100 passa de 300 ms | Tamanho do texto novo |
+| Subida | 0,1 s | Igual | Nada |
+| Rede | Nenhuma própria: só repassa o que o Claude Code enviaria | Igual | Nada |
+| OCR (imagem e PDF) | Só quando há imagem: 0,7–2 s de CPU por imagem nova, em processo separado (tesseract) | Igual | Número de imagens novas |
+
+Como ler:
+
+- **Uma máquina de trabalho comum não sente.** O maior custo é o de memória, ~100 MB, parecido
+  com o de uma aba de navegador.
+- **O custo vem do texto novo, não do tamanho da conversa.** A conversa inteira é reenviada a
+  cada mensagem, mas o que já foi examinado não é examinado de novo.
+- **A versão 0.2.0 custa o mesmo que a 0.1.0**, apesar das listas e dos leitores novos: +4 MB
+  de memória ao subir (as listas embutidas), +1 MB no binário e o mesmo tempo por texto
+  (medido no mesmo material: 77 s contra 75 s).
+- Os números de pior caso foram medidos de propósito com pouco recurso (2 núcleos, prioridade
+  baixa). Com mais núcleos, texto grande é dividido e fica proporcionalmente mais rápido.
 
 ## O log
 

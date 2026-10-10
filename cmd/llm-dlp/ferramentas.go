@@ -85,7 +85,7 @@ func importarPessoas(args []string) error {
 	if err := pessoas.Salvar(); err != nil {
 		return err
 	}
-	// o que já saiu à API fica congelado (ver enviados.go); com nomes novos, o histórico
+	// o que já saiu à API fica congelado (ver memoria_enviados.go); com nomes novos, o histórico
 	// passa a ser mascarado de novo, com eles
 	os.Remove(config.Caminho("enviados.log"))
 	fmt.Printf("%d linhas lidas; variantes de nome conhecidas: %d (antes: %d). Nada em texto puro foi gravado.\n",

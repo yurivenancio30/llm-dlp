@@ -4,90 +4,196 @@
 
 ```bash
 make build   # binário estático em bin/llm-dlp
-make test
+make test    # go vet e todos os testes
+make versao  # versão e commit do código
 
 # testes de carga (minutos): memória com 1,2 GB de texto, entradas patológicas, 16 conversas
 # em paralelo, respostas abandonadas, API fora do ar, requisição de 32 MB
 LLM_DLP_ESTRESSE=1 go test ./... -run Estresse -v -timeout 60m
 ```
 
-## Mapa do código
+Versões e lançamento: [versoes.md](versoes.md).
+
+## Mapa do repositório
 
 ```
-cmd/llm-dlp/          o programa de linha de comando
+cmd/llm-dlp/            o programa de linha de comando
+internal/proxy/         o servidor que fica entre o Claude Code e a API
+internal/mask/          detecção e troca por pseudônimos (não depende de nenhuma API)
+internal/mask/dados/    listas embutidas no binário (quase todas geradas)
+internal/config/        leitura do config.json
+internal/ocr/           leitura de texto em imagem e PDF (tesseract, poppler)
+internal/versao/        o número da versão e o commit
+scripts/                release.sh e notas-da-versao.sh (usados pelo make release)
+.github/workflows/      testes a cada envio (ci.yml) e publicação da release (release.yml)
+docs/                   esta documentação
+CHANGELOG.md            o que mudou em cada versão
+```
+
+### cmd/llm-dlp e internal/proxy
+
+```
+cmd/llm-dlp/
   main.go               ponto de entrada e lista de comandos
   servico.go            servir, supervisionar, garantir, verificar, status, parar
-  ferramentas.go        importar-pessoas, testar, testar-midia, medir, colunas
   instalar.go           instalar, desinstalar e a trava
+  conferir.go           simular: reproduz uma sessão antiga contra uma API falsa
+  ferramentas.go        importar-pessoas, testar, testar-midia, medir, colunas
   emergencia.go         modo emergência (exige sudo)
 
-internal/config/      leitura do config.json
-
-internal/proxy/       o servidor que fica entre o Claude Code e a API
+internal/proxy/
   proxy.go              recebe a requisição, encaminha, devolve a resposta
   requisicao.go         ida: mascara o corpo da requisição (com a dica do comando de cada resultado)
   resposta.go           volta: desmascara a resposta (streaming ou inteira)
+  anterioridade.go      o que o modelo escreveu antes de qualquer dado é público
   midia.go              imagens e PDFs (OCR e tarja preta)
-
-internal/mask/        detecção e troca por pseudônimos
-  masker.go             o tipo Masker e a sua construção
-  mascarar.go           Mascarar: porta de entrada, com memória de resultados; Lote congela o que saiu
-  detectar.go           Detectar: junta os detectores; texto grande vai em pedaços
-  normalizacao.go       tira o transporte (número de linha, grep, diff, ANSI, caixa, JSON escapado)
-  detectores_formato.go   e-mail, IP, hostname, CPF, CNPJ, telefone, cartão, tokens
-  detectores_senhas.go    senhas comuns
-  detectores_extras.go    cabeçalho HTTP, IBAN, processo, documentos com palavra por perto
-  campos_vocabulario.go   nome do campo: que nomes guardam que dado
-  campos.go               nome do campo: "campo: valor", JSON, SQL INSERT, XML
-  campos_tabelas.go       nome do campo: CSV, markdown, terminal, planilha
-  validadores.go        dígitos verificadores (CPF, CNPJ, título, IBAN...)
-  conhecidos.go         valores já mascarados são reconhecidos depois (em memória)
-  vistos.go             os mesmos valores em disco, só como hash
-  enviados.go           o que cada texto já enviado levou, por ponto da conversa (para sair igual nos reenvios)
-  objetos.go            nomes de recursos internos: tipos, pseudônimo, aprendizado com freios
-  decisao.go            nomes decididos por texto, decisores, referência pública, registro de quem escreveu
-  listas.go             listas homogêneas e nome qualificado com parte conhecida (depois dos leitores)
-  comando.go            o comando diz o que a saída é: dica do tool_use para o tool_result
-  leitores.go           registro de todos os leitores de estrutura (fixos e da configuração)
-  leitor_sql.go           SQL e DDL, erros que citam objetos, nome qualificado depois de palavra de tipo
-  leitor_sql_freios.go    SQL citado em prosa e em comentário de código não é instrução
-  leitor_tabela.go        tabelas em qualquer desenho (CSV, largura fixa, caixa, tuplas, HTML, vertical)
-  leitor_esquema.go       nome + tipo de dado (dtypes, printSchema, Arrow, protobuf); name pelo contêiner
-  vocab_tipos.go          tipos de dado das linguagens (SQL, pandas, Arrow, Spark, Avro, Protobuf, R)
-  ref_publica.go          lê a referência pública derivada e os tipos de linguagem (arquivos gerados)
-  ref_publica.txt         GERADO: palavras frequentes como nome de recurso no material público
-  tipos_linguagem.txt     GERADO: tipos de dado que o código Go público usa como tipo de campo
-  leitor_conexao.go       strings de conexão, URIs de banco, DSN, tnsnames, URNs, dbt, Airflow
-  freios_p2.go            freios medidos nas sessões (nome de modelo na URI de banco e no tnsnames)
-  leitor_yaml.go          motor de YAML/JSON por caminho e o despachante das famílias
-  leitor_kubernetes.go    Kubernetes, Helm, imagens, DNS de serviço, env em lista
-  leitor_iac.go           Terraform/HCL, Bicep, ARM, CloudFormation
-  leitor_ansible.go       inventário do Ansible
-  leitor_ci.go            pipelines de CI e Jenkinsfile
-  leitor_chave_valor.go   chave-valor genérico (YAML, JSON, INI, .env, .properties, XML, --opção)
-  leitor_enderecos.go     hosts internos, armazenamento e filas, git, usuário de rede, pasta pessoal
-  leitor_caminhos.go      caminhos fora da pasta pessoal, outras unidades, UNC
-  leitor_nuvem_pacotes.go ARN, Azure, GCP, URLs de nuvem, pacotes internos
-  leitor_codigo.go        código em qualquer linguagem: o nome ao lado e a função chamada dizem o tipo
-  leitor_cli.go           linha de comando
-  leitor_ip.go            IP público e IPv6 (opcional)
-  leitor_termos.go        termos da empresa embutidos em identificadores
-  vocab_dev.go            listas compartilhadas (palavras de tipo, sufixos internos, nomes públicos)
-  pessoas.go            registro de pessoas (nomes, e-mails, códigos), só como hash
-  chave.go              a chave secreta e os identificadores derivados dela
-  pseudonimos.go        troca dos achados por pseudônimos
-  desmascarar.go        troca de volta, inclusive em resposta que chega em pedaços
-
-internal/ocr/         leitura de texto em imagem e PDF (tesseract, poppler)
-internal/versao/      versão e commit (o Makefile grava o commit no binário)
 ```
 
-Os testes ficam ao lado do código que testam, com o mesmo nome e `_test.go` no fim
-(`campos.go` e `campos_test.go`): é a convenção do Go, e é o que permite testar funções
-internas. À parte: `ajuda_test.go` (funções de apoio), `benchmark_test.go` (medições de
-tempo) e `estresse_test.go` (testes de carga). `ref_publica_gerar_test.go` é o gerador de `ref_publica.txt` e
-`tipos_linguagem.txt` (só roda com `LLM_DLP_GERAR_REF=1` e `LLM_DLP_CORPUS`; ver
-[Referência pública derivada](estruturas.md#referência-pública-derivada)).
+### internal/mask
+
+O pacote é um só (em Go, uma pasta é um pacote, e as peças usam funções internas umas das
+outras). A organização é pelo **prefixo do nome do arquivo**: cada família faz uma coisa.
+
+| Prefixo | O que faz |
+|---|---|
+| (sem prefixo) | O caminho principal: entrada, detecção, troca e volta |
+| `detectores_` | Dado pessoal e segredo reconhecidos pelo **formato** |
+| `campos_` | Dado pessoal reconhecido pelo **nome do campo** ao lado |
+| `leitor_` | Nome de recurso interno reconhecido pela **estrutura** do texto (um arquivo por formato) |
+| `objetos` | A base comum dos leitores: tipos, pseudônimo, freios |
+| `chamada_` | O que a chamada de ferramenta diz sobre a saída dela |
+| `decisao`, `decisor_` | Regras que decidem nomes olhando o texto inteiro |
+| `memoria_` | Tudo o que é lembrado, em RAM ou em disco (ver a tabela abaixo) |
+| `vocab_` | Vocabulários públicos e a leitura das listas de `dados/` |
+
+```
+caminho principal
+  masker.go                 o tipo Masker e a sua construção
+  mascarar.go               Mascarar: porta de entrada, com o cache de resultados; Lote congela o que saiu
+  detectar.go               Detectar: junta os detectores; texto grande vai em pedaços
+  normalizacao.go           tira o transporte (número de linha, grep, diff, ANSI, caixa, JSON escapado)
+  pseudonimos.go            troca dos achados por pseudônimos
+  desmascarar.go            troca de volta, inclusive em resposta que chega em pedaços
+  chave.go                  a chave secreta e os identificadores derivados dela
+  pessoas.go                registro de pessoas (nomes, e-mails, códigos), só como hash
+
+dado pessoal e segredo
+  detectores_formato.go     e-mail, IP, hostname, CPF, CNPJ, telefone, cartão, tokens
+  detectores_senhas.go      senhas comuns
+  detectores_extras.go      cabeçalho HTTP, IBAN, processo, documentos com palavra por perto
+  detectores_validadores.go dígitos verificadores (CPF, CNPJ, título, IBAN...)
+  campos_vocabulario.go     que nomes de campo guardam que dado
+  campos.go                 "campo: valor", JSON, SQL INSERT, XML
+  campos_tabelas.go         CSV, markdown, terminal, planilha
+
+nomes de recursos internos (servidor, banco, tabela, coluna, serviço, bucket...)
+  objetos.go                tipos, pseudônimo, aprendizado com freios
+  objetos_listas.go         listas homogêneas e nome qualificado com parte conhecida (depois dos leitores)
+  leitores.go               registro de todos os leitores (fixos e da configuração)
+  leitor_sql.go             SQL e DDL, erros que citam objetos
+  leitor_sql_freios.go      SQL citado em prosa e em comentário de código não é instrução
+  leitor_tabela.go          tabelas em qualquer desenho (CSV, largura fixa, caixa, tuplas, HTML, vertical)
+  leitor_saida_cli.go       tabela de kubectl get, docker ps, helm list
+  leitor_esquema.go         nome + tipo de dado (dtypes, printSchema, Arrow, protobuf)
+  leitor_conexao.go         strings de conexão, URIs de banco, DSN, tnsnames, URNs, dbt, Airflow
+  leitor_conexao_freios.go  nome de modelo na URI de banco e no tnsnames
+  leitor_yaml.go            motor de YAML/JSON por caminho e o despachante das famílias
+  leitor_kubernetes.go      Kubernetes, Helm, imagens, DNS de serviço, env em lista
+  leitor_iac.go             Terraform/HCL, Bicep, ARM, CloudFormation
+  leitor_ansible.go         inventário do Ansible
+  leitor_ci.go              pipelines de CI e Jenkinsfile
+  leitor_chave_valor.go     chave-valor genérico (YAML, JSON, INI, .env, .properties, XML, --opção)
+  leitor_enderecos.go       hosts internos, armazenamento e filas, git, usuário de rede, pasta pessoal
+  leitor_caminhos.go        caminhos fora da pasta pessoal, outras unidades, UNC
+  leitor_nuvem.go           ARN da AWS, IDs do Azure, recursos do GCP, URLs de nuvem
+  leitor_nuvem_hosts.go     hosts de serviço gerenciado (RDS, Redshift, S3, Azure)
+  leitor_pacotes.go         go.mod, groupId do Maven/Gradle, escopo do npm
+  leitor_codigo.go          código em qualquer linguagem: o nome ao lado e a função chamada dizem o tipo
+  leitor_traceback.go       traceback: o caminho da linha diz se o código é do cliente ou de terceiro
+  leitor_cli.go             linha de comando
+  leitor_ip.go              IP público e IPv6 (opcional)
+  leitor_termos.go          termos da empresa embutidos em identificadores
+
+o que a conversa diz
+  chamada.go                o que o proxy sabe de uma chamada de ferramenta (pedido, argumentos, eco)
+  chamada_comando.go        o comando diz o que a saída é (SELECT, cut, listagem)
+  chamada_decisor.go        proveniência e identidade nas saídas de comando
+  decisao.go                nomes decididos por texto, decisores, registro de quem escreveu
+  decisor_lexico.go         regra léxica de código e configuração
+
+memória
+  memoria_conhecidos.go     valores já mascarados, reconhecidos depois em qualquer lugar (RAM)
+  memoria_vistos.go         os mesmos valores em disco, só como hash
+  memoria_enviados.go       o que cada texto já enviado levou (para sair igual nos reenvios)
+  memoria_conversa.go       nomes decididos nos textos de uma requisição valem para os outros
+  memoria_conversa_freios.go  onde a memória da conversa não troca (programa, comentário, prosa)
+  memoria_rastreamento.go   o nome é decidido onde entra e vale em todo lugar
+  memoria_software.go       software público com prova e sombreamento
+
+vocabulário
+  vocab_dev.go              palavras de tipo, sufixos internos, nomes públicos, valor sem dono
+  vocab_tipos.go            tipos de dado das linguagens (SQL, pandas, Arrow, Spark...)
+  vocab_palavras.go         palavras comuns e dicionário (lê dados/palavras_*.txt)
+  vocab_gerado.go           lê as outras listas de dados/
+```
+
+### internal/mask/dados
+
+| Arquivo | O que é | De onde vem |
+|---|---|---|
+| `palavras_comuns.txt` | 20 mil palavras mais frequentes de pt e en | FrequencyWords (CC BY-SA 4.0) |
+| `palavras_dicionario.txt` | As 50 mil mais frequentes, menos as comuns | Gerado: `TestGerarDicionario` |
+| `ref_publica.txt` | Palavras frequentes como nome de recurso no material público | Gerado: `TestGerarRefPublica` |
+| `tipos_linguagem.txt` | Tipos de dado que o código Go público usa como tipo de campo | Gerado: `TestGerarRefPublica` |
+| `imagens_oficiais.txt` | Imagens Oficiais do Docker | Gerado: `TestGerarRefPublica` (de `docker-library/docs`) |
+| `software_publico.txt`, `fornecedores.txt` | Nome e dono dos repositórios do GitHub com 3000 estrelas ou mais | Gerado: `TestGerarSoftwarePublico` |
+| `vocab_sql.txt` | Palavras reservadas e objetos de sistema do SQL | Escrito à mão, com as fontes |
+
+Os geradores estão em `vocab_gerar_test.go` e só rodam com as variáveis de ambiente descritas
+lá (ver [Referência pública derivada](estruturas.md#referência-pública-derivada)). Lista
+desatualizada nunca libera nada: só deixa de reconhecer um nome público, que continua
+mascarado.
+
+### Testes
+
+Os testes ficam ao lado do código, com `_test.go` no fim (é a convenção do Go, e é o que
+permite testar funções internas). O teste de um arquivo tem o mesmo nome (`campos.go` e
+`campos_test.go`). Os que atravessam vários arquivos:
+
+| Arquivo | O que confere |
+|---|---|
+| `casos_publicos_test.go` | Formatos reais tirados de repositórios públicos, com nomes inventados: o que tem de sair e o que tem de ficar. Toda regra que deixa um nome em claro tem um caso aqui |
+| `leitores_*_test.go` | Os leitores por área (dados, DevOps, desenvolvimento, código) |
+| `variacoes_test.go`, `regras_gerais_test.go` | Cada caso em todas as variações de escrita; regras que valem para todos os leitores |
+| `matriz_test.go`, `matriz_transporte_test.go` | O mesmo conteúdo em todos os desenhos e transportes |
+| `negativos_test.go`, `freios_referencia_test.go` | O que não pode ser mascarado |
+| `fuzz_test.go`, `leitores_fuzz_test.go` | Fuzz da normalização e da ida e volta |
+| `benchmark_test.go`, `estresse_test.go` | Tempo e carga |
+| `medicao_test.go` | Medições em corpus público e em sessões reais (só contagens; ver abaixo) |
+| `ajuda_test.go` | Funções de apoio dos testes |
+
+## O que fica guardado
+
+Tudo o que o llm-dlp lembra, onde fica e até quanto cresce. Nenhum valor real vai para o
+disco: lá só há hash, posição e pseudônimo.
+
+| O que | Para que serve | Onde | Quanto dura | Teto |
+|---|---|---|---|---|
+| Cache de resultados (`memo`, `mascarar.go`) | Não examinar de novo o texto que já foi examinado (a conversa inteira é reenviada a cada mensagem) | RAM | Até encher | 64 MB de texto, em duas gerações |
+| Enviados (`memoria_enviados.go`) | O texto que já saiu sai igual nos reenvios (o cache da API depende disso) | RAM e `enviados.log` | Até mudar a configuração ou a versão | 64 MB em RAM; 400 mil textos em disco |
+| Conhecidos (`memoria_conhecidos.go`) | Valor mascarado com uma pista ao lado é reconhecido depois sem a pista | RAM (valor real) | Enquanto o llm-dlp está no ar | 50 mil valores (sai a metade mais antiga) |
+| Vistos (`memoria_vistos.go`) | Os conhecidos, para valerem depois de reiniciar | `vistos.json` (só hash) | 90 dias sem uso, para nome de recurso | 500 mil valores e 500 mil nomes |
+| Pessoas (`pessoas.go`) | Nomes, e-mails e códigos cadastrados | `pessoas.json` (só hash) | Até você importar de novo | O que você importar |
+| Memória da conversa (`memoria_conversa.go`) | Nome decidido num texto vale nos outros textos da mesma requisição | RAM | Uma requisição (é recalculada a cada uma) | Os textos da requisição |
+| Quem escreveu (`escritos`, `decisao.go`) | Saber o que o modelo escreveu, para não tratar como dado | RAM | Até encher | 20 mil textos, em duas gerações |
+| Evidência fraca (`fracos`, `objetos.go`) | Nome visto por uma regra fraca só vale com a segunda | RAM | Enquanto o llm-dlp está no ar | 200 mil nomes |
+| Software provado e sombreamento (`memoria_software.go`) | Não espalhar pela conversa o nome padrão de um software público | RAM | Enquanto o llm-dlp está no ar | A lista de software (medido: 3 nomes depois de 60 mil textos) |
+| Classe do rótulo (`classes`, `campos_vocabulario.go`) | Não classificar de novo o mesmo nome de campo | RAM | Até encher | 20 mil rótulos |
+| Anterioridade (`internal/proxy/anterioridade.go`) | O que o modelo escreveu antes de qualquer dado é público | RAM | Uma requisição | A conversa |
+| Tabela pseudônimo → real (`desmascarar.go`) | Desfazer a troca na resposta | RAM | Uma requisição | A conversa |
+
+Quanto isso custa na prática está em
+[Quanto usa da máquina](como-funciona.md#quanto-usa-da-máquina).
 
 ## Como um texto é mascarado
 
@@ -103,7 +209,7 @@ proxy.ServeHTTP                      recebe a requisição
  │     ├ Detectar (detectar.go)      roda os detectores e junta os achados
  │     │  ├ detectores_*.go          formato, senhas, extras
  │     │  ├ campos*.go               nome do campo
- │     │  └ conhecidos.go            valores já vistos
+ │     │  └ memoria_conhecidos.go    valores já vistos
  │     └ aplicar (pseudonimos.go)    troca cada achado pelo pseudônimo
  ├ envia para a API e congela os textos (Lote.Congelar)
  └ desmascararSSE (resposta.go)      troca os pseudônimos de volta, pedaço a pedaço
@@ -139,7 +245,7 @@ O `estresse_test.go` do proxy faz essas três conferências e serve de modelo.
 3. O pseudônimo sai como `TIPO-identificador`. Para outro formato, acrescente um caso em
    `Pseudonimo` (`pseudonimos.go`).
 4. Se o valor deve ser lembrado depois de mascarado uma vez, acrescente o tipo em
-   `contextuais` (`conhecidos.go`).
+   `contextuais` (`memoria_conhecidos.go`).
 5. Testes: um caso que pega e um que não pega em `detectores_test.go`, e o caso em
    `casosDeCorte` (`detectar_test.go`), que confere o dado em todas as posições de corte de
    um texto grande.
@@ -150,7 +256,7 @@ O `estresse_test.go` do proxy faz essas três conferências e serve de modelo.
    do aprendido (como as listas) roda à parte, depois dos outros.
 8. Nunca procure o começo ou o fim da linha sem limite a cada ocorrência
    (`strings.LastIndexByte(s[:i], '\n')`): numa linha única longa (JSON minificado) isso vira
-   quadrático. Use `inicioLinhaJ`/`fimLinhaJ` (`conhecidos.go`, janela de 1000 caracteres).
+   quadrático. Use `inicioLinhaJ`/`fimLinhaJ` (`memoria_conhecidos.go`, janela de 1000 caracteres).
    `TestLinhaLongaLinear` e os benchmarks `-bench Linha` conferem.
 
 ## Como foi testado
