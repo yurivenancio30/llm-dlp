@@ -14,7 +14,7 @@ import (
 // INDEX... é objeto (tabela, procedure, banco, schema, índice), com as partes de um nome
 // qualificado servidor.banco.schema.objeto; os outros identificadores são colunas.
 
-//go:embed vocab_sql.txt
+//go:embed dados/vocab_sql.txt
 var vocabSQLTxt string
 
 var vocabSQL = func() map[string]bool {
@@ -42,12 +42,16 @@ const (
 const (
 	reIdSQL   = "(?:\\[[^\\]\\n]{1,128}\\]|\"[^\"\\n]{1,128}\"|`[^`\\n]{1,128}`|[\\p{L}_][\\p{L}0-9_$#]*)"
 	reQualSQL = reIdSQL + "(?:\\." + reIdSQL + ")*"
+	// alvo de FROM/INTO/UPDATE: um nome, ou o lugar de um nome num modelo de código (o SQL
+	// montado pelo programa: f"... FROM {tbl}", "FROM ${tabela}", "FROM %s", dbt "{{ ref('x') }}").
+	// A instrução continua sendo SQL; as colunas dela são lidas como sempre
+	reAlvoSQL = "(?:" + reQualSQL + "|\\{\\{?[^{}\\n]{1,80}\\}\\}?|\\$\\{[^}\\n]{1,60}\\}|%(?:\\(\\w+\\))?s)"
 )
 
 var (
 	// forma mínima de cada instrução: a gramática exige essas peças, nessa ordem
-	reFormaSQL = regexp.MustCompile(`(?is)^(?:SELECT\b[^;]*?\bFROM\s+` + reQualSQL + `|WITH\s+(?:RECURSIVE\s+)?` + reIdSQL + `\s*(?:\([^)]{0,500}\)\s*)?AS\s*\(` +
-		`|INSERT\s+(?:INTO\s+|OVERWRITE\s+(?:TABLE\s+)?)` + reQualSQL + `|UPDATE\s+` + reQualSQL + `(?:\s+(?:AS\s+)?\w+)?\s+SET\s+(?:\(|` + reQualSQL + `\s*=)|DELETE\s+FROM\s+` + reQualSQL +
+	reFormaSQL = regexp.MustCompile(`(?is)^(?:SELECT\b[^;]*?\bFROM\s+` + reAlvoSQL + `|WITH\s+(?:RECURSIVE\s+)?` + reIdSQL + `\s*(?:\([^)]{0,500}\)\s*)?AS\s*\(` +
+		`|INSERT\s+(?:INTO\s+|OVERWRITE\s+(?:TABLE\s+)?)` + reAlvoSQL + `|UPDATE\s+` + reAlvoSQL + `(?:\s+(?:AS\s+)?\w+)?\s+SET\s+(?:\(|` + reQualSQL + `\s*=)|DELETE\s+FROM\s+` + reAlvoSQL +
 		`|MERGE\s+INTO\s+` + reQualSQL + `|(?:CREATE|ALTER|DROP)\s+(?:OR\s+(?:REPLACE|ALTER)\s+)?(?:(?:GLOBAL|LOCAL|SECURE|EXTERNAL|MATERIALIZED|TRANSIENT|TEMP(?:ORARY)?|UNIQUE|CLUSTERED|NONCLUSTERED)\s+)*` +
 		`(?:TABLE|VIEW|PROCEDURE|PROC|FUNCTION|TRIGGER|SCHEMA|DATABASE|SEQUENCE|INDEX|STAGE|TASK|PIPE|STREAM|SYNONYM|PACKAGE(?:\s+BODY)?|` + reTiposConta + `|` + reTiposSchema + `)\s+(?:IF\s+(?:NOT\s+)?EXISTS\s+)?` + reQualSQL +
 		`|TRUNCATE\s+TABLE\s+` + reQualSQL + `|COPY\s+INTO\s+'?@?` + reQualSQL + `|(?:EXEC|EXECUTE|CALL)\s+` + reQualSQL + `|USE\s+(?:ROLE\s+|WAREHOUSE\s+|DATABASE\s+|SCHEMA\s+|SECONDARY\s+ROLES\s+)?` + reQualSQL + `\s*(?:;|$|\n)` +
@@ -56,12 +60,20 @@ var (
 		`|(?:DESCRIBE|DESC)\s+(?:TABLE\s+)?` + reQualSQL + `\s*(?:;|$|\n)|SHOW\s+\w+(?:\s+\w+)?\s+(?:IN|FROM)\s+` + reQualSQL + `)`)
 	reClausulasSQL = regexp.MustCompile(`(?i)\b(FROM|WHERE|JOIN|GROUP\s+BY|ORDER\s+BY|SET|VALUES|INTO|HAVING|UNION|AS|ON|TABLE)\b`)
 	// linha que já não é SQL (código em volta): para a instrução ali
-	reNaoSQL   = regexp.MustCompile(`^\s*(?:def |class |func |return\b|if\s*\(|for\s*\(|import |from \S+ import|package |\}|\)\s*$|#|//|print\(|echo |cd |\$ )`)
-	reFimSQL   = regexp.MustCompile("(?m);|\\n[ \\t]*\\n|```")
-	reComSQL   = regexp.MustCompile(`(?s)--[^\n]*|/\*.*?\*/`)
-	reLitSQL   = regexp.MustCompile(`(?s)'(?:[^']|'')*'|--[^\n]*|/\*.*?\*/`)
-	reQualTok  = regexp.MustCompile(reQualSQL)
-	reParteSQL = regexp.MustCompile(reIdSQL)
+	reNaoSQL = regexp.MustCompile(`^\s*(?:def |class |func |return\b|if\s*\(|for\s*\(|import |from \S+ import|package |\}|\)\s*$|#|//|print\(|echo |cd |\$ ` +
+		// Python: comandos que não existem em SQL e "if x:" / "while x:" no fim da linha
+		`|(?:raise|assert|yield|await|elif|except|async)\b|(?:else|try|finally)\s*:|(?:if|while)\s[^\n]*:\s*(?:\n|$))`)
+	// atribuição a atributo de objeto no começo da linha (self.cur.x = ..., mock.y.return_value =
+	// ...): código em volta, a não ser dentro de uma lista de SET (ver listaSET)
+	reAtribAtributo = regexp.MustCompile(`^\s*(?:(?:self|this|cls|mock\w*|\w+_mock)\.[\w.]+\s*=[^=]|\w+(?:\.\w+){2,}\s*=[^=])`)
+	reFimSQL        = regexp.MustCompile("(?m);|\\n[ \\t]*\\n|```")
+	reComSQL        = regexp.MustCompile(`(?s)--[^\n]*|/\*.*?\*/`)
+	reLitSQL        = regexp.MustCompile(`(?s)'(?:[^']|'')*'|--[^\n]*|/\*.*?\*/`)
+	// lugar de modelo no SQL montado por código ({tbl}, ${tabela}, %(nome)s, {{ ref('x') }}): o
+	// que está dentro é do programa (variável, função), não nome do banco
+	reModeloSQL = regexp.MustCompile(`\{\{[^{}\n]{1,80}\}\}|\$\{[^}\n]{1,60}\}|\{[^{}\n]{1,80}\}|%\(\w+\)s`)
+	reQualTok   = regexp.MustCompile(reQualSQL)
+	reParteSQL  = regexp.MustCompile(reIdSQL)
 	// posições de objeto: palavra-chave -> entidade do último pedaço
 	// tem: palavras (em maiúsculas) sem as quais a regex não casa; evita rodá-la à toa
 	rePosObjSQL = []struct {
@@ -82,6 +94,14 @@ var (
 		{regexp.MustCompile(`(?i)(?:\bFROM|\bINTO|\bLIST|\bLS|\bREMOVE|\bRM|=)\s*'?@(` + reQualSQL + `)`), "tabela", []string{"@"}},
 	}
 	reOnObjSQL = regexp.MustCompile(`(?i)\bON\s+(` + reQualSQL + `)\s*(?:\(|TO\b|FROM\b|;|$)`)
+	// DDL de qualquer tipo de objeto, pela gramática e não por uma lista de tipos: CREATE/ALTER/
+	// DROP [OR REPLACE] + 1 a 4 palavras do tipo em maiúsculas + nome (CREATE NETWORK RULE x,
+	// CREATE SEMANTIC VIEW x, CREATE CORTEX SEARCH SERVICE x). Os dialetos ganham tipos novos
+	// todo ano; em maiúsculas, a forma não se confunde com prosa ("create a new table"). Os
+	// tipos conhecidos (TABLE, INDEX, USER...) continuam dando o tipo do nome (rePosObjSQL).
+	reDDLGenerico = regexp.MustCompile(`^(?:CREATE|ALTER|DROP)\s+(?:OR\s+(?:REPLACE|ALTER)\s+)?(?:[A-Z]+\s+){1,4}(?:IF\s+(?:NOT\s+)?EXISTS\s+)?(` + reQualSQL + `)`)
+	// declaração de CTE: WITH [RECURSIVE] x [(colunas)] AS (  e  ), y AS (
+	reCTE      = regexp.MustCompile(`(?i)(?:\bWITH\s+(?:RECURSIVE\s+)?|\)\s*,\s*)(` + reIdSQL + `)\s*(?:\([^)]{0,500}\)\s*)?AS\s*\(`)
 	reListaSQL = regexp.MustCompile(`^\s*(?:(?:AS\s+)?[A-Za-z_]\w*\s*)?,\s*(` + reQualSQL + `)`)
 )
 
@@ -156,13 +176,36 @@ func fimInstrucao(s string, i, j int) int {
 	if a, ok := aberturaString(s, i); ok {
 		lim = fimString(s, j, lim, a)
 	}
+	// SQL citado num comentário de linha (# ..., // ..., * ... de Javadoc): termina com a linha;
+	// a linha seguinte já é o código em volta. Só olha 2000 bytes para trás (linha única longa,
+	// JSON minificado, ficaria quadrática): comentário de linha não é tão longo
+	w := max(0, i-2000)
+	if w == 0 || strings.IndexByte(s[w:i], '\n') >= 0 {
+		if com, _ := comentarioDeLinha(s[w:], i-w); com {
+			if e := strings.IndexByte(s[j:lim], '\n'); e >= 0 {
+				lim = j + e
+			}
+		}
+	}
 	fim := lim
-	if loc := reFimSQL.FindStringIndex(s[j:lim]); loc != nil {
-		fim = j + loc[0]
+	for k := j; k < lim; {
+		loc := reFimSQL.FindStringIndex(s[k:lim])
+		if loc == nil {
+			break
+		}
+		e := k + loc[0]
+		// linha em branco no meio da instrução (estilo do dbt: CTEs e cláusulas separadas por
+		// linha em branco): continua se há parêntese aberto ou se a próxima linha continua o SQL
+		if s[e] == '\n' && continuaSQL(s, i, e, k+loc[1], lim) {
+			k += loc[1]
+			continue
+		}
+		fim = e
+		break
 	}
 	for o := strings.IndexByte(s[j:fim], '\n'); o >= 0; {
 		p := j + o + 1
-		if reNaoSQL.MatchString(s[p:min(fim, p+120)]) || linhaSolta(s, j, p, fim) {
+		if l := s[p:min(fim, p+120)]; reNaoSQL.MatchString(l) || reAtribAtributo.MatchString(l) && !listaSET(s, j, p) || linhaSolta(s, j, p, fim) {
 			return p - 1
 		}
 		k := strings.IndexByte(s[p:fim], '\n')
@@ -172,6 +215,90 @@ func fimInstrucao(s string, i, j int) int {
 		o = p - j + k
 	}
 	return fim
+}
+
+// artigos e determinantes do inglês (em minúsculas): nunca são nome numa instrução SQL
+var artigosProsa = conj("the", "an", "this", "these", "those", "your", "our", "their", "its")
+
+// reContinuaSQL: começo de linha que só existe no meio de uma instrução: cláusula, fecha
+// parêntese, vírgula de lista, comentário de SQL, Jinja (dbt) ou a próxima CTE ("x as (").
+// "and", "on", "with", "case" ficam de fora: começam frase em prosa.
+var reContinuaSQL = regexp.MustCompile(`(?i)^[ \t]*(?:(?:select|from|where|qualify|having|union|except|intersect)\b|(?:inner|left|right|full|cross)\s+(?:outer\s+)?join\b|join\b|(?:group|order)\s+by\b|\)|,|--|\{\{|\{%|` + reIdSQL + `\s+as\s*\()`)
+
+// continuaSQL: depois da linha em branco que termina em p (a instrução começou em i e a linha
+// em branco em e), a instrução continua?
+func continuaSQL(s string, i, e, p, lim int) bool {
+	abertos := 0
+	aspa := false
+	for k := i; k < e; k++ {
+		switch c := s[k]; {
+		case c == '\'':
+			aspa = !aspa
+		case aspa:
+		case c == '(':
+			abertos++
+		case c == ')':
+			abertos--
+		}
+	}
+	for p < lim && (s[p] == '\n' || s[p] == '\r' || s[p] == ' ' || s[p] == '\t') {
+		p++
+	}
+	if p >= lim {
+		return false
+	}
+	return abertos > 0 || reContinuaSQL.MatchString(s[p:min(lim, p+120)])
+}
+
+// cláusulas que vêm logo depois do apelido de uma tabela (FROM anuncios an WHERE ...)
+var depoisDeApelido = conj("where", "join", "inner", "left", "right", "full", "cross", "on", "group", "order",
+	"having", "limit", "union", "set", "using", "natural", "qualify", "window", "fetch", "offset")
+
+// apelidoSQL: o artigo v, que termina em b, é apelido de tabela e não prosa: é usado como
+// qualificador na instrução ("an.cod") ou vem seguido de uma cláusula ("apolices an WHERE").
+func apelidoSQL(lit, v string, b int) bool {
+	for k := strings.Index(lit, v+"."); k >= 0; {
+		if k == 0 || !ehIdent(lit[k-1]) {
+			return true
+		}
+		n := strings.Index(lit[k+1:], v+".")
+		if n < 0 {
+			break
+		}
+		k += 1 + n
+	}
+	e := b + 1
+	for e < len(lit) && letraD(lit[e]) {
+		e++
+	}
+	return depoisDeApelido[strings.ToLower(lit[b+1:e])]
+}
+
+// chamadaEncadeada: depois do parêntese que abre em j e do que o fecha vem "." (o
+// select(User).where(...) de um construtor de consultas): chamada de método, não instrução.
+func chamadaEncadeada(s string, j int) bool {
+	n := 0
+	for k := j; k < len(s) && k < j+400; k++ {
+		switch s[k] {
+		case '(':
+			n++
+		case ')':
+			if n--; n == 0 {
+				for k++; k < len(s) && (s[k] == ' ' || s[k] == '\t' || s[k] == '\r' || s[k] == '\n'); k++ {
+				}
+				return k < len(s) && s[k] == '.'
+			}
+		}
+	}
+	return true // sem fecho por perto: não é "SELECT(col) FROM x"
+}
+
+// listaSET: a linha que começa em p continua uma lista de atribuições do SQL: a linha anterior
+// termina em vírgula ou é o SET ("UPDATE t\nSET\n  t.a = 1,\n  t.b = 2").
+func listaSET(s string, j, p int) bool {
+	ant := strings.TrimRight(s[j:max(j, p-1)], " \t\r\n")
+	return strings.HasSuffix(ant, ",") || len(ant) >= 3 && strings.EqualFold(ant[len(ant)-3:], "SET") &&
+		(len(ant) == 3 || !ehIdent(ant[len(ant)-4]))
 }
 
 // iniciosSQL: as palavras que começam uma instrução (em maiúsculas).
@@ -211,6 +338,12 @@ func acharSQL(s string, add func(ObjAchado)) {
 		if i < ate {
 			return
 		}
+		// select(...).where(...), update(...), delete(...): chamada de função (SQLAlchemy,
+		// query builders), não instrução. Só o SELECT existe colado ao parêntese em SQL
+		// ("SELECT(col) FROM x"), e aí não vem "." depois do parêntese que fecha
+		if j < len(s) && s[j] == '(' && (!strings.EqualFold(s[i:j], "SELECT") || chamadaEncadeada(s, j)) {
+			return
+		}
 		maiusc := strings.ToUpper(s[i:j]) == s[i:j]
 		kw := strings.ToUpper(s[i:j])
 		// palavras comuns em prosa (use, copy, show, call, exec...): fora de maiúsculas, só com
@@ -228,7 +361,7 @@ func acharSQL(s string, add func(ObjAchado)) {
 		if k := inicioProsaSQL(forma); k >= 0 {
 			fim, corpo, forma = i+k, corpo[:k], forma[:k]
 		}
-		if !reFormaSQL.MatchString(forma) {
+		if !reFormaSQL.MatchString(forma) && !(maiusc && reDDLGenerico.MatchString(forma)) {
 			return
 		}
 		if !maiusc && !instrucaoForaDeProsa(s, i, forma, kw, prosa) {
@@ -263,6 +396,11 @@ func inicioProsaSQL(corpo string) int {
 	for _, p := range partesSQLEm(lit) {
 		a, b := p[0], p[1]
 		v := lit[a:b]
+		// artigo ou determinante do inglês seguido de palavra: não existe na gramática do SQL
+		// ("Select the policy ... from scratch", "Create a DatabaseOperations for the ...")
+		if artigosProsa[v] && b+1 < len(lit) && lit[b] == ' ' && letraD(lit[b+1]) && !apelidoSQL(lit, v, b) {
+			return a
+		}
 		solta := strings.ToLower(v) == v && !publicoSQL(v) && !caraDeIdentificador(v) && strings.IndexByte(v, '_') < 0 &&
 			!strings.ContainsAny(v, "[\"`$#") && !(a > 1 && lit[a-1] == '.' && ehIdent(lit[a-2])) &&
 			(b == len(lit) || lit[b] != '(' && !(lit[b] == '.' && b+1 < len(lit) && (ehIdent(lit[b+1]) || strings.IndexByte("[\"`*", lit[b+1]) >= 0)))
@@ -349,10 +487,28 @@ func formaInequivoca(corpo, kw string) bool {
 
 // instrucaoSQL classifica os identificadores de uma instrução já reconhecida.
 func instrucaoSQL(s string, base int, corpo, kw string, forte bool, add func(ObjAchado)) {
-	lit := reLitSQL.ReplaceAllStringFunc(corpo, func(x string) string { return strings.Repeat(" ", len(x)) })
+	branco := func(x string) string { return strings.Repeat(" ", len(x)) }
+	lit := reLitSQL.ReplaceAllStringFunc(corpo, branco)
+	if strings.ContainsAny(lit, "{%") {
+		lit = reModeloSQL.ReplaceAllStringFunc(lit, branco)
+	}
 	ent := map[[2]int]string{} // parte -> entidade
 	objetos := map[string]bool{}
+	// nomes de CTE (WITH x AS (, ), y AS (): nomes locais da consulta, nem tabela nem coluna
+	// (como o apelido de uma tabela, não existem no banco)
+	ctes := map[string]bool{}
+	if strings.Contains(strings.ToUpper(lit[:min(len(lit), 16)]), "WITH") {
+		for _, m := range reCTE.FindAllStringSubmatch(lit, -1) {
+			ctes[strings.ToLower(strings.Trim(m[1], "[]\"`"))] = true
+		}
+	}
+	ehCTE := func(a, b int) bool {
+		return len(ctes) > 0 && ctes[strings.ToLower(strings.Trim(lit[a:b], "[]\"`"))]
+	}
 	marcarQual := func(a, b int, ult string) {
+		if ehCTE(a, b) {
+			return
+		}
 		var vs [][2]int
 		for _, p := range partesSQL(lit, a, b) {
 			if v := strings.Trim(lit[p[0]:p[1]], "[]\"`"); len(v) > 1 && !publicoSQL(v) {
@@ -366,6 +522,27 @@ func instrucaoSQL(s string, base int, corpo, kw string, forte bool, add func(Obj
 			ent[vs[k]] = e
 		}
 		objetos[strings.ToLower(strings.Trim(lit[vs[len(vs)-1][0]:vs[len(vs)-1][1]], "[]\"`"))] = true
+	}
+	// tipo de objeto fora das regras de posição: o nome do DDL é objeto (de schema, como a
+	// tabela); as regras de posição abaixo corrigem o tipo quando o conhecem
+	if kw == "CREATE" || kw == "ALTER" || kw == "DROP" {
+		if m := reDDLGenerico.FindStringSubmatchIndex(lit); m != nil {
+			if !reFormaSQL.MatchString(lit) {
+				// tipo que as regras não conhecem (NETWORK RULE, AGENT...): o corpo são
+				// propriedades (TYPE = IPV4, VALUE_LIST = (...)), não colunas; só o nome
+				// do objeto é nome
+				ps := partesSQL(lit, m[2], m[3])
+				ents := entQual(len(ps), "tabela") // banco.schema.objeto
+				for k, p := range ps {
+					if v := strings.Trim(lit[p[0]:p[1]], "[]\"`"); len(v) > 1 && !publicoSQL(v) {
+						ia, ib := tirarCitacao(lit, p[0], p[1])
+						add(ObjAchado{base + ia, base + ib, ents[k], "sql", forte})
+					}
+				}
+				return
+			}
+			marcarQual(m[2], m[3], "tabela")
+		}
 	}
 	up := strings.ToUpper(lit)
 	for _, p := range rePosObjSQL {
@@ -395,7 +572,7 @@ func instrucaoSQL(s string, base int, corpo, kw string, forte bool, add func(Obj
 		ps := partesSQL(lit, q[0], q[1])
 		for k, p := range ps {
 			a, b := p[0], p[1]
-			if b <= a {
+			if b <= a || ehCTE(a, b) {
 				continue
 			}
 			v := lit[a:b]

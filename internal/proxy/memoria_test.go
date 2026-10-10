@@ -16,7 +16,7 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/mask"
 )
 
-// Memória da conversa e quem escreveu, de ponta a ponta (T3, T4, T5, T6). Nomes inventados,
+// Memória da conversa e quem escreveu, de ponta a ponta. Nomes inventados,
 // de palavra comum, montados por partes.
 
 var (
@@ -149,7 +149,7 @@ func comandoDaEntrada(t *testing.T, entrada string) string {
 	return in["command"]
 }
 
-// T3: o modelo usa o pseudônimo num comando, o proxy traduz para o nome; quando a chamada
+// O modelo usa o pseudônimo num comando, o proxy traduz para o nome; quando a chamada
 // volta no histórico, ela sai com o pseudônimo, a palavra traduzida entra na memória e a saída
 // seguinte com a palavra sai mascarada (numa conversa sem o inventário: só a tradução ensina).
 func TestMemoriaTraduzidaNoComando(t *testing.T) {
@@ -187,10 +187,10 @@ func TestMemoriaTraduzidaNoComando(t *testing.T) {
 	}
 }
 
-// T4: resposta com um pseudônimo traduzido e a mesma palavra escrita pelo próprio modelo no
+// Resposta com um pseudônimo traduzido e a mesma palavra escrita pelo próprio modelo no
 // mesmo bloco. Ao voltar no histórico, só a traduzida vira pseudônimo; na mensagem nova do
 // usuário a palavra comum fica como palavra (o contágio não leva palavra comum para a prosa:
-// mask/palavras_comuns.go). Vale também depois de um reinício (o registro está no
+// mask/vocab_palavras.go). Vale também depois de um reinício (o registro está no
 // enviados.log, só com HMAC e pseudônimos).
 func TestMemoriaQuemEscreveuPontaAPonta(t *testing.T) {
 	molde := "o namespace %s tem logs; " + nsPalavra + " tambem e uma palavra comum" // ASCII: o picote de 3 bytes não parte um caractere
@@ -233,7 +233,7 @@ func TestMemoriaQuemEscreveuPontaAPonta(t *testing.T) {
 	}
 }
 
-// T5: outra conversa, sem o inventário, não mascara a palavra comum (no mesmo processo).
+// Outra conversa, sem o inventário, não mascara a palavra comum (no mesmo processo).
 func TestMemoriaOutraConversa(t *testing.T) {
 	var corpos [][]byte
 	px := montarMem(t, t.TempDir(), &corpos, respTexto(false, "ok"))
@@ -249,7 +249,7 @@ func TestMemoriaOutraConversa(t *testing.T) {
 	}
 }
 
-// T6: o que já foi enviado continua idêntico, byte a byte, depois que a memória passa a
+// O que já foi enviado continua idêntico, byte a byte, depois que a memória passa a
 // conhecer o nome; os textos novos do mesmo pedido usam a memória.
 func TestMemoriaNaoReescreveOPassadoPontaAPonta(t *testing.T) {
 	var corpos [][]byte
@@ -271,7 +271,7 @@ func TestMemoriaNaoReescreveOPassadoPontaAPonta(t *testing.T) {
 		}
 	}
 	// o inventário colado no texto novo continua nome (o leitor decide ali); a palavra comum na
-	// prosa fica como palavra (mask/palavras_comuns.go)
+	// prosa fica como palavra (mask/vocab_palavras.go)
 	if strings.Contains(r[1][2], "-n "+nsPalavra) || !strings.Contains(r[2][4], nsPalavra) {
 		t.Fatalf("texto novo: %s | %s", r[1][2], r[2][4])
 	}

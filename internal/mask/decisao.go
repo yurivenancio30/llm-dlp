@@ -6,7 +6,7 @@ import (
 	"sync"
 )
 
-// Interface comum da rodada "conhecer o nome" (ver docs/estruturas.md, seção Memória da
+// Interface comum das regras que decidem nomes (ver docs/estruturas.md, seção Memória da
 // conversa). Três peças:
 //
 //   - Decisao: um nome que uma regra decidiu num texto (nome, tipo, regra). Fica no resultado
@@ -39,8 +39,8 @@ type TextoCtx struct {
 	S       string
 	Achados []Achado // o que os detectores e leitores já acharam em S (posições de S)
 	Aprende bool     // false: conteúdo da internet (decide no lugar, sem lembrar)
-	// Ext: a parte da dica que não é a do leitor de tabela (comando.go): o que o proxy sabe
-	// da chamada que produziu o texto. "" = nada. O formato é de quem a escreve (trilha B).
+	// Ext: a parte da dica que não é a do leitor de tabela (chamada_comando.go): o que o proxy sabe
+	// da chamada que produziu o texto. "" = nada. O formato é de quem a escreve.
 	Ext string
 
 	m   *Masker
@@ -57,7 +57,7 @@ func (c *TextoCtx) Decidir(ini, fim int, ent, regra string) {
 		return
 	}
 	if !valorInteiro(c.S, ini, fim) || publicoSistema(semCitacao(c.S[ini:fim])) {
-		return // pedaço de uma expressão, ou vocabulário de sistema (ver rastreamento.go)
+		return // pedaço de uma expressão, ou vocabulário de sistema (ver memoria_rastreamento.go)
 	}
 	v := c.S[ini:fim]
 	if ehPseudoObj(v) {
@@ -144,7 +144,7 @@ func (m *Masker) Decididos(s, dica string) []Decisao {
 }
 
 // ---------------------------------------------------------------------------------------
-// Referência pública derivada (trilha D): palavras muito frequentes como nome de recurso no
+// Referência pública derivada: palavras muito frequentes como nome de recurso no
 // material público (default, public, api...). Preenchida por um arquivo gerado por medição.
 
 var refPublica map[string]bool

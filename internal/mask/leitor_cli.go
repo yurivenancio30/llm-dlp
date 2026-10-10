@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// Leitor de linha de comando (item 11 da revisão): opções que levam o nome de um recurso,
+// Leitor de linha de comando: opções que levam o nome de um recurso,
 // iguais em qualquer ferramenta que siga a convenção.
 //
 //	-h/--host, -S/--server        servidor

@@ -602,6 +602,17 @@ func addARNouNome(s string, a, b int, ent, regra string, add func(ObjAchado)) {
 // Leitor de YAML/JSON estruturado: Kubernetes, kubeconfig, Helm, compose, CloudFormation, ARM,
 // Ansible (YAML) e pipelines de CI.
 
+// chavesServicoCompose: as chaves de um serviço na especificação do Compose
+// (https://github.com/compose-spec/compose-spec/blob/main/05-services.md), mais a fusão "<<"
+// (serviço que herda tudo de uma âncora, "<<: *comum"). Um filho de "services:" com uma delas
+// é serviço, tenha imagem própria ou não.
+var chavesServicoCompose = conj("image", "build", "ports", "environment", "env_file", "command", "entrypoint",
+	"depends_on", "volumes", "networks", "restart", "healthcheck", "deploy", "container_name", "hostname",
+	"labels", "expose", "links", "extends", "profiles", "working_dir", "user", "logging", "ulimits",
+	"cap_add", "cap_drop", "secrets", "configs", "extra_hosts", "tmpfs", "stdin_open", "tty", "platform",
+	"pull_policy", "init", "privileged", "network_mode", "external_links", "shm_size", "stop_signal",
+	"stop_grace_period", "sysctls", "devices", "dns", "<<")
+
 var sinaisYAML = []string{"apiVersion", "services:", "Resources:", "runs-on", "stages:", "script:", "pool:",
 	"jobs:", "hosts:", "ansible_", "delegate_to"}
 
@@ -716,12 +727,9 @@ func regrasEstrutura(s string, ents []yEnt, add func(ObjAchado)) {
 			}
 			declCompose[e.root][e.path[0]+"\x00"+k] = true
 		}
-		if len(e.path) == 3 && e.path[0] == "services" {
-			switch k {
-			case "image", "build", "ports", "environment":
-				compose[e.root] = true
-				servCompose[e.ids[1]] = true
-			}
+		if len(e.path) == 3 && e.path[0] == "services" && chavesServicoCompose[k] {
+			compose[e.root] = true
+			servCompose[e.ids[1]] = true
 		}
 	}
 	filho := func(id int, k string) *yEnt {

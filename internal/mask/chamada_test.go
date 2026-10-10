@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// Trilha B da rodada "conhecer o nome" (chamada.go, decisor_chamada.go): proveniência,
+// Chamada de ferramenta (chamada.go, chamada_decisor.go): proveniência,
 // identidade, eco, tipo do pedido. Nomes inventados, vários de palavra comum.
 
 // passoConversa: uma mensagem do usuário (opcional), a chamada e a saída dela.
@@ -54,7 +54,7 @@ func palavraInteira(s, w string) bool {
 	return regexp.MustCompile(`(^|[^\pL\pN_])` + regexp.QuoteMeta(w) + `($|[^\pL\pN_])`).MatchString(s)
 }
 
-// memoriaSimples: o que a memória da conversa (trilha A) faz com as decisões, de forma simples:
+// memoriaSimples: o que a memória da conversa faz com as decisões, de forma simples:
 // a palavra inteira vira o pseudônimo do tipo decidido.
 func memoriaSimples(m *Masker, s string, ds []Decisao) string {
 	for _, d := range ds {
@@ -68,7 +68,7 @@ func memoriaSimples(m *Masker, s string, ds []Decisao) string {
 	return s
 }
 
-// seisFormatos: o mesmo nome solto em 6 formatos (T2).
+// seisFormatos: o mesmo nome solto em 6 formatos.
 func seisFormatos(n string) []string {
 	return []string{
 		"o " + n + " parou de responder hoje cedo",
@@ -121,7 +121,7 @@ var areasT2 = []areaT2{
 		[]string{"notificacoes", "conciliacoes", "reprocessamento"}, ""},
 }
 
-// T2: para cada área, a saída do inventário é mascarada e cada nome fica decidido (sem
+// Para cada área, a saída do inventário é mascarada e cada nome fica decidido (sem
 // Generica); com a memória da conversa (simulada aqui), o mesmo nome solto em 6 formatos fica
 // 0 em claro.
 func TestT2InventarioPalavraComum(t *testing.T) {
@@ -159,7 +159,7 @@ func TestT2InventarioPalavraComum(t *testing.T) {
 	}
 }
 
-// T1: o experimento do catálogo. O CSV (inventado) é lido com head e depois por um script
+// O experimento do catálogo. O CSV (inventado) é lido com head e depois por um script
 // Python que imprime "a | b | c" sem cabeçalho; o script traz as tags e as regex como literais.
 // Colunas e tabelas saem mascaradas; tags e regex continuam legíveis.
 func TestT1Catalogo(t *testing.T) {

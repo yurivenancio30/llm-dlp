@@ -187,9 +187,10 @@ func colunasFixas(s string, l celula) []celula {
 	if len(cs) < 2 || len(cs) > 40 {
 		return nil
 	}
-	// prosa não tem colunas: o cabeçalho tem um vão de 2+ espaços, um TAB ou começa recuado
-	// (índice do DataFrame); as linhas de dados também (ver alinharFixo)
-	if !temVao(s[l.a:l.b]) || pareceCodigo(s[l.a:l.b]) {
+	// prosa não tem colunas: o cabeçalho tem um vão de 2+ espaços ou um TAB entre as palavras
+	// (recuo sozinho é parágrafo recuado de RST/Markdown; o DataFrame separa as colunas por 2+
+	// espaços); as linhas de dados podem só começar recuadas (ver alinharFixo)
+	if h := strings.TrimSpace(s[l.a:l.b]); !strings.Contains(h, "  ") && !strings.Contains(h, "\t") || pareceCodigo(s[l.a:l.b]) {
 		return nil
 	}
 	for _, c := range cs {
@@ -262,7 +263,7 @@ func tituloTipo(s string, linhas []celula, i int) string {
 
 func acharTabelasObj(s string, add func(ObjAchado)) { acharTabelasD(s, nil, add) }
 
-// acharTabelasD: com d != nil (a dica do comando, ver comando.go), só as colunas que o cabeçalho
+// acharTabelasD: com d != nil (a dica do comando, ver chamada_comando.go), só as colunas que o cabeçalho
 // não tipa e a dica tipa (o resto já saiu sem a dica).
 func acharTabelasD(s string, d *dicaSaida, add func(ObjAchado)) {
 	addSemDica := add
@@ -399,9 +400,53 @@ func acharTabelasD(s string, d *dicaSaida, add func(ObjAchado)) {
 		if fixas != nil && len(rows) == 0 {
 			continue
 		}
-		classificarTabelaD(s, cs, rows, tituloTipo(s, linhas, i), fixas != nil && len(rows) < 2, sep == 0 || sep == '|', d, add)
+		semCab := fixas != nil && len(rows) < 2
+		var dv *dicaSaida
+		if d == nil {
+			// a listagem à vista logo acima (terminal colado, README: "$ airflow dags list"): o
+			// cabeçalho é da ferramenta, não coluna do dono, e a listagem tipa a coluna de
+			// identidade como no tool_use. Só listagem: debaixo de "$ cat x.csv" ou de
+			// "$ python relatorio.py" o cabeçalho é do dono e continua sendo coluna
+			if cmd, ok := comandoAcima(s, linhas, i); ok {
+				if dv = dicaListagem(cmd); dv != nil {
+					semCab = true
+				}
+			}
+		}
+		classificarTabelaD(s, cs, rows, tituloTipo(s, linhas, i), semCab, sep == 0 || sep == '|', d, add)
+		if dv != nil {
+			classificarTabelaD(s, cs, rows, "", true, sep == 0 || sep == '|', dv, add)
+		}
 		i = k - 1
 	}
+}
+
+// linha de prompt de shell: "$ cmd", "% cmd", "user@host:~/x$ cmd", "(venv) $ cmd", "PS C:\x> cmd"
+var rePromptShell = regexp.MustCompile(`^(?:\([\w.-]+\)\s*)?(?:[\w.-]+@[\w.-]+(?::[^\s$%]*)?\s*)?[$%]\s+(\S.*)$|^PS [^>\n]{0,80}>\s+(\S.*)$`)
+
+// linha que é ela mesma um comando: programa em minúsculas e argumentos, sem pontuação de frase
+var reLinhaComando = regexp.MustCompile(`^[a-z][\w.-]*(?:\s+[\w./:=@,-]+){1,12}$`)
+
+// SQL no comando (psql -c "select ...", mysql -e "show tables"): o cabeçalho são as colunas
+// da consulta, não campos da ferramenta
+var reSQLNoComando = regexp.MustCompile(`(?i)\b(?:select|insert|update|delete|merge|show|describe|desc|with)\b`)
+
+// comandoAcima: o comando de shell (não SQL) até 3 linhas acima do cabeçalho linhas[i]: uma
+// linha de prompt ou, logo acima, uma linha que é um comando de listagem ("airflow dags list").
+func comandoAcima(s string, linhas []celula, i int) (string, bool) {
+	for k := i - 1; k >= 0 && k >= i-3; k-- {
+		l := strings.TrimSpace(s[linhas[k].a:linhas[k].b])
+		cmd := ""
+		if m := rePromptShell.FindStringSubmatch(l); m != nil {
+			cmd = m[1] + m[2]
+		} else if k == i-1 && reLinhaComando.MatchString(l) && dicaListagem(l) != nil {
+			cmd = l
+		}
+		if cmd != "" {
+			return cmd, !reSQLNoComando.MatchString(cmd)
+		}
+	}
+	return "", false
 }
 
 // classificarTabela: o tipo de cada coluna pelo cabeçalho e os valores das colunas de objeto.

@@ -2,7 +2,7 @@ package mask
 
 import "testing"
 
-// Seção E: o mesmo conjunto de nomes do Snowflake em todas as formas.
+// O mesmo conjunto de nomes do Snowflake em todas as formas.
 
 var nomesSnow = []string{"acme-erpfin", "papel_fin_leitura", "wh_fin_carga", "pol_mascara_cpf", "stg_notas_fin", "tsk_carga_fin"}
 

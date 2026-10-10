@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// Seção G: itens 29 a 33. Todos os nomes são fictícios.
+// Regras que valem para todos os leitores. Todos os nomes são fictícios.
 
 // pseudoDe: o pseudônimo que substituiu real (pelas entradas).
 func pseudoDe(m *Masker, s, real string) (ps, tipo string) {
@@ -19,7 +19,7 @@ func pseudoDe(m *Masker, s, real string) (ps, tipo string) {
 	return "", ""
 }
 
-// Item 29: duas regras que discordam do tipo do mesmo nome. No mesmo texto, um tipo só; depois
+// Duas regras que discordam do tipo do mesmo nome. No mesmo texto, um tipo só; depois
 // de aprendido, o tipo (e o pseudônimo) ficam, também depois de um reinício.
 func TestTipoConsistenteEntreRegras(t *testing.T) {
 	const nome = "xq-ped-api01"
@@ -77,7 +77,7 @@ func TestTipoConsistenteEntreRegras(t *testing.T) {
 	}
 }
 
-// Item 30: prefixo de literal de string do Python não é o valor do campo; valor de 1 ou 2
+// Prefixo de literal de string do Python não é o valor do campo; valor de 1 ou 2
 // letras não é mascarado; padrão de regex no valor não é dado.
 func TestCampoPrefixoLiteral(t *testing.T) {
 	m := novoTeste(t)
@@ -107,7 +107,7 @@ func TestCampoPrefixoLiteral(t *testing.T) {
 	}
 }
 
-// Item 31: nome aprendido com ponto é reconhecido em prosa depois do reinício.
+// Nome aprendido com ponto é reconhecido em prosa depois do reinício.
 func TestNomeComPontoDepoisDoReinicio(t *testing.T) {
 	dir := t.TempDir()
 	vs, _ := CarregarVistos(dir + "/v.json")
@@ -133,7 +133,7 @@ func TestNomeComPontoDepoisDoReinicio(t *testing.T) {
 	}
 }
 
-// Item 32: URLs coladas sem separador e "a://" repetido não são quadráticos.
+// URLs coladas sem separador e "a://" repetido não são quadráticos.
 func TestURLsColadasLinear(t *testing.T) {
 	if testing.Short() {
 		t.Skip("mede tempo")
@@ -149,7 +149,7 @@ func TestURLsColadasLinear(t *testing.T) {
 	}
 }
 
-// Item 33: databaseName= dentro de URL JDBC em string Java (a URI conta como o outro par).
+// DatabaseName= dentro de URL JDBC em string Java (a URI conta como o outro par).
 func TestJDBCDatabaseNameEmString(t *testing.T) {
 	m := novoTeste(t)
 	confere(t, m, `props.put("url", "jdbc:sqlserver://xq-srv01;databaseName=xq_banco01");`, []string{"xq_banco01", "xq-srv01"}, []string{"props.put", "databaseName="})

@@ -2,7 +2,7 @@ package mask
 
 import "testing"
 
-// Seção C: nome + tipo de dado. Os nomes de coluna devem sair mascarados em todas as formas.
+// Nome + tipo de dado. Os nomes de coluna devem sair mascarados em todas as formas.
 
 func TestEsquemaNomeTipo(t *testing.T) {
 	cols := []string{"cd_conta", "vl_lancto", "dt_lancto"}

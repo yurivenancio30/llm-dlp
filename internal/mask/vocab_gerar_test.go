@@ -2,6 +2,7 @@ package mask
 
 import (
 	"compress/gzip"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/fs"
@@ -11,12 +12,13 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode"
 )
 
-// Gerador da referência pública (P1, item D3). Só roda com LLM_DLP_GERAR_REF=1 e lê só o
+// Gerador da referência pública. Só roda com LLM_DLP_GERAR_REF=1 e lê só o
 // material público da máquina, os diretórios de LLM_DLP_CORPUS (código e documentação de
 // terceiros: módulos Go, bibliotecas Python, /usr/share/doc). Grava ref_publica.txt e
-// tipos_linguagem.txt (ref_publica.go os lê com go:embed). Nada é escrito à mão: para mudar a
+// tipos_linguagem.txt (vocab_gerado.go os lê com go:embed). Nada é escrito à mão: para mudar a
 // lista, muda-se o critério aqui e gera-se de novo.
 //
 //	LLM_DLP_GERAR_REF=1 LLM_DLP_CORPUS=dir1:dir2 go test ./internal/mask -run TestGerarRefPublica -v
@@ -30,7 +32,9 @@ import (
 //   - valor de uma opção de linha de comando com palavra de tipo ("--namespace x", "--schema=x");
 //   - nome depois de FROM, JOIN, INTO, UPDATE, TABLE, SCHEMA, DATABASE no SQL (cada parte de um
 //     nome qualificado; em minúsculas, só o nome qualificado e fora de "from x.y import");
-//   - primeiro rótulo do host (api.exemplo.org) e primeiro pedaço do caminho de uma URL.
+//   - primeiro rótulo do host (api.exemplo.org) e primeiro pedaço do caminho de uma URL;
+//   - organização e nome de uma imagem de container (image:, FROM) sem registro ou de registro
+//     público (bitnami/redis, grafana/loki, redis).
 //
 // Projeto: o módulo (o caminho até o pedaço com "@" nos módulos Go) ou o primeiro diretório
 // abaixo da raiz do corpus (pacote Python, pasta de /usr/share/doc). Um nome que só um projeto
@@ -70,6 +74,7 @@ func TestGerarRefPublica(t *testing.T) {
 	nomes := map[string]map[string]bool{} // palavra -> projetos
 	tipos := map[string]map[string]bool{} // tipo -> projetos
 	projetos := map[string]bool{}
+	oficiais := map[string]map[string]bool{} // pasta-mãe -> imagens
 	var arquivos int
 	var bytes int64
 	exts := conj(".go", ".py", ".md", ".rst", ".txt", ".yaml", ".yml", ".json", ".toml", ".sql", ".sh", ".cfg", ".ini", ".conf", ".env")
@@ -84,6 +89,17 @@ func TestGerarRefPublica(t *testing.T) {
 					return filepath.SkipDir
 				}
 				return nil
+			}
+			// Imagens Oficiais do Docker: no docker-library/docs, uma pasta por imagem com
+			// content.md e metadata.json
+			if e.Name() == "metadata.json" {
+				if _, err := os.Stat(filepath.Join(filepath.Dir(p), "content.md")); err == nil {
+					pai := filepath.Dir(filepath.Dir(p))
+					if oficiais[pai] == nil {
+						oficiais[pai] = map[string]bool{}
+					}
+					oficiais[pai][strings.ToLower(filepath.Base(filepath.Dir(p)))] = true
+				}
 			}
 			gz := strings.HasSuffix(p, ".gz")
 			ext := strings.ToLower(filepath.Ext(strings.TrimSuffix(p, ".gz")))
@@ -135,7 +151,7 @@ func TestGerarRefPublica(t *testing.T) {
 	}
 	data := time.Now().Format("2006-01-02")
 	cab := func(oque, crit string) string {
-		return fmt.Sprintf("# GERADO por TestGerarRefPublica (internal/mask/ref_publica_gerar_test.go). Não edite à mão.\n"+
+		return fmt.Sprintf("# GERADO por TestGerarRefPublica (internal/mask/vocab_gerar_test.go). Não edite à mão.\n"+
 			"# %s\n# Gerado em %s, no material público da máquina: %s\n# (%d arquivos, %.0f MB, %d projetos distintos).\n# Critério: %s\n",
 			oque, data, strings.Join(origem, ", "), arquivos, float64(bytes)/(1<<20), len(projetos), crit)
 	}
@@ -144,15 +160,31 @@ func TestGerarRefPublica(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	gravar("ref_publica.txt", cab("Referência pública: palavras muito frequentes como nome de recurso no material público.",
+	gravar("dados/ref_publica.txt", cab("Referência pública: palavras muito frequentes como nome de recurso no material público.",
 		fmt.Sprintf("palavra em posição de nome em pelo menos %d projetos distintos. %d palavras.\n"+
 			"# Posição de nome: valor de chave de tipo (entChave) ou \"name\" em YAML/JSON/TOML/INI/.env (em código, só\n"+
 			"# literal de texto); opção --tipo; nome depois de FROM/JOIN/INTO/UPDATE/TABLE/SCHEMA/DATABASE no SQL (em\n"+
-			"# minúsculas, só nome qualificado); primeiro rótulo do host e primeiro pedaço do caminho de uma URL.",
+			"# minúsculas, só nome qualificado); primeiro rótulo do host e primeiro pedaço do caminho de uma URL;\n"+
+			"# organização e nome de imagem de container sem registro ou de registro público.",
 			minProjetosRef, len(ref))), ref)
-	gravar("tipos_linguagem.txt", cab("Tipos de dado (vocab_tipos.go) que também são tipo de linguagem.",
+	gravar("dados/tipos_linguagem.txt", cab("Tipos de dado (vocab_tipos.go) que também são tipo de linguagem.",
 		fmt.Sprintf("tipo de campo ou de variável (\"\\tnome    tipo\") em código Go de pelo menos %d projetos distintos. %d tipos.",
 			minProjetosTipo, len(tl))), tl)
+	// a pasta-mãe com mais imagens (o docker-library/docs); com menos de 50 não é ele
+	var img []string
+	for _, ims := range oficiais {
+		if len(ims) >= 50 && len(ims) > len(img) {
+			img = img[:0]
+			for v := range ims {
+				img = append(img, v)
+			}
+		}
+	}
+	if len(img) > 0 {
+		sort.Strings(img)
+		gravar("dados/imagens_oficiais.txt", cab("Imagens Oficiais do Docker (softwareDoTexto, leitor_kubernetes.go).",
+			fmt.Sprintf("pasta com content.md e metadata.json no docker-library/docs. %d imagens.", len(img))), img)
+	}
 	t.Logf("%d arquivos, %.0f MB, %d projetos; ref_publica: %d palavras; tipos_linguagem: %d tipos",
 		arquivos, float64(bytes)/(1<<20), len(projetos), len(ref), len(tl))
 	for _, w := range []string{"default", "kube-system", "public", "dbo", "api", "app"} {
@@ -296,6 +328,27 @@ func refNomesNaLinha(l string, codigo bool, fn func(v string)) {
 			}
 		}
 	}
+	// imagem de container (image:, FROM) num registro público ou sem registro: a organização e o
+	// nome (bitnami/redis, grafana/loki, redis); registro privado não conta
+	if m := reImagemQualquer.FindStringSubmatch(l); m != nil {
+		ref, _, _ := strings.Cut(m[1], "@")
+		ps := strings.Split(ref, "/")
+		if len(ps) > 1 && (strings.ContainsAny(ps[0], ".:") || ps[0] == "localhost") {
+			if !registrosPublicos[strings.ToLower(ps[0])] {
+				ps = nil
+			} else {
+				ps = ps[1:]
+			}
+		}
+		if len(ps) > 0 && len(ps) <= 2 {
+			ps[len(ps)-1], _, _ = strings.Cut(ps[len(ps)-1], ":")
+			for _, p := range ps {
+				if p != "library" && valorDeNome(p) {
+					fn(p)
+				}
+			}
+		}
+	}
 	// URL: o primeiro rótulo do host (api.exemplo.com) e o primeiro pedaço do caminho (/api/...)
 	for o := strings.Index(l, "://"); o >= 0; {
 		r := l[o+3:]
@@ -348,4 +401,118 @@ func tipoDeCampoGo(l string) string {
 		return tp
 	}
 	return ""
+}
+
+// Software público (TestGerarSoftwarePublico): os repositórios públicos populares do GitHub,
+// numa lista JSONL ({"r": "dono/nome", "s": estrelas}) baixada com a busca da API (gh api
+// search/repositories, fatiada por faixa de estrelas; ver docs/estruturas.md). Grava:
+//   - software_publico.txt: o nome de cada repositório com pelo menos minEstrelasSoftware
+//     estrelas (airflow, datahub, minio, kube-rbac-proxy), normalizado (normSoftware);
+//   - fornecedores.txt: o dono de cada um (apache, bitnami, confluentinc, grafana), normalizado.
+//
+// Só servem juntos, na regra de imagem (caminhoPublico): org/nome fica em claro quando a
+// organização é fornecedor E o nome é software público. Sozinha, a lista não libera nada: nome
+// de repositório popular inclui codinome típico de cliente (atlas, hermes, phoenix).
+const minEstrelasSoftware = 3000
+
+func TestGerarSoftwarePublico(t *testing.T) {
+	arq := os.Getenv("LLM_DLP_GITHUB_TOP")
+	if arq == "" {
+		t.Skip("LLM_DLP_GITHUB_TOP não definido")
+	}
+	b, err := os.ReadFile(arq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nomes, donos := map[string]bool{}, map[string]bool{}
+	n := 0
+	for _, l := range strings.Split(string(b), "\n") {
+		var x struct {
+			R string
+			S int
+		}
+		if json.Unmarshal([]byte(l), &x) != nil || x.S < minEstrelasSoftware {
+			continue
+		}
+		dono, nome, ok := strings.Cut(x.R, "/")
+		if !ok {
+			continue
+		}
+		n++
+		nomes[normSoftware(nome)] = true
+		donos[normSoftware(dono)] = true
+	}
+	lista := func(m map[string]bool) []string {
+		var out []string
+		for v := range m {
+			if len(v) >= 2 {
+				out = append(out, v)
+			}
+		}
+		sort.Strings(out)
+		return out
+	}
+	cab := func(oque string, k int) string {
+		return fmt.Sprintf("# GERADO por TestGerarSoftwarePublico (internal/mask/vocab_gerar_test.go). Não edite à mão.\n"+
+			"# %s\n# Gerado em %s, dos repositórios públicos do GitHub com pelo menos %d estrelas (%d repositórios).\n"+
+			"# %d nomes. Normalizado: minúsculas, sem - _ . (normSoftware).\n", oque, time.Now().Format("2006-01-02"), minEstrelasSoftware, n, k)
+	}
+	ns, ds := lista(nomes), lista(donos)
+	for arq, conteudo := range map[string]string{
+		"dados/software_publico.txt": cab("Software público: nome de repositório popular (só com fornecedores.txt, na regra de imagem).", len(ns)) + strings.Join(ns, "\n") + "\n",
+		"dados/fornecedores.txt":     cab("Fornecedores: dono de repositório popular (só com software_publico.txt, na regra de imagem).", len(ds)) + strings.Join(ds, "\n") + "\n",
+	} {
+		if err := os.WriteFile(arq, []byte(conteudo), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Logf("%d repositórios; software_publico: %d; fornecedores: %d", n, len(ns), len(ds))
+}
+
+// Dicionário (TestGerarDicionario): as 50000 palavras mais frequentes de cada idioma no
+// FrequencyWords (en e pt_br, OpenSubtitles 2018, CC BY-SA 4.0), só letras, 2 ou mais,
+// minúsculas, menos as que já estão em palavras_comuns.txt (as 20000 primeiras). Serve à prova
+// de software (memoria_software.go): palavra real (polaris, kraken, nexus) é o que um codinome de
+// cliente costuma ser, e nunca recebe a prova. LLM_DLP_FREQWORDS: a pasta com en_50k.txt e
+// pt_br_50k.txt (github.com/hermitdave/FrequencyWords, content/2018/<idioma>/).
+func TestGerarDicionario(t *testing.T) {
+	dir := os.Getenv("LLM_DLP_FREQWORDS")
+	if dir == "" {
+		t.Skip("LLM_DLP_FREQWORDS não definido")
+	}
+	ws := map[string]bool{}
+	for _, f := range []string{"en_50k.txt", "pt_br_50k.txt"} {
+		b, err := os.ReadFile(filepath.Join(dir, f))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, l := range strings.Split(string(b), "\n") {
+			w := strings.ToLower(strings.TrimSpace(strings.SplitN(strings.TrimSpace(l), " ", 2)[0]))
+			if len(w) < 2 || palavrasComuns[w] {
+				continue
+			}
+			so := true
+			for _, r := range w {
+				so = so && unicode.IsLetter(r)
+			}
+			if so {
+				ws[w] = true
+			}
+		}
+	}
+	var out []string
+	for w := range ws {
+		out = append(out, w)
+	}
+	sort.Strings(out)
+	cab := "# GERADO por TestGerarDicionario (internal/mask/vocab_gerar_test.go) a partir de FrequencyWords\n" +
+		"# (https://github.com/hermitdave/FrequencyWords, commit 525f9b5, content/2018/en/en_50k.txt e\n" +
+		"# content/2018/pt_br/pt_br_50k.txt), de Hermit Dave, com dados do OpenSubtitles 2018. Licença do conteúdo:\n" +
+		"# CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/); este arquivo é uma adaptação sob a mesma licença.\n" +
+		"# Adaptação: as 50000 palavras mais frequentes de cada idioma, só letras, 2 ou mais, minúsculas, menos as de\n" +
+		fmt.Sprintf("# palavras_comuns.txt, em ordem alfabética. %d palavras. Não edite à mão: regenere com o mesmo critério.\n", len(out))
+	if err := os.WriteFile("dados/palavras_dicionario.txt", []byte(cab+strings.Join(out, "\n")+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("%d palavras", len(out))
 }

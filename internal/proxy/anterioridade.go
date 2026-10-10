@@ -7,7 +7,7 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/mask"
 )
 
-// Anterioridade (ver mask/rastreamento.go): o modelo só conhece o cliente pelo que o proxy deixa
+// Anterioridade (ver mask/memoria_rastreamento.go): o modelo só conhece o cliente pelo que o proxy deixa
 // passar. Uma palavra que o modelo escreveu (resposta, entrada de ferramenta) antes de qualquer
 // dado trazê-la é conhecimento dele: vocabulário público (as colunas de
 // SNOWFLAKE.ACCOUNT_USAGE.TAG_REFERENCES que ele usou numa query, os pacotes de um pip install).

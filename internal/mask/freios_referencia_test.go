@@ -5,10 +5,10 @@ import (
 	"testing"
 )
 
-// Trilha D da rodada "conhecer o nome": freios (esquema pelo tipo, SQL em prosa) e referência
+// Freios (esquema pelo tipo, SQL em prosa) e referência
 // pública derivada. Nomes inventados.
 
-// T9: "nome    tipo" decide pelo tipo, com ou sem recuo.
+// "nome    tipo" decide pelo tipo, com ou sem recuo.
 func TestEsquemaPeloTipo(t *testing.T) {
 	m := novoTeste(t)
 	bloco := "    cod_pessoa_x      object\n    vlr_saldo_dia       float64\n    dta_nsc_cli  datetime64[ns]\n"

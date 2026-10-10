@@ -1,5 +1,10 @@
 package mask
 
+import (
+	"regexp"
+	"strings"
+)
+
 // Listas compartilhadas pelos leitores de desenvolvimento, configuração e código: palavras de
 // tipo (o que um nome de chave ou de função indica), sufixos de rede interna, TLDs públicos,
 // nomes públicos que nunca são mascarados (software, padrões de sistema, pastas e prefixos
@@ -47,7 +52,10 @@ var pastasPublicas = conj("node_modules", "site-packages", "dist-packages", "__p
 	"onedrive", "ideaprojects", "pycharmprojects", "androidstudioprojects", "go-build", "lost+found",
 	"application data", "my documents", "program files", "programdata", "windowsapps", "microsoft",
 	"github.com", "gitlab.com", "bitbucket.org", "golang.org", "google.golang.org", "gopkg.in", "go.uber.org",
-	"k8s.io", "sigs.k8s.io", "pkg", "mod", "cache", "go-mod", "vscode-server", "jetbrains")
+	"k8s.io", "sigs.k8s.io", "pkg", "mod", "cache", "go-mod", "vscode-server", "jetbrains",
+	// pastas de convenção de repositório (todo projeto tem; não dizem nada do cliente)
+	"examples", "example", "samples", "sample", "demo", "demos", "tests", "test", "testdata", "test_data",
+	"fixtures", "scripts", "tools", "vendor", "third_party", "resources", "templates", "benchmarks", "migrations", "internal", "cmd")
 
 // domínios e contas embutidos do Windows (Well-known SIDs e as raízes do Registro)
 var dominiosPublicos = conj("AUTHORITY", "BUILTIN", "SERVICE", "WORKGROUP", "HKLM", "HKCU", "HKCR", "HKU", "HKCC",
@@ -89,7 +97,8 @@ var entAntesDeNome = map[string]string{"db": "database", "database": "database",
 	"topic": "fila", "group": "servico", "namespace": "namespace", "cluster": "servidor", "collection": "tabela",
 	"stream": "fila", "subject": "fila", "exchange": "fila", "repo": "repositorio", "container": "bucket",
 	"column": "coluna", "field": "coluna", "role": "usuario", "warehouse": "servico", "account": "conta_nuvem", "owner": "usuario",
-	"view": "tabela", "procedure": "procedure", "function": "procedure", "index": "indice", "constraint": "indice", "catalog": "database"}
+	"view": "tabela", "procedure": "procedure", "function": "procedure", "index": "indice", "constraint": "indice", "catalog": "database",
+	"dataset": "schema", "project": "conta_nuvem"}
 
 // sufixos colados a uma palavra de tipo ("rolename", "warehousename", "fieldpath")
 var sufixosColados = []string{"names", "name", "nome", "path", "fqn"}
@@ -106,6 +115,259 @@ var atributoChave = conj("name", "names", "id", "ids", "port", "ports", "timeout
 	"token", "key", "keys", "agent", "format", "level", "limit", "suffix", "encoding", "charset", "ssl", "tls",
 	"protocol", "scheme", "driver", "class", "dialect", "pool", "timezone", "locale", "lang", "url", "uri", "path",
 	"file", "dir", "region", "zone", "weight", "priority", "delay", "length", "capacity", "batch", "concurrency")
+
+// prefixos de nuvem que tornam "project" o projeto do provedor (GCP_PROJECT, bq_project)
+var prefixoProjetoNuvem = conj("gcp", "gcloud", "google", "bq", "bigquery", "cloud", "billing", "firebase", "gke", "dataproc")
+
+// nomeDeCampo: o valor é o nome de um campo, não um dado: só palavras de tipo e de atributo,
+// em dois ou mais pedaços ("project_id", "container_name", "datasetId", "account_id"). Aparece
+// como valor quando o código guarda o nome da chave numa constante (CONTAINER_NAME =
+// "container_name") ou descreve um formulário ({"name": "project_id"}).
+func nomeDeCampo(v string) bool {
+	if len(v) < 4 || len(v) > 40 {
+		return false
+	}
+	for i := 0; i < len(v); i++ {
+		if c := v[i]; !(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c == '_') {
+			return false
+		}
+	}
+	var ps [16][2]int
+	n, ok := pedacosChave(v, &ps)
+	if !ok || n < 2 {
+		return false
+	}
+	var b [24]byte
+	for i := 0; i < n; i++ {
+		w := string(minusculo(v, ps[i], &b))
+		if _, ok := entPedaco[w]; ok {
+			continue
+		}
+		if _, ok := entAntesDeNome[w]; ok {
+			continue
+		}
+		if !atributoChave[w] {
+			return false
+		}
+	}
+	return true
+}
+
+// papéis de vocabulário padrão: WAI-ARIA 1.2 (https://www.w3.org/TR/wai-aria-1.2/#role_definitions)
+// e mensagens de chat de LLM. Quando o tipo do achado vem de "role" (usuário/role de banco),
+// um destes valores é o papel de um elemento ou de uma mensagem, não um usuário.
+var papeisPadrao = conj("alert", "alertdialog", "application", "article", "banner", "blockquote", "button", "caption",
+	"cell", "checkbox", "code", "columnheader", "combobox", "complementary", "contentinfo", "definition", "deletion",
+	"dialog", "directory", "document", "emphasis", "feed", "figure", "form", "generic", "grid", "gridcell", "group",
+	"heading", "img", "insertion", "link", "list", "listbox", "listitem", "log", "main", "marquee", "math", "menu",
+	"menubar", "menuitem", "menuitemcheckbox", "menuitemradio", "meter", "navigation", "none", "note", "option",
+	"paragraph", "presentation", "progressbar", "radio", "radiogroup", "region", "row", "rowgroup", "rowheader",
+	"scrollbar", "search", "searchbox", "separator", "slider", "spinbutton", "status", "strong", "subscript",
+	"superscript", "switch", "tab", "table", "tablist", "tabpanel", "term", "textbox", "time", "timer", "toolbar",
+	"tooltip", "tree", "treegrid", "treeitem",
+	"system", "user", "assistant", "tool", "function", "developer", "model", "human", "ai")
+
+// TLDs genéricos originais (RFC 1591): sozinhos, são pedaço de domínio, nunca nome
+var tldsGenericos = conj("com", "net", "org", "edu", "gov", "mil")
+
+// esquemas de URI: valor de uma chave "schema"/"scheme" que é o protocolo, não um schema de banco
+var esquemasURI = conj("http", "https", "ftp", "ftps", "sftp", "ssh", "file", "ws", "wss", "s3", "s3a", "s3n", "gs",
+	"abfs", "abfss", "wasb", "wasbs", "adl", "hdfs", "jdbc", "odbc", "grpc", "grpcs", "tcp", "udp", "smtp", "smtps")
+
+// reGrupoInvertido: nome em notação de domínio invertido (groupId do Maven, pacote Java):
+// org.slf4j, com.google.guava, io.netty. O leitor de pacotes separa o prefixo público do nome
+// da empresa (grupoEm); os outros leitores não o tomam como serviço.
+var reGrupoInvertido = regexp.MustCompile(`^(?:org|com|io|net|edu|gov|dev|br|de|uk|fr|jp)(?:\.[a-z][a-z0-9_-]*)+$`)
+
+// Valor sem dono: um nome feito só de vocabulário de papel (placeholder, ambiente, origem e
+// destino) e de tipo (o próprio tipo do recurso, um atributo, o provedor), mais numeração, não é
+// nome de ninguém: "test-staging-bucket", "source_host", "stub-user", "MY_DATABASE", "ns-1",
+// "imported_user1", "the_account". Basta um pedaço fora disso para ser nome do dono
+// ("insurance_claims_db", "count_drink_items", "orders_hx", "risk_data_access_opr").
+var vocabPapel = conj("test", "tests", "testing", "stub", "stubbed", "mock", "mocked", "dummy", "fake", "sample",
+	"samples", "example", "examples", "placeholder", "my", "your", "our", "the", "some", "any", "foo", "bar",
+	"baz", "qux", "source", "src", "target", "tgt", "dest", "dst", "destination", "actual", "expected", "different",
+	"other", "another", "new", "old", "default", "primary", "secondary", "remote", "local", "imported", "explicit",
+	"custom", "generic", "unknown", "temp", "tmp", "dev", "prod", "production", "staging", "stage", "qa", "uat",
+	"sandbox", "conn", "connection", "client", "server", "service", "app", "api", "data", "base", "system", "main",
+	"first", "second", "third", "release")
+
+// "demo" fica fora: nos testes do projeto, "app-demo", "repo-demo" fazem o papel do nome do cliente
+
+// abreviações e sinônimos do tipo do recurso que não estão no vocabulário das chaves
+var vocabTipo = conj("ns", "acct", "proj", "tbl", "svc", "srv", "usr", "inst", "keyspace", "instance", "index",
+	"queue", "topic", "wh", "storage", "aws", "azure", "gcp", "cloud",
+	// tipos de objeto do Kubernetes/compose que vão no fim do nome (minio-deployment, redis-svc)
+	"deployment", "controller", "rc", "hpa", "pod", "ingress", "secret", "claim", "pvc", "pv", "job", "worker",
+	"node", "consumer", "producer", "gateway", "proxy", "exporter", "operator", "replica", "replicas", "master",
+	"slave", "leader", "follower", "standalone", "headless")
+
+// pedacosValor: os pedaços de v em minúsculas, separados por pontuação, por troca de caixa
+// (camelCase) e por troca entre letra e dígito.
+func pedacosValor(v string) []string {
+	var ps []string
+	ini := -1
+	for i := 0; i <= len(v); i++ {
+		quebra := i == len(v) || !ehAlnum(v[i])
+		if !quebra && ini >= 0 {
+			p, c := v[i-1], v[i]
+			quebra = c >= 'A' && c <= 'Z' && p >= 'a' && p <= 'z' || ehDigito(c) != ehDigito(p)
+			if quebra {
+				ps = append(ps, strings.ToLower(v[ini:i]))
+				ini = i
+				continue
+			}
+		}
+		if quebra {
+			if ini >= 0 {
+				ps = append(ps, strings.ToLower(v[ini:i]))
+			}
+			ini = -1
+		} else if ini < 0 {
+			ini = i
+		}
+	}
+	return ps
+}
+
+func ehDigito(c byte) bool { return c >= '0' && c <= '9' }
+
+// semDono: v tem dois ou mais pedaços, todos de papel, de tipo ou de numeração, com um de papel
+// ou duas palavras de tipo; ou só X/x de preenchimento ("XXXXXXXXX"). extra: nomes de software
+// público vistos no mesmo texto.
+func semDono(v string, extra map[string]bool) bool {
+	if len(v) >= 3 && strings.Trim(v, "Xx") == "" {
+		return true
+	}
+	ps := pedacosValor(v)
+	if len(ps) == 0 || len(ps) > 8 {
+		return false
+	}
+	if extra[strings.ToLower(v)] { // o nome exato da imagem oficial ("redis", "minio")
+		return true
+	}
+	papel, letras := false, 0
+	for _, p := range ps {
+		switch {
+		case ehDigito(p[0]) || len(p) <= 2 && p[0] == 'v' && len(ps) > 1: // numeração, versão (_v1)
+			continue
+		case vocabPapel[p] || extra[p]:
+			papel = true
+		case vocabTipo[p] || atributoChave[p] || pluralTipo[p]:
+		default:
+			_, ok1 := entPedaco[p]
+			_, ok2 := entAntesDeNome[p]
+			if !ok1 && !ok2 {
+				return false
+			}
+		}
+		letras++
+	}
+	// uma palavra sozinha ("SRC", "main") e tipo + número ("INST01", "ns-1") seguem os outros freios
+	return len(ps) >= 2 && (papel || letras >= 2)
+}
+
+// numeroDeExemplo: número de conta de documentação, não de alguém: só blocos de um dígito
+// repetido, do mesmo tamanho ("111122223333", "000000000000"). A sequência "123456789012" fica
+// de fora: os testes do projeto a usam como conta do cliente.
+//
+// Só vale para o valor que é o número (até 3 letras de prefixo e separadores): com um nome junto
+// ("srv_vendas-99999999-...") o nome é do dono e o valor continua mascarado.
+func numeroDeExemplo(v string) bool {
+	var d []byte
+	letras := 0
+	for i := 0; i < len(v); i++ {
+		switch c := v[i]; {
+		case ehDigito(c):
+			d = append(d, c)
+		case c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z':
+			if letras++; letras > 3 {
+				return false
+			}
+		case c == '-' || c == '.' || c == ' ':
+		default:
+			return false
+		}
+	}
+	if len(d) < 8 {
+		return false
+	}
+	// blocos de um dígito repetido, todos do mesmo tamanho
+	var runs []int
+	for i := 0; i < len(d); i++ {
+		if i == 0 || d[i] != d[i-1] {
+			runs = append(runs, 0)
+		}
+		runs[len(runs)-1]++
+	}
+	if len(runs) > 4 {
+		return false
+	}
+	for _, r := range runs {
+		if r != runs[0] || r < 2 {
+			return false
+		}
+	}
+	return true
+}
+
+// gruposSoTLD: os prefixos de gruposPublicos que são um TLD inteiro. Valem para o leitor de
+// pacotes (o groupId io.x de uma dependência) e para a linha de traceback, mas não provam que um
+// nome é público: a empresa com domínio .io ou .dev escreve io.<empresa>.<sistema>.
+var gruposSoTLD = conj("io.", "dev.")
+
+// grupoJavaPublico: pkg (minúsculas, com pontos) começa por um grupo público do Maven, pedaço
+// inteiro ("com.google" não vale para "com.googlehx"). estrito: sem os prefixos de gruposSoTLD.
+func grupoJavaPublico(pkg string, estrito bool) bool {
+	for _, g := range gruposPublicos { // os mesmos grupos públicos do leitor de pacotes (grupoEm)
+		if estrito && gruposSoTLD[g] {
+			continue
+		}
+		if strings.HasPrefix(pkg, g) && (len(pkg) == len(g) || g[len(g)-1] == '.' || g[len(g)-1] == '-' || pkg[len(g)] == '.') {
+			return true
+		}
+	}
+	return false
+}
+
+// grupoPublico: domínio invertido (org.apache.airflow, com.linkedin.metadata) cujo dono, o segundo
+// rótulo, é público; com.<empresa>.x e io.<empresa>.x continuam com o nome da empresa.
+func grupoPublico(v string) bool {
+	if !reGrupoInvertido.MatchString(v) {
+		return false
+	}
+	l := strings.ToLower(v)
+	if grupoJavaPublico(l, true) {
+		return true
+	}
+	ps := strings.Split(l, ".")
+	return publicoDev(ps[1]) || refPublica[ps[1]]
+}
+
+// achadoDeVocabulario: freios comuns a todos os leitores, pelo tipo do achado. sw: nomes de
+// software público vistos no mesmo texto (ver softwareDoTexto).
+func achadoDeVocabulario(l Leitor, o ObjAchado, v string, sw map[string]bool) bool {
+	// (rótulo em escrita não latina, "スキーマ", fica mascarado: para um cliente russo, chinês ou
+	// israelense o nome real da tabela também é nessa escrita)
+	if nomeDeCampo(v) || semDono(v, sw) {
+		return true
+	}
+	lv := strings.ToLower(v)
+	// pedaço de URL ou de domínio sozinho: TLD genérico ("com" de docs.aws.amazon.com) e esquema
+	// de URI ("https" de https://...) nunca são nome do cliente
+	if tldsGenericos[lv] || esquemasURI[lv] && (o.Ent == "schema" || o.Ent == "pasta" || o.Ent == "servidor" || o.Ent == "coluna") {
+		return true
+	}
+	switch o.Ent {
+	case "usuario":
+		return papeisPadrao[lv]
+	case "conta_nuvem":
+		return numeroDeExemplo(v)
+	case "servico", "namespace", "fila":
+		return l.Nome != "pacote" && grupoPublico(v)
+	}
+	return false
+}
 
 // receptores comuns de código: "self.host", "cfg.user", "process.env" são acesso a atributo
 var receptoresCodigo = conj("self", "this", "cls", "cfg", "conf", "config", "settings", "options", "opts", "args",

@@ -3,6 +3,7 @@ package mask
 import (
 	"regexp"
 	"strings"
+	"unicode"
 )
 
 // Leitor de chave-valor genérico (ver docs/estruturas.md, seção JSON, YAML, TOML, INI, .env,
@@ -84,6 +85,16 @@ func entChave(k string) (ent string, forte bool) {
 	}
 	if e, ok := entPedaco[string(ult)]; ok {
 		return e, true
+	}
+	// "project": o projeto do provedor de nuvem quando a chave diz qual (GCP_PROJECT,
+	// bq_project); sozinho, é evidência fraca (mascara no lugar, não ensina)
+	if string(ult) == "project" {
+		forte := false
+		if n >= 2 {
+			var b [24]byte
+			forte = prefixoProjetoNuvem[string(minusculo(k, ps[n-2], &b))]
+		}
+		return "conta_nuvem", forte
 	}
 	// colado: "rolename", "warehousename", "accountname", "fieldpath"
 	for _, suf := range sufixosColados {
@@ -173,10 +184,10 @@ func titulo(v string) bool {
 	return true
 }
 
-// topicoPontuado: nome de tópico/fila separado por pontos, em minúsculas (fin.notas.emitidas).
-// Não vale se um pedaço é receptor ou atributo de código (cfg.topic, settings.queue_name), se é
-// domínio público ou se termina em extensão de arquivo.
-func topicoPontuado(v string) bool {
+// nomePontuado: nome separado por pontos, em minúsculas: tópico/fila (fin.notas.emitidas) ou
+// usuário (maria.souza, josé.antônio). Não vale se um pedaço é receptor ou atributo de código
+// (cfg.topic, settings.db_user), se é domínio público ou se termina em extensão de arquivo.
+func nomePontuado(v string, usuario bool) bool {
 	ps := strings.Split(v, ".")
 	if len(ps) < 2 || dominioPublico(v) || extensoesArquivo[ps[len(ps)-1]] {
 		return false
@@ -185,10 +196,17 @@ func topicoPontuado(v string) bool {
 		if p == "" || receptoresCodigo[p] || atributoChave[p] || palavrasTipo[p] {
 			return false
 		}
-		for i := 0; i < len(p); i++ {
-			if c := p[i]; !(c >= 'a' && c <= 'z' || ehDig(c) || c == '_' || c == '-') {
+		for _, c := range p {
+			if !(c >= 'a' && c <= 'z' || c >= '0' && c <= '9' || c == '_' || c == '-' || c >= 0x80 && unicode.IsLower(c)) {
 				return false
 			}
+		}
+		// "cfg.queue_name", "settings.db_user": o pedaço é nome de atributo ou de chave
+		if u := strings.LastIndexByte(p, '_'); u >= 0 && atributoChave[p[u+1:]] {
+			return false
+		}
+		if e, _ := entChave(p); usuario && e != "" {
+			return false
 		}
 	}
 	return true
@@ -374,7 +392,7 @@ func kvEm(s string, p int, add func(ObjAchado)) {
 			}
 		}
 		// "chave = valor" com espaços é atribuição de código, salvo dentro de uma seção de INI
-		// ("[db]\ntable_name = pedidos"): ver secaoINI (leitor_lexico.go)
+		// ("[db]\ntable_name = pedidos"): ver secaoINI (decisor_lexico.go)
 		if !(c == ':' || maiusculasSo(chave) || pontuada || cli || pv != ' ' && nx != ' ' || c == '=' && fimLinha && inicioLinha && secaoINI(s, ini)) {
 			return
 		}
@@ -383,9 +401,9 @@ func kvEm(s string, p int, add func(ObjAchado)) {
 		if c == ':' && titulo(chave) {
 			return
 		}
-		// tópico/fila com ponto (fin.notas.emitidas) em chave de configuração (KAFKA_TOPIC=,
-		// kafka.topic=, topic:): nome de recurso, não acesso a atributo nem domínio
-		topico := ent == "fila" && (c == ':' || maiusculasSo(chave) || pontuada) && topicoPontuado(val)
+		// tópico/fila (fin.notas.emitidas) ou usuário (maria.souza) com ponto em chave de
+		// configuração (KAFKA_TOPIC=, kafka.topic=, user:): nome, não acesso a atributo nem domínio
+		topico := (ent == "fila" || ent == "usuario") && (c == ':' || maiusculasSo(chave) || pontuada) && nomePontuado(val, ent == "usuario")
 		if i := strings.IndexByte(val, '.'); i >= 0 && ent != "database" && ent != "schema" && ent != "tabela" &&
 			!topico && !sufixoInterno(strings.ToLower(val)) {
 			return
@@ -525,16 +543,19 @@ func valorRecurso(v, ent string) bool {
 	if len(v) < 2 || len(v) > 200 {
 		return false
 	}
+	// nomes de SQL aceitam "$" no meio (V$SESSION, ped$hist); eles e o usuário aceitam letras
+	// de qualquer escrita ("Продажи", "客户数据", "josé"): para um cliente russo ou chinês o
+	// nome real é nessa escrita. Host, bucket, fila e namespace não (o sistema só aceita ASCII).
+	sqlEnt := entSQL[ent] && ent != "servidor"
+	unicodeOK := sqlEnt || ent == "usuario"
 	c0 := v[0]
-	if !(ehAlnum(c0) || c0 == '_') {
+	if !(ehAlnum(c0) || c0 == '_' || unicodeOK && letraUTF8(v, 0) > 0) {
 		return false // caminho, $VAR, ${...}, {{...}}, %s, <x>, @x
 	}
 	soNum := true
-	// nomes de SQL aceitam "$" no meio (V$SESSION, ped$hist) e letras acentuadas
-	sqlEnt := entSQL[ent] && ent != "servidor"
 	for i := 0; i < len(v); i++ {
 		c := v[i]
-		if sqlEnt && c >= 0x80 {
+		if unicodeOK && c >= 0x80 {
 			if n := letraUTF8(v, i); n > 0 {
 				i += n - 1
 				soNum = false
@@ -558,8 +579,8 @@ func valorRecurso(v, ent string) bool {
 			soNum = false
 		}
 	}
-	if soNum || len(v) > 2 && (v[0] == '0' && (v[1] == 'x' || v[1] == 'X')) {
-		return false
+	if soNum && !(ent == "conta_nuvem" && len(v) == 12 && todoDigitos(v)) || len(v) > 2 && (v[0] == '0' && (v[1] == 'x' || v[1] == 'X')) {
+		return false // número não é nome (a conta da AWS, 12 dígitos, é)
 	}
 	h := strings.ToLower(v)
 	if i := strings.IndexAny(h, ":\\"); i >= 0 {
@@ -582,6 +603,17 @@ func valorRecurso(v, ent string) bool {
 
 // marcarValor entrega o valor s[a:b] com a entidade da chave.
 func marcarValor(s string, a, b int, ent, regra string, forte bool, add func(ObjAchado)) {
+	// 12 dígitos numa chave de conta ou de catálogo: a conta da AWS (o catálogo do Glue é a conta)
+	if (ent == "conta_nuvem" || ent == "database") && b-a == 12 && todoDigitos(s[a:b]) {
+		add(ObjAchado{a, b, "conta_nuvem", regra, forte})
+		return
+	}
+	// conta com região depois (Snowflake: xy12345.us-east-1, ABC12345.ap-south-1.aws): só a conta
+	if ent == "conta_nuvem" {
+		if d := strings.IndexByte(s[a:b], '.'); d > 0 && contaComRegiao(s[a+d+1:b]) {
+			b = a + d
+		}
+	}
 	switch ent {
 	case "servidor": // lista "h1:9092,h2:9092"
 		for x := a; x < b; {
@@ -613,6 +645,21 @@ func marcarValor(s string, a, b int, ent, regra string, forte bool, add func(Obj
 			add(ObjAchado{a, b, ent, regra, forte})
 		}
 	}
+}
+
+// contaComRegiao: o que vem depois do primeiro ponto de uma conta é região e nuvem
+// ("us-east-1", "sa-east-1.aws", "east-us-2.azure", "privatelink").
+func contaComRegiao(r string) bool {
+	for _, p := range strings.Split(strings.ToLower(r), ".") {
+		switch {
+		case reRegiao.MatchString(p), p == "aws", p == "gcp", p == "azure", p == "privatelink":
+		case strings.Count(p, "-") >= 1 && strings.Trim(p, "abcdefghijklmnopqrstuvwxyz0123456789-") == "" && ehDig(p[len(p)-1]):
+			// forma de região do Snowflake/Azure: east-us-2, us-central1, north-europe-1
+		default:
+			return false
+		}
+	}
+	return r != ""
 }
 
 // addHost: nome de servidor sem a porta (e "srv\INST": nome e instância).

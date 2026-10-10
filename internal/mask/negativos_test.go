@@ -2,7 +2,7 @@ package mask
 
 import "testing"
 
-// T8: nada mascarado a mais em texto comum (prosa em português e inglês, código Go e Python,
+// Nada mascarado a mais em texto comum (prosa em português e inglês, código Go e Python,
 // YAML público, logs comuns, saídas de ps, ls e git log), com e sem a extensão da dica de uma
 // saída de comando.
 var negativosT8 = []struct{ nome, texto string }{

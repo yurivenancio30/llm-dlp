@@ -2,7 +2,7 @@ package mask
 
 import "strings"
 
-// Freios do leitor de SQL (P2, medidos no corpus público: TestMedirCorpusPublico com
+// Freios do leitor de SQL (medidos no corpus público: TestMedirCorpusPublico com
 // LLM_DLP_AMOSTRA). Os falsos positivos vinham de três formas, nenhuma delas de SQL:
 //
 //   - comentário de código que fala do código ("// Use x.Errors", "# delete FROM line",

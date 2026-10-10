@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// Fuzz (seção H, item 37): a normalização mantém o mapa coerente e a ida e volta pelos leitores
+// Fuzz: a normalização mantém o mapa coerente e a ida e volta pelos leitores
 // devolve o texto byte a byte, com qualquer transporte em volta.
 // go test ./internal/mask -run '^$' -fuzz FuzzNormalizar -fuzztime 60s
 // go test ./internal/mask -run '^$' -fuzz FuzzIdaVolta -fuzztime 60s

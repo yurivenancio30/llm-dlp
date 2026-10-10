@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// Memória da conversa (memoria.go): nomes inventados, montados por partes.
+// Memória da conversa (memoria_conversa.go): nomes inventados, montados por partes.
 
 var (
 	nsComum  = "pag" + "amentos" // namespace de palavra comum
@@ -59,7 +59,7 @@ func TestMemoriaPalavraInteiraECaixa(t *testing.T) {
 	}
 }
 
-// Sem o inventário no pedido (conversa nova), a palavra comum fica (T5, no nível do lote).
+// Sem o inventário no pedido (conversa nova), a palavra comum fica (no nível do lote).
 func TestMemoriaSoNoPedido(t *testing.T) {
 	m := novoTeste(t)
 	loteCom(m, "kubectl logs -n "+nsComum+" deploy/web --tail 10", "o "+nsComum+" caiu")
@@ -82,7 +82,7 @@ func TestMemoriaGenericaFora(t *testing.T) {
 	}
 }
 
-// Texto já enviado (congelado) sai igual, mesmo que a memória agora conheça o nome (T6).
+// Texto já enviado (congelado) sai igual, mesmo que a memória agora conheça o nome.
 func TestMemoriaNaoReescreveOPassado(t *testing.T) {
 	m := novoTeste(t)
 	velho := "o " + nsComum + " caiu ontem"
@@ -107,8 +107,8 @@ func TestMemoriaNaoReescreveOPassado(t *testing.T) {
 }
 
 // Quem escreveu: o texto do assistente volta como a API o mandou; só o trecho traduzido é
-// pseudônimo, a mesma palavra escrita pelo modelo fica (T4, no nível do lote); a palavra
-// traduzida entra na memória (T3).
+// pseudônimo, a mesma palavra escrita pelo modelo fica (no nível do lote); a palavra
+// traduzida entra na memória.
 func TestMemoriaQuemEscreveu(t *testing.T) {
 	m := novoTeste(t)
 	inv := "kubectl logs -n " + nsComum + " deploy/web --tail 10"

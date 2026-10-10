@@ -23,7 +23,7 @@ import (
 
 // adicionar: põe d na memória (sem repetir). Devolve se entrou.
 func (mm *memoria) adicionar(m *Masker, d Decisao) bool {
-	if d.Generica || len(d.Nome) < memMin || publicoGeral(d.Nome) || !m.objMascara(d.Ent) || ehPseudoObj(d.Nome) {
+	if d.Generica || len(d.Nome) < memMin || publicoGeral(d.Nome) || m.softwareProvado(d.Nome) || !m.objMascara(d.Ent) || ehPseudoObj(d.Nome) {
 		return false
 	}
 	if mm.tem == nil {

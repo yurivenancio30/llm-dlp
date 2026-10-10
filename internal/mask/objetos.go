@@ -341,9 +341,10 @@ func (m *Masker) acharObjetos(s string, aprende bool, add func(ini, fim int, tip
 	if !m.cfg.Objetos.Ligado || len(m.leitores) == 0 {
 		return
 	}
+	ct := contextoTexto(s)
 	if len(s) < paraleloLeitores || runtime.GOMAXPROCS(0) < 2 {
 		for _, l := range m.leitores {
-			m.rodarLeitor(l, s, aprende, add)
+			l.Achar(s, func(o ObjAchado) { m.aplicarAchado(l, s, ct, o, aprende, add) })
 		}
 		return
 	}
@@ -368,7 +369,7 @@ func (m *Masker) acharObjetos(s string, aprende bool, add func(ini, fim int, tip
 	wg.Wait()
 	for i, l := range m.leitores {
 		for _, o := range res[i] {
-			m.aplicarAchado(l, s, o, aprende, add)
+			m.aplicarAchado(l, s, ct, o, aprende, add)
 		}
 	}
 }
@@ -378,16 +379,27 @@ var paraleloLeitores = 64 << 10
 
 // rodarLeitor: um leitor em s, com os freios comuns (tipo desligado, pseudônimo, vocabulário).
 func (m *Masker) rodarLeitor(l Leitor, s string, aprende bool, add func(ini, fim int, tipo string)) {
-	l.Achar(s, func(o ObjAchado) { m.aplicarAchado(l, s, o, aprende, add) })
+	ct := contextoTexto(s)
+	l.Achar(s, func(o ObjAchado) { m.aplicarAchado(l, s, ct, o, aprende, add) })
 }
 
-// aplicarAchado: um achado do leitor l, com os freios comuns.
-func (m *Masker) aplicarAchado(l Leitor, s string, o ObjAchado, aprende bool, add func(ini, fim int, tipo string)) {
+// ctxTexto: o que vale para o texto inteiro, medido uma vez antes dos leitores: o software
+// público que ele roda como imagem (softwareDoTexto).
+type ctxTexto struct {
+	software map[string]bool
+}
+
+func contextoTexto(s string) ctxTexto {
+	return ctxTexto{software: softwareDoTexto(s)}
+}
+
+// aplicarAchado: um achado do leitor l, com os freios comuns. ct: o contexto do texto.
+func (m *Masker) aplicarAchado(l Leitor, s string, ct ctxTexto, o ObjAchado, aprende bool, add func(ini, fim int, tipo string)) {
 	if o.Ini < 0 || o.Fim > len(s) || o.Fim <= o.Ini || !m.objMascara(o.Ent) {
 		return
 	}
 	v := s[o.Ini:o.Fim]
-	if ehPseudoObj(v) || (l.Publico != nil && l.Publico(strings.Trim(v, "[]\"`"))) {
+	if ehPseudoObj(v) || (l.Publico != nil && l.Publico(strings.Trim(v, "[]\"`"))) || achadoDeVocabulario(l, o, strings.Trim(v, "[]\"`'"), ct.software) {
 		return
 	}
 	add(o.Ini, o.Fim, prefTipoObj+o.Ent)

@@ -23,7 +23,7 @@ func (p *Proxy) desmascararSSE(w http.ResponseWriter, body io.Reader, tab *mask.
 	tipos := map[int]string{}
 	crus := map[int]bool{} // blocos que passam sem desmascarar (ferramentas que vão para a internet)
 	// quem escreveu: o texto original de cada bloco (como a API mandou), registrado no fim do
-	// bloco pelo hash do desmascarado (ver mask/memoria.go)
+	// bloco pelo hash do desmascarado (ver mask/memoria_conversa.go)
 	orig := map[int]*strings.Builder{}
 	reg := func(s string) string { return p.m.RegistrarResposta(s, tab) }
 	var evento []string

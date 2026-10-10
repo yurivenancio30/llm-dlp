@@ -1375,7 +1375,7 @@ Um sinal forte basta. Dois sinais fracos juntos também bastam.
 | Nome DNS de serviço | sufixo `.svc.cluster.local` (ou `.svc.<domínio do cluster>`), `.pod.cluster.local` | forma curta `<svc>.<ns>` dentro de URL/connection string |
 | kubeconfig | `apiVersion: v1` + `kind: Config` com `clusters:` / `contexts:` / `users:` | `current-context:` |
 | Helm | `Chart.yaml` com `apiVersion: v2` + `name` + `version`; templates com `{{ .Values.` / `{{ .Release.` / `{{ include` | `values.yaml` sem `kind` |
-| docker-compose | chave `services:` no topo, com filhos contendo `image:`/`build:`; `networks:`/`volumes:`/`secrets:` no topo | `name:` no topo (nome do projeto) |
+| docker-compose | chave `services:` no topo, com filhos contendo uma chave de serviço da especificação (`image:`, `build:`, `depends_on:`, `command:`... ou a fusão `<<:`); `networks:`/`volumes:`/`secrets:` no topo | `name:` no topo (nome do projeto) |
 | Dockerfile | linha começando com instrução: `FROM`, `RUN`, `COPY`, `ENV`, `ARG`, `WORKDIR`, `ENTRYPOINT`, `CMD`, `LABEL`, `EXPOSE` | `FROM x AS estagio` |
 | `docker ps` | cabeçalho `CONTAINER ID IMAGE COMMAND CREATED STATUS PORTS NAMES` | ID hex de 12 caracteres |
 | `docker inspect` | array JSON com `"Id"`, `"Config": {"Image", "Env", "Hostname"}`, `"NetworkSettings"` | `"Name": "/nome"` (barra inicial) |
@@ -2721,7 +2721,7 @@ Sem fonte oficial lida (marcados [VERIFICAR]): formato `N<tab>` do Read (conferi
 Saída de script e de shell não tem formato fixo. Valem quatro mecanismos genéricos, nenhum por
 ferramenta (os nomes de ferramenta abaixo são exemplos de onde a forma aparece):
 
-**1. O comando diz o que a saída é** (`comando.go`; o proxy liga o `tool_use` ao `tool_result`
+**1. O comando diz o que a saída é** (`chamada_comando.go`; o proxy liga o `tool_use` ao `tool_result`
 do mesmo id em `requisicao.go`, `dicasDosComandos`). A entrada da ferramenta (o `command` do
 shell, ou as strings da entrada, sem a descrição) vira uma *dica* com o tipo das colunas da
 saída, que vai junto do texto na chave da memória de resultados. A dica só é evidência para o
@@ -2756,7 +2756,7 @@ sem esquema `host:porta/banco` (EZConnect e mensagens de conexão) no leitor de 
 linha que fala de conexão (`conect`, `connect`, `conex`), com `como|as <usuário>` logo depois;
 sem usuário, host público com banco sem cara de nome (`localhost:8080/api`) não vale.
 
-**3. Lista homogênea** (`listas.go`, roda depois dos leitores, porque depende do que já se
+**3. Lista homogênea** (`objetos_listas.go`, roda depois dos leitores, porque depende do que já se
 sabe): numa coluna solta (um item por linha, com marcador `- `/`* `), em contagem + valor
 (`sort | uniq -c`, `value_counts`), em linha decorada de laço (`== t_x ==`, `--- t_x`, `## t_x`,
 agrupadas pela decoração) ou numa lista entre vírgulas (com ou sem aspas e colchetes:
@@ -3032,7 +3032,7 @@ texto) se aparecer também em outra regra.
 | Vocabulário | Exemplos | Fonte |
 |---|---|---|
 | rótulos de runner hospedado | `ubuntu-latest`, `ubuntu-24.04`, `windows-latest`, `windows-2022`, `macos-latest`, `macos-14`, `self-hosted`, `linux`, `x64`, `arm64` | doc "GitHub-hosted runners" e "self-hosted runners" (rótulos padrão) |
-| imagens públicas | sem registro (`node:20`, `postgres:16`) ou registro público oficial (`docker.io`, `ghcr.io`, `quay.io`, `gcr.io`, `registry.k8s.io`, `mcr.microsoft.com`, `public.ecr.aws`) | regra de imagem |
+| imagens públicas | Imagem Oficial do Docker (`node:20`, `postgres:16`), organização da referência pública (`bitnami/redis`) no Docker Hub ou num registro público, e registro de fornecedor (`registry.k8s.io`, `mcr.microsoft.com`) | regra de imagem (Público só com prova) |
 | ambientes genéricos | `production`, `staging`, `development`, `dev`, `prod`, `test`, `qa` | — |
 | expressões | `${{ ... }}` (Actions), `$VAR` / `${VAR}` (GitLab), `$(var)` (Azure) | não são valores: ficam |
 | chaves e ações | `jobs`, `steps`, `uses: actions/checkout@v4`, `script`, `stage`, `pipeline`, `agent` | spec de cada ferramenta |
@@ -3101,7 +3101,7 @@ servidor); sem posição, servico. Sempre forte.
 Ideia central: o nome da organização, do repositório, do pacote interno e do usuário dono de uma
 pasta aparece em posições fixas de formatos públicos (remoto do git, `go.mod`, `pom.xml`,
 `package.json`, caminho de home). A posição diz o tipo; os hosts e prefixos públicos ficam.
-Código: `internal/mask/leitor_enderecos.go` (git, caminhos) e `leitor_nuvem_pacotes.go` (pacotes).
+Código: `internal/mask/leitor_enderecos.go` (git, caminhos) e `leitor_nuvem.go` (pacotes).
 
 ### 1. Sinais de detecção
 
@@ -3204,7 +3204,7 @@ https://github.com/org-exemplo/repo-demo/issues/1   (fica: fora de contexto de g
 **Snowflake** (as mesmas regras genéricas, mais as formas do produto). Conta: chaves
 `account`/`account_id`/`accountname` em qualquer sintaxe (chave-valor e argumento nomeado); o
 host `<conta>.snowflakecomputing.com` (a conta, sem a região) e `app.snowflake.com/<org>/<conta>/`
-(`leitor_nuvem_pacotes.go`); depois, solta no texto, pela propagação. Papel (`role`, `rolename`,
+(`leitor_nuvem.go`); depois, solta no texto, pela propagação. Papel (`role`, `rolename`,
 `SNOWFLAKE_ROLE`) é usuário; no SQL, o nome depois de `ROLE` ou `USER` (`USE ROLE`, `GRANT ... TO
 ROLE`, `REVOKE ... FROM ROLE`, `GRANT ROLE x TO USER y`, `CREATE/ALTER/DROP ROLE`) é usuário.
 Warehouse é serviço: chave `warehouse`, `USE WAREHOUSE x`, `WAREHOUSE = x`, `CREATE/ALTER
@@ -3219,7 +3219,7 @@ do DataHub com partes preenchidas com espaços (`db2,ABCD    .TABELA`) é lida s
 Ideia central: identificadores de recurso de nuvem têm gramática publicada (ARN, ID do Azure
 Resource Manager, nome de recurso do Google Cloud); usuário de rede tem duas formas fixas
 (`DOMINIO\usuario`, `usuario@host` depois de ssh/scp). A gramática diz o tipo de cada pedaço.
-Código: `internal/mask/leitor_nuvem_pacotes.go` (nuvem, IP público) e `leitor_enderecos.go`
+Código: `internal/mask/leitor_nuvem.go` (nuvem, IP público) e `leitor_enderecos.go`
 (usuário de rede).
 
 ### 1. Sinais de detecção
@@ -3331,6 +3331,12 @@ O que passou a valer:
 | Endereços | URLs coladas sem separador e `a://` repetido eram quadráticos | cada URL vai no máximo até o esquema da próxima (e 2 KB) |
 | Campos (`campo: valor`) | prefixo de literal do Python (`r'...'`) virava o valor | prefixo pulado; valor de 1–2 letras, padrão de regex (`(?`, `\d`, `\b`) e modelo (`{x}`, `%s`) não são dado (os quase identificadores, opcionais, aceitam valor curto) |
 
+Escrita não latina: banco, schema, tabela, coluna, procedure, índice e usuário aceitam letras de
+qualquer escrita (`Продажи_хх`, `客户数据`, `판매팀`) na chave-valor, no código, no SQL e no nome do
+banco de uma URL de conexão: para um cliente russo, chinês ou coreano o nome real é nessa
+escrita. Usuário com ponto (`maria.souza`, `josé.antônio`) também é nome; acesso de código
+(`settings.db_user`, `self.user`) não.
+
 Limites conhecidos: nome de host, bucket, fila e namespace continua só ASCII (é o que DNS e as
 nuvens aceitam); `$` no meio só vale em nomes de SQL e caminhos; caixa alternada só é testada
 onde a linguagem não diferencia caixa (SQL); a sequência de 3 palavras soltas não é procurada
@@ -3385,7 +3391,7 @@ pedido. Aplicar a memória é um passo depois do memo e não muda a chave do mem
 - **Acaba sozinha.** Nada é guardado por conversa fora do memo: a memória é recalculada a
   partir dos pedaços do próprio pedido. Numa conversa nova, sem o inventário no histórico, a
   palavra comum volta a ser só palavra.
-- **Não reescreve o passado.** O que já foi enviado continua congelado (`enviados.go`): as
+- **Não reescreve o passado.** O que já foi enviado continua congelado (`memoria_enviados.go`): as
   decisões novas valem só para texto que ainda não saiu. Um texto antigo que trazia a palavra
   em claro continua igual, para o cache de prompt da API continuar valendo.
 - **Vale para** as mensagens do usuário e as saídas de comando. Não vale para os blocos de
@@ -3407,7 +3413,7 @@ trechos que ele traduziu de um pseudônimo. Quando o bloco volta:
   palavra, não porque conhece o namespace).
 
 Sem registro (o proxy reiniciou, outro processo atendeu) vale o comportamento anterior. O
-registro fica em RAM com teto; se for persistido, é no estilo de `enviados.go` (só pseudônimos
+registro fica em RAM com teto; se for persistido, é no estilo de `memoria_enviados.go` (só pseudônimos
 e HMAC).
 
 ### Regra de proveniência
@@ -3501,13 +3507,13 @@ frase em maiúsculas (`0x3B -> CUSTOMER USE THREE`) e campo de struct com nome d
 `conexão/uri` aprendiam tinham todos a mesma forma: palavra de tipo ou de atributo seguida de
 número ou colada a outra (`host1`, `user2`, `db01`, `dbName`): nome de exemplo, não de
 recurso. Na URI de banco e no tnsnames, um valor de no máximo dois pedaços, todos do
-vocabulário que já existe, com ou sem número no fim, não é mascarado (`freios_p2.go`). Nas
+vocabulário que já existe, com ou sem número no fim, não é mascarado (`leitor_conexao_freios.go`). Nas
 outras regras, `broker1` num `bootstrap.servers` continua nome.
 
 ### Referência pública derivada
 
 `ref_publica.txt` e `tipos_linguagem.txt` são **gerados** por `TestGerarRefPublica`
-(`ref_publica_gerar_test.go`) no material público da máquina (os diretórios de
+(`vocab_gerar_test.go`) no material público da máquina (os diretórios de
 `LLM_DLP_CORPUS`: módulos Go, bibliotecas Python, `/usr/share/doc`), nunca escritos à mão. O
 cabeçalho de cada arquivo diz de onde, quando e com que critério foi gerado:
 
@@ -3527,8 +3533,135 @@ LLM_DLP_GERAR_REF=1 LLM_DLP_CORPUS=~/go/pkg/mod:/usr/lib/python3.10:/usr/share/d
 - **tipos_linguagem.txt:** tipo do vocabulário de tipos de dado que aparece como tipo de campo
   ou de variável (`\tnome    tipo`) em código Go de pelo menos 5 projetos distintos (16 tipos).
 
+- **imagens_oficiais.txt:** as Imagens Oficiais do Docker (`redis`, `postgres`, `nginx`...): as
+  pastas do repositório público `docker-library/docs` que têm `content.md` e `metadata.json`
+  (uma por imagem). Gerado junto, quando esse repositório está no corpus.
+- **software_publico.txt e fornecedores.txt:** nome e dono de cada repositório público do GitHub
+  com pelo menos 3000 estrelas (`TestGerarSoftwarePublico`, com `LLM_DLP_GITHUB_TOP` apontando
+  para a lista em JSONL `{"r": "dono/nome", "s": estrelas}`). A lista vem da busca da API,
+  fatiada por faixa de estrelas porque cada consulta devolve no máximo 1000
+  (`gh api -X GET search/repositories -f q='stars:A..B fork:false' -f per_page=100 -f page=N`,
+  30 consultas por minuto; cerca de 22 mil repositórios em 15 minutos). Normalizado sem `-`,
+  `_` e `.` (o Docker Hub escreve `prometheuscommunity/postgres-exporter`, o GitHub
+  `prometheus-community/postgres_exporter`). As duas listas só valem **juntas**, na regra de
+  imagem: medido, a lista de nomes tem todos os codinomes típicos de cliente (`apollo`,
+  `atlas`, `hermes`, `phoenix`, `zeus`), então sozinha ela não libera nem freia nada. Nenhuma
+  de 30 empresas brasileiras testadas é dona de repositório com 3000 estrelas; 0 dos 45
+  segredos da bateria está na lista.
+
 `ehGenerica` consulta a referência. Uma palavra da referência decidida por qualquer regra é
 mascarada no lugar, com `Decisao.Generica = true`, e não entra na memória da conversa.
+
+### Público só com prova
+
+Uma regra que deixa um nome em claro tem como pior caso um vazamento. Por isso toda regra
+desse tipo pede uma garantia de forma (um pedaço distintivo a bloqueia) e é medida contra os
+segredos da bateria e os nomes do gabarito que devem ser mascarados. Na dúvida, mascara.
+
+- **Valor sem dono** (`semDono`, `vocab_dev.go`): placeholder e nome de papel (`my_bucket`,
+  `stub-user`, `source_db`, `XXXXXXXX`, `000000000000`) ficam em claro; basta um pedaço fora do
+  vocabulário de papel, de tipo e de entidade para o nome ser do dono (`stub-vendashx` é
+  mascarado). Número de conta de exemplo só com dígitos repetidos em blocos iguais e até 3 letras.
+- **Imagem de container:** o caminho de uma imagem do Docker Hub ou de um registro público
+  multiusuário (`ghcr.io`, `quay.io`, `public.ecr.aws`) fica em claro só com prova: sem
+  organização, uma Imagem Oficial do Docker; com organização, as duas chaves: a organização é
+  pública (referência ou `fornecedores.txt`) **e** o nome é software público (inteiro, ou cada
+  pedaço é software, palavra da referência, papel, tipo ou versão, com pelo menos um pedaço de
+  software: `clickhouse/clickhouse-server`, `quay.io/prometheus/statsd-exporter`). Fora disso
+  a organização e o nome são do dono (`vendashx/api-cobranca`, `grafana/billing-vendashx`,
+  `ghcr.io/vendashx/clickhouse-server` e a imagem local `image: api-x` construída pelo
+  `build:`). Um pedaço desconhecido bloqueia, de propósito: `confluentinc/cp-kafka` fica
+  mascarado por causa de `cp`, porque sigla curta é justamente o que distingue nome de
+  cliente. Registro de fornecedor (`registry.k8s.io`, `mcr.microsoft.com`) fica inteiro.
+- **Serviço com o nome do software** (`softwareDoTexto`): o serviço, host ou namespace com o
+  nome de uma imagem que o próprio texto roda fica em claro só se a imagem é oficial
+  (`image: redis:7` → serviço `redis`) ou de organização igual ao nome e pública
+  (`minio/minio`). `image: yudao-server` sem organização é imagem local: o nome é do dono.
+- **Comando à vista:** uma tabela logo abaixo de uma **listagem** à vista (`$ airflow dags list`,
+  `$ gcloud projects list`, ou a linha que é ela mesma uma listagem) tem o cabeçalho da
+  ferramenta, não colunas do dono; a listagem de um tipo fora do vocabulário tipa só a coluna
+  de identidade composta (`dags` → `dag_id`, `projects` → `project_id`). Só listagem: debaixo
+  de `$ cat x.csv`, de `$ python relatorio.py` ou de SQL no comando (`psql -c "select ..."`),
+  o cabeçalho é do dono e continua sendo coluna.
+- **Prova de software** (`memoria_software.go`): o banco do DataHub se chama `datahub`, o do
+  Airflow `airflow`; decidido numa DSN, o nome padrão do software era espalhado pela conversa
+  inteira, inclusive onde é a ferramenta. A memória da conversa não espalha a palavra quando a
+  própria conversa a liga a um pacote externo, como o compilador resolve um nome: instalada
+  (`pip`/`npm`/`brew`/`helm`/`go get` ... `install`), importada (`from datahub.x import`,
+  `require('x')`, `import "github.com/org/x"`), rodada como imagem pública (as duas chaves da
+  regra de imagem) ou executada como programa (`airflow dags list`, `python -m dagster`; o
+  proxy passa o comando de cada chamada de shell). Onde um leitor a decide (a própria DSN), ela
+  continua mascarada. Travas, todas de falha fechada:
+  - segunda chave: a palavra é nome de software público (`software_publico.txt` ou Imagem
+    Oficial do Docker); lista velha só deixa de provar;
+  - palavra real nunca recebe a prova (`palavras_comuns.txt` e `palavras_dicionario.txt`, as
+    50000 palavras mais frequentes de pt e en): é o que um codinome de cliente costuma ser, e
+    um pacote interno com esse nome é importado do mesmo jeito. Medido: dos repositórios
+    populares com nome de codinome típico (`polaris`, `kraken`, `nexus`, `pulsar`, `zephyr`…),
+    nenhum passa; `datahub`, `airflow`, `superset`, `metabase`, `minio`, `trino`, `grafana`,
+    `clickhouse`, `dagster` passam; `kafka`, `snowflake`, `prefect`, `looker` (palavras reais)
+    ficam de fora e continuam mascarados. Número puro também não (`2048` é nome de repositório);
+  - sombreamento (a definição local esconde a global): nome definido no projeto (`name = "x"`
+    num manifesto, `"name": "x"`, `module .../x` no `go.mod`, pasta `x/__init__.py` fora de
+    `site-packages`) é do dono e anula a prova; casar a mais só bloqueia;
+  - termo cadastrado sempre vence.
+
+  A prova e o sombreamento ficam em RAM, valem para qualquer conversa (são fatos sobre o
+  software e o projeto) e não mudam texto já enviado (congelamento). Os dois conjuntos só
+  guardam nome que está na lista de software: o tamanho é limitado pela lista, não pelo que
+  passa na conversa (medido: 60000 textos todos diferentes, 3 e 0 entradas).
+- **Origem pelo caminho** (`leitor_traceback.go`): o caminho de um arquivo diz de quem é o
+  código, como os caminhos de include de um compilador separam o cabeçalho do sistema do
+  cabeçalho do projeto. Estar numa pasta de dependências não basta, porque o pacote interno do
+  cliente é instalado e baixado para as mesmas pastas. É código de terceiro:
+
+  | Onde | O que tem de ser público |
+  |---|---|
+  | `site-packages`, `dist-packages`, `node_modules` | O pacote: nome de repositório popular ou Imagem Oficial (`pandas`, `express`); no npm com escopo, o escopo (`@types`, `@aws-sdk`). Nome de papel (`core`, `common`, `utils`, `app`) não prova nada, e o pacote definido no projeto (sombreamento) também não |
+  | Cache de módulos do Go (`pkg/mod`) | O módulo: host só de código aberto (`golang.org`, `k8s.io`, `gopkg.in`) ou `github.com/<dono>/<repositório>` com as duas chaves (dono fornecedor e repositório popular) |
+  | `.m2/repository`, `.gradle/caches` | O grupo: um grupo público do Maven, sem os de TLD inteiro (`io.<empresa>` é da empresa) |
+  | `.cargo/registry` | O registro: o do crates.io |
+  | JVM, GOROOT, `lib/python3.11/`, `<frozen ...>`, `node:...` | Nada: é a plataforma. `lib/python3/` e `internal/` soltos num caminho são pasta de projeto |
+
+  Três usos, com dois níveis de exigência:
+  - **traceback**: a linha que aponta para código de terceiro fica; a que aponta para outro
+    lugar é do cliente, e a função, o módulo, os identificadores da linha de código e o valor
+    citado no erro final (`KeyError: 'COD_APOLICE_HX'`) são nomes dele. Python, Java/Kotlin/
+    Scala (pacote, classe, método e arquivo; `br.com.<empresa>.<sistema>` inclusive em
+    minúsculas), JavaScript e Go (função, receptor e o pacote `github.com/<empresa>/<sistema>`,
+    com a pasta de mesmo nome na linha do caminho). Aqui vale o critério da tabela como está:
+    sem o leitor, a linha inteira já saía em claro;
+  - **caminho**: os leitores de caminho param no pacote público (`.venv/lib/python3.11/
+    site-packages/sqlalchemy/engine/base.py` fica inteiro) e continuam lendo as pastas do
+    projeto debaixo de usuário público (`/home/ubuntu/<projeto>/...`: o usuário fica, o
+    projeto não);
+  - **leitura de arquivo**: a saída de uma ferramenta que leu arquivo de dependência
+    (`file_path` da chamada) é mascarada como sempre, mas não ensina a memória da conversa:
+    a tabela interna do DataHub lida em `site-packages/datahub/` não vira nome do cliente na
+    prosa.
+
+  No caminho e na leitura de arquivo o critério é mais estrito, porque ali o leitor já
+  mascarava e ensinava: pacote instalado com nome de palavra de dicionário (`pandas`,
+  `requests`, e também `atlas`, `apollo`) não conta, pela mesma razão da prova de software.
+  As pastas de `site-packages/pandas/...` seguem então a regra de caminho de sempre.
+
+Limite: num catálogo de tradução, o rótulo traduzido de uma chave de tipo (`"url_schema":
+"スキーマ"`, `"User": "Użytkownik"`) sai mascarado. Separar isso de `"database": "Продажи_хх"`
+de um cliente russo pediria liberar valor em escrita não latina, que é o vazamento que a
+escrita não latina veio fechar; fica o excesso.
+
+Regras recusadas, para não voltarem (cada uma tem um caso em `casos_publicos_test.go`):
+
+| Regra | Por que vaza |
+|---|---|
+| Liberar o valor quando as chaves do JSON são frases (a forma de um catálogo de tradução) | Um JSON de dados exportado de planilha tem a mesma forma (`"Nome do Cliente": "..."`, `"Usuario": "..."`): saíam o nome da pessoa, o usuário e o servidor |
+| Cabeçalho da ferramenta debaixo de qualquer comando à vista | Debaixo de `$ cat apolices.csv` o cabeçalho são as colunas do dono |
+| Pasta de dependência sempre pública (`site-packages`, `pkg/mod`, `.m2`) | O pacote interno e o módulo privado do cliente ficam nas mesmas pastas |
+| `internal/` ou `lib/python...` no caminho como biblioteca padrão | São pastas comuns de projeto Go e Python |
+| Grupo `io.` ou `dev.` inteiro como público fora do leitor de pacotes | A empresa com domínio `.io` escreve `io.<empresa>.<sistema>` |
+| Artigo do inglês (`the`, `an`, `this`) corta a instrução SQL | São apelidos de tabela comuns (`FROM anuncios an WHERE an.x`) |
+| Palavra-chave colada ao parêntese nunca é SQL | `SELECT(col) FROM tabela` é SQL; só a chamada encadeada (`select(x).where(...)`) não é |
+| Linha `a.b.c = ...` sempre é código | Numa lista de `SET` é coluna qualificada (`UPDATE t SET\n  db.s.t.col = 1`) |
 
 ### Limites
 

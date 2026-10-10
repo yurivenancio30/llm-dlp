@@ -79,7 +79,7 @@ func msg(papel string, conteudo any) map[string]any {
 	return map[string]any{"role": papel, "content": conteudo}
 }
 
-// senha montada por partes (ver o comentário em mask/congelar_test.go)
+// senha montada por partes (ver o comentário em mask/memoria_enviados_test.go)
 var fracaTeste = "gira" + "ssol"
 
 func urlCom(s string) string { return "mysql://app:" + s + "@db1:3306/base" }

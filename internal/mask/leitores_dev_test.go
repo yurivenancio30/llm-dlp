@@ -8,7 +8,7 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/config"
 )
 
-// Testes dos leitores do lote D: chave-valor, endereços, git, pacotes, caminhos, usuário de
+// Testes dos leitores de desenvolvimento: chave-valor, endereços, git, pacotes, caminhos, usuário de
 // rede, nuvem, IP público e termos embutidos. Dados fictícios.
 
 // lidos: o que o leitor achou em s, como "ent:valor" (+ "!" quando forte), em ordem.
@@ -322,7 +322,7 @@ func TestChaveValorExpressaoNaoENome(t *testing.T) {
 	}
 }
 
-// Item 6: bucket e fila de chave explícita e metadata.name de Deployment/Service/StatefulSet
+// Bucket e fila de chave explícita e metadata.name de Deployment/Service/StatefulSet
 // são evidência forte: o nome aprendido é mascarado também em outro texto.
 func TestChaveExplicitaEnsina(t *testing.T) {
 	for _, c := range []struct{ ensina, nome string }{

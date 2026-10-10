@@ -56,7 +56,7 @@ func (m *Masker) novaMemoria(decs []Decisao) *memoria {
 	mm := &memoria{exata: map[string][]nomeMem{}, semCaixa: map[string][]nomeMem{}}
 	visto := map[string]bool{}
 	for _, d := range decs {
-		if d.Generica || len(d.Nome) < memMin || publicoGeral(d.Nome) {
+		if d.Generica || len(d.Nome) < memMin || publicoGeral(d.Nome) || m.softwareProvado(d.Nome) {
 			continue
 		}
 		k := d.Chave()
@@ -131,7 +131,7 @@ func (nm nomeMem) casar(s string, ini int) bool {
 // Uma passada: cada palavra de s é uma consulta no índice.
 func (mm *memoria) varrer(s string, ts []trecho) []trecho { return mm.varrerF(s, ts, filtroMem{}) }
 
-// varrerF: como varrer, com os freios do texto (memoria_freios.go).
+// varrerF: como varrer, com os freios do texto (memoria_conversa_freios.go).
 func (mm *memoria) varrerF(s string, ts []trecho, f filtroMem) []trecho {
 	var out []trecho
 	var buf []byte
@@ -245,7 +245,7 @@ func (l *Lote) comMemoria(s string, r resultado, dica string) resultado {
 }
 
 // semComunsNaProsa: na prosa (texto da mensagem), os trechos que a memória da conversa trouxe e
-// que são palavra comum saem: lá ela é a palavra (palavras_comuns.go). Os que um leitor decidiu
+// que são palavra comum saem: lá ela é a palavra (vocab_palavras.go). Os que um leitor decidiu
 // no próprio texto não passam por aqui.
 func (l *Lote) semComunsNaProsa(s string, xs []trecho) []trecho {
 	if !l.prosa {
@@ -478,7 +478,7 @@ func decisoesTraduzidas(des string, ts []trecho) []Decisao {
 
 // MascararDicaProsa: como MascararDica, para o texto que o usuário escreveu na mensagem (não a
 // saída de ferramenta): palavra comum que chega por contágio fica como palavra; a que um leitor
-// decide ali mesmo (um DDL colado, kubectl -n) continua nome (palavras_comuns.go).
+// decide ali mesmo (um DDL colado, kubectl -n) continua nome (vocab_palavras.go).
 func (l *Lote) MascararDicaProsa(s string, daWeb bool, pos Posicao, dica string) (string, []Entrada) {
 	l.prosa = true
 	defer func() { l.prosa = false }()
@@ -486,7 +486,7 @@ func (l *Lote) MascararDicaProsa(s string, daWeb bool, pos Posicao, dica string)
 }
 
 // MascararProsa: como MascararEscrito, para um bloco de texto da resposta (não a entrada de
-// ferramenta): palavra comum decidida em outro lugar fica como palavra (palavras_comuns.go).
+// ferramenta): palavra comum decidida em outro lugar fica como palavra (vocab_palavras.go).
 func (l *Lote) MascararProsa(des string, daWeb bool, pos Posicao, dica string) (string, []Entrada) {
 	l.prosa = true
 	defer func() { l.prosa = false }()

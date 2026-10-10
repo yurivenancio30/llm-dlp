@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// Regra léxica para código e configuração (seção C, teste T7). Nomes inventados, vários de
+// Regra léxica para código e configuração. Nomes inventados, vários de
 // palavra comum.
 
 // decidido: o nome v está entre as decisões do texto s, com o tipo ent (e a regra, se dada).

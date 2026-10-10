@@ -335,7 +335,7 @@ func (m *Masker) acharConhecidos(s string, numLongo bool, add0 func(ini, fim int
 			}
 			// o conhecimento acumulado (RAM, vistos.json) segue as regras do rastreamento:
 			// palavra comum não se espalha por ele e vocabulário público nunca é aplicado
-			// (um nome aprendido errado antes não volta em todo texto; ver rastreamento.go)
+			// (um nome aprendido errado antes não volta em todo texto; ver memoria_rastreamento.go)
 			if v := s[ini:fim]; !caraDeIdentificador(v) || publicoGeral(v) {
 				return
 			}

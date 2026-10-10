@@ -12,7 +12,7 @@ import (
 	"testing"
 )
 
-// Medições de falso positivo (seção I, item 39). Só rodam com as variáveis de ambiente e só
+// Medições de falso positivo. Só rodam com as variáveis de ambiente e só
 // imprimem contagens (nenhum valor):
 //
 //	LLM_DLP_CORPUS=dir1:dir2   corpus público (código e documentação de terceiros): todo nome de

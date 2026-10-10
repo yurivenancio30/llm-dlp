@@ -230,7 +230,7 @@ func TestObjetoAprendidoNaoMudaOQueJaSaiu(t *testing.T) {
 	}
 }
 
-// Item 3: nome com a forma de um pseudônimo (prefixo de tipo + 8 letras) não é pulado: só é
+// Nome com a forma de um pseudônimo (prefixo de tipo + 8 letras) não é pulado: só é
 // pulado o pseudônimo que nós mesmos geramos.
 func TestNomeComFormaDePseudonimoEMascarado(t *testing.T) {
 	m := novoTeste(t)

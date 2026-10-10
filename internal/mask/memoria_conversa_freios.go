@@ -238,7 +238,7 @@ func (l *Lote) ancorarBloco(s string, bloco [][][2]int, ts []trecho, cobre func(
 				}
 				n++
 				// semente: o valor inteiro do campo (num nome qualificado, a última parte), com
-				// prova direta na mesma fonte; dedução não é semente (ver rastreamento.go)
+				// prova direta na mesma fonte; dedução não é semente (ver memoria_rastreamento.go)
 				if i := ultimoQueCobre(ts, p[0], p[1]); i >= 0 && ts[i].Fim == p[1] && ehObjeto(ts[i].Tipo) && ts[i].Tipo != prefTipoObj+entGenerica &&
 					!l.deduzido(s[ts[i].Ini:ts[i].Fim]) && l.provadoNaFonte(s[ts[i].Ini:ts[i].Fim]) {
 					if porTipo[ts[i].Tipo] == nil {

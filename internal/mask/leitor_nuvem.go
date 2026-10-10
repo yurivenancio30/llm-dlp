@@ -4,13 +4,9 @@ import (
 	"strings"
 )
 
-// Recursos de nuvem (ARN da AWS, IDs do Azure Resource Manager, nomes de recurso do Google
-// Cloud), pacotes internos (go.mod, groupId do Maven/Gradle, escopo do npm) e os leitores que
-// dependem da configuração: IP público (opção ip_publico) e termos cadastrados embutidos em
-// identificadores. Ver docs/estruturas.md, seções Repositórios, pacotes e caminhos e Recursos
-// de nuvem e usuários de rede.
-
-// ---- recursos de nuvem ----------------------------------------------------------------
+// Recursos de nuvem: ARN da AWS, IDs do Azure Resource Manager e nomes de recurso do Google
+// Cloud (ver docs/estruturas.md, seção Recursos de nuvem e usuários de rede). Os hosts de
+// serviço gerenciado ficam em leitor_nuvem_hosts.go.
 
 func acharNuvem(s string, add func(ObjAchado)) {
 	if strings.Contains(s, "arn:") {
@@ -48,7 +44,8 @@ func arnEm(s string, i int, add func(ObjAchado)) {
 	cs[0] = p
 	for k := 1; k < 5; k++ {
 		q := p + 1
-		for q < len(s) && q-p < 40 && s[q] != ':' && !fimRecurso(s[q]) {
+		// região e conta podem ser curinga em policy (arn:aws:glue:*:123456789012:...)
+		for q < len(s) && q-p < 40 && s[q] != ':' && (!fimRecurso(s[q]) || s[q] == '*') {
 			q++
 		}
 		if q >= len(s) || s[q] != ':' {
@@ -200,6 +197,7 @@ var entTipoAzure = map[string]string{"servers": "servidor", "flexibleservers": "
 var servicoArmazenamento = map[string]string{"blob": "bucket", "dfs": "bucket", "file": "bucket", "queue": "fila", "table": "tabela"}
 
 func acharURLsNuvem(s string, add func(ObjAchado)) {
+	acharHostsNuvem(s, add)
 	if strings.Contains(s, "snowflake") {
 		acharSnowflake(s, add)
 	}
@@ -297,12 +295,16 @@ func acharURLsNuvem(s string, add func(ObjAchado)) {
 }
 
 // Snowflake: <conta>.snowflakecomputing.com (a conta pode vir como org-conta ou com a região
-// depois: xy12345.us-east-1) e app.snowflake.com/<org>/<conta>/.
+// depois: xy12345.us-east-1), app.<org>-<conta>.snowflakecomputing.com (Snowsight) e
+// app.snowflake.com/<org>/<conta>/.
 func acharSnowflake(s string, add func(ObjAchado)) {
 	for i := strings.Index(s, ".snowflakecomputing.com"); i >= 0; {
 		a := i
 		for a > 0 && (ehAlnum(s[a-1]) || s[a-1] == '-' || s[a-1] == '_' || s[a-1] == '.') {
 			a--
+		}
+		if strings.HasPrefix(strings.ToLower(s[a:i]), "app.") { // Snowsight: a conta vem depois de "app."
+			a += 4
 		}
 		if d := strings.IndexByte(s[a:i], '.'); d >= 0 { // conta.região
 			i2 := a + d
@@ -414,186 +416,3 @@ func gcpEm(s string, ps [][2]int, add func(ObjAchado)) {
 		}
 	}
 }
-
-// ---- pacotes internos -----------------------------------------------------------------
-
-func acharPacotes(s string, add func(ObjAchado)) {
-	if strings.Contains(s, "module ") {
-		for i := strings.Index(s, "module "); i >= 0; {
-			if i == 0 || s[i-1] == '\n' {
-				goModEm(s, i+7, add)
-			}
-			j := strings.Index(s[i+7:], "module ")
-			if j < 0 {
-				break
-			}
-			i += 7 + j
-		}
-	}
-	if strings.Contains(s, "<groupId>") {
-		for i := strings.Index(s, "<groupId>"); i >= 0; {
-			a := i + 9
-			if e := strings.Index(s[a:min(len(s), a+200)], "</groupId>"); e > 0 {
-				grupoEm(s, a, a+e, add)
-			}
-			j := strings.Index(s[i+9:], "<groupId>")
-			if j < 0 {
-				break
-			}
-			i += 9 + j
-		}
-	}
-	if strings.Contains(s, "group") {
-		for i := strings.Index(s, "group"); i >= 0; {
-			gradleEm(s, i, add)
-			j := strings.Index(s[i+5:], "group")
-			if j < 0 {
-				break
-			}
-			i += 5 + j
-		}
-	}
-	if strings.Contains(s, "\"@") && strings.Contains(s, "\"name\"") {
-		for i := strings.Index(s, "\"name\""); i >= 0; {
-			npmEm(s, i+6, add)
-			j := strings.Index(s[i+6:], "\"name\"")
-			if j < 0 {
-				break
-			}
-			i += 6 + j
-		}
-	}
-}
-
-// module host/org/x (go.mod)
-func goModEm(s string, a int, add func(ObjAchado)) {
-	for a < len(s) && s[a] == ' ' {
-		a++
-	}
-	if a < len(s) && s[a] == '"' {
-		a++
-	}
-	b := a
-	for b < len(s) && (ehAlnum(s[b]) || strings.IndexByte("._~/-", s[b]) >= 0) {
-		b++
-	}
-	r := b
-	if r < len(s) && s[r] == '"' {
-		r++
-	}
-	for r < len(s) && (s[r] == ' ' || s[r] == '\t' || s[r] == '\r') {
-		r++
-	}
-	if b == a || r < len(s) && s[r] != '\n' && !strings.HasPrefix(s[r:], "//") {
-		return // "module " no meio de uma frase
-	}
-	segs := strings.Split(s[a:b], "/")
-	x := a
-	if strings.IndexByte(segs[0], '.') >= 0 {
-		h := strings.ToLower(segs[0])
-		if hostsCodigoPublico[h] {
-			return
-		}
-		if hostInterno(h) {
-			add(ObjAchado{a, a + len(segs[0]), "servidor", "pacote", true})
-		}
-		x += len(segs[0]) + 1
-		segs = segs[1:]
-	}
-	for _, sg := range segs {
-		if nomeSimples(sg) && !publicoDev(sg) && !(len(sg) >= 2 && sg[0] == 'v' && strings.Trim(sg[1:], "0123456789") == "") {
-			add(ObjAchado{x, x + len(sg), "pacote", "pacote", true})
-		}
-		x += len(sg) + 1
-	}
-}
-
-// groupId do Maven/Gradle: os pedaços depois do TLD invertido ("com.empresa.vendas" ->
-// empresa, vendas), fora dos prefixos públicos.
-func grupoEm(s string, a, b int, add func(ObjAchado)) {
-	v := s[a:b]
-	if !nomeSimples(v) || strings.IndexByte(v, '.') < 0 {
-		return
-	}
-	l := strings.ToLower(v)
-	for _, p := range gruposPublicos {
-		if strings.HasPrefix(l, p) && (len(l) == len(p) || p[len(p)-1] == '.' || p[len(p)-1] == '-' || l[len(p)] == '.') {
-			return
-		}
-	}
-	ps := strings.Split(v, ".")
-	x := a
-	inicio := true // TLD invertido no começo: "br.com.", "com.", "org."
-	for _, p := range ps {
-		tld := inicio && (tldsPublicos[strings.ToLower(p)] || len(p) == 2)
-		inicio = tld
-		if !tld && len(p) >= 2 && reIdentSimples.MatchString(p) && !publicoDev(p) {
-			add(ObjAchado{x, x + len(p), "pacote", "pacote", true})
-		}
-		x += len(p) + 1
-	}
-}
-
-// group = 'com.empresa' / group "com.empresa" (build.gradle, no começo da linha)
-func gradleEm(s string, i int, add func(ObjAchado)) {
-	j := i
-	for j > 0 && (s[j-1] == ' ' || s[j-1] == '\t') {
-		j--
-	}
-	if j > 0 && s[j-1] != '\n' {
-		return
-	}
-	p := i + 5
-	for p < len(s) && s[p] == ' ' {
-		p++
-	}
-	if p < len(s) && s[p] == '=' {
-		p++
-		for p < len(s) && s[p] == ' ' {
-			p++
-		}
-	}
-	if p == i+5 || p >= len(s) || s[p] != '\'' && s[p] != '"' {
-		return
-	}
-	q := s[p]
-	e := strings.IndexByte(s[p+1:min(len(s), p+200)], q)
-	if e <= 0 {
-		return
-	}
-	grupoEm(s, p+1, p+1+e, add)
-}
-
-// "name": "@escopo/pacote" (package.json)
-func npmEm(s string, p int, add func(ObjAchado)) {
-	for p < len(s) && (s[p] == ' ' || s[p] == '\t') {
-		p++
-	}
-	if p >= len(s) || s[p] != ':' {
-		return
-	}
-	p++
-	for p < len(s) && (s[p] == ' ' || s[p] == '\t') {
-		p++
-	}
-	if p+2 >= len(s) || s[p] != '"' || s[p+1] != '@' {
-		return
-	}
-	a := p + 2
-	e := strings.IndexByte(s[a:min(len(s), a+214)], '"')
-	if e <= 0 {
-		return
-	}
-	v := s[a : a+e]
-	k := strings.IndexByte(v, '/')
-	if k <= 0 || k == len(v)-1 || !nomeSimples(v[:k]) || !nomeSimples(v[k+1:]) {
-		return
-	}
-	if escoposNpmPublicos[strings.ToLower(v[:k])] {
-		return
-	}
-	add(ObjAchado{a, a + k, "organizacao", "pacote", true})
-	add(ObjAchado{a + k + 1, a + e, "pacote", "pacote", true})
-}
-
-// ---- leitores que dependem da configuração --------------------------------------------

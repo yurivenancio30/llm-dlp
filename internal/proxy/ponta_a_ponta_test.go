@@ -6,10 +6,10 @@ import (
 	"testing"
 )
 
-// T2 de ponta a ponta, com a memória da conversa de verdade: o pedido, o inventário e, numa
+// Ponta a ponta, com a memória da conversa de verdade: o pedido, o inventário e, numa
 // saída de comando seguinte (sem arquivo: recebe o contágio), o mesmo nome solto em 6 formatos.
 // Alvo: 0 em claro. (Na prosa da mensagem do usuário a palavra comum fica como palavra:
-// mask/palavras_comuns.go.)
+// mask/vocab_palavras.go.)
 
 func seisFormatosP(n string) []string {
 	return []string{
@@ -96,5 +96,5 @@ func TestT2PontaAPonta(t *testing.T) {
 			}
 		}
 	}
-	t.Logf("T2: %d de %d ocorrências em claro depois do inventário", claro, total)
+	t.Logf("ponta a ponta: %d de %d ocorrências em claro depois do inventário", claro, total)
 }

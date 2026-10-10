@@ -85,7 +85,7 @@ func (m *Masker) detectarInteiroE(s string, aprende bool, d *dicaSaida, ext stri
 	dec = append(decisoesDosAchados(out), dec...) // as dos leitores (antes dos achados dos decisores)
 	out = append(out, novos...)
 	// Valores que dependem de contexto são lembrados e reconhecidos depois em qualquer
-	// lugar (ver conhecidos.go): sem isto, vazariam quando o modelo os repete sem a
+	// lugar (ver memoria_conhecidos.go): sem isto, vazariam quando o modelo os repete sem a
 	// palavra-chave por perto e o histórico é reenviado.
 	for _, a := range out {
 		if aprende {
@@ -197,8 +197,8 @@ func (m *Masker) detectarGrandeE(s string, aprende bool, d *dicaSaida, ext strin
 // acharEstrutura: os leitores de estrutura e de tabela, no texto sem o transporte (ver
 // normalizacao.go), com os achados de volta nas posições do original, e no original quando a
 // normalização tirou algo que traz nome. base: os achados dos detectores (para nomesNaLinha).
-// d: a dica do comando que produziu o texto (comando.go), ou nil. Depois dos leitores, as
-// listas homogêneas (listas.go) usam o que já se sabe para tipar os itens que faltam.
+// d: a dica do comando que produziu o texto (chamada_comando.go), ou nil. Depois dos leitores, as
+// listas homogêneas (objetos_listas.go) usam o que já se sabe para tipar os itens que faltam.
 func (m *Masker) acharEstrutura(s string, aprende bool, base []Achado, d *dicaSaida) []Achado {
 	ler := func(s string, base []Achado) []Achado {
 		var out []Achado

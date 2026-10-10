@@ -7,7 +7,7 @@ func FuzzLeitores(f *testing.F) {
 	for _, s := range []string{"SELECT a FROM `x..y`", "SELECT [", "Server=;Database=", "a|b\n---\n|", "jdbc:oracle:thin:@", "{{ ref('') }}", "urn:li:dataset:(urn:li:dataPlatform:x,,PROD)", "CREATE TABLE \"\" (", "relation \"\" does"} {
 		f.Add(s)
 	}
-	// lote C (DevOps)
+	// DevOps
 	for _, s := range []string{manifestoK8s, "apiVersion: v1\nkind: Config\nclusters:\n- name: arn:\n  cluster:\n    server: https://\n",
 		"apiVersion: v1\nkind: Pod\nmetadata: {name: [a, {b: }], namespace: 'x''}\n- - -\n  - image: a.b/\n",
 		`{"apiVersion": "v1", "kind": "X", "metadata": {"name": "a"}, "items": [{"image": "h.x:/"}]]}`,

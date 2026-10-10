@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// Transportes (seção A): o mesmo conteúdo embrulhado como chega na conversa. Usados também
+// Transportes: o mesmo conteúdo embrulhado como chega na conversa. Usados também
 // pela matriz CONTEÚDO × TRANSPORTE × DESENHO.
 
 type transporte struct {
@@ -116,7 +116,7 @@ func TestNormalizarMapa(t *testing.T) {
 	}
 }
 
-// item 33: o manifesto chega com prefixo de linha
+// O manifesto chega com prefixo de linha
 func TestTransporteManifesto(t *testing.T) {
 	y := "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: svc-cobranca-lote\n  namespace: ns-financeiro\nspec:\n  replicas: 2\n"
 	for _, tr := range transportes {

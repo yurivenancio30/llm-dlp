@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// Lote C (DevOps): Kubernetes, kubeconfig, Helm, compose, Terraform, Ansible, CloudFormation,
+// Kubernetes, kubeconfig, Helm, compose, Terraform, Ansible, CloudFormation,
 // ARM, Bicep e pipelines de CI. Nomes fictícios.
 
 // chavesYAML: os caminhos das chaves de um YAML (para conferir que a estrutura não mudou).
@@ -163,12 +163,12 @@ spec:
         image: registry.k8s.io/nginx-slim:0.8
         imagePullPolicy: Always
       - name: side
-        image: ghcr.io/projeto/ferramenta:2.0
+        image: ghcr.io/prometheus/prometheus:2.0
       restartPolicy: Always
 `
 	out, _ := m.Mascarar(s)
 	for _, v := range []string{"apiVersion: apps/v1", "kind: Deployment", "namespace: default", "serviceAccountName: default",
-		"image: registry.k8s.io/nginx-slim:0.8", "image: ghcr.io/projeto/ferramenta:2.0", "imagePullPolicy: Always", "restartPolicy: Always", "app: nginx"} {
+		"image: registry.k8s.io/nginx-slim:0.8", "image: ghcr.io/prometheus/prometheus:2.0", "imagePullPolicy: Always", "restartPolicy: Always", "app: nginx"} {
 		if !strings.Contains(out, v) {
 			t.Errorf("%q deveria ficar:\n%s", v, out)
 		}
@@ -520,7 +520,7 @@ func TestDevopsNaoPegaCodigoNemProsa(t *testing.T) {
 	}
 }
 
-// Item 15: env em lista segue a mesma regra de "NOME: valor"; o resto do manifesto fica.
+// Env em lista segue a mesma regra de "NOME: valor"; o resto do manifesto fica.
 func TestK8sEnvLista(t *testing.T) {
 	m := novoTeste(t)
 	s := "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: app\nspec:\n  replicas: 3\n  template:\n    spec:\n      containers:\n        - name: app\n          env:\n            - name: DB_HOST\n              value: pgprd01\n            - name: QUEUE_NAME\n              value: \"fila-x1\"\n            - name: LOG_LEVEL\n              value: debug\n          ports:\n            - containerPort: 8080\n          resources:\n            limits:\n              cpu: 500m\n          volumeMounts:\n            - name: dados\n              mountPath: /app/dados\n      tier: backend\n"

@@ -94,8 +94,10 @@ func valorDoCampo(classe, v string) (string, bool) {
 	case "endereco":
 		return classe, let >= 4 && len(v) >= 6
 	case "usuario":
-		// não vale variável de ambiente, parâmetro de consulta (":user_id") nem trecho de código
-		return classe, dig+let >= 2 && !usuarioComum[strings.ToLower(v)] && !strings.ContainsAny(v, " ()[]{}$<>:%")
+		// não vale variável de ambiente, parâmetro de consulta (":user_id") nem trecho de código;
+		// nem valor sem dono ("stub-user", "my_user", "XXXXXXXXX", ver vocab_dev.go)
+		return classe, dig+let >= 2 && !usuarioComum[strings.ToLower(v)] && !strings.ContainsAny(v, " ()[]{}$<>:%") &&
+			!semDono(v, nil)
 	case "sensivel":
 		return classe, let+dig >= 1
 	case "nomecompleto":

@@ -2,7 +2,7 @@ package mask
 
 import "strings"
 
-// Leitores de código (itens 9 e 10 da revisão): iguais para qualquer linguagem. Não leem a
+// Leitores de código: iguais para qualquer linguagem. Não leem a
 // gramática de uma linguagem; leem a estrutura comum a todas: um texto entre aspas ao lado de
 // um nome. Se o nome contém uma palavra de tipo (host, db, table, queue, topic, bucket,
 // namespace, user...) em qualquer estilo (DB_HOST, queueName, queue_name, QueueName, topics,
@@ -511,7 +511,7 @@ func acharCodigoChamada(s string, add func(ObjAchado)) {
 					continue
 				}
 				if todosLista() {
-					// "nome: 'v'" / "nome = 'v'" dentro da chamada é parâmetro nomeado (item 9)
+					// "nome: 'v'" / "nome = 'v'" dentro da chamada é parâmetro nomeado
 					if p := antesBranco(s, j); p >= 0 && (s[p] == ':' || s[p] == '=') {
 						j = e
 						continue

@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// Leitores de código, linha de comando, caminhos e URLs de nuvem (itens 9 a 14 da revisão).
+// Leitores de código, linha de comando, caminhos e URLs de nuvem.
 // Nomes fictícios.
 
 func TestLeitorCodigoNome(t *testing.T) {
@@ -183,7 +183,7 @@ func TestAjustesFinaisFormatos(t *testing.T) {
 	}
 }
 
-// Revisão 68d44da, item 1: linha única longa (JSON minificado, resposta de API) cresce de
+// Linha única longa (JSON minificado, resposta de API) cresce de
 // forma linear. Quadrático daria ~16x de 128 KB para 512 KB; o limite é 8x.
 func TestLinhaLongaLinear(t *testing.T) {
 	if testing.Short() {
@@ -213,7 +213,7 @@ func TestLinhaLongaLinear(t *testing.T) {
 	confere(t, m, longa, []string{"repo-x2"}, nil)
 }
 
-// Item 2: SELECT em maiúsculas com uma cláusula ensina, como em minúsculas.
+// SELECT em maiúsculas com uma cláusula ensina, como em minúsculas.
 func TestSQLMaiusculoUmaClausulaEnsina(t *testing.T) {
 	m := novoTeste(t)
 	confere(t, m, "SELECT * FROM fin.tb_nota_fiscal", []string{"tb_nota_fiscal"}, []string{"SELECT * FROM "})
@@ -222,7 +222,7 @@ func TestSQLMaiusculoUmaClausulaEnsina(t *testing.T) {
 	}
 }
 
-// Item 3: tópico/fila com ponto vindo de chave de fila/tópico; atributo de código, domínio e
+// Tópico/fila com ponto vindo de chave de fila/tópico; atributo de código, domínio e
 // arquivo ficam.
 func TestTopicoComPonto(t *testing.T) {
 	m := novoTeste(t)
@@ -239,7 +239,7 @@ func TestTopicoComPonto(t *testing.T) {
 	}
 }
 
-// Item 4: usuário posicional depois do DSN do PDO e name no bloco metadata do Terraform.
+// Usuário posicional depois do DSN do PDO e name no bloco metadata do Terraform.
 func TestPDOUsuarioETerraformMetadata(t *testing.T) {
 	m := novoTeste(t)
 	u := "svc" + "_pdo_x1"

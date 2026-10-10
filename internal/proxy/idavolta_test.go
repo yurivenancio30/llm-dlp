@@ -153,7 +153,7 @@ func TestIdaEVoltaNomeDeTabela(t *testing.T) {
 	}
 }
 
-// Item 4: a volta aceita o pseudônimo de objeto em qualquer caixa (inclusive todo em
+// A volta aceita o pseudônimo de objeto em qualquer caixa (inclusive todo em
 // maiúsculas), e uma pasta volta com a grafia exata dela.
 func TestIdaEVoltaObjetoQualquerCaixa(t *testing.T) {
 	re := regexp.MustCompile(`\b(?i:t|bkt)_[a-zA-Z2-7]{8}\b`)

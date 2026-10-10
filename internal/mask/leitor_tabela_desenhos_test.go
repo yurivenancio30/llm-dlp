@@ -2,7 +2,7 @@ package mask
 
 import "testing"
 
-// Seção B: o leitor de tabela em qualquer desenho. Os nomes de ferramenta são só de onde a forma
+// O leitor de tabela em qualquer desenho. Os nomes de ferramenta são só de onde a forma
 // foi copiada; a regra lê a forma.
 
 var nomesTabela = []string{"fin_contab", "lanc_diario", "plano_contas", "vl_lancto", "cd_conta"}
@@ -131,7 +131,7 @@ ns-financeiro    svc-conciliacao-6c8d7b9f4-k8j2m     1/1     Running   3        
 `},
 		{"aws text", "BUCKETS\t2024-01-01T00:00:00.000Z\tbkt-relat-fin\nBUCKETS\t2024-02-01T00:00:00.000Z\tbkt-notas-fisc\n"},
 	}
-	// a coluna NAME sem tipo no cabeçalho fica para o tipo dado pelo comando (seção F)
+	// a coluna NAME sem tipo no cabeçalho fica para o tipo dado pelo comando (chamada_comando.go)
 	nomes := []string{"ns-financeiro", "bkt-relat-fin", "bkt-notas-fisc"}
 	for _, c := range casos {
 		m := novoTeste(t)
@@ -143,7 +143,7 @@ ns-financeiro    svc-conciliacao-6c8d7b9f4-k8j2m     1/1     Running   3        
 	}
 }
 
-// negativos (item 10): nada mascarado
+// negativos: nada mascarado
 var negativosTabela = []struct{ nome, texto string }{
 	{"ls -l", `total 16
 drwxr-xr-x 2 root root 4096 Oct  5 10:11 bin

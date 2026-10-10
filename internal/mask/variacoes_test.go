@@ -9,7 +9,7 @@ import (
 	"unicode"
 )
 
-// Seção G, item 28: gerador de variações aplicado aos casos de cada leitor. Cada caso é um
+// Gerador de variações aplicado aos casos de cada leitor. Cada caso é um
 // modelo com lugares para nomes («1» «2» «3» = nome simples, «Q» = nome qualificado) e para
 // comentário («c»). O gerador muda UMA dimensão de cada vez a partir do caso base: caixa,
 // espaços/tabs/quebras entre tokens, citação do nome, comentário no meio, pontuação colada no

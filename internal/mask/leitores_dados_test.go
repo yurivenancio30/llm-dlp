@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// Lote B (Dados): leitores de SQL, mensagens de erro, conexões e tabelas. Nomes fictícios.
+// Leitores de SQL, mensagens de erro, conexões e tabelas. Nomes fictícios.
 
 var rePseudoQualquer = regexp.MustCompile(`\b(?i:host|db|sch|t|c|proc|idx|usr|ns|svc|bkt|top)_[a-z2-7]{8}\b`)
 
@@ -202,7 +202,7 @@ func TestSQLMascaradoContinuaValido(t *testing.T) {
 	}
 }
 
-// Item 5: minúsculas com uma cláusula, quando a forma não deixa dúvida; prosa fica.
+// Minúsculas com uma cláusula, quando a forma não deixa dúvida; prosa fica.
 func TestSQLMinusculoUmaClausula(t *testing.T) {
 	m := novoTeste(t)
 	for _, c := range []struct{ s, nome string }{
@@ -230,7 +230,7 @@ func TestSQLMinusculoUmaClausula(t *testing.T) {
 	}
 }
 
-// Item 7: colunas e views públicas do information_schema e dos catálogos ficam.
+// Colunas e views públicas do information_schema e dos catálogos ficam.
 func TestVocabularioCatalogoFica(t *testing.T) {
 	m := novoTeste(t)
 	for _, s := range []string{
@@ -245,7 +245,7 @@ func TestVocabularioCatalogoFica(t *testing.T) {
 	}
 }
 
-// Item 13: DSN do driver MySQL do Go e DSN do PDO.
+// DSN do driver MySQL do Go e DSN do PDO.
 func TestDSNGoEPDO(t *testing.T) {
 	m := novoTeste(t)
 	confere(t, m, `db, err := sql.Open("mysql", "svc_app_x1:pw@tcp(db-mysql-x1:3306)/vendas_x1?parseTime=true")`,

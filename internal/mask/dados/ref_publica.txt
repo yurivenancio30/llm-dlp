@@ -1,4 +1,4 @@
-# GERADO por TestGerarRefPublica (internal/mask/ref_publica_gerar_test.go). Não edite à mão.
+# GERADO por TestGerarRefPublica (internal/mask/vocab_gerar_test.go). Não edite à mão.
 # Referência pública: palavras muito frequentes como nome de recurso no material público.
 # Gerado em 2026-10-06, no material público da máquina: ~/go/pkg/mod, /usr/lib/python3.10, /usr/share/doc, /usr/lib/python3/dist-packages, ~/.local/lib/python3.10/site-packages, /usr/share/man/pt_BR, /usr/share/vim/vim82/lang, /usr/share/gnupg, /usr/lib/systemd/catalog, /usr/share/i18n/locales
 # (33711 arquivos, 500 MB, 1435 projetos distintos).

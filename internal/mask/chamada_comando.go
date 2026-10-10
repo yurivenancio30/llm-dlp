@@ -468,14 +468,22 @@ func dicaListagem(cmd string) *dicaSaida {
 		}
 		return ""
 	}
+	// o tipo listado: o do vocabulário ou, para qualquer outro substantivo no plural ("dags",
+	// "projects", "pipelines"), objeto nomeado (servico)
+	dicaDe := func(w string) *dicaSaida {
+		if e := tipoDe(w); e != "" {
+			return dicaNome(e)
+		}
+		if substantivoPlural(w) {
+			return dicaIdentidade("servico", w)
+		}
+		return nil
+	}
 	for i := 1; i < len(ts); i++ {
 		v := strings.ToLower(ts[i])
 		if strings.HasPrefix(v, "list-") {
 			ps := strings.Split(v[5:], "-")
-			if e := tipoDe(ps[len(ps)-1]); e != "" {
-				return dicaNome(e)
-			}
-			return nil
+			return dicaDe(ps[len(ps)-1])
 		}
 		if !verbosListagem[v] {
 			continue
@@ -484,13 +492,15 @@ func dicaListagem(cmd string) *dicaSaida {
 			if strings.HasPrefix(ts[j], "-") {
 				continue
 			}
-			if e := tipoDe(ts[j]); e != "" {
-				return dicaNome(e)
+			if d := dicaDe(ts[j]); d != nil {
+				return d
 			}
 			break
 		}
-		if e := tipoDe(ts[i-1]); e != "" && i >= 2 {
-			return dicaNome(e)
+		if i >= 2 {
+			if d := dicaDe(ts[i-1]); d != nil {
+				return d
+			}
 		}
 		if v == "ps" || v == "list" && i == 1 {
 			return dicaNome("servico") // docker ps, helm list: contêineres e releases
@@ -502,6 +512,43 @@ func dicaListagem(cmd string) *dicaSaida {
 
 func dicaNome(e string) *dicaSaida {
 	return &dicaSaida{nomes: map[string]string{"name": e, "names": e}, name: e}
+}
+
+// dicaIdentidade: a listagem de um tipo fora do vocabulário tipa só a coluna de identidade
+// composta, o tipo no singular com _id ou _name (dags -> dag_id, projects -> project_id,
+// clusters -> cluster_name). NAME ou o tipo sozinho não: "UNIT" de systemctl list-units não diz
+// que o valor é nome de alguém.
+func dicaIdentidade(e, tipo string) *dicaSaida {
+	d := &dicaSaida{nomes: map[string]string{}}
+	t := strings.ToLower(strings.Trim(tipo, `"'`))
+	switch {
+	case strings.HasSuffix(t, "ies"):
+		t = t[:len(t)-3] + "y"
+	case strings.HasSuffix(t, "sses"), strings.HasSuffix(t, "xes"):
+		t = t[:len(t)-2]
+	case strings.HasSuffix(t, "s"):
+		t = t[:len(t)-1]
+	}
+	if len(t) >= 2 {
+		for _, suf := range []string{"_id", "_name", "id", "name", "-id", "-name"} {
+			d.nomes[t+suf] = e
+		}
+	}
+	return d
+}
+
+// substantivoPlural: uma palavra em minúsculas terminada em "s" (não "ss"): o tipo listado.
+func substantivoPlural(w string) bool {
+	w = strings.Trim(w, `"'`)
+	if len(w) < 4 || w[len(w)-1] != 's' || w[len(w)-2] == 's' {
+		return false
+	}
+	for i := 0; i < len(w); i++ {
+		if c := w[i]; !(c >= 'a' && c <= 'z' || c == '-' || c == '_') {
+			return false
+		}
+	}
+	return true
 }
 
 // ---- a dica aplicada -------------------------------------------------------------------

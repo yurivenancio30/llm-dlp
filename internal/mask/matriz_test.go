@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// Matriz de cobertura (item 16): o mesmo conjunto de nomes internos fictícios escrito em várias
+// Matriz de cobertura: o mesmo conjunto de nomes internos fictícios escrito em várias
 // linguagens e formatos, nas formas constante, parâmetro nomeado, anotação, chamada de função e
 // linha de comando, mais AWS, GCP e Azure. Roda SEM nada no config (sem domínio interno, sem
 // termos). Meta: pelo menos 90% das ocorrências mascaradas.

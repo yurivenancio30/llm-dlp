@@ -18,7 +18,7 @@ import (
 )
 
 // Masker: o objeto que mascara. Este arquivo tem os tipos e a construção; cada etapa está
-// num arquivo próprio (ver o mapa do código no README).
+// num arquivo próprio (ver o mapa do código em docs/desenvolvimento.md).
 
 // Achado é um trecho sensível encontrado num texto.
 type Achado struct {
@@ -42,32 +42,43 @@ type resultado struct {
 }
 
 // Masker detecta e troca dado sensível por pseudônimos. É seguro para uso concorrente.
+//
+// Os campos vêm em três grupos: o que é fixo depois da construção (configuração e regras), o
+// que o Masker lembra (cada memória com o seu teto; a tabela completa está em
+// docs/desenvolvimento.md, "O que fica guardado") e os caches.
 type Masker struct {
+	// ---- fixo depois da construção ----
 	cfg      config.Config
 	p        *Pseudo
-	leaks    *detect.Detector
-	pessoas  *Pessoas
-	vistos   *Vistos
-	enviados *Enviados
-	conh     *conhecidos
-	leitores []Leitor         // leitores de estrutura (objetos.go)
-	escritos registroEscritos // quem escreveu (decisao.go)
-	fracos   fracos
-	extras   []*regexp.Regexp
-	rotExtra []string
-	termos   *regexp.Regexp
-	rotTermo map[string]string
 	chaveB64 string
+	leaks    *detect.Detector // gitleaks: tokens e segredos com formato próprio
+	leitores []Leitor         // leitores de estrutura (leitores.go)
+	vocab    *vocabulario     // nomes de campo (campos_vocabulario.go)
+	extras   []*regexp.Regexp // padrões da configuração
+	rotExtra []string
+	termos   *regexp.Regexp // termos cadastrados (sempre vencem)
+	rotTermo map[string]string
 
-	vocab    *vocabulario
-	classes  sync.Map // rótulo de campo -> classe (ver rotulos.go)
+	// ---- o que o Masker lembra ----
+	pessoas   *Pessoas         // pessoas cadastradas, só hash, em disco (pessoas.go)
+	conh      *conhecidos      // valores já mascarados, em RAM (memoria_conhecidos.go)
+	vistos    *Vistos          // os mesmos valores, só hash, em disco (memoria_vistos.go)
+	enviados  *Enviados        // o que cada texto já enviado levou, em disco (memoria_enviados.go)
+	escritos  registroEscritos // o que o modelo escreveu, para saber quem escreveu (decisao.go)
+	fracos    fracos           // evidência fraca de nome: vale com duas regras (objetos.go)
+	soft      sync.Map         // software público com prova estrutural (memoria_software.go)
+	softLocal sync.Map         // nomes definidos no projeto: anulam a prova (sombreamento)
+
+	// ---- caches (só evitam refazer trabalho) ----
+	classes  sync.Map // rótulo de campo -> classe (campos_vocabulario.go)
 	nClasses atomic.Int64
 
 	mu    sync.Mutex
-	memo  map[[32]byte]resultado
+	memo  map[[32]byte]resultado // texto -> resultado (mascarar.go); duas gerações
 	velho map[[32]byte]resultado // geração anterior do memo
 	bytes int
-	// o que já saiu, por posição na conversa (ver Lote); duas gerações, como o memo
+	// o que já saiu, por posição na conversa (ver Lote); duas gerações, como o memo. É a cópia
+	// em RAM do registro de enviados
 	cong, congVelho map[Posicao]resultado
 	congBytes       int
 }
@@ -84,6 +95,8 @@ func NovoMasker(cfg config.Config, chave []byte, pessoas *Pessoas, vistos *Visto
 	m := &Masker{cfg: cfg, p: NovoPseudo(chave), leaks: d, pessoas: pessoas, vistos: vistos, conh: novosConhecidos(),
 		memo: map[[32]byte]resultado{}, cong: map[Posicao]resultado{}, rotTermo: map[string]string{},
 		chaveB64: base64.StdEncoding.EncodeToString(chave), leitores: leitoresDe(cfg)}
+	// o leitor de traceback consulta o sombreamento deste Masker (memoria_software.go)
+	m.leitores = append(m.leitores, Leitor{Nome: "traceback", Achar: m.acharTraceback, Publico: publicoDev})
 	// vocabulário dos nomes de campo: o padrão mais o que o usuário acrescentou
 	m.vocab = vocabularioPadrao()
 	m.vocab.quase = cfg.Opcional("quase")

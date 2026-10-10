@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// Seção F: saídas soltas de script e de shell. Os nomes são fictícios.
+// Saídas soltas de script e de shell. Os nomes são fictícios.
 
 // mostrar: o texto mascarado com cada pseudônimo trocado por «tipo» (para ler a falha).
 func mostrar(m *Masker, s string) string {
@@ -47,7 +47,7 @@ func conferirComando(t *testing.T, m *Masker, rotulo string, ps []passo, nomes [
 
 var cabCarga = passo{"head -3 dados/carga_contab.csv", "cd_conta,nm_tabela,nm_schema\n1001,t_lanc_diario,fin_contab\n1002,t_saldo_mes,fin_fiscal\n"}
 
-// item 24: o comando tipa as colunas do resultado
+// O comando tipa as colunas do resultado
 var casosComando = []struct {
 	nome  string
 	ps    []passo
@@ -169,7 +169,7 @@ func TestDicaDoComando(t *testing.T) {
 	}
 }
 
-// item 25: nome qualificado depois de palavra de tipo, em qualquer frase
+// Nome qualificado depois de palavra de tipo, em qualquer frase
 var casosTipoQualificado = []struct{ nome, texto string }{
 	{"rótulo pt", "tabela fin_contab.t_lanc_diario: 1200 linhas\n"},
 	{"dbt", "10:01:02  1 of 3 OK created sql table model fin_contab.t_lanc_diario ....... [SUCCESS 1 in 2.10s]\n"},
@@ -219,7 +219,7 @@ func TestTipoQualificadoNegativos(t *testing.T) {
 	}
 }
 
-// item 26: lista homogênea; os nomes ensinados antes por um SQL
+// Lista homogênea; os nomes ensinados antes por um SQL
 const sqlEnsina = "select * from fin_contab.t_lanc_diario d join fin_contab.t_saldo_mes s on s.cd = d.cd join fin_contab.t_plano_contas p on p.cd = d.cd\n"
 
 var casosLista = []struct{ nome, texto string }{
@@ -280,7 +280,7 @@ func TestListaHomogeneaNegativos(t *testing.T) {
 	}
 }
 
-// item 27: um nome aprendido é mascarado dentro de qualquer forma solta
+// Um nome aprendido é mascarado dentro de qualquer forma solta
 func TestPropagacaoFormasSoltas(t *testing.T) {
 	formas := []struct{ nome, texto string }{
 		{"f-string", `print(f"carregando fin_contab.t_lanc_diario em {destino}")` + "\n" + `log.info(f"t_saldo_mes: {n} linhas")` + "\n"},

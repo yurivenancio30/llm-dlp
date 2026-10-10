@@ -17,7 +17,7 @@ const memoMax = 64 << 20 // teto (aproximado) do texto memorizado, somando as du
 
 // Mascarar troca o dado sensível de s por pseudônimos e devolve as entradas usadas.
 // Resultados são memorizados: o Claude Code reenvia a conversa inteira a cada mensagem.
-// O proxy usa um Lote, que além disso congela o que saiu, por posição (ver enviados.go).
+// O proxy usa um Lote, que além disso congela o que saiu, por posição (ver memoria_enviados.go).
 func (m *Masker) Mascarar(s string) (string, []Entrada) {
 	r, _ := m.mascarar(s, true)
 	return r.texto, r.entradas
@@ -27,7 +27,7 @@ func (m *Masker) mascarar(s string, aprende bool) (resultado, [32]byte) {
 	return m.mascararD(s, aprende, "")
 }
 
-// mascararD: com a dica do comando que produziu o texto (ver comando.go; "" = sem dica).
+// mascararD: com a dica do comando que produziu o texto (ver chamada_comando.go; "" = sem dica).
 func (m *Masker) mascararD(s string, aprende bool, dica string) (resultado, [32]byte) {
 	if len(s) < 4 {
 		return resultado{texto: s}, [32]byte{}
@@ -81,6 +81,7 @@ func (m *Masker) mascararKE(s string, k [32]byte, aprende bool, d *dicaSaida, di
 	}
 	_, ext := partesDica(dica)
 	achados, decididos := m.detectarDE(s, aprende, d, ext)
+	m.registrarSoftware(s)
 
 	// Até que geração este resultado vale? Se nada foi aprendido durante a detecção, até g.
 	// Se algo foi aprendido (por este texto ou por outro, em paralelo), confere: todo valor
@@ -177,15 +178,15 @@ func (m *Masker) guardarCong(kc Posicao, r resultado) {
 type Lote struct {
 	m      *Masker
 	saidas map[Posicao]resultado // o que saiu em cada posição
-	mem    *memoria              // a memória da conversa (ver memoria.go); nil = vazia
+	mem    *memoria              // a memória da conversa (ver memoria_conversa.go); nil = vazia
 	pre    map[Posicao]resultado // o resultado do memo de cada texto novo, já consultado em Memoria
-	// rastreamento (ver rastreamento.go)
+	// rastreamento (ver memoria_rastreamento.go)
 	deduzidos  map[string]bool            // valores marcados por dedução: não servem de semente
 	fontes     map[string]map[string]bool // valor (minúsculas) -> fontes em que teve prova direta
 	fonteAtual string                     // a fonte do texto sendo montado (vazia: sem comando)
 	provAtual  map[string]bool            // decididos com prova no próprio texto sendo montado
 	escrevendo bool                       // montando texto do assistente (recebe todo o contágio)
-	prosa      bool                       // montando texto de mensagem, do usuário ou da resposta (palavras_comuns.go)
+	prosa      bool                       // montando texto de mensagem, do usuário ou da resposta (vocab_palavras.go)
 	publicos   map[string]bool            // anterioridade: o modelo escreveu antes de qualquer dado
 }
 

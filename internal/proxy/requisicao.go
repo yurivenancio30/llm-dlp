@@ -46,7 +46,7 @@ func (p *Proxy) mascararCorpo(r *http.Request, corpo []byte) ([]byte, []mask.Ent
 		lote.UsarPublicos(publicosDoModelo(v, p.m, lote.DecididosPorTexto(col.itens)))
 	}
 	// memória da conversa: os nomes decididos em todos os textos valem para os textos ainda
-	// não enviados (ver mask/memoria.go)
+	// não enviados (ver mask/memoria_conversa.go)
 	lote.Memoria(col.itens, col.extras)
 
 	// 2ª passada: monta, em ordem
@@ -264,7 +264,7 @@ func (w walker) s(v string) string {
 		return w.escrito(v)
 	}
 	if f, _ := mask.SepararFonte(w.dica); w.col != nil && f == mask.FonteSistema {
-		w.pos.doTexto() // catálogo de sistema: não é fonte de decisão (mask/rastreamento.go)
+		w.pos.doTexto() // catálogo de sistema: não é fonte de decisão (mask/memoria_rastreamento.go)
 		return v
 	}
 	if w.col != nil {
@@ -290,7 +290,7 @@ func (w walker) escrito(v string) string {
 			return v
 		}
 		if !w.daWeb {
-			w.pos.doTexto() // o texto do assistente não é fonte de decisão (mask/rastreamento.go)
+			w.pos.doTexto() // o texto do assistente não é fonte de decisão (mask/memoria_rastreamento.go)
 			return v
 		}
 		w.col.itens = append(w.col.itens, mask.ItemLote{S: v, DaWeb: w.daWeb, Pos: w.pos.doTexto(), Dica: w.dica})
@@ -318,7 +318,8 @@ func (w walker) web(nome string) bool {
 	return false
 }
 
-// idsDaWeb junta os ids das chamadas de ferramentas da web feitas na conversa.
+// idsDaWeb junta os ids das chamadas de ferramentas da web feitas na conversa e das leituras de
+// arquivo de dependência pública: o resultado delas é mascarado, mas não ensina.
 func (w walker) idsDaWeb(msgs []any) map[string]bool {
 	ids := map[string]bool{}
 	for _, mm := range msgs {
@@ -329,9 +330,17 @@ func (w walker) idsDaWeb(msgs []any) map[string]bool {
 			if bl == nil || bl["type"] != "tool_use" {
 				continue
 			}
-			if nome, _ := bl["name"].(string); w.web(nome) {
-				if id, _ := bl["id"].(string); id != "" {
-					ids[id] = true
+			id, _ := bl["id"].(string)
+			if nome, _ := bl["name"].(string); w.web(nome) && id != "" {
+				ids[id] = true
+			}
+			// arquivo lido de uma dependência pública (site-packages/pandas/..., node_modules/
+			// express/...): código do fornecedor, mascarado mas sem ensinar a memória (como a web)
+			if in, _ := bl["input"].(map[string]any); in != nil && id != "" && w.m != nil {
+				for _, k := range []string{"file_path", "path", "notebook_path"} {
+					if p, _ := in[k].(string); p != "" && w.m.CaminhoTerceiro(p) {
+						ids[id] = true
+					}
 				}
 			}
 		}
@@ -341,7 +350,7 @@ func (w walker) idsDaWeb(msgs []any) map[string]bool {
 
 // dicasDosComandos: para cada resultado de ferramenta, o que o comando da chamada (o tool_use
 // do mesmo id) diz dele: as colunas de um SELECT, o tipo pedido numa listagem, a coluna de um
-// arquivo cujo cabeçalho já passou, as palavras do programa (ver mask/comando.go e
+// arquivo cujo cabeçalho já passou, as palavras do programa (ver mask/chamada_comando.go e
 // mask/chamada.go). E, para cada tool_use, o que se sabe da entrada (eco de uma saída anterior,
 // palavras que o proxy traduziu de um pseudônimo). Calculado em ordem, antes de mascarar (a
 // entrada do tool_use ainda é a original), e igual nas duas passadas.
@@ -368,6 +377,11 @@ func dicasDosComandos(msgs []any, m *mask.Masker) (dicas, dicasUso map[string]st
 				if id, _ := bl["id"].(string); id != "" {
 					cmds[id] = comandoDe(bl["input"])
 					cs.Argumentos(cmds[id])
+					if in, _ := bl["input"].(map[string]any); in != nil && m != nil {
+						if c, ok := in["command"].(string); ok {
+							m.RegistrarComando(c) // o programa rodado prova software (mask/memoria_software.go)
+						}
+					}
 				}
 				anotarEscrito(escritos, bl["input"])
 			}

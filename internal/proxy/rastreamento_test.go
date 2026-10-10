@@ -16,7 +16,7 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/mask"
 )
 
-// Rastreamento (mask/rastreamento.go) de ponta a ponta, com nomes inventados.
+// Rastreamento (mask/memoria_rastreamento.go) de ponta a ponta, com nomes inventados.
 
 var rePsRT = regexp.MustCompile(`(?i)\b(host|db|sch|t|c|proc|idx|usr|ns|svc|bkt|top|repo|org|pkg|dir|acc|obj)_[a-z2-7]{8}\b`)
 

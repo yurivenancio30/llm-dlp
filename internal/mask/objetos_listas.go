@@ -283,6 +283,20 @@ func listasHomogeneas(s string, conhecido func(string) (string, bool), add func(
 	}
 }
 
+// atribuiAtributo: o nome s[a:b] abre a linha e recebe uma atribuição ("mock.scalars.return_value
+// = x", "self.cfg.schema = y"): é atributo de objeto no código, não nome de tabela.
+func atribuiAtributo(s string, a, b int) bool {
+	for k := a - 1; k >= 0 && s[k] != '\n'; k-- {
+		if s[k] != ' ' && s[k] != '\t' {
+			return false
+		}
+	}
+	for b < len(s) && (s[b] == ' ' || s[b] == '\t') {
+		b++
+	}
+	return b+1 < len(s) && s[b] == '=' && s[b+1] != '='
+}
+
 // qualificadosConhecidos: "a.b" ou "a.b.c" em que uma parte é um schema ou banco conhecido na
 // posição em que fica num nome de tabela: as outras partes ganham o tipo da posição.
 func qualificadosConhecidos(s string, conhecido func(string) (string, bool), add func(ObjAchado)) {
@@ -332,7 +346,7 @@ func qualificadosConhecidos(s string, conhecido func(string) (string, bool), add
 				}
 			}
 		}
-		if !casa {
+		if !casa || atribuiAtributo(s, ps[0][0], j) {
 			continue
 		}
 		for k, p := range ps {

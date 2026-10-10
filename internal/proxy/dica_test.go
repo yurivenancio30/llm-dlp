@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// Seção F, item 24: o resultado de uma ferramenta é tipado pelo comando do tool_use do mesmo
+// O resultado de uma ferramenta é tipado pelo comando do tool_use do mesmo
 // id. A mesma saída com outro comando não é tipada.
 func TestComandoTipaResultado(t *testing.T) {
 	saida := "t_lanc_diario\nt_nota_entrada\nt_saldo_mes\n"

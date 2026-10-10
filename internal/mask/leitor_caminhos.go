@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// Caminhos fora da pasta pessoal (item 12 da revisão). A pasta pessoal (/home/u, /Users/u,
+// Caminhos fora da pasta pessoal. A pasta pessoal (/home/u, /Users/u,
 // C:\Users\u) fica com o leitor de caminhos de usuário. Aqui:
 //
 //	/srv/x, /opt/x, /data/x, /mnt/x, /media/x, /var/www/x   cada pasta que não é pública
@@ -75,6 +75,7 @@ func pastaFora(v string, estrito bool) bool {
 
 // pedacosCaminho marca as pastas de s[a:] separadas por sep, até o fim do caminho.
 func pedacosCaminho(s string, a int, sep byte, estrito bool, add func(ObjAchado)) {
+	ant := ""
 	for n := 0; n < 10 && a < len(s); n++ {
 		for a < len(s) && s[a] == sep {
 			a++
@@ -84,6 +85,10 @@ func pedacosCaminho(s string, a int, sep byte, estrito bool, add func(ObjAchado)
 			return
 		}
 		v := s[a:b]
+		if dependenciaPublica(ant, v, s[b:]) {
+			return // código de terceiro: site-packages/pandas/..., node_modules/express/...
+		}
+		ant = v
 		dir := b < len(s) && s[b] == sep
 		if !dir && strings.IndexByte(v, '.') > 0 {
 			return // arquivo

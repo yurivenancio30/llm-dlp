@@ -2,7 +2,7 @@ package mask
 
 import "strings"
 
-// Regra léxica para código e configuração (seção C da rodada "conhecer o nome"; ver
+// Regra léxica para código e configuração (ver
 // docs/estruturas.md). A maior parte já é feita pelos leitores de código (leitor_codigo.go) e
 // de chave-valor (leitor_chave_valor.go), que ficam como estão:
 //

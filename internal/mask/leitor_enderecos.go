@@ -2,8 +2,10 @@ package mask
 
 import "strings"
 
-// Vocabulário e regras de domínio comuns aos leitores do lote D (chave-valor, endereços,
-// repositórios, pacotes, caminhos, nuvem). Ver docs/estruturas.md.
+// Endereços (ver docs/estruturas.md): host interno, armazenamento e filas em URLs, remoto do
+// git, pasta pessoal (/home/u, C:\Users\u) e usuário de rede (DOMÍNIO\usuário). No começo, as
+// regras de domínio que os outros leitores de desenvolvimento também usam (chave-valor,
+// pacotes, caminhos, nuvem).
 
 func sufixoInterno(h string) bool {
 	// nome DNS de serviço do Kubernetes (servico.namespace.svc[.cluster.local]): fica com o
@@ -470,10 +472,15 @@ func caminhoEm(s string, u int, add func(ObjAchado)) {
 		return
 	}
 	nome := s[u:e]
-	if !letraD(nome[0]) && !ehDig(nome[0]) || publicoDev(nome) {
+	if !letraD(nome[0]) && !ehDig(nome[0]) {
 		return
 	}
-	add(ObjAchado{u, e, "usuario", "caminho", true})
+	// usuário público (/home/ubuntu, /home/ec2-user) fica, mas as pastas do projeto abaixo dele
+	// continuam sendo lidas
+	if !publicoDev(nome) && len(nome) >= 2 {
+		add(ObjAchado{u, e, "usuario", "caminho", true})
+	}
+	ant := ""
 	for n, a := 0, e; n < 8 && a < len(s) && sepCaminho(s[a]); n++ {
 		for a < len(s) && sepCaminho(s[a]) {
 			a++
@@ -486,6 +493,10 @@ func caminhoEm(s string, u int, add func(ObjAchado)) {
 			return
 		}
 		v := s[a:b]
+		if dependenciaPublica(ant, v, s[b:]) {
+			return // código de terceiro: .venv/lib/python3.11/site-packages/pandas/...
+		}
+		ant = v
 		dir := b < len(s) && sepCaminho(s[b])
 		if !dir && strings.IndexByte(v, '.') >= 0 {
 			return // arquivo

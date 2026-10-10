@@ -2,7 +2,7 @@ package mask
 
 import "testing"
 
-// Seção D: a regra "o nome ao lado diz o tipo" em todas as sintaxes de chave → valor.
+// A regra "o nome ao lado diz o tipo" em todas as sintaxes de chave → valor.
 
 var casosChaveValor = []struct {
 	nome, texto string

@@ -22,15 +22,21 @@ var chavesConexao = map[string]string{
 }
 
 var (
-	reURIBanco   = regexp.MustCompile(`(?i)\b(?:jdbc:[a-z0-9]+(?::[a-z]+)*:|(?:postgres(?:ql)?|mysql|mariadb|mssql|sqlserver|oracle|redshift|snowflake|mongodb(?:\+srv)?|clickhouse|db2|teradata|presto|trino|hive|cockroachdb|sqlite)(?:\+[a-z0-9_]+)?:)//(?:([^\s:/@;?"']+)(?::[^\s@/"']*)?@)?([A-Za-z0-9_.\-,:\\]+)(?:/([A-Za-z_][\w$\-]*))?`)
+	reURIBanco   = regexp.MustCompile(`(?i)\b(?:jdbc:[a-z0-9]+(?::[a-z]+)*:|(?:postgres(?:ql)?|mysql|mariadb|mssql|sqlserver|oracle|redshift|snowflake|mongodb(?:\+srv)?|clickhouse|db2|teradata|presto|trino|hive|cockroachdb|sqlite)(?:\+[a-z0-9_]+)?:)//(?:([^\s:/@;?"']+)(?::[^\s@/"']*)?@)?([A-Za-z0-9_.\-,:\\]+)(?:/([\pL_][\pL\w$\-]*))?`)
 	reJDBCOracle = regexp.MustCompile(`(?i)\bjdbc:oracle:thin:(?:[^\s@/"']+@)?@?(?://)?([A-Za-z0-9_.\-]+)(?::\d+)?[:/]([A-Za-z_][\w.$\-]*)`)
 	reTNS        = regexp.MustCompile(`(?i)\(\s*(HOST|SERVICE_NAME|SID)\s*=\s*([A-Za-z0-9_.\-]+)\s*\)`)
 	reURN        = regexp.MustCompile(`urn:li:dataset:\(urn:li:dataPlatform:[\w-]+,([^,()\n]+),[A-Z]+\)`)
 	reURNUsuario = regexp.MustCompile(`urn:li:corpuser:([\w.\-@]+)`)
 	reURNFluxo   = regexp.MustCompile(`urn:li:dataFlow:\([\w-]+,([\w.\-]+),[A-Za-z]+\)(?:,([\w.\-]+)\))?`)
-	reDbtRef     = regexp.MustCompile(`\{\{[^}]*?\bref\(\s*['"]([\w.\-]+)['"](?:\s*,\s*['"]([\w.\-]+)['"])?\s*\)`)
-	reDbtSource  = regexp.MustCompile(`\{\{[^}]*?\bsource\(\s*['"]([\w.\-]+)['"]\s*,\s*['"]([\w.\-]+)['"]\s*\)`)
-	reConnID     = regexp.MustCompile(`\b\w*conn_id\s*=\s*['"]([\w.\-]+)['"]`)
+	// outras URNs com nome do cliente (https://docs.datahub.com/docs/what/urn): instância da
+	// plataforma, grupo (time), gráfico e painel (id na plataforma) e campo de dataset (coluna)
+	reURNInstancia = regexp.MustCompile(`urn:li:dataPlatformInstance:\(urn:li:dataPlatform:[\w-]+,([\w.\-]+)\)`)
+	reURNGrupo     = regexp.MustCompile(`urn:li:corpGroup:([\w.\-@]+)`)
+	reURNPainel    = regexp.MustCompile(`urn:li:(?:chart|dashboard):\([\w-]+,([\w.\-]+)\)`)
+	reURNCampo     = regexp.MustCompile(`urn:li:schemaField:\(urn:li:dataset:\([^()]*\),([\w.\-\[\]=]+)\)`)
+	reDbtRef       = regexp.MustCompile(`\{\{[^}]*?\bref\(\s*['"]([\w.\-]+)['"](?:\s*,\s*['"]([\w.\-]+)['"])?\s*\)`)
+	reDbtSource    = regexp.MustCompile(`\{\{[^}]*?\bsource\(\s*['"]([\w.\-]+)['"]\s*,\s*['"]([\w.\-]+)['"]\s*\)`)
+	reConnID       = regexp.MustCompile(`\b\w*conn_id\s*=\s*['"]([\w.\-]+)['"]`)
 )
 
 // valores que nunca são nome de recurso
@@ -163,7 +169,7 @@ func acharConexoes(s string, add func(ObjAchado)) {
 			// vários hosts: h1:p1,h2:p2
 			a := m[4]
 			for _, h := range strings.Split(s[m[4]:m[5]], ",") {
-				if nomeDeModelo(strings.SplitN(h, ":", 2)[0]) { // freios_p2.go
+				if nomeDeModelo(strings.SplitN(h, ":", 2)[0]) { // leitor_conexao_freios.go
 					a += len(h) + 1
 					continue
 				}
@@ -188,7 +194,7 @@ func acharConexoes(s string, add func(ObjAchado)) {
 	}
 	if strings.Contains(s, "(") {
 		for _, m := range reTNS.FindAllStringSubmatchIndex(s, -1) {
-			if nomeDeModelo(s[m[4]:m[5]]) { // freios_p2.go
+			if nomeDeModelo(s[m[4]:m[5]]) { // leitor_conexao_freios.go
 				continue
 			}
 			if strings.EqualFold(s[m[2]:m[3]], "HOST") {
@@ -209,6 +215,16 @@ func acharConexoes(s string, add func(ObjAchado)) {
 			add(ObjAchado{m[2], m[3], "servico", "urn", true})
 			if m[4] >= 0 {
 				add(ObjAchado{m[4], m[5], "servico", "urn", true})
+			}
+		}
+		for _, u := range []struct {
+			re  *regexp.Regexp
+			ent string
+		}{{reURNInstancia, "servidor"}, {reURNGrupo, "usuario"}, {reURNPainel, "servico"}, {reURNCampo, "coluna"}} {
+			for _, m := range u.re.FindAllStringSubmatchIndex(s, -1) {
+				if v := s[m[2]:m[3]]; !publicoDev(v) {
+					add(ObjAchado{m[2], m[3], u.ent, "urn", true})
+				}
 			}
 		}
 	}
@@ -369,7 +385,7 @@ func prefixoPDO(s string, i int) bool {
 // para "localhost:8080/api" de uma URL sem esquema não virar banco; "como|as <usuário>" logo
 // depois é o usuário.
 var (
-	reEnderecoBanco = regexp.MustCompile(`(?:^|[\s"'=@(\[])([A-Za-z][\w.\-]*[A-Za-z0-9]):(\d{2,5})/([A-Za-z_][\w$\-]*)(?:\s+(?:como|as)\s+(?:(?:o\s+)?(?:usu[aá]rio|user|role)\s+)?([A-Za-z_][\w.$\-]*))?`)
+	reEnderecoBanco = regexp.MustCompile(`(?:^|[\s"'=@(\[])([A-Za-z][\w.\-]*[A-Za-z0-9]):(\d{2,5})/([\pL_][\pL\w$\-]*)(?:\s+(?:como|as)\s+(?:(?:o\s+)?(?:usu[aá]rio|user|role)\s+)?([\pL_][\pL\w.$\-]*))?`)
 	reFalaConexao   = regexp.MustCompile(`(?i)\b(?:conect|connect|conex)`)
 )
 
@@ -400,7 +416,7 @@ func acharEnderecoBanco(s string, add func(ObjAchado)) {
 
 // DSN do driver MySQL do Go: usuario[:senha]@protocolo(endereço)/banco[?parâmetros]
 // (https://github.com/go-sql-driver/mysql#dsn-data-source-name)
-var reDSNGo = regexp.MustCompile(`(?:^|[\s"'\x60=(,])([A-Za-z_][\w.\-]*)(?::[^@\s"'\x60]*)?@(?:tcp6?|unix)\(([^)\s"'\x60]+)\)/([A-Za-z_][\w$\-]*)`)
+var reDSNGo = regexp.MustCompile(`(?:^|[\s"'\x60=(,])([\pL_][\pL\w.\-]*)(?::[^@\s"'\x60]*)?@(?:tcp6?|unix)\(([^)\s"'\x60]+)\)/([\pL_][\pL\w$\-]*)`)
 
 // PDO do Oracle: oci:dbname=//host:porta/serviço
 var reDSNOci = regexp.MustCompile(`\boci:dbname=//([A-Za-z0-9_.\-]+)(?::\d+)?/([A-Za-z_][\w.$\-]*)`)

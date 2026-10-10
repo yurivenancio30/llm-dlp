@@ -19,10 +19,18 @@ import (
 // Dados: palavras_comuns.txt, as 20000 palavras mais frequentes de cada idioma no FrequencyWords
 // (OpenSubtitles 2018), CC BY-SA 4.0; origem e critério no cabeçalho do arquivo.
 
-//go:embed palavras_comuns.txt
+//go:embed dados/palavras_comuns.txt
 var palavrasComunsTxt string
 
 var palavrasComuns = lerListaGerada(palavrasComunsTxt)
+
+// palavras_dicionario.txt: as 50000 mais frequentes de cada idioma, menos as comuns (gerado por
+// TestGerarDicionario). Só a prova de software o usa (memoria_software.go).
+//
+//go:embed dados/palavras_dicionario.txt
+var palavrasDicionarioTxt string
+
+var palavrasDicionario = lerListaGerada(palavrasDicionarioTxt)
 
 // palavraComum: v (sem aspas e colchetes) é uma palavra só, de letras, da lista.
 func palavraComum(v string) bool {

@@ -17,7 +17,7 @@ func (m *Masker) aplicar(s string, achados []Achado) (string, []Entrada) {
 	return t, e
 }
 
-// aplicarT é o aplicar que devolve também os trechos trocados (ver enviados.go).
+// aplicarT é o aplicar que devolve também os trechos trocados (ver memoria_enviados.go).
 func (m *Masker) aplicarT(s string, achados []Achado) (string, []Entrada, []trecho) {
 	if len(achados) == 0 {
 		return s, nil, nil
@@ -76,7 +76,7 @@ func entradaDe(entradas []Entrada, ps, real, tipo string) []Entrada {
 }
 
 // remontar refaz o texto enviado antes a partir dos trechos guardados: sai igual, byte a
-// byte, mesmo que hoje se saiba mais (ver enviados.go). Trecho inválido: não remonta.
+// byte, mesmo que hoje se saiba mais (ver memoria_enviados.go). Trecho inválido: não remonta.
 func remontar(s string, ts []trecho) (string, []Entrada, bool) {
 	var b strings.Builder
 	var entradas []Entrada

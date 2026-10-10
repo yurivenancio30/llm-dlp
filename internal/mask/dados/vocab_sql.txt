@@ -1,6 +1,6 @@
 # Vocabulário público do SQL: palavras-chave, tipos, funções nativas e schemas/bancos de
-# sistema dos dialetos ANSI/ISO, T-SQL, PL/SQL, PostgreSQL, MySQL, Db2, Snowflake, BigQuery e
-# Spark SQL (fontes em docs/estruturas.md, seção SQL e DDL). Nunca é mascarado nem aprendido.
+# sistema dos dialetos ANSI/ISO, T-SQL, PL/SQL, PostgreSQL, MySQL, Db2, Snowflake, BigQuery,
+# SQLite, DuckDB e Spark SQL (fontes em docs/estruturas.md, seção SQL e DDL). Nunca é mascarado nem aprendido.
 # Uma palavra que falte aqui é mascarada a mais (custa legibilidade, nunca vaza).
 abort abs absolute access account accounts action add admin after aggregate alias all allocate alter always analyse analyze and any apply are array array_agg as asc ascii asensitive assertion assignment asymmetric at atomic attach attribute authorization auto_increment autoincrement avg
 backup before begin between bigint bignumeric binary bit bit_length blob bool boolean both breadth break browse btree bucket buckets bulk by bytea bytes
@@ -28,8 +28,11 @@ waitfor warehouse warehouses week when whenever where while width_bucket window 
 xml xmlagg xmlattributes xmlelement xmlforest xmlparse xmlpi xmlroot xmlserialize
 year years yes
 zone
-# schemas e bancos de sistema (iguais em toda instalação)
-sysadmin accountadmin securityadmin useradmin orgadmin public
+# Snowflake Marketplace: CREATE DATABASE x FROM LISTING, SHOW LISTINGS (docs.snowflake.com/sql-reference/sql/create-database)
+listing listings
+# schemas e bancos de sistema (iguais em toda instalação); main e temp: os schemas de todo banco
+# SQLite e DuckDB (sqlite.org/lang_attach.html, duckdb.org/docs/sql/statements/attach)
+sysadmin accountadmin securityadmin useradmin orgadmin public main
 information_schema pg_catalog pg_toast dbo guest master model msdb tempdb mysql performance_schema sysibm syscat sysstat sysproc sysfun snowflake account_usage organization_usage snowflake_sample_data
 # information_schema (ISO/IEC 9075-11): views e colunas
 schemata tables columns views routines parameters triggers sequences table_constraints key_column_usage referential_constraints check_constraints constraint_column_usage constraint_table_usage view_table_usage view_column_usage table_privileges column_privileges routine_privileges usage_privileges role_table_grants applicable_roles enabled_roles character_sets collations domains element_types

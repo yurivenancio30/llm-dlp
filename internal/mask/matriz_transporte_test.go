@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// Matriz CONTEÚDO × TRANSPORTE × DESENHO (seção H, itens 34 e 35): cada conteúdo (registros com
+// Matriz CONTEÚDO × TRANSPORTE × DESENHO: cada conteúdo (registros com
 // campos de tipo conhecido) é escrito em cada desenho e embrulhado em cada transporte. Regra:
 // os mesmos nomes mascarados em todas as células, sem nada no config. Meta: 95%. Os negativos
 // (conteúdo sem nome interno) não podem ter nada mascarado em célula nenhuma.

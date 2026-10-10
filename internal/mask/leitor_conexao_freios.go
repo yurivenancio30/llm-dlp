@@ -2,7 +2,7 @@ package mask
 
 import "strings"
 
-// Freios das regras acima de 2% nas sessões reais (P2, item D2; TestMedirSessoesReais, só
+// Freios das regras acima de 2% nas sessões reais (TestMedirSessoesReais, só
 // contagens e formas). Pela forma e pelos vocabulários públicos que já existem.
 
 // Conexão (medido nas sessões: conexão/tnsnames e conexão/uri acima de 2%). Os
