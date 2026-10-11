@@ -34,6 +34,12 @@ matters to whoever changes the code.
 - When the API cannot be reached, the log and the error no longer show the address of the
   request, which may carry the API key (`?key=...`).
 
+### Code
+
+- `llm-dlp simular` also checks the way back of what the model writes: the fake API returns
+  the last tool call with the pseudonyms, and the replay counts the calls that came back
+  different from the original (what would go to a generated file or to the terminal).
+
 ## [0.3.1] - 2026-10-11
 
 Security fixes in the program itself. Nothing changes in what is masked. After updating,

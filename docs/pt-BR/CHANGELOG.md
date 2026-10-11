@@ -35,6 +35,12 @@ que só interessa a quem mexe no código.
 - Quando a API não responde, o log e o erro não mostram mais o endereço da requisição, que
   pode levar a chave da API (`?key=...`).
 
+### Código
+
+- O `llm-dlp simular` passa a conferir também a volta do que o modelo escreve: a API falsa
+  devolve a última chamada de ferramenta com os pseudônimos, e a repetição conta as chamadas
+  que voltaram diferentes da original (o que iria para um arquivo gerado ou para o terminal).
+
 ## [0.3.1] - 2026-10-11
 
 Correções de segurança no próprio programa. Nada muda no que é mascarado. Depois de
