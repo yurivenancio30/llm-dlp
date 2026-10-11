@@ -33,6 +33,8 @@ matters to whoever changes the code.
   longer exhausts the memory and brings llm-dlp down: it is refused by its header (more
   than 16000 points on a side or 64 million in total) and the output of the external
   programs has a ceiling.
+- Built with Go 1.27.2, which fixes 9 known vulnerabilities of the standard library
+  (HTTP and TLS) present in the binaries up to 0.3.0; `xz` dependency updated.
 - **Release notes on GitHub:** the releases 0.2.1 and 0.3.0 were published with empty notes
   (a GoReleaser setting skipped the step that reads them). The notes are the section of the
   version in this file again, now with each paragraph on one line, links that work from the

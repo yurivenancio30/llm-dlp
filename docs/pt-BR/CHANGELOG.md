@@ -32,6 +32,8 @@ que só interessa a quem mexe no código.
 - Imagem que declara um tamanho enorme, ou PDF cujo texto se expande sem fim, não estoura
   mais a memória nem derruba o llm-dlp: é recusada pelo cabeçalho (mais de 16000 pontos de
   lado ou 64 milhões no total), e a saída dos programas externos tem teto.
+- Compilado com o Go 1.27.2, que corrige 9 vulnerabilidades conhecidas da biblioteca
+  padrão (HTTP e TLS) presentes nos binários até a 0.3.0; dependência `xz` atualizada.
 - **Notas da release no GitHub:** as releases 0.2.1 e 0.3.0 foram publicadas com as notas
   vazias (uma configuração do GoReleaser pulava o passo que as lê). As notas voltam a ser a
   seção da versão neste arquivo (a versão em inglês), agora com cada parágrafo numa linha
