@@ -21,8 +21,9 @@ import (
 // mascararCorpo mascara o JSON da requisição. Corpo que não é JSON não sai (falha fechada).
 // Devolve também o lote dos textos, para congelar depois que a requisição sair.
 //
-// formato: "anthropic" (/v1/messages), "gemini" (vista na forma da Anthropic: ver gemini.go) ou
-// outro (modo genérico: todo texto é mascarado).
+// formato: "anthropic" (/v1/messages); "gemini", "codeassist", "openai" ou "responses" (vista na
+// forma da Anthropic por uma ponte: ver gemini.go, openai.go e responses.go); ou outro (modo
+// genérico: todo texto é mascarado).
 func (p *Proxy) mascararCorpo(formato, tipo string, corpo []byte) ([]byte, []mask.Entrada, *mask.Lote, error) {
 	dec := json.NewDecoder(bytes.NewReader(corpo))
 	dec.UseNumber()
