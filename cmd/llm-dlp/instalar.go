@@ -161,7 +161,7 @@ Em dois passos (OCR e trava) ele usa sudo: a sua senha será pedida nessa hora.`
 	}
 
 	// 4. Claude Code
-	passo(4, "Claude Code", "só para quem usa o Claude Code (com o Gemini CLI, o opencode ou o Copilot, responda n: eles\n      são apontados à mão, ver o README). Faz o Claude Code passar pelo llm-dlp. Muda o\n      ~/.claude/settings.json (com backup):")
+	passo(4, "Claude Code", "só para quem usa o Claude Code (com o Gemini CLI, o Codex, o opencode ou o Copilot, responda n:\n      eles são apontados à mão, ver o README). Faz o Claude Code passar pelo llm-dlp. Muda o\n      ~/.claude/settings.json (com backup):")
 	fmt.Printf(`        • ANTHROPIC_BASE_URL=http://%s  → as mensagens passam pelo llm-dlp
         • ao abrir uma sessão: "llm-dlp garantir"   → sobe o llm-dlp se não estiver no ar
         • a cada mensagem:     "llm-dlp verificar"  → barra a mensagem se algo estiver errado
@@ -248,10 +248,10 @@ Em dois passos (OCR e trava) ele usa sudo: a sua senha será pedida nessa hora.`
 		fmt.Println("\nPara valer: feche e abra o Claude Code (no VS Code, recarregue a janela).")
 	}
 	fmt.Println(`
-Outros clientes, em beta (Gemini CLI, opencode, Copilot com a sua chave): esta instalação não
-os aponta para o llm-dlp nem os trava. Falta pôr o endereço do llm-dlp no cliente; ele fica
-protegido enquanto apontar para cá. Como fazer, cliente por cliente: README, seção
-"Gemini CLI, opencode e Copilot (beta)".`)
+Outros clientes, em beta (Gemini CLI, Codex, opencode, Copilot com a sua chave): esta
+instalação não os aponta para o llm-dlp nem os trava. Falta pôr o endereço do llm-dlp no
+cliente; ele fica protegido enquanto apontar para cá. Como fazer, cliente por cliente: README,
+seção "Gemini CLI, Codex, opencode e Copilot (beta)".`)
 	return nil
 }
 

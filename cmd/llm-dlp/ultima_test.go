@@ -36,3 +36,23 @@ func TestMensagensDaUltima(t *testing.T) {
 		}
 	}
 }
+
+// O "llm-dlp ultima" também lê o Gemini CLI com a conta Google (a conversa dentro de "request") e
+// o Responses do Codex (instruções e itens).
+func TestMensagensDaUltimaAssinaturas(t *testing.T) {
+	codeAssist := `{"model":"m","project":"p","request":{"contents":[{"role":"user","parts":[{"text":"oi"}]}]}}`
+	if veio, quer := mensagensDaUltima([]byte(codeAssist)), []mensagemVista{{"user", []string{"oi"}}}; !reflect.DeepEqual(veio, quer) {
+		t.Errorf("code assist: veio %q", veio)
+	}
+	responses := `{"instructions":"seja breve","input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"oi"}]},
+		{"type":"function_call","name":"shell","arguments":"{\"command\":[\"ls\"]}","call_id":"c1"},
+		{"type":"function_call_output","call_id":"c1","output":"a.txt"},
+		{"type":"custom_tool_call","name":"apply_patch","input":"*** Begin Patch","call_id":"c2"},
+		{"type":"reasoning","summary":[]}]}`
+	quer := []mensagemVista{{"instructions", []string{"seja breve"}}, {"user", []string{"oi"}},
+		{"assistant", []string{`[ferramenta shell] {"command":["ls"]}`}}, {"user", []string{"[resultado de ferramenta]\na.txt"}},
+		{"assistant", []string{"[ferramenta apply_patch] *** Begin Patch"}}}
+	if veio := mensagensDaUltima([]byte(responses)); !reflect.DeepEqual(veio, quer) {
+		t.Errorf("responses:\n veio %q\n quer %q", veio, quer)
+	}
+}

@@ -50,8 +50,15 @@ func (p *Proxy) destino(r *http.Request) (formato, upstream, uri string) {
 	nome, _, _ := strings.Cut(strings.TrimPrefix(r.URL.Path, "/"), "/")
 	if pv, ok := p.cfg.Provedores[nome]; ok && nome != "" && pv.Upstream != "" {
 		formato = pv.Formato
-		if strings.HasSuffix(r.URL.Path, "/chat/completions") {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/chat/completions"):
 			formato = "openai" // o endereço compatível com a OpenAI de qualquer provedor (o do Gemini também)
+		case strings.HasSuffix(r.URL.Path, "/responses"):
+			formato = "responses" // o Responses da OpenAI (o Codex, com chave ou com a assinatura do ChatGPT)
+		case formato == "codeassist":
+			if i := strings.LastIndexByte(r.URL.Path, ':'); i >= 0 && metodosDaConta[r.URL.Path[i+1:]] {
+				formato = formatoConta
+			}
 		}
 		return formato, pv.Upstream, strings.TrimPrefix(uri, "/"+nome)
 	}
@@ -135,7 +142,7 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var entradas []mask.Entrada
 	var lote *mask.Lote
 	semMascara := false
-	if len(bytes.TrimSpace(corpo)) > 0 {
+	if len(bytes.TrimSpace(corpo)) > 0 && formato != formatoConta {
 		novo, ents, l, err := p.mascararCorpo(formato, r.Header.Get("content-type"), corpo)
 		if err != nil {
 			var obrig erroObrigatorio
@@ -147,7 +154,8 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			semMascara = true
 		} else {
 			corpo, entradas, lote = novo, ents, l
-			if (formato == "anthropic" || formato == "gemini" || formato == "openai") && !strings.Contains(r.URL.Path, "count_tokens") &&
+			if (formato == "anthropic" || formato == "gemini" || formato == "openai" || formato == "codeassist" || formato == "responses") &&
+				!strings.Contains(r.URL.Path, "count_tokens") &&
 				!strings.Contains(r.URL.Path, ":countTokens") && len(corpo) > 2000 {
 				c := corpo
 				p.ultima.Store(&c)
@@ -197,8 +205,10 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ct := resp.Header.Get("content-type")
 	erroAPI := ""
 	switch {
-	case strings.HasPrefix(ct, "text/event-stream") && formato == "gemini":
+	case strings.HasPrefix(ct, "text/event-stream") && (formato == "gemini" || formato == "codeassist"):
 		err = p.desmascararSSEGemini(w, resp.Body, tab)
+	case strings.HasPrefix(ct, "text/event-stream") && formato == "responses":
+		err = p.desmascararSSEResponses(w, resp.Body, tab)
 	case strings.HasPrefix(ct, "text/event-stream") && formato == "openai":
 		err = p.desmascararSSEOpenAI(w, resp.Body, tab)
 	case strings.HasPrefix(ct, "text/event-stream"):
@@ -210,8 +220,10 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			if resp.StatusCode >= 400 && !semMascara {
 				erroAPI = resumoDoErro(b)
 			}
-			if !tab.Vazia() && formato == "gemini" {
+			if !tab.Vazia() && (formato == "gemini" || formato == "codeassist") {
 				b = p.desmascararGeminiJSON(b, tab)
+			} else if !tab.Vazia() && formato == "responses" {
+				b = p.desmascararResponsesJSON(b, tab)
 			} else if !tab.Vazia() && formato == "openai" {
 				b = p.desmascararOpenAIJSON(b, tab)
 			} else if !tab.Vazia() {

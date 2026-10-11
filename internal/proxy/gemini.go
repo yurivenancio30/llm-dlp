@@ -40,7 +40,30 @@ const marcaParte = "\x00parte"
 var paramsGemini = map[string]bool{"contents": true, "tools": true, "systemInstruction": true, "system_instruction": true,
 	"generationConfig": true, "generation_config": true, "safetySettings": true, "safety_settings": true,
 	"toolConfig": true, "tool_config": true, "cachedContent": true, "cached_content": true, "model": true,
-	"labels": true, "serviceTier": true, "service_tier": true, "store": true}
+	"labels": true, "serviceTier": true, "service_tier": true, "store": true, "session_id": true}
+
+// O Gemini CLI com a conta Google (Login with Google) não fala com a API do Gemini: fala com a
+// API do Code Assist (cloudcode-pa.googleapis.com/v1internal:<método>), apontada pela variável
+// CODE_ASSIST_ENDPOINT. A conversa vai no formato do Gemini dentro de "request" ({model, project,
+// user_prompt_id, request: {contents, systemInstruction, tools...}}), e a resposta volta dentro de
+// "response" ({response: {candidates...}, traceId}). Os métodos da conta (login, cota,
+// experimentos) não levam conversa e passam como vieram.
+var metodosDaConta = map[string]bool{"loadCodeAssist": true, "onboardUser": true, "getCodeAssistGlobalUserSetting": true,
+	"setCodeAssistGlobalUserSetting": true, "listExperiments": true, "retrieveUserQuota": true, "fetchAdminControls": true}
+
+// formatoConta: um método da conta do Code Assist (ver metodosDaConta): passa sem mudar nada.
+const formatoConta = "codeassist-conta"
+
+// ponteCodeAssist: a requisição do Gemini que vai dentro de "request", vista como a do Gemini. O
+// envelope (modelo, projeto, ids) não muda.
+func ponteCodeAssist(v any) (map[string]any, func(), bool) {
+	req, _ := v.(map[string]any)
+	in, ok := req["request"].(map[string]any)
+	if !ok {
+		return nil, nil, false
+	}
+	return ponteGemini(in)
+}
 
 func campo(m map[string]any, nomes ...string) (any, string) {
 	for _, n := range nomes {
@@ -303,6 +326,12 @@ func (g *voltaGemini) soltar(i int) string {
 
 // pedaco desmascara uma resposta (ou um pedaço dela), no lugar. fim = não vem mais nada.
 func (g *voltaGemini) pedaco(resp map[string]any, fim bool) {
+	if _, ok := resp["candidates"]; !ok {
+		if in, _ := resp["response"].(map[string]any); in != nil { // Code Assist: {response: {...}, traceId}
+			g.pedaco(in, fim)
+			return
+		}
+	}
 	cands, _ := resp["candidates"].([]any)
 	for pos, c := range cands {
 		cm, _ := c.(map[string]any)

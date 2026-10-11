@@ -102,6 +102,16 @@ func mensagensDaUltima(corpo []byte) []mensagemVista {
 			Role  string `json:"role"`
 			Parts []any  `json:"parts"`
 		} `json:"contents"`
+		// Gemini CLI com a conta Google: a conversa do Gemini vai dentro de "request"
+		Request struct {
+			Contents []struct {
+				Role  string `json:"role"`
+				Parts []any  `json:"parts"`
+			} `json:"contents"`
+		} `json:"request"`
+		// Responses (o Codex): instruções e itens
+		Instructions string `json:"instructions"`
+		Input        any    `json:"input"`
 	}
 	if json.Unmarshal(corpo, &req) != nil {
 		return nil
@@ -114,8 +124,55 @@ func mensagensDaUltima(corpo []byte) []mensagemVista {
 		}
 		out = append(out, mensagemVista{m.Role, ts})
 	}
-	for _, c := range req.Contents {
+	for _, c := range append(req.Contents, req.Request.Contents...) {
 		out = append(out, mensagemVista{c.Role, textosDasPartes(c.Parts)})
+	}
+	if req.Instructions != "" {
+		out = append(out, mensagemVista{"instructions", []string{req.Instructions}})
+	}
+	return append(out, itensDoResponses(req.Input)...)
+}
+
+// itensDoResponses: as mensagens do "input" do Responses (texto, chamada e resultado de ferramenta).
+func itensDoResponses(entrada any) []mensagemVista {
+	if s, ok := entrada.(string); ok {
+		return []mensagemVista{{"user", []string{s}}}
+	}
+	itens, _ := entrada.([]any)
+	textos := func(c any) []string {
+		if s, ok := c.(string); ok {
+			return []string{s}
+		}
+		var out []string
+		partes, _ := c.([]any)
+		for _, x := range partes {
+			pm, _ := x.(map[string]any)
+			if t, ok := pm["text"].(string); ok {
+				out = append(out, t)
+			} else if pm != nil {
+				out = append(out, "[arquivo]")
+			}
+		}
+		return out
+	}
+	var out []mensagemVista
+	for _, x := range itens {
+		it, _ := x.(map[string]any)
+		papel, _ := it["role"].(string)
+		switch it["type"] {
+		case "message", nil:
+			out = append(out, mensagemVista{papel, textos(it["content"])})
+		case "function_call":
+			out = append(out, mensagemVista{"assistant", []string{fmt.Sprintf("[ferramenta %v] %v", it["name"], it["arguments"])}})
+		case "custom_tool_call":
+			out = append(out, mensagemVista{"assistant", []string{fmt.Sprintf("[ferramenta %v] %v", it["name"], it["input"])}})
+		case "function_call_output", "custom_tool_call_output":
+			var ts []string
+			for _, t := range textos(it["output"]) {
+				ts = append(ts, "[resultado de ferramenta]\n"+t)
+			}
+			out = append(out, mensagemVista{"user", ts})
+		}
 	}
 	return out
 }

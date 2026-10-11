@@ -26,9 +26,11 @@ type Termo struct {
 type Provedor struct {
 	// Para onde a requisição vai, sem o "/<nome>".
 	Upstream string `json:"upstream"`
-	// Como ler a requisição e a resposta: "gemini", "openai" (Chat Completions) ou "anthropic".
-	// Outro valor: modo genérico (todo texto da requisição é mascarado, e a resposta em streaming
-	// não é desmascarada). Um caminho terminado em /chat/completions é sempre lido como "openai".
+	// Como ler a requisição e a resposta: "gemini", "codeassist" (o Gemini CLI com a conta
+	// Google), "openai" (Chat Completions), "responses" (o Codex) ou "anthropic". Outro valor:
+	// modo genérico (todo texto da requisição é mascarado, e a resposta em streaming não é
+	// desmascarada). Um caminho terminado em /chat/completions é sempre lido como "openai", e um
+	// terminado em /responses, como "responses".
 	Formato string `json:"formato"`
 }
 
@@ -129,6 +131,9 @@ func ProvedoresPadrao() map[string]Provedor {
 		"gemini": {Upstream: "https://generativelanguage.googleapis.com", Formato: "gemini"},
 		"openai": {Upstream: "https://api.openai.com", Formato: "openai"},
 		"xai":    {Upstream: "https://api.x.ai", Formato: "openai"},
+		// as assinaturas: o Gemini CLI com a conta Google e o Codex com a conta do ChatGPT
+		"codeassist": {Upstream: "https://cloudcode-pa.googleapis.com", Formato: "codeassist"},
+		"chatgpt":    {Upstream: "https://chatgpt.com/backend-api/codex", Formato: "responses"},
 	}
 }
 

@@ -175,7 +175,8 @@ func TestOutrasAPIsMalformadasNaoDerrubamOClaude(t *testing.T) {
 		w.Write(respostaAtual)
 	}))
 	cfg.Upstream = up.URL
-	cfg.Provedores = map[string]config.Provedor{"gemini": {Upstream: up.URL, Formato: "gemini"}, "xai": {Upstream: up.URL, Formato: "openai"}}
+	cfg.Provedores = map[string]config.Provedor{"gemini": {Upstream: up.URL, Formato: "gemini"}, "xai": {Upstream: up.URL, Formato: "openai"},
+		"codeassist": {Upstream: up.URL, Formato: "codeassist"}, "chatgpt": {Upstream: up.URL, Formato: "responses"}}
 	p := Novo(cfg, m, nil, log.New(io.Discard, "", 0))
 	px := httptest.NewServer(p)
 	t.Cleanup(func() { up.Close(); px.Close() })
@@ -195,6 +196,15 @@ func TestOutrasAPIsMalformadasNaoDerrubamOClaude(t *testing.T) {
 	respOA := map[string]any{"choices": []any{map[string]any{"index": 0, "message": map[string]any{"role": "assistant", "content": "oi " + pse,
 		"tool_calls": []any{map[string]any{"id": "c", "function": map[string]any{"name": "f", "arguments": `{"a":"` + pse + `"}`}}}}}}}
 
+	var ca, rs any
+	json.Unmarshal(codeAssistReq(), &ca)
+	json.Unmarshal(responsesReq(false), &rs)
+	respCA := map[string]any{"traceId": "t", "response": respGem}
+	respRS := map[string]any{"output": []any{
+		map[string]any{"type": "message", "content": []any{map[string]any{"type": "output_text", "text": "oi " + pse}}},
+		map[string]any{"type": "function_call", "name": "f", "arguments": `{"a":"` + pse + `"}`},
+		map[string]any{"type": "custom_tool_call", "name": "apply_patch", "input": pse},
+		map[string]any{"type": "local_shell_call", "action": map[string]any{"command": []any{"echo", pse}}}}}
 	casos := []struct {
 		caminho     string
 		req, resp   any
@@ -202,6 +212,8 @@ func TestOutrasAPIsMalformadasNaoDerrubamOClaude(t *testing.T) {
 	}{
 		{"/gemini/v1beta/models/m:generateContent", gem, respGem, true},
 		{"/xai/v1/chat/completions", oa, respOA, true},
+		{"/codeassist/v1internal:generateContent", ca, respCA, true},
+		{"/chatgpt/responses", rs, respRS, true},
 	}
 	n := 0
 	for _, c := range casos {
@@ -249,6 +261,12 @@ func TestOutrasAPIsStreamingMalformado(t *testing.T) {
 		`{"candidates":5}`, `{"choices":[{"delta":{"content":5,"tool_calls":[5,{"function":"x"},{"index":"a","function":{"arguments":7}}]}}]}`,
 		`{"choices":[{"delta":null,"finish_reason":"stop"}]}`, `não é json`, `[1,2]`, `null`,
 		`{"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"name":"f","arguments":"{\"a\":\"` + pse[:7] + `"}}]}}]}`,
+		`{"type":"response.output_text.delta","item_id":5,"delta":"` + pse[:5] + `"}`, `{"type":"response.output_text.done","text":5}`,
+		`{"type":"response.function_call_arguments.delta","delta":7}`, `{"type":"response.output_item.done","item":"x"}`,
+		`{"type":"response.output_item.done","item":{"type":"function_call","arguments":5,"name":["x"]}}`,
+		`{"type":"response.custom_tool_call_input.delta","item_id":"p","delta":"` + pse[:9] + `"}`,
+		`{"type":"response.completed","response":{"output":[5,null,{"type":"message","content":"x"},{"type":"local_shell_call","action":7}]}}`,
+		`{"type":"response.content_part.done","part":5}`, `{"response":{"candidates":"x"}}`, `{"response":5}`,
 	}
 	for _, fim := range []string{"", "data: [DONE]\n\n"} {
 		var corpo strings.Builder
@@ -257,7 +275,7 @@ func TestOutrasAPIsStreamingMalformado(t *testing.T) {
 		}
 		corpo.WriteString(fim)
 		for nome, f := range map[string]func(http.ResponseWriter, io.Reader, *mask.Tabela) error{
-			"gemini": p.desmascararSSEGemini, "openai": p.desmascararSSEOpenAI} {
+			"gemini": p.desmascararSSEGemini, "openai": p.desmascararSSEOpenAI, "responses": p.desmascararSSEResponses} {
 			func() {
 				defer func() {
 					if r := recover(); r != nil {

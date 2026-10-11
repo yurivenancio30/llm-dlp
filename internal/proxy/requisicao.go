@@ -33,7 +33,8 @@ func (p *Proxy) mascararCorpo(formato, tipo string, corpo []byte) ([]byte, []mas
 	anthropic := formato == "anthropic"
 	v, voltar := original, func() {}
 	// outro formato com leitor próprio: a requisição é vista na forma da Anthropic (ponte)
-	ponte := map[string]func(any) (map[string]any, func(), bool){"gemini": ponteGemini, "openai": ponteOpenAI}[formato]
+	ponte := map[string]func(any) (map[string]any, func(), bool){"gemini": ponteGemini, "openai": ponteOpenAI,
+		"codeassist": ponteCodeAssist, "responses": ponteResponses}[formato]
 	comPonte := false
 	if ponte != nil {
 		if a, f, ok := ponte(original); ok {
