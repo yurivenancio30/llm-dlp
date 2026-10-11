@@ -9,7 +9,10 @@ In each version: **Masking** is what started (or stopped) being masked; **Progra
 commands, installation, configuration, performance and documentation; **Code** is what only
 matters to whoever changes the code.
 
-## [Unreleased]
+## [0.3.0] - 2026-10-11
+
+A conversation no longer gets stuck: neither on 429 after an update, nor on an image that
+cannot be verified.
 
 ### Masking
 
