@@ -173,11 +173,17 @@ func (mm *memoria) varrerF(s string, ts []trecho, f filtroMem) []trecho {
 			}
 			tentar(mm.semCaixa[string(buf)])
 		}
-		if melhor == nil {
+		fim := 0
+		if melhor != nil {
+			fim = ini + len(melhor.nome)
+		} else if nm := mm.pedaco(s[i:j]); nm != nil {
+			// o nome é um pedaço de uma palavra maior ("LH_BRONZE_VENDA2024"): a palavra inteira
+			// é mascarada, com o tipo dele
+			melhor, ini, fim = nm, i, j
+		} else {
 			i = j
 			continue
 		}
-		fim := ini + len(melhor.nome)
 		for k < len(ts) && ts[k].Fim <= ini {
 			k++
 		}
@@ -190,6 +196,52 @@ func (mm *memoria) varrerF(s string, ts []trecho, f filtroMem) []trecho {
 		i = j
 	}
 	return out
+}
+
+// pedaco: o nome da memória que é uma sequência de partes de p (palavra com "_"), com cara de
+// identificador, se há; o mais longo. "VENDA2024" casa em "LH_BRONZE_VENDA2024" e em
+// "T01_VENDA2024"; "CLIENTES_PF" em "DIM_CLIENTES_PF_HIST". Palavra comum ("status" em
+// "user_status") fica de fora: só nome com "_", dígito ou mistura de caixa.
+func (mm *memoria) pedaco(p string) *nomeMem {
+	if strings.IndexByte(p, '_') < 0 || len(p) > 128 {
+		return nil
+	}
+	var cortes []int // início de cada parte e, no fim, len(p)+1
+	cortes = append(cortes, 0)
+	for x := 0; x < len(p); x++ {
+		if p[x] == '_' {
+			cortes = append(cortes, x+1)
+		}
+	}
+	cortes = append(cortes, len(p)+1)
+	var melhor *nomeMem
+	for a := 0; a < len(cortes)-1; a++ {
+		for b := a + 1; b < len(cortes); b++ {
+			ini, fim := cortes[a], cortes[b]-1
+			if ini == 0 && fim == len(p) || fim-ini < memMin || melhor != nil && fim-ini <= len(melhor.nome) {
+				continue
+			}
+			c := p[ini:fim]
+			if c[0] == '_' || c[len(c)-1] == '_' {
+				continue
+			}
+			achar := func(ns []nomeMem, igual func(string) bool) {
+				for x := range ns {
+					if nm := &ns[x]; nm.off == 0 && igual(nm.nome) && caraDeIdentificador(nm.nome) {
+						melhor = nm
+						return
+					}
+				}
+			}
+			if mm.tamExata&bitTam(len(c)) != 0 {
+				achar(mm.exata[c], func(n string) bool { return n == c })
+			}
+			if mm.tamSemCaixa&bitTam(len(c)) != 0 {
+				achar(mm.semCaixa[strings.ToLower(c)], func(n string) bool { return strings.EqualFold(n, c) })
+			}
+		}
+	}
+	return melhor
 }
 
 // comMemoria: o resultado de s com a memória da conversa aplicada (os trechos novos entram

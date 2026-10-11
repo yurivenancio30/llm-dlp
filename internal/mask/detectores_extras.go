@@ -22,6 +22,11 @@ var (
 	rePlaca      = regexp.MustCompile(`(?i)\bplaca\W{0,20}([A-Za-z]{3}-?\d[A-Za-z0-9]\d{2})\b`)
 	reChassi     = regexp.MustCompile(`(?i)(?:chassi|\bvin\b)\W{0,20}([A-HJ-NPR-Za-hj-npr-z0-9]{17})\b`)
 	reIMEI       = regexp.MustCompile(`(?i)\bimei\D{0,20}(\d{15})\b`)
+	// GUID que é o valor de um campo terminado em "id" (workspace_id: X, "lakehouseId": "X",
+	// tenant_id=X, "id": "X"): identifica um recurso do cliente (workspace, tenant, assinatura)
+	reGUIDDeID = regexp.MustCompile(`(?i)([a-z0-9_.-]*id)["']?\s*[:=]\s*["']?([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b`)
+	// o id do aplicativo OAuth não é segredo (RFC 6749, 2.2): vai na URL de login do navegador
+	idPublicoOAuth = conj("clientid", "appid", "applicationid")
 
 	// credenciais em cabeçalho HTTP (saída de curl -v, HAR, log de proxy)
 	reAuthHTTP = regexp.MustCompile("(?i)\\b(?:proxy-)?authorization[\"']?\\s*[:=]\\s*[\"']?(?:basic|bearer|digest|token|negotiate|apikey)\\s+([^\\s\"',;]{8,})")
@@ -96,6 +101,13 @@ func (m *Masker) acharExtras(s, baixo string, numLongo bool, add func(ini, fim i
 			}
 		}
 		return false
+	}
+	if strings.Contains(baixo, "id") && strings.Count(s, "-") >= 4 {
+		for _, ix := range reGUIDDeID.FindAllStringSubmatchIndex(s, -1) {
+			if !idPublicoOAuth[strings.NewReplacer("_", "", "-", "", ".", "").Replace(strings.ToLower(s[ix[2]:ix[3]]))] {
+				add(ix[4], ix[5], "doc")
+			}
+		}
 	}
 	if numLongo && tem("eleitor", "titulo", "título") {
 		com(reTitulo, TituloValido)
