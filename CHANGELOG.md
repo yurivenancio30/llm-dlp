@@ -29,6 +29,10 @@ matters to whoever changes the code.
   While that is the case, Claude Code shows a warning on every message and so does
   `llm-dlp status`. `llm-dlp instalar` also forbids the agent to mention the llm-dlp folder
   in a command (run it again to get the rule).
+- An image that declares an enormous size, or a PDF whose text expands without end, no
+  longer exhausts the memory and brings llm-dlp down: it is refused by its header (more
+  than 16000 points on a side or 64 million in total) and the output of the external
+  programs has a ceiling.
 - **Release notes on GitHub:** the releases 0.2.1 and 0.3.0 were published with empty notes
   (a GoReleaser setting skipped the step that reads them). The notes are the section of the
   version in this file again, now with each paragraph on one line, links that work from the

@@ -88,7 +88,8 @@ OCR makes mistakes (it reads `@` as `Q`, for example), in images llm-dlp covers 
 needed: everything that looks like an e-mail, domain, IP or long number. A PDF with text
 becomes masked text; a scanned PDF becomes covered images.
 
-Without OCR installed, or with a file it cannot read, the image or PDF does not go out. A
+Without OCR installed, or with a file it cannot read (including one that declares an absurd
+size, built to exhaust the memory), the image or PDF does not go out. A
 note goes in its place, and Claude says in its answer what happened and the command that
 installs OCR; the detail of the error stays in the log. After installing, just send the file
 again. `llm-dlp status` warns when OCR is missing.

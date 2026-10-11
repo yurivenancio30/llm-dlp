@@ -87,7 +87,8 @@ OCR erra (lê `@` como `Q`, por exemplo), em imagem o llm-dlp cobre a mais: tudo
 e-mail, domínio, IP ou número longo. PDF com texto vira texto mascarado; PDF escaneado vira
 imagens cobertas.
 
-Sem o OCR instalado, ou com um arquivo que ele não consegue ler, a imagem ou o PDF não sai.
+Sem o OCR instalado, ou com um arquivo que ele não consegue ler (inclusive o que declara um
+tamanho absurdo, montado para estourar a memória), a imagem ou o PDF não sai.
 No lugar vai um aviso, e o Claude conta na resposta o que houve e o comando para instalar o
 OCR; o detalhe do erro fica no log. Depois de instalar, é só mandar o arquivo de novo. O
 `llm-dlp status` avisa quando falta o OCR.

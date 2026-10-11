@@ -29,6 +29,9 @@ que só interessa a quem mexe no código.
   caso, o Claude Code mostra um aviso a cada mensagem, e o `llm-dlp status` também. O
   `llm-dlp instalar` também passa a proibir o agente de citar a pasta do llm-dlp num
   comando (rode de novo para receber a regra).
+- Imagem que declara um tamanho enorme, ou PDF cujo texto se expande sem fim, não estoura
+  mais a memória nem derruba o llm-dlp: é recusada pelo cabeçalho (mais de 16000 pontos de
+  lado ou 64 milhões no total), e a saída dos programas externos tem teto.
 - **Notas da release no GitHub:** as releases 0.2.1 e 0.3.0 foram publicadas com as notas
   vazias (uma configuração do GoReleaser pulava o passo que as lê). As notas voltam a ser a
   seção da versão neste arquivo (a versão em inglês), agora com cada parágrafo numa linha

@@ -69,6 +69,13 @@ type Linha struct {
 
 // Ler devolve a imagem decodificada e as linhas de texto encontradas nela.
 func (o *OCR) Ler(dados []byte) (image.Image, []Linha, error) {
+	// o tamanho declarado no cabeçalho, antes de decodificar: um arquivo de poucos KB pode
+	// declarar uma imagem de gigabytes e derrubar o processo por falta de memória
+	if c, _, err := image.DecodeConfig(bytes.NewReader(dados)); err != nil {
+		return nil, nil, fmt.Errorf("imagem ilegível: %w", err)
+	} else if c.Width <= 0 || c.Height <= 0 || c.Width > ladoMax || c.Height > ladoMax || c.Width*c.Height > pontosMax {
+		return nil, nil, fmt.Errorf("imagem grande demais (%d x %d pontos)", c.Width, c.Height)
+	}
 	img, _, err := image.Decode(bytes.NewReader(dados))
 	if err != nil {
 		return nil, nil, fmt.Errorf("imagem ilegível: %w", err)
@@ -198,12 +205,43 @@ func (o *OCR) rodar(ctx context.Context, entrada []byte, bin string, args ...str
 	if entrada != nil {
 		cmd.Stdin = bytes.NewReader(entrada)
 	}
-	var out, errb bytes.Buffer
-	cmd.Stdout, cmd.Stderr = &out, &errb
+	out, errb := &limitado{max: saidaMax}, &limitado{max: 64 << 10, descarta: true}
+	cmd.Stdout, cmd.Stderr = out, errb
 	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("%w: %s", err, strings.TrimSpace(errb.String()))
+		if out.estourou {
+			return nil, fmt.Errorf("a saída de %s passou de %d MB", filepath.Base(bin), saidaMax>>20)
+		}
+		return nil, fmt.Errorf("%w: %s", err, strings.TrimSpace(errb.b.String()))
 	}
-	return out.Bytes(), nil
+	return out.b.Bytes(), nil
+}
+
+// Limites contra arquivo montado para estourar a memória. A API não aceita imagem com lado maior
+// que 8000 pontos; o texto de um PDF de verdade não chega perto de saidaMax.
+const (
+	ladoMax   = 16000
+	pontosMax = 64 << 20
+	saidaMax  = 64 << 20
+)
+
+// limitado guarda até max bytes. Passou disso: com descarta, o resto é jogado fora (as mensagens
+// de erro do programa); sem, a escrita falha e o programa é encerrado (a saída).
+type limitado struct {
+	b        bytes.Buffer
+	max      int
+	descarta bool
+	estourou bool
+}
+
+func (l *limitado) Write(p []byte) (int, error) {
+	if l.b.Len()+len(p) > l.max {
+		if l.descarta {
+			return len(p), nil
+		}
+		l.estourou = true
+		return 0, errors.New("saída grande demais")
+	}
+	return l.b.Write(p)
 }
 
 // Ausente: o erro é de programa não instalado (tesseract ou poppler fora do PATH).
