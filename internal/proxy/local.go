@@ -28,7 +28,12 @@ func enderecoLocal(h string) bool {
 
 // Local: a requisição veio de um programa da máquina falando com o endereço local, e não de uma
 // página aberta no navegador. No rebinding o Host é o domínio do atacante; uma página de outro
-// site manda a Origin dela (ou "null", de um arquivo local ou iframe isolado).
+// site manda a Origin dela.
+//
+// Só recusa o que um programa local nunca manda: o Claude Code chama por 127.0.0.1 (o gancho
+// exige) e não tem Origin de site. Outros sinais de navegador (Origin "null", Sec-Fetch-Site)
+// não entram: um cliente que os mandasse ficaria sem funcionar, e o que eles barrariam a mais
+// (uma requisição às cegas, sem ler a resposta e sem a credencial) não lê nem envia nada.
 func Local(r *http.Request) bool {
 	h := r.Host
 	if hh, _, err := net.SplitHostPort(h); err == nil {
@@ -37,16 +42,7 @@ func Local(r *http.Request) bool {
 	if !enderecoLocal(strings.Trim(h, "[]")) {
 		return false
 	}
-	if o := r.Header.Get("Origin"); o != "" {
-		u, err := url.Parse(o)
-		if err != nil || o == "null" {
-			return false
-		}
-		if (u.Scheme == "http" || u.Scheme == "https") && !enderecoLocal(u.Hostname()) {
-			return false
-		}
-	}
-	if s := r.Header.Get("Sec-Fetch-Site"); s == "cross-site" || s == "same-site" {
+	if u, err := url.Parse(r.Header.Get("Origin")); err == nil && (u.Scheme == "http" || u.Scheme == "https") && !enderecoLocal(u.Hostname()) {
 		return false
 	}
 	return true

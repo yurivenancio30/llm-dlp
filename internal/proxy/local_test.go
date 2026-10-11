@@ -79,8 +79,9 @@ func TestSoAtendeProgramaLocal(t *testing.T) {
 		{"atacante.example:8787", "", "", false},
 		{"127.0.0.1.atacante.example", "", "", false},
 		{"127.0.0.1:8787", "https://atacante.example", "", false},
-		{"127.0.0.1:8787", "null", "", false},
-		{"127.0.0.1:8787", "", "cross-site", false},
+		{"127.0.0.1:8787", "http://atacante.example:8787", "", false},
+		{"127.0.0.1:8787", "null", "", true},
+		{"127.0.0.1:8787", "", "cross-site", true},
 		{"", "", "", false},
 	}
 	for _, c := range casos {
