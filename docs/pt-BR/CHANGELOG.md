@@ -13,14 +13,25 @@ que só interessa a quem mexe no código.
 
 ### Programa
 
-- **API do Gemini.** O llm-dlp passa a atender também a API do Gemini (`generateContent`,
+- **API do Gemini (beta).** O llm-dlp passa a atender também a API do Gemini (`generateContent`,
   `streamGenerateContent`, `countTokens`), no caminho `/gemini` da mesma porta: aponte o
   Gemini CLI, o opencode ou uma SDK do Google para `http://127.0.0.1:8787/gemini`. Vale o
   mesmo mascaramento do Claude Code (texto, chamadas e resultados de ferramenta, instruções
   do sistema, imagens e PDFs, memória da conversa, histórico congelado), e a resposta é
   desmascarada também em streaming. Campo novo na configuração: `provedores`; outras APIs
-  podem ser acrescentadas ali (sem leitor próprio, todo texto é mascarado). Ver
-  [configuracao.md](configuracao.md#outras-apis-gemini).
+  podem ser acrescentadas ali (sem leitor próprio, todo texto é mascarado). Conferido com o
+  Gemini CLI e o opencode rodando, e o `llm-dlp ultima` mostra também a conversa do Gemini.
+  Ver [configuracao.md](configuracao.md#outros-clientes-e-apis-beta).
+- **Formato da OpenAI, Chat Completions (beta).** A requisição cujo caminho termina em
+  `/chat/completions` passa a ser lida como as outras (instruções, ferramentas, texto,
+  chamadas e resultados de ferramenta, imagens), e a resposta é desmascarada, também em
+  streaming. Com isso, o GitHub Copilot com a sua chave e as APIs da OpenAI, da xAI e a do
+  Gemini compatível com a OpenAI passam pelo llm-dlp: provedores embutidos `openai` e `xai`,
+  ao lado do `gemini`. Conferido com o Copilot CLI rodando.
+- A documentação marca os outros clientes como beta (o Claude Code segue o único estável) e
+  diz o que vale para cada um: só o Claude Code é apontado,
+  iniciado, conferido e travado pela instalação; os outros clientes são apontados à mão e não
+  têm trava.
 - Quando a API não responde, o log e o erro não mostram mais o endereço da requisição, que
   pode levar a chave da API (`?key=...`).
 

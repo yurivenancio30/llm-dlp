@@ -33,43 +33,122 @@ does not go to the API.
 | `objetos.ip_publico` | Also masks public IPv4 and IPv6 as a server name (`HOST_...`). `::1`, link-local, documentation ranges and the public DNS servers (`8.8.8.8`, `1.1.1.1`, `9.9.9.9`...) stay. A private IP is always masked by the `ip` detector | off |
 | `porta` | Local port of the proxy | 8787 |
 | `upstream` | Address of the API | `https://api.anthropic.com` |
-| `provedores` | Other APIs served on the same port, under the path `/<name>` (see [Other APIs](#other-apis-gemini)). Each one has `upstream` and `formato` (`gemini` or `anthropic`; any other value falls into the generic mode) | `gemini` → `https://generativelanguage.googleapis.com` |
+| `provedores` | **Beta.** Other APIs served on the same port, under the path `/<name>` (see [Other clients and APIs](#other-clients-and-apis-beta)). Each one has `upstream` and `formato` (`gemini`, `openai` or `anthropic`; any other value falls into the generic mode) | `gemini`, `openai` and `xai`, each with the address of its API |
 
 Names accepted in `detectores_desligados`: `segredo`, `email`, `ip`, `host`, `cpf`, `cnpj`,
 `pis`, `cnh`, `rg`, `telefone`, `cep`, `cartao`, `conta`, `pix`, `endereco`, `nascimento`,
 `nome`, `campo` (detection by the field name), `usuario`, `doc`, `iban`, `processo`, `mac`.
 
-## Other APIs (Gemini)
+## Other clients and APIs (beta)
 
-llm-dlp serves the Gemini API on the same port, under the path `/gemini`: point the client's
-API address to `http://127.0.0.1:8787/gemini`. The API key is still yours and goes straight
-through (llm-dlp does not store it or write it to the log).
+> [!WARNING]
+> **Beta.** Everything in this section (the Gemini and OpenAI formats, and the Gemini CLI,
+> opencode and Copilot clients) is beta. Only Claude Code is stable. Beta clients have **no
+> lock**: if the client stops pointing to llm-dlp, it talks straight to the API, unmasked, and
+> nothing warns you. Read [what beta means](#what-beta-means) before using them with real data.
 
-| Client | How to point it |
-|---|---|
-| Gemini CLI | `export GOOGLE_GEMINI_BASE_URL=http://127.0.0.1:8787/gemini` |
-| opencode (`google` provider) | In `opencode.json`: `"provider": {"google": {"options": {"baseURL": "http://127.0.0.1:8787/gemini/v1beta"}}}` |
-| Google SDKs (`google-genai`) | The base address option (`http_options.base_url` / `httpOptions.baseUrl`) with `http://127.0.0.1:8787/gemini` |
-| `curl` | `curl http://127.0.0.1:8787/gemini/v1beta/models/MODEL:generateContent -H "x-goog-api-key: $KEY" ...` |
+llm-dlp was built around Claude Code, and `llm-dlp instalar` sets up **only Claude Code**.
+Other clients work with the same masking, but you point them by hand and they have no lock.
 
-The same masking as with Claude Code applies: text, tool calls and tool results, system
-instructions, images and PDFs, with the response unmasked in streaming as well. It was tested
-against the real API with `curl` (with and without streaming, and with a tool call); the line
-of each client above follows its documentation and has not yet been checked with the client
-running.
+| Client | Status | Installed and locked by `llm-dlp instalar` |
+|---|---|---|
+| Claude Code | **Stable** | Yes |
+| Gemini CLI | Beta | No |
+| opencode | Beta | No |
+| GitHub Copilot (CLI and VS Code), with your own key | Beta | No |
+| Any other client of the Anthropic, Gemini or OpenAI (Chat Completions) API | Beta | No |
 
-What is left out:
+### What beta means
 
-- **The lock and the hooks belong to Claude Code.** Nothing stops the other client from
-  talking straight to the API if its address is undone, and there is no warning on every
-  message.
-- Audio, video and other attached files (`inlineData` that is neither an image nor a PDF) are
-  removed: llm-dlp has no way to verify them.
-- The summary of the model's reasoning (`thought`) comes back with the pseudonyms, not
-  unmasked.
-- APIs in the OpenAI format (Grok, OpenRouter, Copilot) do not have their own reader yet: for a
-  provider with another `formato`, every text of the request is masked and the streaming
-  response comes back with the pseudonyms.
+- **It is on by default and comes in the same binary.** It is tested (automated tests and
+  real clients, see the table [Client by client](#client-by-client)), but it has been used
+  much less than the Claude Code path.
+- **It may change in a MINOR version**, without the notice that the
+  [versions table](versioning.md#what-each-number-means) gives to stable features: the
+  addresses, the `provedores` field and what is read in each format.
+- **It is isolated from Claude Code.** The code of each format only runs for requests on its
+  own path (`/gemini`, `/openai`, `/xai`...). A request from Claude Code goes out byte for
+  byte the same with or without these providers, and a malformed request or response from
+  another format does not bring llm-dlp down. Both are checked by automated tests. The
+  conversation memory is shared: a name masked in a Gemini conversation is also masked in
+  Claude Code (more masking, never less).
+- **Report problems** in the [issues](https://github.com/yurivenancio30/llm-dlp/issues), saying
+  the client and its version.
+
+### Claude Code and the beta clients
+
+| | Claude Code (stable) | Gemini CLI, opencode, Copilot and other clients (beta) |
+|---|---|---|
+| What goes out is masked and what comes back is unmasked (text, tool calls and results, files the agent writes, images and PDFs) | Yes | Yes, the same engine |
+| `llm-dlp ultima` and the log | Yes | Yes |
+| Pointed to llm-dlp by `llm-dlp instalar` | Yes (step 4) | **No.** You set the address in the client, as in the tables below |
+| llm-dlp is started for you | Yes, when a session opens | **No.** Run `llm-dlp garantir` before using the client. If llm-dlp is not running, the client gets "connection refused" and nothing goes out |
+| Check on every message (llm-dlp is running, is the right version and proves it is itself) | Yes | **No** |
+| Lock: the client refuses to work outside llm-dlp | Yes (step 5) | **No.** If the address is removed from the client's configuration, the client talks straight to the API, unmasked, and nothing warns you |
+
+In short: with another client, the protection lasts while its address points to llm-dlp. Check
+it with `llm-dlp ultima` after the first message: it must show your conversation, with the
+pseudonyms.
+
+### Which address to give the client
+
+Each API is served under a path of the same port. The API key is still yours and goes
+straight through (llm-dlp does not store it or write it to the log).
+
+| API | Address | What llm-dlp reads |
+|---|---|---|
+| Anthropic | `http://127.0.0.1:8787` | Messages (`/v1/messages`) |
+| Gemini | `http://127.0.0.1:8787/gemini` | `generateContent`, `streamGenerateContent`, `countTokens` |
+| Gemini, OpenAI-compatible address | `http://127.0.0.1:8787/gemini/v1beta/openai` | Chat Completions |
+| OpenAI | `http://127.0.0.1:8787/openai/v1` | Chat Completions |
+| xAI (Grok) | `http://127.0.0.1:8787/xai/v1` | Chat Completions |
+| Another one (OpenRouter, a company gateway) | add it to `provedores`, with its `upstream` | `formato`: `openai`, `gemini` or `anthropic` |
+
+A path that ends in `/chat/completions` is always read as Chat Completions, whatever the
+provider.
+
+### Client by client
+
+| Client | How to point it | Checked how |
+|---|---|---|
+| Gemini CLI | `export GOOGLE_GEMINI_BASE_URL=http://127.0.0.1:8787/gemini` | Running (0.63.0), real API |
+| opencode (`google` provider) | In `opencode.json`: `"provider": {"google": {"options": {"baseURL": "http://127.0.0.1:8787/gemini/v1beta"}}}` | Running (1.19.0), real API |
+| GitHub Copilot CLI, with your own key | `export COPILOT_PROVIDER_BASE_URL=http://127.0.0.1:8787/openai/v1` (or `/xai/v1`, or another address of the table above), plus `COPILOT_PROVIDER_API_KEY` and `COPILOT_MODEL` | Running (1.0.95), real API, with the caveat below |
+| GitHub Copilot in VS Code, with your own key | "Chat: Manage Language Models" > "Custom Endpoint". In the model's `url`: `http://127.0.0.1:8787/openai/v1/chat/completions` (API type Chat Completions) or `http://127.0.0.1:8787/v1/messages` (API type Messages) | **Not checked.** It follows the VS Code documentation; the format is the same as the Copilot CLI's |
+| Google SDKs (`google-genai`) | The base address option (`http_options.base_url` / `httpOptions.baseUrl`) with `http://127.0.0.1:8787/gemini` | **Not checked** with an SDK running |
+| `curl` | `curl http://127.0.0.1:8787/gemini/v1beta/models/MODEL:generateContent -H "x-goog-api-key: $KEY" ...` | Real API, with and without streaming, and with a tool call |
+
+"Running, real API" means: the client itself, pointed as in the table, did a task in which
+the agent read a file with an e-mail and an IP and wrote another file. The API only received
+the pseudonyms and the file came out with the real values.
+
+About Copilot:
+
+- **Only Copilot with your own key goes through llm-dlp** (the Copilot CLI's own provider,
+  or the "Custom Endpoint" of VS Code). The models that GitHub hosts and the suggestions while
+  you type talk to GitHub's servers, cannot be pointed elsewhere and are **not protected**.
+- The Copilot CLI was checked with a Gemini model, through the OpenAI-compatible address of
+  Gemini. These two do not work together on their own: Gemini refuses the `"refusal": null`
+  that the Copilot CLI sends back from the second message on, with or without llm-dlp. In the
+  test, a relay after llm-dlp removed that field. With the OpenAI and the xAI APIs, the format
+  is covered by the automated tests (against a fake API), not by a run against the real API.
+- Only Chat Completions has a reader. The Responses API (`/v1/responses`) falls into the
+  generic mode below.
+
+### What is left out
+
+- **The client's own instructions are masked too.** A name that looks like data inside the
+  instructions the client sends (a table of an SQL example, a folder of an example path)
+  becomes a pseudonym. It works, because the answer is translated back, but the model reads
+  `t_x7k2...` where the client wrote the name. Claude Code's own identification text is the
+  only one left untouched.
+- Audio, video and other attached files that are neither an image nor a PDF are removed, with
+  a note in their place: llm-dlp has no way to verify them.
+- The summary of the model's reasoning (`thought`, `reasoning_content`) comes back with the
+  pseudonyms, not unmasked.
+- **Generic mode.** A request that none of the readers understands (another `formato`, the
+  Responses API) has every text masked, and its streaming response comes back with the
+  pseudonyms. Nothing leaks, but the client receives pseudonyms: do not use an agent this way.
 
 ## Commands
 

@@ -104,8 +104,11 @@ proof, and the messages are blocked until you close Claude Code and run `llm-dlp
   symbol, so it is not confused with code and ordinary text.
 - Images and PDFs: the result is memoized only while llm-dlp is running. After a restart
   they are examined again with what is known at that moment.
-- For now, only the Anthropic and the Gemini APIs have their own reader (see
-  [Other APIs](configuration.md#other-apis-gemini) and [Plugging in another LLM API](development.md#plugging-in-another-llm-api)).
+- Only Claude Code is locked and checked on every message. A beta client (Gemini CLI,
+  opencode, Copilot) is protected while its address points to llm-dlp, and nothing warns you
+  if it stops pointing there.
+- The Anthropic, the Gemini and the OpenAI (Chat Completions) formats have their own reader (see
+  [Other clients and APIs (beta)](configuration.md#other-clients-and-apis-beta) and [Plugging in another LLM API](development.md#plugging-in-another-llm-api)).
 
 ## Design decisions
 

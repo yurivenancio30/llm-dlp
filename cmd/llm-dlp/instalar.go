@@ -223,6 +223,11 @@ Em dois passos (OCR e trava) ele usa sudo: a sua senha será pedida nessa hora.`
 		fmt.Println("  – sem domínio interno nem nomes protegidos (opcional: rode o llm-dlp instalar de novo para informar)")
 	}
 	fmt.Println("\nPara valer: feche e abra o Claude Code (no VS Code, recarregue a janela).")
+	fmt.Println(`
+Outros clientes, em beta (Gemini CLI, opencode, Copilot com a sua chave): esta instalação não
+os aponta para o llm-dlp nem os trava. Você põe o endereço no cliente, e ele fica protegido
+enquanto apontar para cá. Como fazer: docs/pt-BR/configuracao.md, seção "Outros clientes e APIs
+(beta)".`)
 	return nil
 }
 

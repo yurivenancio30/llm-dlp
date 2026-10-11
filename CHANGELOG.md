@@ -13,13 +13,24 @@ matters to whoever changes the code.
 
 ### Program
 
-- **Gemini API.** llm-dlp now also serves the Gemini API (`generateContent`,
+- **Gemini API (beta).** llm-dlp now also serves the Gemini API (`generateContent`,
   `streamGenerateContent`, `countTokens`), under the `/gemini` path of the same port: point
   the Gemini CLI, opencode or a Google SDK to `http://127.0.0.1:8787/gemini`. The same masking
   as with Claude Code applies (text, tool calls and results, system instructions, images and
   PDFs, conversation memory, frozen history), and the response is unmasked in streaming too.
   New configuration field `provedores`; other APIs can be added there (without a reader of
-  their own, every text is masked). See [docs/configuration.md](docs/configuration.md#other-apis-gemini).
+  their own, every text is masked). Checked with the Gemini CLI and opencode running, and
+  `llm-dlp ultima` shows the Gemini conversation too. See
+  [docs/configuration.md](docs/configuration.md#other-clients-and-apis-beta).
+- **OpenAI format, Chat Completions (beta).** A request whose path ends in `/chat/completions` is
+  now read like the others (system, tools, text, tool calls and results, images), and the
+  response is unmasked, in streaming too. With it, GitHub Copilot with your own key, and the
+  OpenAI, the xAI and the OpenAI-compatible Gemini APIs go through llm-dlp: built-in providers
+  `openai` and `xai`, next to `gemini`. Checked with the Copilot CLI running.
+- The documentation marks the other clients as beta (Claude Code stays the only stable one)
+  and says what is covered for each: only Claude Code is pointed,
+  started, checked and locked by the installation; the other clients are pointed by hand and
+  have no lock.
 - When the API cannot be reached, the log and the error no longer show the address of the
   request, which may carry the API key (`?key=...`).
 

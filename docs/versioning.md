@@ -23,6 +23,11 @@ The version has three numbers: `MAJOR.MINOR.PATCH`.
 | MINOR (`0.2.1` → `0.3.0`) | Changes what is masked (new rule or reader, regenerated list) or adds a command or a configuration field | A new format starts being read | Nothing. The CHANGELOG is worth reading |
 | MAJOR (`0.x` → `1.0`) | Breaks compatibility: the format of `config.json`, of the files on disk (`vistos.json`, `enviados.log`, `pessoas.json`) or of the pseudonyms; a removed command | The old `config.json` is no longer accepted | Follow what the CHANGELOG says |
 
+Features marked **beta** (today, the [other clients and APIs](configuration.md#other-clients-and-apis-beta))
+are outside this table: they may change in a MINOR version, even in a way that asks you to
+redo a configuration, and the CHANGELOG says so. When a feature leaves beta, the CHANGELOG says
+that too.
+
 While the version starts with `0.`, the project is still changing fast: a MINOR version may
 change a lot of what is masked.
 

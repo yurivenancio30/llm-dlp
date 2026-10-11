@@ -23,6 +23,10 @@ A versão tem três números: `MAIOR.MENOR.CORREÇÃO`.
 | MENOR (`0.2.1` → `0.3.0`) | Muda o que é mascarado (regra ou leitor novo, lista regenerada) ou acrescenta comando ou campo de configuração | Um formato novo passa a ser lido | Nada. Vale ler o CHANGELOG |
 | MAIOR (`0.x` → `1.0`) | Quebra compatibilidade: formato do `config.json`, dos arquivos em disco (`vistos.json`, `enviados.log`, `pessoas.json`) ou dos pseudônimos; comando removido | O `config.json` antigo não é mais aceito | Seguir o que o CHANGELOG mandar |
 
+Os recursos marcados como **beta** (hoje, os [outros clientes e APIs](configuracao.md#outros-clientes-e-apis-beta))
+ficam fora desta tabela: podem mudar numa versão MENOR, até de um jeito que peça para refazer
+uma configuração, e o CHANGELOG avisa. Quando um recurso sai do beta, o CHANGELOG também diz.
+
 Enquanto a versão começar com `0.`, o projeto ainda está mudando rápido: uma versão MENOR pode
 mudar bastante o que é mascarado.
 

@@ -44,13 +44,25 @@ você lê:        verifique se maria.lopes@empresa.com.br tem permissão em mysq
 - **Mantém a referência:** o mesmo valor vira sempre o mesmo pseudônimo, então o modelo
   continua entendendo que duas menções são da mesma pessoa, do mesmo servidor, da mesma conta.
 - **Lê imagens e PDFs** (OCR) e cobre de preto o que for sensível.
-- **Também atende a API do Gemini** (Gemini CLI, opencode, SDKs do Google), no caminho
-  `/gemini` da mesma porta: ver [Outras APIs](configuracao.md#outras-apis-gemini).
+- **Outros clientes, em beta:** Gemini CLI, opencode e GitHub Copilot com a sua chave (os
+  formatos do Gemini e da OpenAI), na mesma porta. Ver a tabela abaixo.
 - **Falha fechada:** se o llm-dlp cair ou não souber tratar algo, a mensagem **não sai**. Não
   existe vazamento silencioso.
 - **Não pesa:** uma mensagem custa 5–30 ms, quase não muda o número de tokens e não atrapalha
   o cache da API.
 - **Não exige nada no dia a dia:** sobe sozinho com a sessão e volta sozinho se cair.
+
+### Clientes atendidos
+
+| Cliente | Status | Instalado e travado pelo `llm-dlp instalar` |
+|---|---|---|
+| Claude Code (terminal, VS Code, JetBrains) | **Estável** | Sim |
+| Gemini CLI, opencode, GitHub Copilot com a sua chave | Beta | Não: você o aponta à mão, e ele não tem trava |
+
+> [!WARNING]
+> Nos clientes em beta, a proteção só vale enquanto o endereço do cliente apontar para o
+> llm-dlp: nada impede o cliente de falar direto com a API, e nada avisa. Ver
+> [Outros clientes e APIs (beta)](configuracao.md#outros-clientes-e-apis-beta).
 
 ## Instalação
 
@@ -115,6 +127,12 @@ No fim, ele mostra um resumo com ✓ e ✗. Se algo ficar com ✗, é só rodar
 `llm-dlp instalar` de novo: ele pula o que já está pronto.
 
 Depois, feche e abra o Claude Code (no VS Code, recarregue a janela).
+
+**Os passos 4 e 5 são só do Claude Code.** Se você usa um cliente em beta (Gemini CLI,
+opencode, Copilot ou outro), a instalação não o aponta para o llm-dlp nem o trava: você mesmo põe o endereço
+no cliente, e nada impede o cliente de falar direto com a API se esse endereço for tirado.
+Veja o que está e o que não está coberto em
+[Outros clientes e APIs (beta)](configuracao.md#outros-clientes-e-apis-beta).
 
 ### Atualizar para uma versão nova
 

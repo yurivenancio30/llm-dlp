@@ -50,14 +50,26 @@ command does.
 - **Keeps the reference:** the same value always becomes the same pseudonym, so the model
   still understands that two mentions are the same person, the same server, the same account.
 - **Reads images and PDFs** (OCR) and covers in black whatever is sensitive.
-- **Also serves the Gemini API** (Gemini CLI, opencode, Google SDKs), under the `/gemini` path
-  of the same port: see [Other APIs](docs/configuration.md#other-apis-gemini).
+- **Other clients, in beta:** Gemini CLI, opencode and GitHub Copilot with your own key (the
+  Gemini and the OpenAI formats), on the same port. See the table below.
 - **Fail-closed:** if llm-dlp goes down or does not know how to handle something, the message
   **does not go out**. There is no silent leak.
 - **Is light:** a message costs 5–30 ms, the number of tokens hardly changes and the API
   cache is not disturbed.
 - **Asks nothing of you day to day:** it starts with the session and comes back by itself if
   it goes down.
+
+### Supported clients
+
+| Client | Status | Installed and locked by `llm-dlp instalar` |
+|---|---|---|
+| Claude Code (terminal, VS Code, JetBrains) | **Stable** | Yes |
+| Gemini CLI, opencode, GitHub Copilot with your own key | Beta | No: you point it by hand, and it has no lock |
+
+> [!WARNING]
+> In beta clients, the protection lasts only while the client's address points to llm-dlp:
+> nothing stops the client from talking straight to the API, and nothing warns you. See
+> [Other clients and APIs (beta)](docs/configuration.md#other-clients-and-apis-beta).
 
 ## Installation
 
@@ -123,6 +135,12 @@ At the end it shows a summary with ✓ and ✗. If something is left with ✗, j
 `llm-dlp instalar` again: it skips what is already done.
 
 Then close and open Claude Code (in VS Code, reload the window).
+
+**Steps 4 and 5 are for Claude Code only.** If you use a beta client (Gemini CLI, opencode,
+Copilot or another), the installation does not point it to llm-dlp and does not lock it: you set
+the address in the client yourself, and nothing stops the client from talking straight to the
+API if that address is removed. See what is and is not covered in
+[Other clients and APIs (beta)](docs/configuration.md#other-clients-and-apis-beta).
 
 ### Updating to a new version
 
