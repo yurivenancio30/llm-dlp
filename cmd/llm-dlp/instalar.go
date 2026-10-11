@@ -141,7 +141,7 @@ Em dois passos (OCR e trava) ele usa sudo: a sua senha será pedida nessa hora.`
 	fmt.Printf("      ✓ chave: %s — guarde uma cópia no seu gerenciador de senhas\n", config.Caminho("chave"))
 
 	// 3. OCR
-	passo(3, "OCR de imagens e PDFs", "com o OCR, prints e PDFs têm os dados sensíveis cobertos antes de sair. Sem ele, ficam bloqueados.")
+	passo(3, "OCR de imagens e PDFs", "com o OCR, prints e PDFs têm os dados sensíveis cobertos antes de sair. Sem ele, não são enviados (o Claude recebe um aviso no lugar).")
 	if falta := faltaOCR(cfg); falta != "" {
 		cmd := ocr.ComandoInstalacao()
 		fmt.Printf("      falta %s. Comando:  sudo sh -c '%s'\n", falta, cmd)
@@ -151,7 +151,7 @@ Em dois passos (OCR e trava) ele usa sudo: a sua senha será pedida nessa hora.`
 			}
 		}
 		if falta := faltaOCR(cfg); falta != "" {
-			fmt.Println("      ✗ OCR ausente: imagens e PDFs enviados ao Claude serão bloqueados (nada vaza)")
+			fmt.Println("      ✗ OCR ausente: imagens e PDFs não serão enviados ao Claude (nada vaza; ele recebe um aviso no lugar)")
 		} else {
 			fmt.Println("      ✓ OCR instalado")
 		}
@@ -211,7 +211,7 @@ Em dois passos (OCR e trava) ele usa sudo: a sua senha será pedida nessa hora.`
 	}
 	ok(saudavel(cfg), "llm-dlp no ar", "llm-dlp fora do ar: rode llm-dlp garantir")
 	ok(claudeLigado(home, cfg), "Claude Code passa pelo llm-dlp", "Claude Code NÃO passa pelo llm-dlp: rode o llm-dlp instalar de novo e aceite o passo 4")
-	ok(faltaOCR(cfg) == "", "OCR de imagens e PDFs", "sem OCR: imagens e PDFs ficam bloqueados")
+	ok(faltaOCR(cfg) == "", "OCR de imagens e PDFs", "sem OCR: imagens e PDFs não são enviados (para instalar: "+ocr.DicaInstalacao()+")")
 	ok(travaInstalada(endereco(cfg)), "trava instalada", "sem trava: rode o llm-dlp instalar de novo e aceite o passo 5")
 	if len(cfg.DominiosInternos) > 0 || contarTermos(cfg) > 0 {
 		fmt.Println("  ✓ domínios internos e nomes protegidos configurados")

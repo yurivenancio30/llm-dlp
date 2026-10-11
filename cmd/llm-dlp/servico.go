@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/yurivenancio30/llm-dlp/internal/config"
+	"github.com/yurivenancio30/llm-dlp/internal/ocr"
 	"github.com/yurivenancio30/llm-dlp/internal/proxy"
 	"github.com/yurivenancio30/llm-dlp/internal/versao"
 )
@@ -227,6 +228,9 @@ func status() error {
 	json.Unmarshal(b, &info)
 	if aviso := binarioNovo(info.Commit, info.PID); aviso != "" {
 		fmt.Println("⚠️  " + aviso + ": rode llm-dlp parar com o Claude Code fechado para aplicar (ele volta sozinho na próxima mensagem)")
+	}
+	if falta := faltaOCR(cfg); falta != "" && cfg.OCR.Modo == "mascarar" {
+		fmt.Printf("⚠️  sem OCR (falta %s): imagens e PDFs não são enviados. Para instalar: %s\n", falta, ocr.DicaInstalacao())
 	}
 	return nil
 }

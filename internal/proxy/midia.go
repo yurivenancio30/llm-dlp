@@ -3,6 +3,7 @@ package proxy
 import (
 	"crypto/sha256"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"image"
 	"regexp"
@@ -18,7 +19,8 @@ import (
 
 // Midia trata imagens e PDFs que vão para a API: lê o texto (OCR/pdftotext),
 // cobre o que é sensível e devolve blocos seguros. Resultados ficam memorizados
-// (o Claude Code reenvia as mesmas imagens a cada mensagem).
+// (o Claude Code reenvia as mesmas imagens a cada mensagem). O arquivo que não deu para
+// verificar nunca sai: é retirado, e no lugar vai um aviso (ver retirar).
 type Midia struct {
 	cfg   config.OCR
 	o     *ocr.OCR
@@ -28,6 +30,9 @@ type Midia struct {
 	mu    sync.Mutex
 	memo  map[[32]byte]resMidia
 	bytes int
+	// Aviso recebe o motivo de cada arquivo retirado (o proxy grava no log)
+	Aviso    func(msg string)
+	avisados map[[32]byte]bool
 }
 
 type resMidia struct {
@@ -62,7 +67,7 @@ func NovaMidia(cfg config.Config, m *mask.Masker) *Midia {
 		env = append(env, k+"="+v)
 	}
 	return &Midia{cfg: cfg.OCR, m: m, lib: cfg.DominiosEmailLiberados, dom: cfg.DominiosInternos,
-		memo: map[[32]byte]resMidia{},
+		memo: map[[32]byte]resMidia{}, avisados: map[[32]byte]bool{},
 		o: ocr.Novo(ocr.Config{Tesseract: cfg.OCR.Tesseract, PDFToText: cfg.OCR.PDFToText, PDFToPPM: cfg.OCR.PDFToPPM,
 			Idioma: cfg.OCR.Idioma, Env: env})}
 }
@@ -83,7 +88,7 @@ func (md *Midia) Processar(b map[string]any) ([]any, []mask.Entrada, error) {
 	case "permitir":
 		return []any{b}, nil, nil
 	case "bloquear":
-		return nil, nil, fmt.Errorf("envio de %s bloqueado pela configuração (ocr.modo = bloquear)", tipo)
+		return md.retirar(b, ehPDF, "o envio de imagens e PDFs está bloqueado na configuração do llm-dlp (ocr.modo = bloquear). Avise o usuário"), nil, nil
 	}
 	k := sha256.Sum256([]byte(dados))
 	md.mu.Lock()
@@ -94,17 +99,25 @@ func (md *Midia) Processar(b map[string]any) ([]any, []mask.Entrada, error) {
 	md.mu.Unlock()
 
 	bin, err := base64.StdEncoding.DecodeString(dados)
-	if err != nil {
-		return nil, nil, fmt.Errorf("%s com base64 inválido", tipo)
-	}
 	var r resMidia
-	if ehPDF {
+	if err != nil {
+		err = errors.New("base64 inválido")
+	} else if ehPDF {
 		r, err = md.pdf(b, bin)
 	} else {
 		r, err = md.imagem(b, bin)
 	}
 	if err != nil {
-		return nil, nil, fmt.Errorf("não consegui verificar %s: %w (para instalar o OCR: %s)", tipo, err, ocr.DicaInstalacao())
+		md.avisar(k, fmt.Sprintf("%q retirado da requisição, não deu para verificar: %v", tipo, err))
+		motivo := "o llm-dlp não conseguiu verificar se o arquivo tem dado sensível, porque "
+		if ocr.Ausente(err) {
+			motivo += "o OCR não está instalado nesta máquina. Avise o usuário: para enviar imagens e PDFs, instalar o OCR (" +
+				ocr.DicaInstalacao() + ") e mandar o arquivo de novo"
+		} else {
+			motivo += "a leitura do arquivo falhou. Avise o usuário: o motivo está no log do llm-dlp (llm-dlp.log); se o OCR estiver incompleto: " +
+				ocr.DicaInstalacao()
+		}
+		return md.retirar(b, ehPDF, motivo), nil, nil
 	}
 	if r.limpa {
 		r.blocos = nil
@@ -120,6 +133,34 @@ func (md *Midia) Processar(b map[string]any) ([]any, []mask.Entrada, error) {
 	md.memo[k] = r
 	md.mu.Unlock()
 	return saida, ents, nil
+}
+
+// retirar: a imagem ou o PDF que não deu para verificar (ou que a configuração bloqueia) não
+// sai; no lugar vai um aviso, para o modelo contar ao usuário o que houve e como resolver.
+// Recusar a requisição inteira prendia a conversa: o arquivo fica no histórico, que o Claude
+// Code reenvia a cada mensagem. O aviso só tem texto fixo (o detalhe do erro, que pode citar um
+// caminho da máquina, fica no log) e o resultado não é memorizado: com o OCR instalado, a
+// próxima mensagem já leva o arquivo.
+func (md *Midia) retirar(b map[string]any, ehPDF bool, motivo string) []any {
+	t := "[llm-dlp] Uma imagem foi retirada daqui e não foi enviada: "
+	if ehPDF {
+		t = "[llm-dlp] Um PDF foi retirado daqui e não foi enviado: "
+	}
+	return resMidia{blocos: []any{map[string]any{"type": "text", "text": t + motivo + "."}}}.saida(b)
+}
+
+// avisar grava no log, uma vez por arquivo, por que ele foi retirado.
+func (md *Midia) avisar(k [32]byte, msg string) {
+	md.mu.Lock()
+	ja := md.avisados[k]
+	if len(md.avisados) > 4096 {
+		md.avisados = map[[32]byte]bool{}
+	}
+	md.avisados[k] = true
+	md.mu.Unlock()
+	if !ja && md.Aviso != nil {
+		md.Aviso(msg)
+	}
 }
 
 func (md *Midia) imagem(b map[string]any, bin []byte) (resMidia, error) {

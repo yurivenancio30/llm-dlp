@@ -76,7 +76,7 @@ into a secret everywhere.
 |---|---|
 | llm-dlp is down | Claude Code cannot send the message |
 | The request is not JSON, or has something it does not know how to handle | Refused with an error; nothing is sent |
-| An image or PDF that could not be read | Refused |
+| An image or PDF that could not be verified (OCR missing, unreadable file) | The file does not go out: it is removed from the request, and the model gets a note in its place with the reason. The conversation goes on |
 | Someone deletes the configuration (with the lock installed) | Claude Code refuses to work |
 
 ## Images and PDFs
@@ -85,6 +85,11 @@ The text is read by OCR and the sensitive spans are covered in black before goin
 OCR makes mistakes (it reads `@` as `Q`, for example), in images llm-dlp covers more than
 needed: everything that looks like an e-mail, domain, IP or long number. A PDF with text
 becomes masked text; a scanned PDF becomes covered images.
+
+Without OCR installed, or with a file it cannot read, the image or PDF does not go out. A
+note goes in its place, and Claude says in its answer what happened and the command that
+installs OCR; the detail of the error stays in the log. After installing, just send the file
+again. `llm-dlp status` warns when OCR is missing.
 
 ## Claude Code's own text
 
@@ -197,3 +202,5 @@ POST /v1/messages -> 200 | 245 substituições | 0 colisões | mascarar 9ms | to
 | `colisões` | Pseudonyms that would stand for two different real values. Pseudonyms are short, so this is rare but possible, and more common with IPs (the fake subnet has few combinations). The outbound text stays masked; only the swap back of that pseudonym is not made, so it is not replaced with the wrong value. At worst, you see a pseudonym in a response |
 | `mascarar` | Time spent by llm-dlp |
 | `total` | Total time, dominated by the model's response |
+
+An `AVISO` line says why an image or a PDF was removed from a request.

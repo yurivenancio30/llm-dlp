@@ -44,7 +44,9 @@ type Proxy struct {
 type erroObrigatorio struct{ error }
 
 func Novo(cfg config.Config, m *mask.Masker, vistos *mask.Vistos, logger *log.Logger) *Proxy {
-	return &Proxy{cfg: cfg, m: m, midia: NovaMidia(cfg, m), vistos: vistos, log: logger, inicio: time.Now(),
+	midia := NovaMidia(cfg, m)
+	midia.Aviso = func(msg string) { logger.Printf("AVISO %s", msg) }
+	return &Proxy{cfg: cfg, m: m, midia: midia, vistos: vistos, log: logger, inicio: time.Now(),
 		cliente: &http.Client{Transport: &http.Transport{Proxy: http.ProxyFromEnvironment, DisableCompression: true,
 			DialContext:       (&net.Dialer{Timeout: 15 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
 			ForceAttemptHTTP2: true, TLSHandshakeTimeout: 15 * time.Second,

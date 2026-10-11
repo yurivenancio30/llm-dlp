@@ -75,7 +75,7 @@ em todo lugar.
 |---|---|
 | O llm-dlp está fora do ar | O Claude Code não consegue enviar a mensagem |
 | A requisição não é JSON, ou tem algo que ele não sabe tratar | Recusada com erro; nada é enviado |
-| Imagem ou PDF que não deu para ler | Recusada |
+| Imagem ou PDF que não deu para verificar (falta o OCR, arquivo ilegível) | O arquivo não sai: é retirado da requisição, e o modelo recebe no lugar um aviso com o motivo. A conversa continua |
 | Alguém apaga a configuração (com a trava instalada) | O Claude Code se recusa a funcionar |
 
 ## Imagens e PDFs
@@ -84,6 +84,11 @@ O texto é lido por OCR e os trechos sensíveis são cobertos de preto antes de 
 OCR erra (lê `@` como `Q`, por exemplo), em imagem o llm-dlp cobre a mais: tudo com cara de
 e-mail, domínio, IP ou número longo. PDF com texto vira texto mascarado; PDF escaneado vira
 imagens cobertas.
+
+Sem o OCR instalado, ou com um arquivo que ele não consegue ler, a imagem ou o PDF não sai.
+No lugar vai um aviso, e o Claude conta na resposta o que houve e o comando para instalar o
+OCR; o detalhe do erro fica no log. Depois de instalar, é só mandar o arquivo de novo. O
+`llm-dlp status` avisa quando falta o OCR.
 
 ## O texto do próprio Claude Code
 
@@ -193,4 +198,6 @@ POST /v1/messages -> 200 | 245 substituições | 0 colisões | mascarar 9ms | to
 | `colisões` | Pseudônimos que valeriam para dois valores reais diferentes. Os pseudônimos são curtos, então isso é raro, mas possível, e mais comum em IPs (a sub-rede falsa tem poucas combinações). A ida continua mascarada; só a volta daquele pseudônimo não é feita, para não trocar pelo valor errado. No pior caso, você vê um pseudônimo numa resposta |
 | `mascarar` | Tempo gasto pelo llm-dlp |
 | `total` | Tempo total, dominado pela resposta do modelo |
+
+Uma linha `AVISO` diz por que uma imagem ou um PDF foi retirado de uma requisição.
 

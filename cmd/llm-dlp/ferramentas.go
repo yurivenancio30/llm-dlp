@@ -150,6 +150,7 @@ func testarMidia(args []string) error {
 		bloco["type"] = "document"
 	}
 	md := proxy.NovaMidia(cfg, m)
+	md.Aviso = func(msg string) { fmt.Fprintln(os.Stderr, "  aviso:", msg) }
 	t0 := time.Now()
 	blocos, ents, err := md.Processar(bloco)
 	frio := time.Since(t0)

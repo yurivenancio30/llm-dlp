@@ -24,6 +24,11 @@ que só interessa a quem mexe no código.
 
 ### Programa
 
+- **Imagem ou PDF que não dá para verificar não trava mais a conversa.** Sem o OCR instalado
+  (ou com arquivo ilegível, ou com `ocr.modo = bloquear`) a requisição inteira era recusada
+  com 502, em toda mensagem dali em diante. Agora o arquivo é retirado da requisição
+  (continua sem sair nunca) e o modelo recebe um aviso no lugar, com o motivo e o comando
+  que instala o OCR. O `llm-dlp status` avisa quando falta o OCR.
 - Menos arquivos na raiz do repositório: `CONTRIBUTING.md` e `SECURITY.md` foram para
   `.github/` (o GitHub continua mostrando os dois), e o README em português para
   `docs/pt-BR/README.md`.

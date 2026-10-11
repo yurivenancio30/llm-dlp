@@ -22,8 +22,8 @@ File `~/.config/llm-dlp/config.json`. After changing it, run `llm-dlp parar`.
 | `detectores_opcionais` | Detectors to turn on. Today only `quase`: sex, age, marital status, occupation, nationality, income, latitude/longitude | empty |
 | `ferramentas_sem_desmascarar` | Web tools: they receive pseudonyms only, and what they bring is not remembered. The claude.ai connectors (`mcp__claude_ai_*`) always receive pseudonyms only, regardless of this list | `WebFetch`, `WebSearch` |
 | `documentos_sem_contexto` | Masks digit-only CPF and CNPJ even without the word "cpf"/"cnpj" nearby, if the check digit matches. About 1 in 100 random numbers of that length also matches and is masked needlessly | `true` |
-| `falhar_fechado` | Refuses what it does not know how to mask. When off, a failure while masking sends the request **unmasked** (only a warning is logged). An image or PDF that could not be verified is refused anyway. Turning it off is not recommended | `true` |
-| `ocr` | `modo` (`mascarar`, `bloquear` or `permitir`: mask, block or allow), `idioma` (language), `max_paginas` (maximum pages), paths of tesseract and poppler | `mascarar`, `por`, 30 |
+| `falhar_fechado` | Refuses what it does not know how to mask. When off, a failure while masking sends the request **unmasked** (only a warning is logged). An image or PDF that could not be verified never goes out, whatever the value of this field. Turning it off is not recommended | `true` |
+| `ocr` | `modo` (`mascarar`, `bloquear` or `permitir`: mask, block or allow), `idioma` (language), `max_paginas` (maximum pages), paths of tesseract and poppler. With `bloquear`, and with `mascarar` when the file cannot be verified (OCR missing, unreadable file), it is removed from the request and the model gets a note in its place | `mascarar`, `por`, 30 |
 | `objetos` | Internal resource names (see [What is detected](detection.md#5-internal-resource-names-by-structure)). `ligado` (on); `mascarar` (mask) and `propagar` (propagate): maps type → `true`/`false` (types: `servidor`, `database`, `schema`, `tabela`, `coluna`, `procedure`, `indice`, `usuario`, `namespace`, `servico`, `bucket`, `fila`). E.g. `{"mascarar": {"coluna": false}}` leaves the columns readable | on; masks all; propagates all except `coluna` and `indice` |
 | `objetos.ip_publico` | Also masks public IPv4 and IPv6 as a server name (`HOST_...`). `::1`, link-local, documentation ranges and the public DNS servers (`8.8.8.8`, `1.1.1.1`, `9.9.9.9`...) stay. A private IP is always masked by the `ip` detector | off |
 | `porta` | Local port of the proxy | 8787 |
@@ -40,7 +40,7 @@ Names accepted in `detectores_desligados`: `segredo`, `email`, `ip`, `host`, `cp
 | `llm-dlp instalar` | Installs and configures everything, explaining each step |
 | `sudo llm-dlp instalar-trava` | Claude Code only works when going through llm-dlp (the lock) |
 | `llm-dlp desinstalar` / `sudo llm-dlp desinstalar-trava` | Undoes it |
-| `llm-dlp status` | Shows whether it is running, in which mode and at which commit. Warns if a new binary is installed but not yet running |
+| `llm-dlp status` | Shows whether it is running, in which mode and at which commit. Warns if a new binary is installed but not yet running, and if OCR is missing |
 | `llm-dlp parar` | Stops the proxy (it comes back on the next message) |
 | `sudo llm-dlp emergencia [30m\|sair]` | Lets Claude through unmasked for a limited time |
 | `llm-dlp importar-pessoas FILE.csv --grupo CODE:NAME:EMAIL` | Teaches people |

@@ -144,7 +144,7 @@ goes down.
 | I want to know which version I have | `llm-dlp versao` (what changed in each one: [CHANGELOG.md](CHANGELOG.md)) |
 | llm-dlp went down | It comes back by itself in ~1 s. While it is out, no message goes out |
 | It does not come back, and I need Claude to fix it | `sudo llm-dlp emergencia 30m` lets Claude through **unmasked** for a limited time. Use a new session, with no client data. It goes back to normal when the time is up, or with `sudo llm-dlp emergencia sair`. Every message shows a warning |
-| Image or PDF blocked | OCR is missing: the error message brings the installation command |
+| The image or PDF did not reach Claude | OCR is missing: Claude says so in its answer, and `llm-dlp status` shows the installation command. After installing, send the file again |
 | I changed `config.json` | `llm-dlp parar` (it comes back on the next message, with the new configuration) |
 | I want to see what was done on each message | `~/.config/llm-dlp/llm-dlp.log` (counts and times only, never values) |
 | I want to undo everything | `llm-dlp desinstalar` (and `sudo llm-dlp desinstalar-trava`, if you installed the lock). Then close and open Claude Code and run `llm-dlp parar` |

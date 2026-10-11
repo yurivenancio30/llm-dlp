@@ -5,6 +5,7 @@ package ocr
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"image"
 	"image/color"
@@ -200,9 +201,14 @@ func (o *OCR) rodar(ctx context.Context, entrada []byte, bin string, args ...str
 	var out, errb bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &errb
 	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("%v: %s", err, strings.TrimSpace(errb.String()))
+		return nil, fmt.Errorf("%w: %s", err, strings.TrimSpace(errb.String()))
 	}
 	return out.Bytes(), nil
+}
+
+// Ausente: o erro é de programa não instalado (tesseract ou poppler fora do PATH).
+func Ausente(err error) bool {
+	return errors.Is(err, exec.ErrNotFound) || errors.Is(err, os.ErrNotExist)
 }
 
 // escura: luminância média baixa (amostrada, para ser barato).
