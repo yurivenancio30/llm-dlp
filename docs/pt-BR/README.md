@@ -44,6 +44,8 @@ você lê:        verifique se maria.lopes@empresa.com.br tem permissão em mysq
 - **Mantém a referência:** o mesmo valor vira sempre o mesmo pseudônimo, então o modelo
   continua entendendo que duas menções são da mesma pessoa, do mesmo servidor, da mesma conta.
 - **Lê imagens e PDFs** (OCR) e cobre de preto o que for sensível.
+- **Também atende a API do Gemini** (Gemini CLI, opencode, SDKs do Google), no caminho
+  `/gemini` da mesma porta: ver [Outras APIs](configuracao.md#outras-apis-gemini).
 - **Falha fechada:** se o llm-dlp cair ou não souber tratar algo, a mensagem **não sai**. Não
   existe vazamento silencioso.
 - **Não pesa:** uma mensagem custa 5–30 ms, quase não muda o número de tokens e não atrapalha

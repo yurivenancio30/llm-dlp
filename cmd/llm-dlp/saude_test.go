@@ -103,10 +103,13 @@ func TestProtecaoReduzida(t *testing.T) {
 	casos := map[string]func(*config.Config){
 		"atacante.example":     func(c *config.Config) { c.Upstream = "https://atacante.example/v1" },
 		"http://api.anthropic": func(c *config.Config) { c.Upstream = "http://api.anthropic.com" },
-		"falhar_fechado":       func(c *config.Config) { c.FalharFechado = false },
-		"ocr.modo":             func(c *config.Config) { c.OCR.Modo = "permitir" },
-		"objetos.ligado":       func(c *config.Config) { c.Objetos.Ligado = false },
-		"segredo, email":       func(c *config.Config) { c.DetectoresDesligados = []string{"segredo", "email"} },
+		"provedor gemini": func(c *config.Config) {
+			c.Provedores = map[string]config.Provedor{"gemini": {Upstream: "https://atacante.example", Formato: "gemini"}}
+		},
+		"falhar_fechado": func(c *config.Config) { c.FalharFechado = false },
+		"ocr.modo":       func(c *config.Config) { c.OCR.Modo = "permitir" },
+		"objetos.ligado": func(c *config.Config) { c.Objetos.Ligado = false },
+		"segredo, email": func(c *config.Config) { c.DetectoresDesligados = []string{"segredo", "email"} },
 	}
 	for parte, f := range casos {
 		c := config.Padrao()

@@ -21,9 +21,22 @@ type Termo struct {
 	Valores []string `json:"valores"`
 }
 
+// Provedor: outra API de LLM atendida na mesma porta, pelo caminho "/<nome>/..." (o cliente
+// aponta o endereço da API para http://127.0.0.1:<porta>/<nome>).
+type Provedor struct {
+	// Para onde a requisição vai, sem o "/<nome>".
+	Upstream string `json:"upstream"`
+	// Como ler a requisição e a resposta: "gemini" ou "anthropic". Outro valor: modo genérico
+	// (todo texto da requisição é mascarado, e a resposta em streaming não é desmascarada).
+	Formato string `json:"formato"`
+}
+
 type Config struct {
 	Porta    int    `json:"porta"`
 	Upstream string `json:"upstream"`
+	// Outras APIs, pelo nome que vai no caminho. O que não começa com um nome daqui vai para
+	// Upstream (a API da Anthropic).
+	Provedores map[string]Provedor `json:"provedores"`
 
 	// Hostnames e e-mails que contêm um destes trechos são tratados como internos.
 	DominiosInternos []string `json:"dominios_internos"`
@@ -109,11 +122,19 @@ type OCR struct {
 	PDFEstrito bool `json:"pdf_estrito"`
 }
 
+// ProvedoresPadrao: as APIs que já vêm configuradas.
+func ProvedoresPadrao() map[string]Provedor {
+	return map[string]Provedor{
+		"gemini": {Upstream: "https://generativelanguage.googleapis.com", Formato: "gemini"},
+	}
+}
+
 func Padrao() Config {
 	return Config{
 		Porta:                  8787,
 		Objetos:                Objetos{Ligado: true},
 		Upstream:               "https://api.anthropic.com",
+		Provedores:             ProvedoresPadrao(),
 		DominiosInternos:       []string{},
 		EmailsLiberados:        []string{},
 		DominiosEmailLiberados: []string{"example.com", "example.org", "example.net", "users.noreply.github.com", "anthropic.com"},
@@ -123,7 +144,8 @@ func Padrao() Config {
 		DocumentosSemContexto: true,
 		OCR: OCR{Modo: "mascarar", Tesseract: "tesseract", PDFToText: "pdftotext", PDFToPPM: "pdftoppm",
 			Idioma: "por", Env: map[string]string{}, MaxPaginas: 30},
-		FerramentasSemDesmascarar: []string{"WebFetch", "WebSearch"},
+		// as do Claude Code e as de mesmo papel no Gemini CLI e no opencode
+		FerramentasSemDesmascarar: []string{"WebFetch", "WebSearch", "web_fetch", "google_web_search", "webfetch", "websearch"},
 	}
 }
 

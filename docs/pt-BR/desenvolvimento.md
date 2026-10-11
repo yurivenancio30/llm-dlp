@@ -223,8 +223,14 @@ proxy.ServeHTTP                      recebe a requisição
 
 ## Acoplar outra API de LLM
 
-Hoje o llm-dlp entende o formato da API da Anthropic (`/v1/messages`). O que já funciona e o
-que falta para outro formato (OpenAI, Gemini):
+O llm-dlp entende o formato da API da Anthropic (`/v1/messages`) e o do Gemini
+(`generateContent`, em `gemini.go`). O do Gemini é o modelo para o próximo: a requisição não
+ganhou um mascarador próprio, ela é **vista na forma da Anthropic** (`ponteGemini`) e passa
+pelo mesmo caminho, de modo que a memória da conversa, as dicas dos comandos, o congelamento
+e as imagens valem igual; só a volta (`voltaGemini`) é escrita para o formato. O destino é
+escolhido pelo caminho (`Proxy.destino`, com os `provedores` da configuração).
+
+O que já funciona e o que falta para um formato ainda sem leitor (OpenAI):
 
 | Parte | Hoje, com outra API | O que fazer |
 |---|---|---|

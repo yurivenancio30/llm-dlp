@@ -33,10 +33,43 @@ does not go to the API.
 | `objetos.ip_publico` | Also masks public IPv4 and IPv6 as a server name (`HOST_...`). `::1`, link-local, documentation ranges and the public DNS servers (`8.8.8.8`, `1.1.1.1`, `9.9.9.9`...) stay. A private IP is always masked by the `ip` detector | off |
 | `porta` | Local port of the proxy | 8787 |
 | `upstream` | Address of the API | `https://api.anthropic.com` |
+| `provedores` | Other APIs served on the same port, under the path `/<name>` (see [Other APIs](#other-apis-gemini)). Each one has `upstream` and `formato` (`gemini` or `anthropic`; any other value falls into the generic mode) | `gemini` → `https://generativelanguage.googleapis.com` |
 
 Names accepted in `detectores_desligados`: `segredo`, `email`, `ip`, `host`, `cpf`, `cnpj`,
 `pis`, `cnh`, `rg`, `telefone`, `cep`, `cartao`, `conta`, `pix`, `endereco`, `nascimento`,
 `nome`, `campo` (detection by the field name), `usuario`, `doc`, `iban`, `processo`, `mac`.
+
+## Other APIs (Gemini)
+
+llm-dlp serves the Gemini API on the same port, under the path `/gemini`: point the client's
+API address to `http://127.0.0.1:8787/gemini`. The API key is still yours and goes straight
+through (llm-dlp does not store it or write it to the log).
+
+| Client | How to point it |
+|---|---|
+| Gemini CLI | `export GOOGLE_GEMINI_BASE_URL=http://127.0.0.1:8787/gemini` |
+| opencode (`google` provider) | In `opencode.json`: `"provider": {"google": {"options": {"baseURL": "http://127.0.0.1:8787/gemini/v1beta"}}}` |
+| Google SDKs (`google-genai`) | The base address option (`http_options.base_url` / `httpOptions.baseUrl`) with `http://127.0.0.1:8787/gemini` |
+| `curl` | `curl http://127.0.0.1:8787/gemini/v1beta/models/MODEL:generateContent -H "x-goog-api-key: $KEY" ...` |
+
+The same masking as with Claude Code applies: text, tool calls and tool results, system
+instructions, images and PDFs, with the response unmasked in streaming as well. It was tested
+against the real API with `curl` (with and without streaming, and with a tool call); the line
+of each client above follows its documentation and has not yet been checked with the client
+running.
+
+What is left out:
+
+- **The lock and the hooks belong to Claude Code.** Nothing stops the other client from
+  talking straight to the API if its address is undone, and there is no warning on every
+  message.
+- Audio, video and other attached files (`inlineData` that is neither an image nor a PDF) are
+  removed: llm-dlp has no way to verify them.
+- The summary of the model's reasoning (`thought`) comes back with the pseudonyms, not
+  unmasked.
+- APIs in the OpenAI format (Grok, OpenRouter, Copilot) do not have their own reader yet: for a
+  provider with another `formato`, every text of the request is masked and the streaming
+  response comes back with the pseudonyms.
 
 ## Commands
 

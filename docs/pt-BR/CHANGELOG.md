@@ -9,6 +9,21 @@ Em cada versão: **Mascaramento** é o que passou a ser (ou deixou de ser) masca
 **Programa** é comando, instalação, configuração, desempenho e documentação; **Código** é o
 que só interessa a quem mexe no código.
 
+## [Não lançado]
+
+### Programa
+
+- **API do Gemini.** O llm-dlp passa a atender também a API do Gemini (`generateContent`,
+  `streamGenerateContent`, `countTokens`), no caminho `/gemini` da mesma porta: aponte o
+  Gemini CLI, o opencode ou uma SDK do Google para `http://127.0.0.1:8787/gemini`. Vale o
+  mesmo mascaramento do Claude Code (texto, chamadas e resultados de ferramenta, instruções
+  do sistema, imagens e PDFs, memória da conversa, histórico congelado), e a resposta é
+  desmascarada também em streaming. Campo novo na configuração: `provedores`; outras APIs
+  podem ser acrescentadas ali (sem leitor próprio, todo texto é mascarado). Ver
+  [configuracao.md](configuracao.md#outras-apis-gemini).
+- Quando a API não responde, o log e o erro não mostram mais o endereço da requisição, que
+  pode levar a chave da API (`?key=...`).
+
 ## [0.3.1] - 2026-10-11
 
 Correções de segurança no próprio programa. Nada muda no que é mascarado. Depois de

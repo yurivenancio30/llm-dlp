@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"hash"
 	"io"
-	"net/http"
 	"regexp"
 	"sort"
 	"strings"
@@ -21,14 +20,23 @@ import (
 
 // mascararCorpo mascara o JSON da requisição. Corpo que não é JSON não sai (falha fechada).
 // Devolve também o lote dos textos, para congelar depois que a requisição sair.
-func (p *Proxy) mascararCorpo(r *http.Request, corpo []byte) ([]byte, []mask.Entrada, *mask.Lote, error) {
+//
+// formato: "anthropic" (/v1/messages), "gemini" (vista na forma da Anthropic: ver gemini.go) ou
+// outro (modo genérico: todo texto é mascarado).
+func (p *Proxy) mascararCorpo(formato, tipo string, corpo []byte) ([]byte, []mask.Entrada, *mask.Lote, error) {
 	dec := json.NewDecoder(bytes.NewReader(corpo))
 	dec.UseNumber()
-	var v any
-	if err := dec.Decode(&v); err != nil {
-		return nil, nil, nil, fmt.Errorf("corpo não é JSON (%s)", r.Header.Get("content-type"))
+	var original any
+	if err := dec.Decode(&original); err != nil {
+		return nil, nil, nil, fmt.Errorf("corpo não é JSON (%s)", tipo)
 	}
-	anthropic := strings.HasPrefix(r.URL.Path, "/v1/messages")
+	anthropic := formato == "anthropic"
+	v, voltar := original, func() {}
+	if formato == "gemini" {
+		if a, f, ok := ponteGemini(original); ok {
+			v, voltar, anthropic = a, f, true
+		}
+	}
 	lote := p.m.NovoLote()
 	// 1ª passada: só junta os textos (os mesmos que a montagem vai mascarar) e os mascara
 	// antes, em paralelo quando são muitos. Assim, todo valor aprendido nesta requisição já
@@ -66,10 +74,15 @@ func (p *Proxy) mascararCorpo(r *http.Request, corpo []byte) ([]byte, []mask.Ent
 		// imagem/PDF que não deu para verificar nunca sai, mesmo com falhar_fechado=false
 		return nil, nil, nil, erroObrigatorio{errMidia}
 	}
+	if formato == "gemini" && anthropic {
+		voltar() // o que foi mascarado na forma da Anthropic volta para a requisição do Gemini
+	} else {
+		original = v
+	}
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	enc.SetEscapeHTML(false)
-	if err := enc.Encode(v); err != nil {
+	if err := enc.Encode(original); err != nil {
 		return nil, nil, nil, err
 	}
 	return bytes.TrimRight(buf.Bytes(), "\n"), ents, lote, nil
@@ -561,7 +574,9 @@ func textoDe(v any) string {
 // Chaves que nunca carregam dado do usuário (ou que não podem mudar).
 var chavesIntocaveis = map[string]bool{"type": true, "id": true, "tool_use_id": true, "signature": true,
 	"media_type": true, "cache_control": true, "model": true, "role": true, "stop_reason": true,
-	"stop_sequence": true, "citations": false}
+	"stop_sequence": true, "citations": false,
+	// Gemini: assinatura do raciocínio, tipo do arquivo e o tipo/formato de um schema
+	"thoughtSignature": true, "thought_signature": true, "mimeType": true, "mime_type": true, "format": true}
 
 // requisicaoAnthropic: /v1/messages e /v1/messages/count_tokens.
 

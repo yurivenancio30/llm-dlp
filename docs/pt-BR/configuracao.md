@@ -30,10 +30,41 @@ Anthropic, o Claude Code mostra um aviso a cada mensagem (ver
 | `objetos.ip_publico` | Mascara também IPv4 público e IPv6 como nome de servidor (`HOST_...`). Ficam `::1`, link-local, faixas de documentação e os DNS públicos (`8.8.8.8`, `1.1.1.1`, `9.9.9.9`...). O IP privado é sempre mascarado pelo detector `ip` | desligado |
 | `porta` | Porta local do proxy | 8787 |
 | `upstream` | Endereço da API | `https://api.anthropic.com` |
+| `provedores` | Outras APIs atendidas na mesma porta, pelo caminho `/<nome>` (ver [Outras APIs](#outras-apis-gemini)). Cada uma tem `upstream` e `formato` (`gemini` ou `anthropic`; outro valor cai no modo genérico) | `gemini` → `https://generativelanguage.googleapis.com` |
 
 Nomes aceitos em `detectores_desligados`: `segredo`, `email`, `ip`, `host`, `cpf`, `cnpj`,
 `pis`, `cnh`, `rg`, `telefone`, `cep`, `cartao`, `conta`, `pix`, `endereco`, `nascimento`,
 `nome`, `campo` (detecção pelo nome do campo), `usuario`, `doc`, `iban`, `processo`, `mac`.
+
+## Outras APIs (Gemini)
+
+O llm-dlp atende a API do Gemini na mesma porta, no caminho `/gemini`: aponte o endereço da
+API do cliente para `http://127.0.0.1:8787/gemini`. A chave da API continua sendo a sua e
+passa direto (o llm-dlp não a guarda nem a grava no log).
+
+| Cliente | Como apontar |
+|---|---|
+| Gemini CLI | `export GOOGLE_GEMINI_BASE_URL=http://127.0.0.1:8787/gemini` |
+| opencode (provedor `google`) | No `opencode.json`: `"provider": {"google": {"options": {"baseURL": "http://127.0.0.1:8787/gemini/v1beta"}}}` |
+| SDKs do Google (`google-genai`) | A opção de endereço base (`http_options.base_url` / `httpOptions.baseUrl`) com `http://127.0.0.1:8787/gemini` |
+| `curl` | `curl http://127.0.0.1:8787/gemini/v1beta/models/MODELO:generateContent -H "x-goog-api-key: $CHAVE" ...` |
+
+Vale o mesmo mascaramento do Claude Code: texto, chamadas e resultados de ferramenta,
+instruções do sistema, imagens e PDFs, com a resposta desmascarada também em streaming. Foi
+testado com a API de verdade por `curl` (com e sem streaming e com chamada de ferramenta); a
+linha de cada cliente acima segue a documentação dele e ainda não foi conferida com o
+cliente rodando.
+
+O que fica de fora:
+
+- **A trava e os ganchos são do Claude Code.** Nada impede o outro cliente de falar direto com
+  a API se o endereço dele for desfeito, e não há o aviso a cada mensagem.
+- Áudio, vídeo e outros arquivos anexados (`inlineData` que não é imagem nem PDF) são
+  retirados: o llm-dlp não tem como verificá-los.
+- O resumo do raciocínio do modelo (`thought`) volta com os pseudônimos, sem desmascarar.
+- APIs no formato da OpenAI (Grok, OpenRouter, Copilot) ainda não têm leitor próprio: num
+  provedor com outro `formato`, todo texto da requisição é mascarado e a resposta em streaming
+  volta com os pseudônimos.
 
 ## Comandos
 

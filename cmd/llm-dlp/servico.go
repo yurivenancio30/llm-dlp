@@ -265,6 +265,12 @@ func protecaoReduzida(cfg config.Config) []string {
 		}
 		out = append(out, "as mensagens e a credencial da API vão para "+proxy.Limpo(destino)+" (upstream), não para a API da Anthropic")
 	}
+	padrao := config.ProvedoresPadrao()
+	for _, nome := range []string{"gemini"} {
+		if pv, ok := cfg.Provedores[nome]; ok && pv.Upstream != padrao[nome].Upstream {
+			out = append(out, "as mensagens e a credencial do provedor "+nome+" vão para "+proxy.Limpo(pv.Upstream)+", não para a API dele")
+		}
+	}
 	if !cfg.FalharFechado {
 		out = append(out, "uma falha ao mascarar manda a mensagem sem máscara (falhar_fechado = false)")
 	}

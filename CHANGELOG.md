@@ -9,6 +9,20 @@ In each version: **Masking** is what started (or stopped) being masked; **Progra
 commands, installation, configuration, performance and documentation; **Code** is what only
 matters to whoever changes the code.
 
+## [Unreleased]
+
+### Program
+
+- **Gemini API.** llm-dlp now also serves the Gemini API (`generateContent`,
+  `streamGenerateContent`, `countTokens`), under the `/gemini` path of the same port: point
+  the Gemini CLI, opencode or a Google SDK to `http://127.0.0.1:8787/gemini`. The same masking
+  as with Claude Code applies (text, tool calls and results, system instructions, images and
+  PDFs, conversation memory, frozen history), and the response is unmasked in streaming too.
+  New configuration field `provedores`; other APIs can be added there (without a reader of
+  their own, every text is masked). See [docs/configuration.md](docs/configuration.md#other-apis-gemini).
+- When the API cannot be reached, the log and the error no longer show the address of the
+  request, which may carry the API key (`?key=...`).
+
 ## [0.3.1] - 2026-10-11
 
 Security fixes in the program itself. Nothing changes in what is masked. After updating,

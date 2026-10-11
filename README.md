@@ -50,6 +50,8 @@ command does.
 - **Keeps the reference:** the same value always becomes the same pseudonym, so the model
   still understands that two mentions are the same person, the same server, the same account.
 - **Reads images and PDFs** (OCR) and covers in black whatever is sensitive.
+- **Also serves the Gemini API** (Gemini CLI, opencode, Google SDKs), under the `/gemini` path
+  of the same port: see [Other APIs](docs/configuration.md#other-apis-gemini).
 - **Fail-closed:** if llm-dlp goes down or does not know how to handle something, the message
   **does not go out**. There is no silent leak.
 - **Is light:** a message costs 5–30 ms, the number of tokens hardly changes and the API

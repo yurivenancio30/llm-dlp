@@ -243,8 +243,15 @@ proxy.ServeHTTP                      receives the request
 
 ## Plugging in another LLM API
 
-Today llm-dlp understands the format of the Anthropic API (`/v1/messages`). What already
-works and what is missing for another format (OpenAI, Gemini):
+llm-dlp understands the format of the Anthropic API (`/v1/messages`) and that of Gemini
+(`generateContent`, in `gemini.go`). The Gemini one is the model for the next: the request did
+not get a masker of its own, it is **seen in the Anthropic shape** (`ponteGemini`) and goes
+through the same path, so the conversation memory, the command hints, the freezing and the
+images work the same; only the way back (`voltaGemini`) is written for the format. The
+destination is chosen by the path (`Proxy.destino`, with the `provedores` of the
+configuration).
+
+What already works and what is missing for a format that has no reader yet (OpenAI):
 
 | Part | Today, with another API | What to do |
 |---|---|---|

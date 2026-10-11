@@ -11,6 +11,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"sync/atomic"
@@ -39,6 +40,21 @@ type Proxy struct {
 	// a última requisição de mensagens, já mascarada (só em memória): é o que o comando
 	// "llm-dlp ultima" mostra, para conferir o que a API recebeu
 	ultima atomic.Pointer[[]byte]
+}
+
+// destino: para onde a requisição vai e em que formato ela vem. "/gemini/..." vai para o
+// provedor "gemini" da configuração, sem o "/gemini"; o que não começa com o nome de um provedor
+// vai para o upstream (a API da Anthropic).
+func (p *Proxy) destino(r *http.Request) (formato, upstream, uri string) {
+	uri = r.URL.RequestURI()
+	nome, _, _ := strings.Cut(strings.TrimPrefix(r.URL.Path, "/"), "/")
+	if pv, ok := p.cfg.Provedores[nome]; ok && nome != "" && pv.Upstream != "" {
+		return pv.Formato, pv.Upstream, strings.TrimPrefix(uri, "/"+nome)
+	}
+	if strings.HasPrefix(r.URL.Path, "/v1/messages") {
+		formato = "anthropic"
+	}
+	return formato, p.cfg.Upstream, uri
 }
 
 // erroObrigatorio: falha que bloqueia a requisição independentemente de falhar_fechado.
@@ -105,11 +121,12 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		p.recusar(w, r, "não consegui ler a requisição")
 		return
 	}
+	formato, upstream, uri := p.destino(r)
 	var entradas []mask.Entrada
 	var lote *mask.Lote
 	semMascara := false
 	if len(bytes.TrimSpace(corpo)) > 0 {
-		novo, ents, l, err := p.mascararCorpo(r, corpo)
+		novo, ents, l, err := p.mascararCorpo(formato, r.Header.Get("content-type"), corpo)
 		if err != nil {
 			var obrig erroObrigatorio
 			if p.cfg.FalharFechado || errors.As(err, &obrig) {
@@ -120,7 +137,7 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			semMascara = true
 		} else {
 			corpo, entradas, lote = novo, ents, l
-			if strings.HasPrefix(r.URL.Path, "/v1/messages") && !strings.Contains(r.URL.Path, "count_tokens") && len(corpo) > 2000 {
+			if formato == "anthropic" && !strings.Contains(r.URL.Path, "count_tokens") && len(corpo) > 2000 {
 				c := corpo
 				p.ultima.Store(&c)
 			}
@@ -129,7 +146,7 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	tab := mask.NovaTabela(entradas)
 	tMascara := time.Since(t0)
 
-	alvo := strings.TrimRight(p.cfg.Upstream, "/") + r.URL.RequestURI()
+	alvo := strings.TrimRight(upstream, "/") + uri
 	req, err := http.NewRequestWithContext(r.Context(), r.Method, alvo, bytes.NewReader(corpo))
 	if err != nil {
 		p.recusar(w, r, "url inválida")
@@ -145,6 +162,11 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := p.cliente.Do(req)
 	if err != nil {
+		// só a causa: a mensagem inteira traz o endereço, que pode levar a chave da API (?key=...)
+		var ue *url.Error
+		if errors.As(err, &ue) {
+			err = ue.Err
+		}
 		http.Error(w, "llm-dlp: falha ao contatar a API: "+err.Error(), http.StatusBadGateway)
 		p.log.Printf("ERRO %s %s: upstream: %v", r.Method, limpo(r.URL.Path), err)
 		return
@@ -164,6 +186,8 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ct := resp.Header.Get("content-type")
 	erroAPI := ""
 	switch {
+	case strings.HasPrefix(ct, "text/event-stream") && formato == "gemini":
+		err = p.desmascararSSEGemini(w, resp.Body, tab)
 	case strings.HasPrefix(ct, "text/event-stream"):
 		err = p.desmascararSSE(w, resp.Body, tab)
 	case strings.Contains(ct, "json") && (!tab.Vazia() || resp.StatusCode >= 400):
@@ -173,7 +197,9 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			if resp.StatusCode >= 400 && !semMascara {
 				erroAPI = resumoDoErro(b)
 			}
-			if !tab.Vazia() {
+			if !tab.Vazia() && formato == "gemini" {
+				b = p.desmascararGeminiJSON(b, tab)
+			} else if !tab.Vazia() {
 				b = desmascararJSONResposta(b, tab, p.cfg.SemDesmascarar,
 					func(s string) string { return p.m.RegistrarResposta(s, tab) })
 			}
@@ -197,10 +223,21 @@ func resumoDoErro(b []byte) string {
 	var e struct {
 		Error struct {
 			Type    string `json:"type"`
+			Status  string `json:"status"` // Gemini
 			Message string `json:"message"`
 		} `json:"error"`
 	}
-	if json.Unmarshal(b, &e) != nil || e.Error.Type == "" && e.Error.Message == "" {
+	if json.Unmarshal(b, &e) != nil {
+		// o Gemini manda uma lista com um erro só
+		var lista []json.RawMessage
+		if json.Unmarshal(b, &lista) != nil || len(lista) == 0 || json.Unmarshal(lista[0], &e) != nil {
+			return ""
+		}
+	}
+	if e.Error.Type == "" {
+		e.Error.Type = e.Error.Status
+	}
+	if e.Error.Type == "" && e.Error.Message == "" {
 		return ""
 	}
 	msg := []rune(strings.Join(strings.Fields(e.Error.Message), " "))

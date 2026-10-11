@@ -104,7 +104,8 @@ proof, and the messages are blocked until you close Claude Code and run `llm-dlp
   symbol, so it is not confused with code and ordinary text.
 - Images and PDFs: the result is memoized only while llm-dlp is running. After a restart
   they are examined again with what is known at that moment.
-- For now, only the Anthropic API (see [Plugging in another LLM API](development.md#plugging-in-another-llm-api)).
+- For now, only the Anthropic and the Gemini APIs have their own reader (see
+  [Other APIs](configuration.md#other-apis-gemini) and [Plugging in another LLM API](development.md#plugging-in-another-llm-api)).
 
 ## Design decisions
 
