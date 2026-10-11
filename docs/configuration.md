@@ -53,12 +53,12 @@ Other clients work with the same masking, but you point them by hand and they ha
 | Client | Status | Installed and locked by `llm-dlp instalar` |
 |---|---|---|
 | Claude Code, with a subscription (Pro, Max) or an API key | **Stable** | Yes |
-| Gemini CLI, with a Google account or a Gemini API key | Beta | No |
-| Codex CLI, with a ChatGPT subscription or an OpenAI API key | Beta | No |
-| opencode | Beta | No |
+| Gemini CLI (terminal, also inside VS Code), with a Google account or a Gemini API key | Beta | No |
+| Codex (CLI and VS Code extension), with a ChatGPT subscription or an OpenAI API key | Beta | No |
+| opencode (terminal and VS Code) | Beta | No |
 | GitHub Copilot (CLI and VS Code), with your own key | Beta | No |
 | Any other client of the Anthropic, Gemini or OpenAI (Chat Completions, Responses) API | Beta | No |
-| GitHub Copilot with the GitHub subscription (the models GitHub hosts) | **Not supported** | Copilot does not let you change the address it talks to |
+| GitHub Copilot with the GitHub subscription (the models GitHub hosts), the Gemini Code Assist extension (VS Code, JetBrains), Vertex AI | **Not supported** | They do not let you change the address they talk to |
 
 ### What beta means
 
@@ -85,7 +85,7 @@ Other clients work with the same masking, but you point them by hand and they ha
 | `llm-dlp ultima` and the log | Yes | Yes |
 | Pointed to llm-dlp by `llm-dlp instalar` | Yes (step 4) | **No.** You set the address where the client reads it (`~/.bashrc`, `~/.codex/config.toml`, `opencode.json`), as in the tables below |
 | llm-dlp is started for you | Yes, when a session opens | **No.** A function in `~/.bashrc` runs `llm-dlp garantir` before opening the client ([README](../README.md#gemini-cli-codex-opencode-and-copilot-beta)). Without it, if llm-dlp is not running, the client gets "connection refused" and nothing goes out |
-| Account types that go through llm-dlp | Subscription (Pro, Max) and API key: Claude Code always talks to the Anthropic API | The ones pointed in [Client by client](#client-by-client): the Gemini CLI with a Google account or an API key, Codex with a ChatGPT subscription or an API key. **Not** Vertex AI, and **not** Copilot with the models GitHub hosts: they talk to other servers and go out **unmasked** |
+| Account types that go through llm-dlp | Subscription (Pro, Max) and API key: Claude Code always talks to the Anthropic API | The ones pointed in [Client by client](#client-by-client): the Gemini CLI with a Google account or an API key, Codex with a ChatGPT subscription or an API key. **Not** Vertex AI, the Gemini Code Assist extension or Copilot with the models GitHub hosts: they talk to other servers and go out **unmasked** |
 | Check on every message (llm-dlp is running, is the right version and proves it is itself) | Yes | **No** |
 | Lock: the client refuses to work outside llm-dlp | Yes (step 5) | **No.** If the address is removed from the client's configuration, the client talks straight to the API, unmasked, and nothing warns you |
 
@@ -123,9 +123,11 @@ in `/responses`, as Responses, whatever the provider.
 | Gemini CLI, with a Google account (*Login with Google*) | `export CODE_ASSIST_ENDPOINT=http://127.0.0.1:8787/codeassist` | **Not checked with a real account yet.** The format follows the Gemini CLI source code and is covered by the automated tests |
 | Codex CLI, with a ChatGPT subscription | In `~/.codex/config.toml`: `model_provider = "llm-dlp"` and `[model_providers.llm-dlp]` with `base_url = "http://127.0.0.1:8787/chatgpt"`, `wire_api = "responses"`, `requires_openai_auth = true` | **Not checked with a real account yet.** The format follows the Codex source code and is covered by the automated tests |
 | Codex CLI, with an OpenAI API key | The same provider, with `base_url = "http://127.0.0.1:8787/openai/v1"` and `env_key = "OPENAI_API_KEY"` (instead of `requires_openai_auth`) | **Not checked with a real key yet** (automated tests only) |
+| Codex extension for VS Code | Reads the same `~/.codex/config.toml` as the CLI. It does not go through the `~/.bashrc` function: run `llm-dlp garantir` once after turning on the machine | **Not checked.** OpenAI's documentation says the CLI and the extension share the configuration |
+| Gemini CLI inside VS Code (integrated terminal, *Gemini CLI Companion*) | The same lines as the Gemini CLI: it is the same program, in the editor's terminal | Like the Gemini CLI |
 | opencode (`google` provider) | In `opencode.json`: `"provider": {"google": {"options": {"baseURL": "http://127.0.0.1:8787/gemini/v1beta"}}}`, and the key in `GOOGLE_GENERATIVE_AI_API_KEY` | Running (1.19.0), real API, following the README on a clean home folder |
 | GitHub Copilot CLI, with your own key | `export COPILOT_PROVIDER_BASE_URL=http://127.0.0.1:8787/openai/v1` (or `/xai/v1`, or another address of the table above), plus `COPILOT_PROVIDER_API_KEY` and `COPILOT_MODEL` | Running (1.0.95), real API, with the caveat below |
-| GitHub Copilot in VS Code, with your own key | "Chat: Manage Language Models" > "Custom Endpoint". In the model's `url`: `http://127.0.0.1:8787/openai/v1/chat/completions` (API type Chat Completions) or `http://127.0.0.1:8787/v1/messages` (API type Messages) | **Not checked.** It follows the VS Code documentation; the format is the same as the Copilot CLI's |
+| GitHub Copilot in VS Code, with your own key | "Chat: Manage Language Models" > "Custom Endpoint". In the model's `url`: `http://127.0.0.1:8787/openai/v1/chat/completions` (API type Chat Completions) or `http://127.0.0.1:8787/v1/messages` (API type Messages). Like the Codex extension, start llm-dlp with `llm-dlp garantir` | **Not checked.** It follows the VS Code documentation; the format is the same as the Copilot CLI's |
 | Google SDKs (`google-genai`) | The base address option (`http_options.base_url` / `httpOptions.baseUrl`) with `http://127.0.0.1:8787/gemini` | **Not checked** with an SDK running |
 | `curl` | `curl http://127.0.0.1:8787/gemini/v1beta/models/MODEL:generateContent -H "x-goog-api-key: $KEY" ...` | Real API, with and without streaming, and with a tool call |
 

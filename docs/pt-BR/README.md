@@ -45,21 +45,14 @@ DB_PASSWORD=SEGREDO-vqxz5dvy
 SUPPORT_EMAIL=p.ouhiojea@ds373.invalid
 ```
 
-**2. O modelo responde com os pseudônimos**, porque é só o que ele viu:
+**2. O modelo responde com os pseudônimos, e o llm-dlp troca de volta antes de o agente
+agir.** O script gravado no seu disco, o comando que roda e a resposta que você lê têm os
+valores reais:
 
 ```bash
-pg_dump -h hkdzp7s4a.invalid -U usr_xyxhy7ug -d db_nr3b5hpi -f backup.sql
+pg_dump -h hkdzp7s4a.invalid -U usr_xyxhy7ug -d db_nr3b5hpi -f backup.sql   # o que o modelo escreveu
+pg_dump -h pg-prd.acme.intra -U app_crm -d crm_clientes -f backup.sql       # o que chega à sua máquina
 ```
-
-**3. O llm-dlp troca de volta antes de o agente agir.** O script gravado no seu disco, e o
-comando que roda, têm os valores reais:
-
-```bash
-pg_dump -h pg-prd.acme.intra -U app_crm -d crm_clientes -f backup.sql
-```
-
-A resposta que você lê também volta real: *"o backup.sh faz o dump de crm_clientes em
-pg-prd.acme.intra"*.
 
 | Valor real | Pseudônimo | O modelo continua sabendo que é |
 |---|---|---|
@@ -103,11 +96,11 @@ máquina. `pg_dump`, `postgresql` e `5432` ficam como estão: nome público não
 | Cliente | Status | Como é ligado |
 |---|---|---|
 | Claude Code (terminal, VS Code, JetBrains), com assinatura (Pro, Max) ou chave de API | **Estável** | Pelo `llm-dlp instalar`, com trava: o Claude Code se recusa a funcionar fora do llm-dlp |
-| Gemini CLI, com conta Google ou chave de API do Gemini | Beta | À mão, no `~/.bashrc` ([como](#gemini-cli-codex-opencode-e-copilot-beta)). Sem trava |
-| Codex CLI, com assinatura do ChatGPT ou chave de API da OpenAI | Beta | À mão, no `~/.codex/config.toml` e no `~/.bashrc` ([como](#gemini-cli-codex-opencode-e-copilot-beta)). Sem trava |
-| opencode, com o provedor `google` | Beta | À mão, no `opencode.json` e no `~/.bashrc` ([como](#gemini-cli-codex-opencode-e-copilot-beta)). Sem trava |
-| GitHub Copilot CLI e VS Code, com a sua chave | Beta | À mão, no `~/.bashrc` ([como](#gemini-cli-codex-opencode-e-copilot-beta)). Sem trava |
-| GitHub Copilot com a assinatura do GitHub | **Não atendido** | O Copilot não deixa trocar o endereço dos modelos que o GitHub hospeda |
+| Gemini CLI (terminal, também dentro do VS Code), com conta Google ou chave de API | Beta | À mão, sem trava ([como](#gemini-cli-codex-opencode-e-copilot-beta)) |
+| Codex (CLI e extensão do VS Code), com assinatura do ChatGPT ou chave de API | Beta | À mão, sem trava |
+| opencode (terminal e VS Code), com o provedor `google` | Beta | À mão, sem trava |
+| GitHub Copilot (CLI e VS Code), com a sua chave | Beta | À mão, sem trava |
+| Copilot com a assinatura do GitHub, a extensão Gemini Code Assist, Vertex AI | **Não atendido** | Não deixam trocar o endereço com que falam: saem **sem máscara** |
 
 > [!WARNING]
 > **Os clientes em beta não têm trava.** A proteção vale enquanto o endereço do cliente
@@ -191,129 +184,44 @@ confira com `llm-dlp status`.
 > [!WARNING]
 > Beta, e sem trava: leia o aviso em [Clientes atendidos](#clientes-atendidos).
 
-O `llm-dlp instalar` não mexe nesses clientes. Para cada um, você configura duas coisas:
+O `llm-dlp instalar` não mexe nesses clientes. Para cada um, você põe o endereço do llm-dlp
+onde o cliente o lê, e uma função no `~/.bashrc` que sobe o llm-dlp antes do cliente (só o
+Claude Code o sobe sozinho; sem ela, depois de reiniciar a máquina o cliente recebe "conexão
+recusada": nada vaza, mas não funciona).
 
-- **o endereço do llm-dlp** no lugar do endereço da API do cliente, onde o cliente o lê
-  (tabela abaixo);
-- **uma função com o nome do cliente** no `~/.bashrc`, que sobe o llm-dlp (`llm-dlp garantir`)
-  antes de abrir o cliente. Só o Claude Code sobe o llm-dlp sozinho: sem a função, depois de
-  reiniciar a máquina o cliente recebe "conexão recusada". Nada vaza, mas não funciona.
-
-| Cliente | Conta | Onde vai o endereço |
-|---|---|---|
-| Gemini CLI | Conta Google (*Login with Google*) | `CODE_ASSIST_ENDPOINT`, no `~/.bashrc` |
-| Gemini CLI | Chave de API do Gemini | `GOOGLE_GEMINI_BASE_URL`, no `~/.bashrc` |
-| Codex CLI | Assinatura do ChatGPT | Um provedor no `~/.codex/config.toml` |
-| Codex CLI | Chave de API da OpenAI | Um provedor no `~/.codex/config.toml` |
-| opencode | Chave de API do Gemini | `baseURL` do provedor `google`, no `opencode.json` |
-| GitHub Copilot CLI | A sua chave da OpenAI ou da xAI | `COPILOT_PROVIDER_BASE_URL`, no `~/.bashrc` |
-
-**Gemini CLI.** Cada tipo de conta fala com uma API diferente do Google, com uma linha
-própria. O Vertex AI não é coberto: com ele, **a conversa sai sem máscara**.
-
-Com a sua conta Google (*Login with Google*, o plano gratuito e o Google AI Pro):
+| Cliente e conta | Endereço do llm-dlp |
+|---|---|
+| Gemini CLI, conta Google | `export CODE_ASSIST_ENDPOINT=http://127.0.0.1:8787/codeassist` |
+| Gemini CLI, chave de API | `export GOOGLE_GEMINI_BASE_URL=http://127.0.0.1:8787/gemini`, com a chave em `GEMINI_API_KEY` e *Use Gemini API Key* escolhido quando ele abrir |
+| Codex, assinatura do ChatGPT ou chave de API | O provedor abaixo, no `~/.codex/config.toml` |
+| opencode, chave de API do Gemini | No `opencode.json`: `{"provider": {"google": {"options": {"baseURL": "http://127.0.0.1:8787/gemini/v1beta"}}}}`, com a chave em `GOOGLE_GENERATIVE_AI_API_KEY` |
+| Copilot CLI, a sua chave | `export COPILOT_PROVIDER_BASE_URL=http://127.0.0.1:8787/openai/v1` (xAI: `.../xai/v1`), com `COPILOT_PROVIDER_API_KEY` e `COPILOT_MODEL` |
+| Copilot no VS Code, a sua chave | "Custom Endpoint", como em [Cliente por cliente](configuracao.md#cliente-por-cliente) |
 
 ```bash
-# ~/.bashrc
-export CODE_ASSIST_ENDPOINT=http://127.0.0.1:8787/codeassist
+# ~/.bashrc: o export da tabela, e uma função por cliente (gemini, codex, opencode, copilot)
 gemini() { llm-dlp garantir && command gemini "$@"; }
 ```
-
-Com **chave de API** do Gemini (do Google AI Studio):
-
-```bash
-# ~/.bashrc
-export GEMINI_API_KEY="sua-chave"
-export GOOGLE_GEMINI_BASE_URL=http://127.0.0.1:8787/gemini
-gemini() { llm-dlp garantir && command gemini "$@"; }
-```
-
-Com a chave de API, escolha-a também no `~/.gemini/settings.json` (ou escolha *Use Gemini API
-Key* na primeira vez que ele abrir):
-
-```json
-{ "security": { "auth": { "selectedType": "gemini-api-key" } } }
-```
-
-**Codex CLI.** O Codex lê o endereço de um provedor no `~/.codex/config.toml` (crie o arquivo
-se ele não existir; o `model_provider` vai no topo, antes de qualquer `[seção]`).
-
-Com a sua assinatura do ChatGPT (entre com `codex login`, como sempre):
 
 ```toml
-# ~/.codex/config.toml
+# ~/.codex/config.toml: o Codex CLI e a extensão do VS Code o leem; o model_provider vai no topo
 model_provider = "llm-dlp"
 
 [model_providers.llm-dlp]
 name = "llm-dlp"
-base_url = "http://127.0.0.1:8787/chatgpt"
 wire_api = "responses"
-requires_openai_auth = true
+base_url = "http://127.0.0.1:8787/chatgpt"    # chave de API: "http://127.0.0.1:8787/openai/v1"
+requires_openai_auth = true                   # chave de API: env_key = "OPENAI_API_KEY"
 ```
 
-Com **chave de API** da OpenAI:
+**No VS Code**, o terminal integrado funciona como qualquer outro. Uma extensão (Codex,
+Copilot) não passa pela função: rode `llm-dlp garantir` uma vez depois de ligar a máquina, e
+dali em diante o llm-dlp volta sozinho.
 
-```toml
-# ~/.codex/config.toml
-model_provider = "llm-dlp"
-
-[model_providers.llm-dlp]
-name = "llm-dlp"
-base_url = "http://127.0.0.1:8787/openai/v1"
-wire_api = "responses"
-env_key = "OPENAI_API_KEY"
-```
-
-E, nos dois casos:
-
-```bash
-# ~/.bashrc
-export OPENAI_API_KEY="sua-chave"     # só com a chave de API
-codex() { llm-dlp garantir && command codex "$@"; }
-```
-
-Só o provedor `llm-dlp` passa pelo llm-dlp: se você trocar o Codex para outro provedor
-(`--profile`, `-c model_provider=...`), ele fala direto com a API.
-
-**opencode**, com o provedor `google`:
-
-```bash
-# ~/.bashrc
-export GOOGLE_GENERATIVE_AI_API_KEY="sua-chave"
-opencode() { llm-dlp garantir && command opencode "$@"; }
-```
-
-```json
-// ~/.config/opencode/opencode.json
-{ "provider": { "google": { "options": { "baseURL": "http://127.0.0.1:8787/gemini/v1beta" } } } }
-```
-
-Só o provedor apontado ali passa pelo llm-dlp. Se você trocar o opencode para outro provedor,
-aponte esse também.
-
-**GitHub Copilot CLI**, só com a sua chave (OpenAI ou xAI). Os modelos que o GitHub hospeda e
-as sugestões enquanto você digita não passam pelo llm-dlp.
-
-```bash
-# ~/.bashrc
-export COPILOT_PROVIDER_BASE_URL=http://127.0.0.1:8787/openai/v1    # xAI (Grok): .../xai/v1
-export COPILOT_PROVIDER_API_KEY="sua-chave"
-export COPILOT_MODEL="nome-do-modelo"
-copilot() { llm-dlp garantir && command copilot "$@"; }
-```
-
-Copilot no VS Code e outros clientes: [Cliente por cliente](configuracao.md#cliente-por-cliente).
-
-**Confira se está protegido.** Abra um terminal novo (ou rode `source ~/.bashrc`), mande uma
-mensagem pelo cliente e rode `llm-dlp ultima`: ele tem de mostrar essa mensagem, com os
-pseudônimos. Se disser *"Ainda não passou nenhuma mensagem"*, o cliente não está passando pelo
-llm-dlp: confira o endereço.
-
-As linhas do Gemini CLI com chave de API e do opencode foram seguidas como estão numa máquina
-limpa (uma pasta pessoal nova): o agente leu um arquivo com um e-mail e um IP e escreveu outro;
-a API só recebeu os pseudônimos e o arquivo saiu com os valores reais. O Gemini CLI com conta
-Google e o Codex seguem o código-fonte dos clientes e os testes automáticos, e **ainda não
-foram conferidos com uma conta de verdade**.
+**Confira:** mande uma mensagem e rode `llm-dlp ultima`. Ele tem de mostrar essa mensagem, com
+os pseudônimos; se disser *"Ainda não passou nenhuma mensagem"*, o cliente não está passando
+pelo llm-dlp. Só passa o que foi apontado: outro provedor ou outra conta fala direto com a API.
+O que foi conferido em cada cliente está em [Cliente por cliente](configuracao.md#cliente-por-cliente).
 
 ### Atualizar para uma versão nova
 

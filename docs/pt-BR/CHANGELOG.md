@@ -9,6 +9,24 @@ Em cada versão: **Mascaramento** é o que passou a ser (ou deixou de ser) masca
 **Programa** é comando, instalação, configuração, desempenho e documentação; **Código** é o
 que só interessa a quem mexe no código.
 
+## [Não lançado]
+
+### Programa
+
+- O README põe os clientes em beta numa tabela só, com a linha exata de cada cliente e conta,
+  e diz quais rodam no VS Code: o Gemini CLI no terminal do editor, a extensão do Codex (o
+  mesmo `config.toml` do CLI), o opencode e o Copilot. Uma extensão não passa pela função do
+  `~/.bashrc`: rode `llm-dlp garantir` uma vez depois de ligar a máquina. A extensão Gemini
+  Code Assist não é atendida.
+
+### Código
+
+- O `llm-dlp simular` repete um arquivo de subagente (`subagents/agent-*.jsonl`). Antes, toda
+  mensagem dele era pulada como conversa lateral, e o arquivo dava zero requisições e zero
+  problemas. Um arquivo sem nada para repetir agora avisa.
+- O `llm-dlp simular` deixa de contar como ida e volta diferente um texto cortado pela API
+  falsa (um texto logo abaixo de 4000 bytes que cresce ao ser mascarado).
+
 ## [0.5.0] - 2026-10-11
 
 Assinaturas, **em beta**: o Gemini CLI com conta Google e o Codex com assinatura do ChatGPT (ou

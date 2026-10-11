@@ -9,6 +9,24 @@ In each version: **Masking** is what started (or stopped) being masked; **Progra
 commands, installation, configuration, performance and documentation; **Code** is what only
 matters to whoever changes the code.
 
+## [Unreleased]
+
+### Program
+
+- The README fits the beta clients in one table, with the exact line for each client and
+  account, and says which ones run in VS Code: the Gemini CLI in the editor's terminal, the
+  Codex extension (the same `config.toml` as the CLI), opencode and Copilot. An extension does
+  not go through the `~/.bashrc` function: run `llm-dlp garantir` once after turning on the
+  machine. The Gemini Code Assist extension is not supported.
+
+### Code
+
+- `llm-dlp simular` replays a subagent file (`subagents/agent-*.jsonl`). Before, every message
+  of it was skipped as a side conversation, and the file gave zero requests and zero
+  problems. A file with nothing to replay now says so.
+- `llm-dlp simular` no longer counts as a different round trip a text that was cut by the
+  fake API (a text just under 4000 bytes that grows when masked).
+
 ## [0.5.0] - 2026-10-11
 
 Subscriptions, **in beta**: the Gemini CLI with a Google account and Codex with a ChatGPT
