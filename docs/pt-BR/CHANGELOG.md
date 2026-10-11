@@ -9,7 +9,10 @@ Em cada versão: **Mascaramento** é o que passou a ser (ou deixou de ser) masca
 **Programa** é comando, instalação, configuração, desempenho e documentação; **Código** é o
 que só interessa a quem mexe no código.
 
-## [Não lançado]
+## [0.3.1] - 2026-10-11
+
+Correções de segurança no próprio programa. Nada muda no que é mascarado. Depois de
+atualizar, feche o Claude Code e rode `llm-dlp parar`.
 
 ### Programa
 

@@ -9,7 +9,10 @@ In each version: **Masking** is what started (or stopped) being masked; **Progra
 commands, installation, configuration, performance and documentation; **Code** is what only
 matters to whoever changes the code.
 
-## [Unreleased]
+## [0.3.1] - 2026-10-11
+
+Security fixes in the program itself. Nothing changes in what is masked. After updating,
+close Claude Code and run `llm-dlp parar`.
 
 ### Program
 
