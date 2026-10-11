@@ -6,24 +6,72 @@
 
 [English](../../README.md) · **Português**
 
-Proxy local que **mascara dado sensível entre você e a LLM**. Hoje funciona com o Claude Code.
+Proxy local que **mascara dado sensível entre você e a LLM**. A API do modelo só vê
+pseudônimos; você, o seu terminal e os arquivos que o agente escreve veem os valores reais.
 
-Você e o seu disco veem tudo real. A API do modelo só vê pseudônimos.
-
-```
-você ─► Claude Code ─► [ llm-dlp ] ─► API da Anthropic
- real       real        mascara ►      só vê pseudônimos
- real   ◄── real    ◄── desmascara ◄── responde com pseudônimos
-```
-
-Exemplo do que acontece com uma mensagem:
+Feito para o **Claude Code** (estável). O Gemini CLI, o opencode e o GitHub Copilot com a sua
+chave também funcionam, **em beta** (ver [Clientes atendidos](#clientes-atendidos)).
 
 ```
-você escreve:   o cliente de cpf 529.982.247-25 (maria.lopes@empresa.com.br) não acessa mysql.empresa.intra
-a API recebe:   o cliente de cpf CPF-irvikcpk (p.k3f9x2ab@d7q2m.invalid) não acessa mysql-x7k2.invalid
-a API responde: verifique se p.k3f9x2ab@d7q2m.invalid tem permissão em mysql-x7k2.invalid
-você lê:        verifique se maria.lopes@empresa.com.br tem permissão em mysql.empresa.intra
+          sua máquina                                             │ internet
+ você ──► Claude Code (ou outro cliente) ──► llm-dlp ── mascara ──►│──► API do modelo
+                                                                  │    (só vê pseudônimos)
+ você ◄── valores reais ◄───────────────── llm-dlp ◄─ desmascara ─│◄── responde com pseudônimos
 ```
+
+## Um exemplo, passo a passo
+
+Você pede ao agente: *"faça um script de backup do banco de clientes; a conexão está no
+`.env`"*.
+
+**1. O agente lê o `.env`.** Este é o arquivo no seu disco:
+
+```bash
+DB_HOST=pg-prd.acme.intra
+DB_NAME=crm_clientes
+DB_USER=app_crm
+DB_PASSWORD=Pr0dS3nha2024
+SUPPORT_EMAIL=maria.lopes@acme.com.br
+```
+
+E isto é o que sai da sua máquina, a única coisa que a API do modelo vê:
+
+```bash
+DB_HOST=hkdzp7s4a.invalid
+DB_NAME=db_nr3b5hpi
+DB_USER=usr_xyxhy7ug
+DB_PASSWORD=SEGREDO-vqxz5dvy
+SUPPORT_EMAIL=p.ouhiojea@ds373.invalid
+```
+
+**2. O modelo responde com os pseudônimos**, porque é só o que ele viu:
+
+```bash
+pg_dump -h hkdzp7s4a.invalid -U usr_xyxhy7ug -d db_nr3b5hpi -f backup.sql
+```
+
+**3. O llm-dlp troca de volta antes de o agente agir.** O script gravado no seu disco, e o
+comando que roda, têm os valores reais:
+
+```bash
+pg_dump -h pg-prd.acme.intra -U app_crm -d crm_clientes -f backup.sql
+```
+
+A resposta que você lê também volta real: *"o backup.sh faz o dump de crm_clientes em
+pg-prd.acme.intra"*.
+
+| Valor real | Pseudônimo | O modelo continua sabendo que é |
+|---|---|---|
+| `pg-prd.acme.intra` | `hkdzp7s4a.invalid` | um servidor (`.invalid` é um domínio que nunca existe: nada pode ser enviado para ele) |
+| `crm_clientes` | `db_nr3b5hpi` | um banco |
+| `app_crm` | `usr_xyxhy7ug` | um usuário |
+| `Pr0dS3nha2024` | `SEGREDO-vqxz5dvy` | uma senha |
+| `maria.lopes@acme.com.br` | `p.ouhiojea@ds373.invalid` | um e-mail |
+| `529.982.247-25` | `CPF-5qwopr5x` | um CPF |
+
+O mesmo valor vira sempre o mesmo pseudônimo, então o modelo continua entendendo que duas
+menções são o mesmo servidor. Os pseudônimos vêm de uma chave secreta que só existe na sua
+máquina. `pg_dump`, `postgresql` e `5432` ficam como estão: nome público não é mascarado.
 
 ## O que ele faz
 
@@ -41,33 +89,35 @@ você lê:        verifique se maria.lopes@empresa.com.br tem permissão em mysq
   dúvida, é mascarado.
 - **Desmascara tudo que volta:** você lê os valores reais; comandos rodam e arquivos são
   gravados com os valores reais.
-- **Mantém a referência:** o mesmo valor vira sempre o mesmo pseudônimo, então o modelo
-  continua entendendo que duas menções são da mesma pessoa, do mesmo servidor, da mesma conta.
 - **Lê imagens e PDFs** (OCR) e cobre de preto o que for sensível.
-- **Outros clientes, em beta:** Gemini CLI, opencode e GitHub Copilot com a sua chave (os
-  formatos do Gemini e da OpenAI), na mesma porta. Ver a tabela abaixo.
 - **Falha fechada:** se o llm-dlp cair ou não souber tratar algo, a mensagem **não sai**. Não
   existe vazamento silencioso.
 - **Não pesa:** uma mensagem custa 5–30 ms, quase não muda o número de tokens e não atrapalha
   o cache da API.
-- **Não exige nada no dia a dia:** sobe sozinho com a sessão e volta sozinho se cair.
+- **Não exige nada no dia a dia** (com o Claude Code): sobe sozinho com a sessão e volta
+  sozinho se cair.
 
-### Clientes atendidos
+## Clientes atendidos
 
-| Cliente | Status | Instalado e travado pelo `llm-dlp instalar` |
+| Cliente | Status | Como é ligado |
 |---|---|---|
-| Claude Code (terminal, VS Code, JetBrains) | **Estável** | Sim |
-| Gemini CLI, opencode, GitHub Copilot com a sua chave | Beta | Não: você o aponta à mão, e ele não tem trava |
+| Claude Code (terminal, VS Code, JetBrains) | **Estável** | Pelo `llm-dlp instalar`, com trava: o Claude Code se recusa a funcionar fora do llm-dlp |
+| Gemini CLI, com chave de API do Gemini | Beta | À mão, no `~/.bashrc` ([como](#gemini-cli-opencode-e-copilot-beta)). Sem trava |
+| opencode, com o provedor `google` | Beta | À mão, no `~/.bashrc` e no `opencode.json`. Sem trava |
+| GitHub Copilot CLI e VS Code, com a sua chave | Beta | À mão. Sem trava |
 
 > [!WARNING]
-> Nos clientes em beta, a proteção só vale enquanto o endereço do cliente apontar para o
-> llm-dlp: nada impede o cliente de falar direto com a API, e nada avisa. Ver
-> [Outros clientes e APIs (beta)](configuracao.md#outros-clientes-e-apis-beta).
+> **Os clientes em beta não têm trava.** A proteção vale enquanto o endereço do cliente
+> apontar para o llm-dlp: se deixar de apontar (uma linha apagada, outro tipo de conta, outro
+> provedor), o cliente fala direto com a API, sem máscara, e nada avisa. Beta pode mudar numa
+> versão MENOR. Detalhes: [Outros clientes e APIs (beta)](configuracao.md#outros-clientes-e-apis-beta).
 
 ## Instalação
 
 Funciona em qualquer Linux, inclusive WSL no Windows. Não precisa clonar o repositório nem
-instalar o Go:
+instalar o Go.
+
+### 1. Instale o llm-dlp (igual para todos os clientes)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/yurivenancio30/llm-dlp/main/install.sh | sh
@@ -113,53 +163,124 @@ git clone https://github.com/yurivenancio30/llm-dlp.git && cd llm-dlp && make bu
 
 </details>
 
-O `instalar` faz tudo, em 5 passos, perguntando o que precisa:
+O `instalar` pergunta o que precisa, em 5 passos (responda `s` para sim, `n` para não):
 
 | Passo | O que acontece | Você responde |
 |---|---|---|
-| 1. Programa | Copia o llm-dlp para `~/.local/bin` | Nada |
-| 2. Configuração | Cria `~/.config/llm-dlp` com a configuração e a chave secreta | O domínio interno, que aparece no nome dos servidores (ex.: `empresa`, para `mysql.empresa.intra`), e os nomes que nunca podem sair (empresa, cliente, projetos). E-mails são mascarados sempre |
+| 1. Programa | Copia o llm-dlp para `~/.local/bin` | Nada. Se ele avisar que `~/.local/bin` não está no seu PATH, acrescente `export PATH="$HOME/.local/bin:$PATH"` ao `~/.bashrc` |
+| 2. Configuração | Cria `~/.config/llm-dlp` com a configuração e a chave secreta | O domínio interno, que aparece no nome dos servidores (ex.: `acme`, para `pg-prd.acme.intra`), e os nomes que nunca podem sair (empresa, cliente, projetos). E-mails são mascarados sempre |
 | 3. OCR | Instala o tesseract e o poppler, se faltarem | Sim e a senha do `sudo` |
-| 4. Claude Code | Liga o Claude Code ao llm-dlp (com backup do `~/.claude/settings.json`) | Sim |
-| 5. Trava | Faz o Claude Code se recusar a funcionar fora do llm-dlp | Sim e a senha do `sudo` |
+| 4. Claude Code | Liga o Claude Code ao llm-dlp (com backup do `~/.claude/settings.json`) | **Sim, se você usa o Claude Code; senão, não** |
+| 5. Trava | Faz o Claude Code se recusar a funcionar fora do llm-dlp | **Sim, se você usa o Claude Code** (e a senha do `sudo`); pulado nos outros casos |
 
-No fim, ele mostra um resumo com ✓ e ✗. Se algo ficar com ✗, é só rodar
-`llm-dlp instalar` de novo: ele pula o que já está pronto.
+No fim, ele mostra um resumo. ✓ é feito, ✗ é o que falta (rode `llm-dlp instalar` de novo:
+ele pula o que já está pronto) e – é o que você escolheu não configurar.
 
-Depois, feche e abra o Claude Code (no VS Code, recarregue a janela).
+### 2. Ligue o seu cliente
 
-**Os passos 4 e 5 são só do Claude Code.** Se você usa um cliente em beta (Gemini CLI,
-opencode, Copilot ou outro), a instalação não o aponta para o llm-dlp nem o trava: você mesmo põe o endereço
-no cliente, e nada impede o cliente de falar direto com a API se esse endereço for tirado.
-Veja o que está e o que não está coberto em
-[Outros clientes e APIs (beta)](configuracao.md#outros-clientes-e-apis-beta).
+#### Claude Code (estável)
+
+Os passos 4 e 5 fizeram tudo. Feche e abra o Claude Code (no VS Code, recarregue a janela) e
+confira com `llm-dlp status`.
+
+#### Gemini CLI, opencode e Copilot (beta)
+
+> [!WARNING]
+> Beta, e sem trava: leia o aviso em [Clientes atendidos](#clientes-atendidos).
+
+O `llm-dlp instalar` não mexe nesses clientes. Para cada um, você acrescenta ao `~/.bashrc`:
+
+- **o endereço do llm-dlp** no lugar do endereço da API do cliente;
+- **uma função com o nome do cliente** que sobe o llm-dlp (`llm-dlp garantir`) antes de abrir
+  o cliente. Só o Claude Code sobe o llm-dlp sozinho: sem a função, depois de reiniciar a
+  máquina o cliente recebe "conexão recusada". Nada vaza, mas não funciona.
+
+**Gemini CLI.** Só com **chave de API** do Gemini (do Google AI Studio). Com *Login with
+Google* ou Vertex AI, o Gemini CLI fala com outra API do Google, que o llm-dlp não lê: **a
+conversa sai sem máscara**.
+
+```bash
+# ~/.bashrc
+export GEMINI_API_KEY="sua-chave"
+export GOOGLE_GEMINI_BASE_URL=http://127.0.0.1:8787/gemini
+gemini() { llm-dlp garantir && command gemini "$@"; }
+```
+
+E, no `~/.gemini/settings.json`, escolha a chave de API (ou escolha *Use Gemini API Key* na
+primeira vez que ele abrir):
+
+```json
+{ "security": { "auth": { "selectedType": "gemini-api-key" } } }
+```
+
+**opencode**, com o provedor `google`:
+
+```bash
+# ~/.bashrc
+export GOOGLE_GENERATIVE_AI_API_KEY="sua-chave"
+opencode() { llm-dlp garantir && command opencode "$@"; }
+```
+
+```json
+// ~/.config/opencode/opencode.json
+{ "provider": { "google": { "options": { "baseURL": "http://127.0.0.1:8787/gemini/v1beta" } } } }
+```
+
+Só o provedor apontado ali passa pelo llm-dlp. Se você trocar o opencode para outro provedor,
+aponte esse também.
+
+**GitHub Copilot CLI**, só com a sua chave (OpenAI ou xAI). Os modelos que o GitHub hospeda e
+as sugestões enquanto você digita não passam pelo llm-dlp.
+
+```bash
+# ~/.bashrc
+export COPILOT_PROVIDER_BASE_URL=http://127.0.0.1:8787/openai/v1    # xAI (Grok): .../xai/v1
+export COPILOT_PROVIDER_API_KEY="sua-chave"
+export COPILOT_MODEL="nome-do-modelo"
+copilot() { llm-dlp garantir && command copilot "$@"; }
+```
+
+Copilot no VS Code e outros clientes: [Cliente por cliente](configuracao.md#cliente-por-cliente).
+
+**Confira se está protegido.** Abra um terminal novo (ou rode `source ~/.bashrc`), mande uma
+mensagem pelo cliente e rode `llm-dlp ultima`: ele tem de mostrar essa mensagem, com os
+pseudônimos. Se disser *"Ainda não passou nenhuma mensagem"*, o cliente não está passando pelo
+llm-dlp: confira o endereço.
+
+As linhas do Gemini CLI e do opencode acima foram seguidas como estão numa máquina limpa (uma
+pasta pessoal nova): o agente leu um arquivo com um e-mail e um IP e escreveu outro; a API só
+recebeu os pseudônimos e o arquivo saiu com os valores reais.
 
 ### Atualizar para uma versão nova
 
 1. Rode de novo o comando de instalação de cima. Ele troca o programa e pula o que já está
    pronto; a sua configuração e a sua chave não mudam.
-2. Feche o Claude Code (todas as janelas) e rode `llm-dlp parar`. O que está no ar só é
-   trocado quando o processo antigo para.
-3. Abra o Claude Code e confira com `llm-dlp status`.
+2. Feche o seu cliente (no Claude Code, todas as janelas) e rode `llm-dlp parar`. O que está
+   no ar só é trocado quando o processo antigo para.
+3. Abra o cliente de novo (num cliente em beta, a função sobe a versão nova) e confira com
+   `llm-dlp status`.
 
 O que mudou em cada versão está no [CHANGELOG.md](CHANGELOG.md). Depois de
 atualizar, a primeira mensagem de cada conversa regrava o cache da API uma vez.
 
 ## No dia a dia
 
-Não há nada para rodar. O llm-dlp sobe ao abrir uma sessão e volta sozinho se cair.
+Com o Claude Code, não há nada para rodar: o llm-dlp sobe ao abrir uma sessão e volta sozinho
+se cair. Num cliente em beta, a função do `~/.bashrc` o sobe quando você abre o cliente, e daí
+em diante ele também volta sozinho.
 
 | Situação | O que acontece / o que fazer |
 |---|---|
 | Quero ver se está tudo certo | `llm-dlp status` |
+| Quero ver o que a API recebeu | `llm-dlp ultima` (as últimas mensagens, com os pseudônimos) |
 | Quero saber qual versão tenho | `llm-dlp versao` (o que mudou em cada uma: [CHANGELOG.md](CHANGELOG.md)) |
 | O llm-dlp caiu | Volta sozinho em ~1 s. Enquanto estiver fora, nenhuma mensagem sai |
 | Ele não volta, e preciso do Claude para consertar | `sudo llm-dlp emergencia 30m` libera o Claude **sem máscara** por tempo limitado. Use uma sessão nova, sem dados de cliente. Volta ao normal no fim do prazo, ou com `sudo llm-dlp emergencia sair`. Cada mensagem mostra um aviso |
-| A imagem ou o PDF não chegou ao Claude | Falta o OCR: o Claude avisa na resposta, e o `llm-dlp status` mostra o comando de instalação. Depois de instalar, mande o arquivo de novo |
+| A imagem ou o PDF não chegou ao modelo | Falta o OCR: o modelo avisa na resposta, e o `llm-dlp status` mostra o comando de instalação. Depois de instalar, mande o arquivo de novo |
 | A mensagem foi barrada: "não provou ser o seu llm-dlp" | Você acabou de atualizar e o processo antigo ainda está no ar: feche o Claude Code e rode `llm-dlp parar`. Se não atualizou, outro programa está usando a porta |
 | Mudei o `config.json` | `llm-dlp parar` (ele volta na próxima mensagem, com a configuração nova) |
 | Quero ver o que foi feito em cada mensagem | `~/.config/llm-dlp/llm-dlp.log` (só contagens e tempos, nunca valores) |
-| Quero desfazer tudo | `llm-dlp desinstalar` (e `sudo llm-dlp desinstalar-trava`, se instalou a trava). Depois, feche e abra o Claude Code e rode `llm-dlp parar` |
+| Quero desfazer tudo | `llm-dlp desinstalar` (e `sudo llm-dlp desinstalar-trava`, se instalou a trava). Depois, feche e abra o Claude Code e rode `llm-dlp parar`. Num cliente em beta, tire também as linhas dele do `~/.bashrc` (e do `opencode.json`) |
 
 ## Mais detalhes
 

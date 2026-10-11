@@ -9,6 +9,23 @@ Em cada versão: **Mascaramento** é o que passou a ser (ou deixou de ser) masca
 **Programa** é comando, instalação, configuração, desempenho e documentação; **Código** é o
 que só interessa a quem mexe no código.
 
+## [Não lançado]
+
+### Programa
+
+- O README explica como ligar cada cliente. A instalação fica dividida em instalar o llm-dlp
+  (igual para todos) e ligar o seu cliente: o Claude Code (passos 4 e 5) ou os clientes em
+  beta, com as linhas do `~/.bashrc` (o endereço do cliente e uma função que sobe o llm-dlp
+  antes de abri-lo). Também diz que o Gemini CLI só passa pelo llm-dlp com chave de API: com
+  *Login with Google* ele fala com outra API, sem máscara. Esses passos foram seguidos como
+  estão escritos numa pasta pessoal limpa, com o Gemini CLI e o opencode.
+- O exemplo do topo do README passa a ir passo a passo: o arquivo que o agente lê, o que a
+  API recebe, o que o modelo escreve e o que é gravado no seu disco, com uma tabela de como
+  ler cada pseudônimo.
+- O `llm-dlp instalar` diz que os passos 4 e 5 são só do Claude Code. Quem responde não deixa
+  de receber um ✗ mandando refazer esses passos: o resumo os mostra como não configurados (–)
+  e aponta para o README.
+
 ## [0.4.0] - 2026-10-11
 
 Outros clientes e APIs, **em beta**: a API do Gemini e o formato Chat Completions da OpenAI,

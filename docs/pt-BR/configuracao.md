@@ -80,9 +80,13 @@ não têm trava.
 | O que sai é mascarado e o que volta é desmascarado (texto, chamadas e resultados de ferramenta, arquivos que o agente escreve, imagens e PDFs) | Sim | Sim, o mesmo motor |
 | `llm-dlp ultima` e o log | Sim | Sim |
 | Apontado para o llm-dlp pelo `llm-dlp instalar` | Sim (passo 4) | **Não.** Você põe o endereço no cliente, como nas tabelas abaixo |
-| O llm-dlp sobe sozinho | Sim, ao abrir uma sessão | **Não.** Rode `llm-dlp garantir` antes de usar o cliente. Se o llm-dlp não estiver no ar, o cliente recebe "conexão recusada" e nada sai |
+| O llm-dlp sobe sozinho | Sim, ao abrir uma sessão | **Não.** Uma função no `~/.bashrc` roda `llm-dlp garantir` antes de abrir o cliente ([README](README.md#gemini-cli-opencode-e-copilot-beta)). Sem ela, se o llm-dlp não estiver no ar, o cliente recebe "conexão recusada" e nada sai |
+| Tipos de conta que passam pelo llm-dlp | Todos (o Claude Code fala sempre com a API da Anthropic) | **Só chave de API.** O Gemini CLI com *Login with Google* ou Vertex AI, e o Copilot com os modelos que o GitHub hospeda, falam com outros servidores e saem **sem máscara** |
 | Conferência a cada mensagem (o llm-dlp está no ar, é da versão certa e prova que é ele) | Sim | **Não** |
 | Trava: o cliente se recusa a funcionar fora do llm-dlp | Sim (passo 5) | **Não.** Se o endereço for tirado da configuração do cliente, ele fala direto com a API, sem máscara, e nada avisa |
+
+O passo a passo, com as linhas do `~/.bashrc`, está no
+[README](README.md#gemini-cli-opencode-e-copilot-beta).
 
 Em resumo: com outro cliente, a proteção vale enquanto o endereço dele apontar para o llm-dlp.
 Confira com `llm-dlp ultima` depois da primeira mensagem: ele tem de mostrar a sua conversa,
@@ -109,8 +113,8 @@ for o provedor.
 
 | Cliente | Como apontar | Como foi conferido |
 |---|---|---|
-| Gemini CLI | `export GOOGLE_GEMINI_BASE_URL=http://127.0.0.1:8787/gemini` | Rodando (0.63.0), API de verdade |
-| opencode (provedor `google`) | No `opencode.json`: `"provider": {"google": {"options": {"baseURL": "http://127.0.0.1:8787/gemini/v1beta"}}}` | Rodando (1.19.0), API de verdade |
+| Gemini CLI, com chave de API | `export GOOGLE_GEMINI_BASE_URL=http://127.0.0.1:8787/gemini` e `GEMINI_API_KEY`, com a chave escolhida no `~/.gemini/settings.json` (`"security": {"auth": {"selectedType": "gemini-api-key"}}`). Sem essa escolha ele para com "Invalid auth method selected" | Rodando (0.63.0), API de verdade, seguindo o README numa pasta pessoal limpa |
+| opencode (provedor `google`) | No `opencode.json`: `"provider": {"google": {"options": {"baseURL": "http://127.0.0.1:8787/gemini/v1beta"}}}`, e a chave em `GOOGLE_GENERATIVE_AI_API_KEY` | Rodando (1.19.0), API de verdade, seguindo o README numa pasta pessoal limpa |
 | GitHub Copilot CLI, com a sua chave | `export COPILOT_PROVIDER_BASE_URL=http://127.0.0.1:8787/openai/v1` (ou `/xai/v1`, ou outro endereço da tabela acima), mais `COPILOT_PROVIDER_API_KEY` e `COPILOT_MODEL` | Rodando (1.0.95), API de verdade, com a ressalva abaixo |
 | GitHub Copilot no VS Code, com a sua chave | "Chat: Manage Language Models" > "Custom Endpoint". No `url` do modelo: `http://127.0.0.1:8787/openai/v1/chat/completions` (tipo de API Chat Completions) ou `http://127.0.0.1:8787/v1/messages` (tipo de API Messages) | **Não conferido.** Segue a documentação do VS Code; o formato é o mesmo do Copilot CLI |
 | SDKs do Google (`google-genai`) | A opção de endereço base (`http_options.base_url` / `httpOptions.baseUrl`) com `http://127.0.0.1:8787/gemini` | **Não conferido** com uma SDK rodando |

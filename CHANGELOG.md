@@ -9,6 +9,23 @@ In each version: **Masking** is what started (or stopped) being masked; **Progra
 commands, installation, configuration, performance and documentation; **Code** is what only
 matters to whoever changes the code.
 
+## [Unreleased]
+
+### Program
+
+- The README explains how to connect each client. Installation is split into installing
+  llm-dlp (the same for everyone) and connecting your client: Claude Code (steps 4 and 5) or
+  the beta clients, with the lines for `~/.bashrc` (the client's address and a function that
+  starts llm-dlp before opening it). It also says that the Gemini CLI only goes through
+  llm-dlp with an API key: with *Login with Google* it talks to another API, unmasked. These
+  steps were followed as written on a clean home folder, with the Gemini CLI and opencode.
+- The example at the top of the README now goes step by step: the file the agent reads, what
+  the API receives, what the model writes and what is saved on your disk, with a table of
+  how to read each pseudonym.
+- `llm-dlp instalar` says that steps 4 and 5 are only for Claude Code. Whoever answers no
+  no longer gets a ✗ telling them to run those steps again: the summary shows them as not set
+  up (–) and points to the README.
+
 ## [0.4.0] - 2026-10-11
 
 Other clients and APIs, **in beta**: the Gemini API and the OpenAI Chat Completions format,
