@@ -7,6 +7,40 @@ import (
 	"testing"
 )
 
+// A mesma pessoa escrita em caixas diferentes volta cada uma como estava: o relatório que o
+// modelo escreve com "MARIA DA SILVA" não grava "Maria da Silva" (e um Edit com old_string em
+// maiúsculas ainda casa com o arquivo). Caso tirado da forma de 7 escritas que voltavam
+// diferentes numa sessão real (os nomes aqui são inventados).
+func TestPessoaVoltaComACaixaDeCadaGrafia(t *testing.T) {
+	const texto = `[{"nome_cliente": "Maria da Silva", "cidade": "Recife"},` + "\n" +
+		` {"nome_cliente": "MARIA DA SILVA", "cidade": "Recife"},` + "\n" +
+		` {"nome_cliente": "maria da silva", "cidade": "Recife"},` + "\n" +
+		` {"nome_cliente": "João Pereira Santos", "cidade": "Natal"},` + "\n" +
+		` {"nome_cliente": "JOÃO PEREIRA SANTOS", "cidade": "Natal"}]`
+	var corpos [][]byte
+	px := montarMem(t, t.TempDir(), &corpos, func(corpo []byte, w http.ResponseWriter) {
+		var req struct {
+			Messages []struct {
+				Content string `json:"content"`
+			} `json:"messages"`
+		}
+		json.Unmarshal(corpo, &req)
+		w.Header().Set("content-type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"type": "message", "role": "assistant",
+			"content": []any{map[string]any{"type": "text", "text": req.Messages[len(req.Messages)-1].Content}}})
+	})
+	volta, _ := enviarLer(t, px, false, []any{msg("user", texto)})
+	corpo := string(corpos[len(corpos)-1])
+	for _, real := range []string{"Maria da Silva", "MARIA DA SILVA", "maria da silva", "João Pereira Santos", "JOÃO PEREIRA SANTOS"} {
+		if strings.Contains(corpo, real) {
+			t.Errorf("%q saiu em claro", real)
+		}
+	}
+	if volta != texto {
+		t.Errorf("a volta mudou a caixa:\n quer %q\n veio %q", texto, volta)
+	}
+}
+
 // O lado de lá: uma coluna que é palavra comum ("status", "valor") não mascara a palavra maior
 // que a contém ("user_status" no código): só nome com cara de identificador vale por pedaço.
 func TestPalavraComumNaoMascaraPalavraMaior(t *testing.T) {

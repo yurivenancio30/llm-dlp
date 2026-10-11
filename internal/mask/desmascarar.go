@@ -73,6 +73,18 @@ func NovaTabela(entradas []Entrada) *Tabela {
 			t.ipPref[f] = r
 		}
 	}
+	// as outras caixas do pseudônimo de uma pessoa, depois de todas as grafias que apareceram:
+	// a variante nunca toma o lugar de uma grafia real ("Maria da Silva" fica como estava)
+	for _, e := range entradas {
+		if e.Tipo != "nome" || conflito[e.Pseudo] {
+			continue
+		}
+		for _, v := range variantesNome(e.Pseudo, e.Real) {
+			if _, ok := t.m[v.Pseudo]; !ok {
+				t.m[v.Pseudo], t.tipo[v.Pseudo] = v.Real, v.Tipo
+			}
+		}
+	}
 	for p := range conflito {
 		delete(t.m, p)
 	}

@@ -224,12 +224,13 @@ func TestDetectoresExtras(t *testing.T) {
 func TestNomeQualquerGrafia(t *testing.T) {
 	m := novoTeste(t)
 	for _, s := range []string{"falei com joão silva ontem", "o JOAO CARLOS SILVA saiu", "Joao Carlos Silva", "ana paula souza aprovou"} {
-		if out, _ := m.Mascarar(s); !strings.Contains(out, "Pessoa ") {
+		// o pseudônimo segue a caixa do nome: Pessoa, PESSOA ou pessoa
+		if out, _ := m.Mascarar(s); !strings.Contains(strings.ToLower(out), "pessoa ") {
 			t.Errorf("nome não mascarado em %q: %q", s, out)
 		}
 	}
 	// palavras comuns que não são nome importado continuam intactas
-	if out, _ := m.Mascarar("a silva e souza são sobrenomes comuns"); strings.Contains(out, "Pessoa ") {
+	if out, _ := m.Mascarar("a silva e souza são sobrenomes comuns"); strings.Contains(strings.ToLower(out), "pessoa ") {
 		t.Errorf("falso positivo: %q", out)
 	}
 }

@@ -18,7 +18,7 @@ var usuarioComum = map[string]bool{"root": true, "admin": true, "administrator":
 	"sys": true, "sysadmin": true, "guest": true, "nobody": true, "www-data": true, "default": true, "anonymous": true, "public": true, "git": true,
 	"docker": true, "oracle": true, "hadoop": true, "spark": true, "hive": true, "kafka": true, "jenkins": true, "claude": true, "assistant": true}
 
-var rePseudoPronto = regexp.MustCompile(`^(?:[A-Z:]+-[a-z2-7]{8}|Pessoa [a-z2-7]{8}|\S+\.invalid)$`)
+var rePseudoPronto = regexp.MustCompile(`^(?:[A-Z:]+-[a-z2-7]{8}|[Pp]essoa [a-z2-7]{8}|PESSOA [A-Z2-7]{8}|\S+\.invalid)$`)
 
 // marcar aplica valorDoCampo ao trecho s[ini:fim] e registra o achado. Num campo de nome,
 // "Fulano de Tal / Beltrana Souza" são duas pessoas: cada parte é um achado.

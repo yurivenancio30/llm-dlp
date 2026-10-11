@@ -104,7 +104,7 @@ func TestCodigoDePessoaImportada(t *testing.T) {
 		t.Fatalf("código importado passou: %s", out)
 	}
 	i := strings.Index(out, "USUARIO-")
-	if i < 0 || !strings.Contains(out, "Pessoa "+out[i+8:i+16]) {
+	if i < 0 || !strings.Contains(strings.ToLower(out), "pessoa "+out[i+8:i+16]) { // o nome em maiúsculas: PESSOA ID
 		t.Errorf("código e nome da mesma pessoa sem o mesmo id: %s", out)
 	}
 }

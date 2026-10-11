@@ -121,6 +121,14 @@ func (m *Masker) Pseudonimo(tipo, real string) string {
 		if pid == "" {
 			pid = m.p.ID("nome", NormNome(real))
 		}
+		// a mesma pessoa, com a caixa da grafia ("MARIA SILVA", "maria silva"): a volta devolve
+		// cada grafia como estava (ver variantesNome)
+		switch caixaNome(real) {
+		case 'A':
+			return "PESSOA " + strings.ToUpper(pid)
+		case 'a':
+			return "pessoa " + pid
+		}
 		return "Pessoa " + pid
 	case "ip":
 		a := netip.MustParseAddr(real).As4()
@@ -155,6 +163,49 @@ func (m *Masker) Pseudonimo(tipo, real string) string {
 		rot := strings.TrimPrefix(strings.TrimPrefix(tipo, "x:"), "t:")
 		return strings.ToUpper(rot) + "-" + m.p.ID(tipo, NormNome(real))
 	}
+}
+
+// caixaNome: 'A' para nome todo em maiúsculas, 'a' para todo em minúsculas, 'M' para o resto.
+func caixaNome(s string) byte {
+	switch {
+	case strings.ToUpper(s) == s && strings.ToLower(s) != s:
+		return 'A'
+	case strings.ToLower(s) == s && strings.ToUpper(s) != s:
+		return 'a'
+	}
+	return 'M'
+}
+
+// conectivosNome: as palavras que ficam minúsculas num nome com as iniciais maiúsculas.
+var conectivosNome = conj("da", "das", "de", "do", "dos", "e", "del", "di", "du", "van", "von")
+
+// variantesNome: as outras caixas do pseudônimo de uma pessoa (o modelo pode reescrever a
+// caixa, como faz com os nomes de objeto), com o nome real na mesma caixa.
+func variantesNome(ps, real string) []Entrada {
+	i := strings.IndexByte(ps, ' ')
+	if i < 0 {
+		return nil
+	}
+	pid := strings.ToLower(ps[i+1:])
+	iniciais := strings.Fields(strings.ToLower(real))
+	for k, w := range iniciais {
+		if k == 0 || !conectivosNome[w] {
+			r := []rune(w)
+			r[0] = []rune(strings.ToUpper(string(r[0])))[0]
+			iniciais[k] = string(r)
+		}
+	}
+	var out []Entrada
+	for _, v := range []Entrada{
+		{"PESSOA " + strings.ToUpper(pid), strings.ToUpper(real), "nome"},
+		{"pessoa " + pid, strings.ToLower(real), "nome"},
+		{"Pessoa " + pid, strings.Join(iniciais, " "), "nome"},
+	} {
+		if v.Pseudo != ps {
+			out = append(out, v)
+		}
+	}
+	return out
 }
 
 func (m *Masker) emailLiberado(e string) bool {
