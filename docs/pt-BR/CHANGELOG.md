@@ -9,7 +9,13 @@ Em cada versão: **Mascaramento** é o que passou a ser (ou deixou de ser) masca
 **Programa** é comando, instalação, configuração, desempenho e documentação; **Código** é o
 que só interessa a quem mexe no código.
 
-## [Não lançado]
+## [0.4.0] - 2026-10-11
+
+Outros clientes e APIs, **em beta**: a API do Gemini e o formato Chat Completions da OpenAI,
+para o Gemini CLI, o opencode e o GitHub Copilot com a sua chave. O Claude Code segue o único
+cliente estável, e nada muda no que é mascarado para ele. Os clientes em beta são apontados à
+mão e não têm trava: leia [Outros clientes e APIs (beta)](configuracao.md#outros-clientes-e-apis-beta)
+antes de usá-los. Depois de atualizar, feche o Claude Code e rode `llm-dlp parar`.
 
 ### Programa
 

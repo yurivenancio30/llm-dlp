@@ -9,7 +9,13 @@ In each version: **Masking** is what started (or stopped) being masked; **Progra
 commands, installation, configuration, performance and documentation; **Code** is what only
 matters to whoever changes the code.
 
-## [Unreleased]
+## [0.4.0] - 2026-10-11
+
+Other clients and APIs, **in beta**: the Gemini API and the OpenAI Chat Completions format,
+for the Gemini CLI, opencode and GitHub Copilot with your own key. Claude Code stays the only
+stable client, and nothing changes in what is masked for it. Beta clients are pointed by hand
+and have no lock: read [Other clients and APIs (beta)](docs/configuration.md#other-clients-and-apis-beta)
+before using them. After updating, close Claude Code and run `llm-dlp parar`.
 
 ### Program
 
