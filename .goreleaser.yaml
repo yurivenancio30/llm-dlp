@@ -42,9 +42,12 @@ checksum:
 snapshot:
   version_template: "{{ .Version }}-next"
 
-# as notas da release são a seção da versão no CHANGELOG.md (--release-notes), não a lista de commits
+# As notas da release são a seção da versão no CHANGELOG.md, que o workflow passa com
+# --release-notes (scripts/notas-da-versao.sh). O passo "changelog" do GoReleaser é quem lê esse
+# arquivo: com "disable: true" ele é pulado e a release sai com as notas vazias (aconteceu na
+# 0.2.1 e na 0.3.0). Sem --release-notes, ele listaria os commits.
 changelog:
-  disable: true
+  use: git
 
 release:
   name_template: "llm-dlp {{ .Version }}"

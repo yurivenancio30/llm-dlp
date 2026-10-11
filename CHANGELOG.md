@@ -9,6 +9,16 @@ In each version: **Masking** is what started (or stopped) being masked; **Progra
 commands, installation, configuration, performance and documentation; **Code** is what only
 matters to whoever changes the code.
 
+## [Unreleased]
+
+### Program
+
+- **Release notes on GitHub:** the releases 0.2.1 and 0.3.0 were published with empty notes
+  (a GoReleaser setting skipped the step that reads them). The notes are the section of the
+  version in this file again, now with each paragraph on one line, links that work from the
+  release page and the install command at the end. A release without notes fails the
+  workflow.
+
 ## [0.3.0] - 2026-10-11
 
 A conversation no longer gets stuck: neither on 429 after an update, nor on an image that

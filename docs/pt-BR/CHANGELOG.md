@@ -9,6 +9,16 @@ Em cada versão: **Mascaramento** é o que passou a ser (ou deixou de ser) masca
 **Programa** é comando, instalação, configuração, desempenho e documentação; **Código** é o
 que só interessa a quem mexe no código.
 
+## [Não lançado]
+
+### Programa
+
+- **Notas da release no GitHub:** as releases 0.2.1 e 0.3.0 foram publicadas com as notas
+  vazias (uma configuração do GoReleaser pulava o passo que as lê). As notas voltam a ser a
+  seção da versão neste arquivo (a versão em inglês), agora com cada parágrafo numa linha
+  só, links que funcionam na página da release e o comando de instalação no fim. Release
+  sem notas faz o workflow falhar.
+
 ## [0.3.0] - 2026-10-11
 
 A conversa não fica mais presa: nem em 429 depois de uma atualização, nem numa imagem que

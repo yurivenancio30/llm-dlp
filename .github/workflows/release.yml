@@ -37,3 +37,12 @@ jobs:
           args: release --clean --release-notes ${{ runner.temp }}/notas.md
         env:
           GITHUB_TOKEN: ${{ github.token }}
+      # a 0.2.1 e a 0.3.0 saíram com as notas vazias sem ninguém notar: uma release sem notas falha aqui
+      - name: a release saiu com as notas
+        run: |
+          test -n "$(gh release view "v$VERSAO" --json body -q .body)" && exit 0
+          echo "a release v$VERSAO saiu sem notas; gravando as do CHANGELOG"
+          gh release edit "v$VERSAO" --notes-file "$RUNNER_TEMP/notas.md"
+          exit 1
+        env:
+          GH_TOKEN: ${{ github.token }}
