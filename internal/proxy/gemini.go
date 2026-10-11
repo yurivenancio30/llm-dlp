@@ -353,7 +353,7 @@ func (g *voltaGemini) pedaco(resp map[string]any, fim bool) {
 				// outra coisa depois de texto: o bloco de texto acabou
 				texto(g.soltar(i))
 				if fm, _ := fc.(map[string]any); fm != nil {
-					if nome, _ := fm["name"].(string); !g.p.cfg.SemDesmascarar(nome) {
+					if nome, _ := fm["name"].(string); !g.p.semDesmascararPonte(nome) {
 						fm["args"] = registrarTudo(fm["args"], func(s string) string { return g.p.m.RegistrarResposta(s, g.tab) })
 					}
 				}

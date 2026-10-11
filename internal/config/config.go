@@ -26,8 +26,9 @@ type Termo struct {
 type Provedor struct {
 	// Para onde a requisição vai, sem o "/<nome>".
 	Upstream string `json:"upstream"`
-	// Como ler a requisição e a resposta: "gemini" ou "anthropic". Outro valor: modo genérico
-	// (todo texto da requisição é mascarado, e a resposta em streaming não é desmascarada).
+	// Como ler a requisição e a resposta: "gemini", "openai" (Chat Completions) ou "anthropic".
+	// Outro valor: modo genérico (todo texto da requisição é mascarado, e a resposta em streaming
+	// não é desmascarada). Um caminho terminado em /chat/completions é sempre lido como "openai".
 	Formato string `json:"formato"`
 }
 
@@ -126,6 +127,8 @@ type OCR struct {
 func ProvedoresPadrao() map[string]Provedor {
 	return map[string]Provedor{
 		"gemini": {Upstream: "https://generativelanguage.googleapis.com", Formato: "gemini"},
+		"openai": {Upstream: "https://api.openai.com", Formato: "openai"},
+		"xai":    {Upstream: "https://api.x.ai", Formato: "openai"},
 	}
 }
 
@@ -144,8 +147,7 @@ func Padrao() Config {
 		DocumentosSemContexto: true,
 		OCR: OCR{Modo: "mascarar", Tesseract: "tesseract", PDFToText: "pdftotext", PDFToPPM: "pdftoppm",
 			Idioma: "por", Env: map[string]string{}, MaxPaginas: 30},
-		// as do Claude Code e as de mesmo papel no Gemini CLI e no opencode
-		FerramentasSemDesmascarar: []string{"WebFetch", "WebSearch", "web_fetch", "google_web_search", "webfetch", "websearch"},
+		FerramentasSemDesmascarar: []string{"WebFetch", "WebSearch"},
 	}
 }
 

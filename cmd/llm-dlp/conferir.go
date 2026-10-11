@@ -56,29 +56,120 @@ func ultima(args []string) error {
 	if resp.StatusCode == http.StatusForbidden {
 		return errors.New("o llm-dlp no ar não aceitou a prova: ele é de outra versão ou usa outra chave (rode llm-dlp status)")
 	}
+	corpo, _ := io.ReadAll(resp.Body)
+	msgs := mensagensDaUltima(corpo)
+	if len(msgs) == 0 {
+		fmt.Println("Ainda não passou nenhuma mensagem desde que o llm-dlp subiu.")
+		return nil
+	}
+	if n > len(msgs) {
+		n = len(msgs)
+	}
+	fmt.Printf("Últimas %d de %d mensagens, como a API recebeu (os pseudônimos estão no lugar dos valores reais):\n", n, len(msgs))
+	for _, m := range msgs[len(msgs)-n:] {
+		for _, t := range m.textos {
+			if len(t) > 3000 {
+				t = t[:3000] + fmt.Sprintf("\n… (mais %d caracteres)", len(t)-3000)
+			}
+			fmt.Printf("\n── %s ──\n%s\n", m.papel, t)
+		}
+	}
+	return nil
+}
+
+// mensagemVista: uma mensagem da última requisição, com os textos que "llm-dlp ultima" mostra.
+type mensagemVista struct {
+	papel  string
+	textos []string
+}
+
+// mensagensDaUltima lê as mensagens da última requisição mascarada, no formato da Anthropic
+// (messages) ou do Gemini (contents).
+func mensagensDaUltima(corpo []byte) []mensagemVista {
 	var req struct {
 		Messages []struct {
 			Role    string `json:"role"`
 			Content any    `json:"content"`
+			// formato da OpenAI: as chamadas de ferramenta ficam fora do conteúdo
+			ToolCalls []struct {
+				Function struct {
+					Name      string `json:"name"`
+					Arguments string `json:"arguments"`
+				} `json:"function"`
+			} `json:"tool_calls"`
 		} `json:"messages"`
+		Contents []struct {
+			Role  string `json:"role"`
+			Parts []any  `json:"parts"`
+		} `json:"contents"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&req); err != nil || len(req.Messages) == 0 {
-		fmt.Println("Ainda não passou nenhuma mensagem desde que o llm-dlp subiu.")
+	if json.Unmarshal(corpo, &req) != nil {
 		return nil
 	}
-	if n > len(req.Messages) {
-		n = len(req.Messages)
+	var out []mensagemVista
+	for _, m := range req.Messages {
+		ts := textosDoConteudo(m.Content)
+		for _, tc := range m.ToolCalls {
+			ts = append(ts, fmt.Sprintf("[ferramenta %s] %s", tc.Function.Name, tc.Function.Arguments))
+		}
+		out = append(out, mensagemVista{m.Role, ts})
 	}
-	fmt.Printf("Últimas %d de %d mensagens, como a API recebeu (os pseudônimos estão no lugar dos valores reais):\n", n, len(req.Messages))
-	for _, m := range req.Messages[len(req.Messages)-n:] {
-		for _, t := range textosDoConteudo(m.Content) {
-			if len(t) > 3000 {
-				t = t[:3000] + fmt.Sprintf("\n… (mais %d caracteres)", len(t)-3000)
+	for _, c := range req.Contents {
+		out = append(out, mensagemVista{c.Role, textosDasPartes(c.Parts)})
+	}
+	return out
+}
+
+// textosDasPartes devolve os textos de uma mensagem do Gemini (texto, chamada e resultado de
+// ferramenta).
+func textosDasPartes(partes []any) []string {
+	var out []string
+	for _, p := range partes {
+		pt, _ := p.(map[string]any)
+		if t, _ := pt["text"].(string); t != "" {
+			out = append(out, t)
+		}
+		if fc, _ := pt["functionCall"].(map[string]any); fc != nil {
+			b, _ := json.Marshal(fc["args"])
+			out = append(out, fmt.Sprintf("[ferramenta %v] %s", fc["name"], b))
+		}
+		if fr, _ := pt["functionResponse"].(map[string]any); fr != nil {
+			out = append(out, "[resultado de ferramenta]\n"+textoDaResposta(fr["response"]))
+		}
+		for _, k := range []string{"inlineData", "inline_data", "fileData", "file_data"} {
+			if d, _ := pt[k].(map[string]any); d != nil {
+				out = append(out, "[arquivo]")
 			}
-			fmt.Printf("\n── %s ──\n%s\n", m.Role, t)
 		}
 	}
-	return nil
+	return out
+}
+
+// textoDaResposta: o resultado de uma ferramenta do Gemini. Os textos saem como texto (um por
+// linha, com o nome do campo quando há mais de um); o resto, em JSON.
+func textoDaResposta(r any) string {
+	m, _ := r.(map[string]any)
+	var nomes []string
+	for k, v := range m {
+		if _, ok := v.(string); !ok {
+			b, _ := json.Marshal(r)
+			return string(b)
+		}
+		nomes = append(nomes, k)
+	}
+	if len(nomes) == 0 {
+		b, _ := json.Marshal(r)
+		return string(b)
+	}
+	sort.Strings(nomes)
+	var linhas []string
+	for _, k := range nomes {
+		if len(nomes) == 1 {
+			return m[k].(string)
+		}
+		linhas = append(linhas, k+": "+m[k].(string))
+	}
+	return strings.Join(linhas, "\n")
 }
 
 // textosDoConteudo devolve os textos de uma mensagem (texto, resultado e entrada de ferramenta).

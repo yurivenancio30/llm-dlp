@@ -362,3 +362,43 @@ func TestGeminiErroNoLogSemAChave(t *testing.T) {
 		t.Errorf("status %d; a chave apareceu no log ou na resposta:\n%s\n%s", resp.StatusCode, lg.String(), b)
 	}
 }
+
+// "llm-dlp ultima" também mostra a conversa do Gemini: a última requisição mascarada fica
+// guardada (só para quem tem a chave), e a contagem de tokens não toma o lugar dela.
+func TestGeminiUltima(t *testing.T) {
+	cfg := config.Padrao()
+	cfg.DominiosInternos = []string{"empresa-ficticia"}
+	m, err := mask.NovoMasker(cfg, chaveTeste, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		io.Copy(io.Discard, r.Body)
+		w.Header().Set("content-type", "application/json")
+		w.Write([]byte(`{"candidates":[{"content":{"role":"model","parts":[{"text":"ok"}]}}]}`))
+	}))
+	cfg.Provedores = map[string]config.Provedor{"gemini": {Upstream: up.URL, Formato: "gemini"}}
+	px := httptest.NewServer(Novo(cfg, m, nil, log.New(io.Discard, "", 0)).ComChave(chaveTeste))
+	t.Cleanup(func() { up.Close(); px.Close() })
+
+	corpo := func(texto string) []byte {
+		b, _ := json.Marshal(map[string]any{"contents": []any{conteudoG("user", parte("text", texto))}})
+		return b
+	}
+	conversa := "o contato é joao.silva@empresa-ficticia.com.br. " + strings.Repeat("texto da conversa ", 200)
+	for _, p := range []struct{ caminho, texto string }{
+		{"/gemini/v1beta/models/m:generateContent", conversa},
+		{"/gemini/v1beta/models/m:countTokens", strings.Repeat("contagem de tokens ", 200)},
+	} {
+		if st, _ := pedir(t, "POST", px.URL+p.caminho, corpo(p.texto), nil); st != 200 {
+			t.Fatalf("%s: status %d", p.caminho, st)
+		}
+	}
+	st, b := pedir(t, "GET", px.URL+"/__llm-dlp/ultima", nil, func(r *http.Request) { r.Header.Set(CabecalhoProva, Prova(chaveTeste, "ultima")) })
+	if st != 200 || !bytes.Contains(b, []byte("texto da conversa")) || bytes.Contains(b, []byte("contagem de tokens")) {
+		t.Errorf("status %d, corpo %.120s", st, b)
+	}
+	if bytes.Contains(b, []byte("joao.silva@")) || !bytes.Contains(b, []byte(".invalid")) {
+		t.Errorf("a última conversa devia estar mascarada: %.160s", b)
+	}
+}

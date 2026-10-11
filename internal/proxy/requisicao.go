@@ -32,9 +32,12 @@ func (p *Proxy) mascararCorpo(formato, tipo string, corpo []byte) ([]byte, []mas
 	}
 	anthropic := formato == "anthropic"
 	v, voltar := original, func() {}
-	if formato == "gemini" {
-		if a, f, ok := ponteGemini(original); ok {
-			v, voltar, anthropic = a, f, true
+	// outro formato com leitor próprio: a requisição é vista na forma da Anthropic (ponte)
+	ponte := map[string]func(any) (map[string]any, func(), bool){"gemini": ponteGemini, "openai": ponteOpenAI}[formato]
+	comPonte := false
+	if ponte != nil {
+		if a, f, ok := ponte(original); ok {
+			v, voltar, anthropic, comPonte = a, f, true, true
 		}
 	}
 	lote := p.m.NovoLote()
@@ -42,7 +45,7 @@ func (p *Proxy) mascararCorpo(formato, tipo string, corpo []byte) ([]byte, []mas
 	// antes, em paralelo quando são muitos. Assim, todo valor aprendido nesta requisição já
 	// vale quando ela é montada, e a requisição seguinte não muda nada do que esta enviou.
 	col := &coleta{}
-	wc := walker{cfg: p.cfg, m: p.m, col: col, lote: lote, pos: &posicao{}}
+	wc := walker{cfg: p.cfg, m: p.m, col: col, lote: lote, pos: &posicao{}, ponte: comPonte}
 	if anthropic {
 		wc.requisicaoAnthropic(v)
 	} else {
@@ -62,7 +65,7 @@ func (p *Proxy) mascararCorpo(formato, tipo string, corpo []byte) ([]byte, []mas
 	var ents []mask.Entrada
 	var errMidia error
 	// as posições já foram calculadas na 1ª passada (os blocos ainda estavam intactos)
-	w := walker{cfg: p.cfg, m: p.m, lote: lote, md: p.midia, ents: &ents, err: &errMidia, pos: &posicao{seq: wc.pos.seq}}
+	w := walker{cfg: p.cfg, m: p.m, lote: lote, md: p.midia, ents: &ents, err: &errMidia, pos: &posicao{seq: wc.pos.seq}, ponte: comPonte}
 	if anthropic {
 		v = w.requisicaoAnthropic(v)
 	} else {
@@ -74,8 +77,8 @@ func (p *Proxy) mascararCorpo(formato, tipo string, corpo []byte) ([]byte, []mas
 		// imagem/PDF que não deu para verificar nunca sai, mesmo com falhar_fechado=false
 		return nil, nil, nil, erroObrigatorio{errMidia}
 	}
-	if formato == "gemini" && anthropic {
-		voltar() // o que foi mascarado na forma da Anthropic volta para a requisição do Gemini
+	if comPonte {
+		voltar() // o que foi mascarado na forma da Anthropic volta para a requisição original
 	} else {
 		original = v
 	}
@@ -213,12 +216,15 @@ func chaves(x map[string]any) []string {
 // walker percorre o JSON de uma requisição e mascara as strings que podem levar
 // dado do usuário, guardando as entradas pseudônimo -> real usadas.
 type walker struct {
-	cfg  config.Config
-	m    *mask.Masker // só para as palavras traduzidas de um tool_use (dicasDosComandos)
-	lote *mask.Lote
-	md   *Midia
-	ents *[]mask.Entrada
-	err  *error // primeiro erro ao tratar mídia (a requisição inteira é recusada)
+	cfg config.Config
+	// ponte: a requisição veio de outro formato (Gemini, OpenAI) e é vista na forma da Anthropic.
+	// Só liga o que é desses formatos (chavesIntocaveisPonte, ferramentasWebPonte).
+	ponte bool
+	m     *mask.Masker // só para as palavras traduzidas de um tool_use (dicasDosComandos)
+	lote  *mask.Lote
+	md    *Midia
+	ents  *[]mask.Entrada
+	err   *error // primeiro erro ao tratar mídia (a requisição inteira é recusada)
 	// col != nil: só junta os textos, sem mudar nada (1ª passada)
 	col *coleta
 	// idsWeb: tool_use_id das chamadas de WebFetch/WebSearch desta conversa
@@ -359,6 +365,9 @@ func textoFixoDoCliente(v string) bool {
 // segredo do usuário: é mascarado onde aparece, mas não é lembrado. Os conectores do
 // claude.ai (mcp__claude_ai_*) ficam de fora: trazem dado do próprio usuário.
 func (w walker) web(nome string) bool {
+	if w.ponte && ferramentasWebPonte[nome] {
+		return true
+	}
 	for _, f := range w.cfg.FerramentasSemDesmascarar {
 		if f == nome {
 			return true
@@ -574,9 +583,23 @@ func textoDe(v any) string {
 // Chaves que nunca carregam dado do usuário (ou que não podem mudar).
 var chavesIntocaveis = map[string]bool{"type": true, "id": true, "tool_use_id": true, "signature": true,
 	"media_type": true, "cache_control": true, "model": true, "role": true, "stop_reason": true,
-	"stop_sequence": true, "citations": false,
-	// Gemini: assinatura do raciocínio, tipo do arquivo e o tipo/formato de um schema
-	"thoughtSignature": true, "thought_signature": true, "mimeType": true, "mime_type": true, "format": true}
+	"stop_sequence": true, "citations": false}
+
+// chavesIntocaveisPonte: as de chavesIntocaveis e, só nas requisições vistas por uma ponte
+// (Gemini, OpenAI), as que esses formatos têm a mais: a assinatura do raciocínio, o tipo do
+// arquivo e o formato de um schema. Nunca valem para a API da Anthropic: lá um campo "format"
+// numa entrada de ferramenta continua sendo mascarado.
+var chavesIntocaveisPonte = map[string]bool{"thoughtSignature": true, "thought_signature": true,
+	"mimeType": true, "mime_type": true, "format": true}
+
+// ferramentasWebPonte: os nomes que o Gemini CLI, o opencode e o Copilot dão às ferramentas de
+// busca e leitura na internet (as do Claude Code estão em ferramentas_sem_desmascarar). Só valem
+// nas requisições vistas por uma ponte.
+var ferramentasWebPonte = map[string]bool{"web_fetch": true, "google_web_search": true, "webfetch": true, "websearch": true}
+
+func (w walker) intocavel(k string) bool {
+	return chavesIntocaveis[k] || w.ponte && chavesIntocaveisPonte[k]
+}
 
 // requisicaoAnthropic: /v1/messages e /v1/messages/count_tokens.
 
@@ -767,7 +790,7 @@ func (w walker) generico(v any) any {
 			return x
 		}
 		for _, k := range chaves(x) {
-			if !chavesIntocaveis[k] && k != "data" {
+			if !w.intocavel(k) && k != "data" {
 				x[k] = w.generico(x[k])
 			}
 		}

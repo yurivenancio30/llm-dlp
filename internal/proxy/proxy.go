@@ -49,12 +49,22 @@ func (p *Proxy) destino(r *http.Request) (formato, upstream, uri string) {
 	uri = r.URL.RequestURI()
 	nome, _, _ := strings.Cut(strings.TrimPrefix(r.URL.Path, "/"), "/")
 	if pv, ok := p.cfg.Provedores[nome]; ok && nome != "" && pv.Upstream != "" {
-		return pv.Formato, pv.Upstream, strings.TrimPrefix(uri, "/"+nome)
+		formato = pv.Formato
+		if strings.HasSuffix(r.URL.Path, "/chat/completions") {
+			formato = "openai" // o endereço compatível com a OpenAI de qualquer provedor (o do Gemini também)
+		}
+		return formato, pv.Upstream, strings.TrimPrefix(uri, "/"+nome)
 	}
 	if strings.HasPrefix(r.URL.Path, "/v1/messages") {
 		formato = "anthropic"
 	}
 	return formato, p.cfg.Upstream, uri
+}
+
+// semDesmascararPonte: na volta do Gemini e da OpenAI, a ferramenta segue com os pseudônimos
+// (vai para a internet): as da configuração e as de mesmo papel nesses clientes.
+func (p *Proxy) semDesmascararPonte(nome string) bool {
+	return p.cfg.SemDesmascarar(nome) || ferramentasWebPonte[nome]
 }
 
 // erroObrigatorio: falha que bloqueia a requisição independentemente de falhar_fechado.
@@ -137,7 +147,8 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			semMascara = true
 		} else {
 			corpo, entradas, lote = novo, ents, l
-			if formato == "anthropic" && !strings.Contains(r.URL.Path, "count_tokens") && len(corpo) > 2000 {
+			if (formato == "anthropic" || formato == "gemini" || formato == "openai") && !strings.Contains(r.URL.Path, "count_tokens") &&
+				!strings.Contains(r.URL.Path, ":countTokens") && len(corpo) > 2000 {
 				c := corpo
 				p.ultima.Store(&c)
 			}
@@ -188,6 +199,8 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case strings.HasPrefix(ct, "text/event-stream") && formato == "gemini":
 		err = p.desmascararSSEGemini(w, resp.Body, tab)
+	case strings.HasPrefix(ct, "text/event-stream") && formato == "openai":
+		err = p.desmascararSSEOpenAI(w, resp.Body, tab)
 	case strings.HasPrefix(ct, "text/event-stream"):
 		err = p.desmascararSSE(w, resp.Body, tab)
 	case strings.Contains(ct, "json") && (!tab.Vazia() || resp.StatusCode >= 400):
@@ -199,6 +212,8 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 			if !tab.Vazia() && formato == "gemini" {
 				b = p.desmascararGeminiJSON(b, tab)
+			} else if !tab.Vazia() && formato == "openai" {
+				b = p.desmascararOpenAIJSON(b, tab)
 			} else if !tab.Vazia() {
 				b = desmascararJSONResposta(b, tab, p.cfg.SemDesmascarar,
 					func(s string) string { return p.m.RegistrarResposta(s, tab) })
