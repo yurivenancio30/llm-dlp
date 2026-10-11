@@ -30,5 +30,5 @@ cat <<FIM
 
 **Install or update:** \`curl -fsSL https://raw.githubusercontent.com/yurivenancio30/llm-dlp/main/install.sh | sh\` (then close Claude Code and run \`llm-dlp parar\`). The archives below are checked against \`checksums.txt\`.
 
-[Changelog em português](${REPO}/blob/v${V}/docs/pt-BR/CHANGELOG.md) · [All versions](${REPO}/blob/main/CHANGELOG.md)
+[Changelog in Portuguese](${REPO}/blob/v${V}/docs/pt-BR/CHANGELOG.md) · [All versions](${REPO}/blob/main/CHANGELOG.md)
 FIM
