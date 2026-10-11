@@ -2906,7 +2906,7 @@ Hífen sozinho **não** é sinal (só conta com dígito ou junto de outro sinal)
 |---|---|---|---|
 | Versão | `1.2.3`, `v2.10.0-rc1` | excluir | `^v?\d+(\.\d+)+([-+][\w.]+)?$` (SemVer) |
 | Data / hora | `2026-10-05`, `05/10/2026`, `20261005T120000Z` | excluir | regex ISO 8601 e dd/mm/aaaa |
-| UUID | `3f2c…-…-…` (8-4-4-4-12 hex) | excluir desta família | é ID, não nome; família de IDs/segredos |
+| UUID | `3f2c…-…-…` (8-4-4-4-12 hex) | excluir desta família | é ID, não nome; família de IDs/segredos. Como valor de um campo de id (`workspace_id: X`, `"id": "X"`), é mascarado como documento |
 | Hash | `9fceb02` (7–64 hex puros) | excluir | hex sem separador; família de IDs |
 | Arquivo | `relatorio_final.xlsx`, `main.go` | excluir pela forma | extensão conhecida no último pedaço; mas o nome aprendido dentro dele é trocado: `tb_pedido_x9.sql` → `T_3gjogzbd.sql` |
 | Hífen PT | `guarda-chuva`, `segunda-feira`, `pé-de-moleque`, `e-mail` | não é identificador | hífen só com letras não conta; acento derruba |
@@ -3395,7 +3395,9 @@ Numa requisição, o proxy mascara todos os textos em paralelo (1ª passada) e d
 corpo (2ª passada). Entre as duas, junta os nomes decididos de **todos** os textos do pedido:
 é a memória da conversa. Ela é aplicada aos textos ainda não enviados, por palavra inteira,
 com a regra de caixa de cada tipo (nome de SQL e de servidor sem diferença de caixa; os outros
-exatos). Uma decisão tomada num texto novo vale também para os outros textos novos do mesmo
+exatos). Um nome com cara de identificador vale também como sequência das partes separadas por
+`_` de uma palavra maior (`VENDA2024` em `LH_BRONZE_VENDA2024`), e aí a palavra inteira é
+mascarada com o tipo dele; palavra comum não (`status` não mascara `user_status`). Uma decisão tomada num texto novo vale também para os outros textos novos do mesmo
 pedido. Aplicar a memória é um passo depois do memo e não muda a chave do memo.
 
 - **Acaba sozinha.** Nada é guardado por conversa fora do memo: a memória é recalculada a

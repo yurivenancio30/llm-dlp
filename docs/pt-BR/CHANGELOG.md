@@ -11,6 +11,21 @@ que só interessa a quem mexe no código.
 
 ## [Não lançado]
 
+### Mascaramento
+
+- Um nome que a conversa já conhece passa a ser mascarado também dentro de uma palavra maior:
+  a tabela `VENDA2024`, mascarada no SQL, saía em `LH_BRONZE_VENDA2024`, `T01_VENDA2024.sql`
+  ou `DW$VENDA2024_HIST`. Agora a palavra inteira é mascarada. Só vale assim o nome com cara de
+  identificador (com `_`, dígito ou mistura de caixa): uma coluna `status` não mascara o
+  `user_status` do código.
+- Um GUID que é o valor de um campo de id (`workspace_id: X`, `"lakehouseId": "X"`,
+  `tenant_id=X`, `"id": "X"`) é mascarado como documento, e dali em diante nos outros lugares
+  em que aparece. Ele identifica um recurso do cliente (um workspace do Fabric, um tenant do
+  Azure). O id de um aplicativo OAuth (`client_id`, `app_id`) fica: ele não é segredo (RFC 6749,
+  2.2).
+- Os dois casos foram achados repetindo uma sessão real do Microsoft Fabric: nomes que o
+  próprio llm-dlp tinha reconhecido saíam sem máscara em saídas de comando novas.
+
 ### Programa
 
 - O README põe os clientes em beta numa tabela só, com a linha exata de cada cliente e conta,

@@ -36,6 +36,7 @@ Sozinhos, estes são só números, e confundiriam com IDs e datas.
 | Data de nascimento | `nascimento: 12/03/1985` |
 | Título de eleitor, cartão SUS, RENAVAM | `título de eleitor 1234 5678 9012` |
 | Passaporte, placa, chassi, IMEI | `passaporte FZ123456`, `placa BRA2E19` |
+| GUID de um campo de id (um workspace, um tenant) | `workspace_id: 3fa85f64-…`, `"lakehouseId": "…"` |
 
 CPF, CNPJ, PIS, CNH, cartão, título de eleitor, cartão SUS, RENAVAM, IBAN e IMEI só contam
 se o dígito verificador for válido.

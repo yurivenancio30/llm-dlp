@@ -11,6 +11,20 @@ matters to whoever changes the code.
 
 ## [Unreleased]
 
+### Masking
+
+- A name the conversation already knows is masked inside a longer word too: a table
+  `VENDA2024`, masked in the SQL, went out in `LH_BRONZE_VENDA2024`, `T01_VENDA2024.sql` or
+  `DW$VENDA2024_HIST`. Now the whole word is masked. Only a name that looks like an identifier
+  (with `_`, a digit or mixed case) counts this way: a column `status` does not mask
+  `user_status` in code.
+- A GUID that is the value of an id field (`workspace_id: X`, `"lakehouseId": "X"`,
+  `tenant_id=X`, `"id": "X"`) is masked as a document, and from then on in the other places it
+  appears. It identifies a resource of the client (a Fabric workspace, an Azure tenant). The id
+  of an OAuth application (`client_id`, `app_id`) stays: it is not a secret (RFC 6749, 2.2).
+- Both were found replaying a real Microsoft Fabric session: names that llm-dlp itself had
+  recognized went out unmasked in new command output.
+
 ### Program
 
 - The README fits the beta clients in one table, with the exact line for each client and

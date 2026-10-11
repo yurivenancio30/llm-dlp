@@ -40,6 +40,7 @@ On their own these are just numbers, and would be confused with IDs and dates.
 | Date of birth | `nascimento: 12/03/1985` |
 | Voter ID, SUS card, RENAVAM | `título de eleitor 1234 5678 9012` |
 | Passport, licence plate, chassis, IMEI | `passaporte FZ123456`, `placa BRA2E19` |
+| GUID of an id field (a workspace, a tenant) | `workspace_id: 3fa85f64-…`, `"lakehouseId": "…"` |
 
 CPF, CNPJ, PIS, CNH, card, voter ID, SUS card, RENAVAM, IBAN and IMEI only count if the
 check digit is valid.

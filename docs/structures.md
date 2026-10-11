@@ -2912,7 +2912,7 @@ A hyphen alone is **not** a signal (it only counts with a digit or together with
 |---|---|---|---|
 | Version | `1.2.3`, `v2.10.0-rc1` | exclude | `^v?\d+(\.\d+)+([-+][\w.]+)?$` (SemVer) |
 | Date / time | `2026-10-05`, `05/10/2026`, `20261005T120000Z` | exclude | ISO 8601 and dd/mm/yyyy regex |
-| UUID | `3f2c…-…-…` (8-4-4-4-12 hex) | exclude from this family | it is an ID, not a name; IDs/secrets family |
+| UUID | `3f2c…-…-…` (8-4-4-4-12 hex) | exclude from this family | it is an ID, not a name; IDs/secrets family. As the value of an id field (`workspace_id: X`, `"id": "X"`) it is masked as a document |
 | Hash | `9fceb02` (7–64 pure hex) | exclude | hex without a separator; IDs family |
 | File | `relatorio_final.xlsx`, `main.go` | exclude by shape | known extension in the last piece; but the learned name inside it is replaced: `tb_pedido_x9.sql` → `T_3gjogzbd.sql` |
 | Portuguese hyphen | `guarda-chuva`, `segunda-feira`, `pé-de-moleque`, `e-mail` | not an identifier | a hyphen with letters only does not count; an accent knocks it down |
@@ -3401,7 +3401,9 @@ In a request, the proxy masks all the texts in parallel (1st pass) and then asse
 body (2nd pass). Between the two, it gathers the names decided in **all** the texts of the request:
 that is the conversation memory. It is applied to the texts not sent yet, as whole words,
 with the case rule of each type (SQL and server names case-insensitive; the others
-exact). A decision made in a new text also holds for the other new texts of the same
+exact). A name that looks like an identifier also counts as a sequence of the `_` parts of a
+longer word (`VENDA2024` in `LH_BRONZE_VENDA2024`), and then the whole word is masked with
+its type; a common word does not (`status` does not mask `user_status`). A decision made in a new text also holds for the other new texts of the same
 request. Applying the memory is a step after the memo and does not change the memo key.
 
 - **It ends by itself.** Nothing is stored per conversation outside the memo: the memory is recomputed
