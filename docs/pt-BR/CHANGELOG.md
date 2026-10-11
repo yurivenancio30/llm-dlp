@@ -9,7 +9,12 @@ Em cada versão: **Mascaramento** é o que passou a ser (ou deixou de ser) masca
 **Programa** é comando, instalação, configuração, desempenho e documentação; **Código** é o
 que só interessa a quem mexe no código.
 
-## [Não lançado]
+## [0.5.0] - 2026-10-11
+
+Assinaturas, **em beta**: o Gemini CLI com conta Google e o Codex com assinatura do ChatGPT (ou
+chave da OpenAI) passam a ir pelo llm-dlp; ainda não foram conferidos com uma conta de verdade.
+Uma string de conexão passa a ter cada parte mascarada com o seu tipo. Para o Claude Code, só
+essa correção da máscara muda. Depois de atualizar, feche o Claude Code e rode `llm-dlp parar`.
 
 ### Mascaramento
 

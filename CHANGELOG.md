@@ -9,7 +9,12 @@ In each version: **Masking** is what started (or stopped) being masked; **Progra
 commands, installation, configuration, performance and documentation; **Code** is what only
 matters to whoever changes the code.
 
-## [Unreleased]
+## [0.5.0] - 2026-10-11
+
+Subscriptions, **in beta**: the Gemini CLI with a Google account and Codex with a ChatGPT
+subscription (or an OpenAI key) now go through llm-dlp; they have not been checked with a real
+account yet. A connection string now has each part masked with its own type. For Claude Code,
+only that masking fix changes. After updating, close Claude Code and run `llm-dlp parar`.
 
 ### Masking
 
