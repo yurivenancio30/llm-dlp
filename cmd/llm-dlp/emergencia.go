@@ -135,7 +135,7 @@ func servirEmergencia(ate time.Time) error {
 			"ate": ate.Format(time.RFC3339), "versao": proxy.Versao, "commit": versao.Commit, "pid": os.Getpid()})
 	})
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		lg.Printf("EMERGÊNCIA (sem máscara): %s %s", r.Method, r.URL.Path)
+		lg.Printf("EMERGÊNCIA (sem máscara): %s %s", r.Method, proxy.Limpo(r.URL.Path))
 		rp.ServeHTTP(w, r)
 	})
 	ln, err := net.Listen("tcp", endereco(cfg))
@@ -144,5 +144,5 @@ func servirEmergencia(ate time.Time) error {
 	}
 	lg.Printf("EMERGÊNCIA: repasse sem máscara no ar até %s", ate.Local().Format("15:04"))
 	go vigiarEmergencia(true)
-	return (&http.Server{Handler: mux, ReadHeaderTimeout: 30 * time.Second}).Serve(ln)
+	return (&http.Server{Handler: proxy.SoLocal(mux), ReadHeaderTimeout: 30 * time.Second}).Serve(ln)
 }

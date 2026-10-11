@@ -176,10 +176,13 @@ Em dois passos (OCR e trava) ele usa sudo: a sua senha será pedida nessa hora.`
 		} else {
 			fmt.Println("      ✓ aplicado")
 		}
-		if err := garantir(); err != nil {
+		if err := garantir(); errors.Is(err, errSemProva) {
+			fmt.Println("      ! há outro llm-dlp no ar (de antes desta instalação): feche o Claude Code e rode \"llm-dlp parar\" para este assumir")
+		} else if err != nil {
 			return err
+		} else {
+			fmt.Println("      ✓ llm-dlp no ar")
 		}
-		fmt.Println("      ✓ llm-dlp no ar")
 	} else {
 		fmt.Println("      – pulado (o Claude Code NÃO está protegido)")
 	}
@@ -209,7 +212,7 @@ Em dois passos (OCR e trava) ele usa sudo: a sua senha será pedida nessa hora.`
 			fmt.Println("  ✗", nao)
 		}
 	}
-	ok(saudavel(cfg), "llm-dlp no ar", "llm-dlp fora do ar: rode llm-dlp garantir")
+	ok(saudavel(cfg), "llm-dlp no ar", "llm-dlp fora do ar, ou de uma versão anterior: feche o Claude Code e rode llm-dlp parar")
 	ok(claudeLigado(home, cfg), "Claude Code passa pelo llm-dlp", "Claude Code NÃO passa pelo llm-dlp: rode o llm-dlp instalar de novo e aceite o passo 4")
 	ok(faltaOCR(cfg) == "", "OCR de imagens e PDFs", "sem OCR: imagens e PDFs não são enviados (para instalar: "+ocr.DicaInstalacao()+")")
 	ok(travaInstalada(endereco(cfg)), "trava instalada", "sem trava: rode o llm-dlp instalar de novo e aceite o passo 5")

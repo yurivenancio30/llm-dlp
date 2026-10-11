@@ -36,6 +36,23 @@ password, this barrier does not exist.
 | `enviados.log` | For each text already sent: hashes, positions, types and pseudonyms, never values |
 | `llm-dlp.log` | One line per request: counts and times, never values |
 
+## The local port
+
+llm-dlp listens only on `127.0.0.1`, but the browser and the other users of the machine also
+reach that address. What each one can do:
+
+| Who tries | What happens |
+|---|---|
+| A page open in the browser that points its own domain to `127.0.0.1` (DNS rebinding) or sends the request from another site | Refused (403). Only a caller that uses the local address (`127.0.0.1`, `localhost`) and is not a web page is served. Nothing goes to the API |
+| Another user of the machine who wants to read your last (masked) conversation | Cannot read it: it only goes out with a proof that only whoever reads your `chave` (the key) can compute. That is what the `llm-dlp ultima` command does |
+| Another program that takes the port while llm-dlp is down, to receive the unmasked conversation and the API credential | On every message, Claude Code asks the port whether it is llm-dlp and requires the answer to a fresh challenge, which only whoever reads the key can compute. Without the proof, the message is blocked |
+
+Whoever runs as **your** user reads the key and gets through the three barriers (see "What it
+does not protect", above).
+
+When updating from a version up to 0.3.0, the old process still running cannot give that
+proof, and the messages are blocked until you close Claude Code and run `llm-dlp parar`.
+
 ## Known limits
 
 **What goes through unmasked:**

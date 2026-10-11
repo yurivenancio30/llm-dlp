@@ -36,6 +36,23 @@ não existe.
 | `enviados.log` | De cada texto já enviado: hashes, posições, tipos e pseudônimos, nunca valores |
 | `llm-dlp.log` | Uma linha por requisição: contagens e tempos, nunca valores |
 
+## A porta local
+
+O llm-dlp escuta só em `127.0.0.1`, mas o navegador e os outros usuários da máquina também
+chegam nesse endereço. O que cada um consegue:
+
+| Quem tenta | O que acontece |
+|---|---|
+| Uma página aberta no navegador, que aponta o próprio domínio para `127.0.0.1` (DNS rebinding) ou manda a requisição de outro site | Recusada (403). Só é atendido quem chama pelo endereço local (`127.0.0.1`, `localhost`) e não é uma página da web. Nada vai para a API |
+| Outro usuário da máquina querendo ler a sua última conversa (mascarada) | Não lê: ela só sai com uma prova que só quem lê a sua `chave` calcula. É o que o comando `llm-dlp ultima` faz |
+| Outro programa que ocupa a porta enquanto o llm-dlp está fora do ar, para receber a conversa sem máscara e a credencial da API | A cada mensagem, o Claude Code pergunta à porta se é o llm-dlp e exige a resposta a um desafio novo, que só quem lê a `chave` calcula. Sem a prova, a mensagem é barrada |
+
+Quem roda com o **seu** usuário lê a chave e passa pelas três barreiras (ver "O que não
+protege", acima).
+
+Ao atualizar de uma versão até a 0.3.0, o processo antigo ainda no ar não sabe dar essa
+prova, e as mensagens são barradas até você fechar o Claude Code e rodar `llm-dlp parar`.
+
 ## Limites conhecidos
 
 **O que passa sem máscara:**

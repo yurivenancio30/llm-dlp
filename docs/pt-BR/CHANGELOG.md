@@ -13,6 +13,16 @@ que só interessa a quem mexe no código.
 
 ### Programa
 
+- **A porta local está protegida de páginas da web e de outros usuários.** Uma página
+  aberta no navegador conseguia chegar à porta por DNS rebinding e ler a última conversa
+  (mascarada), e qualquer outro usuário da máquina também; um programa que ocupasse a porta
+  com o llm-dlp fora do ar se passava por ele e receberia a conversa sem máscara e a
+  credencial da API. Agora a requisição que não usa o endereço local, ou que vem de uma
+  página da web, é recusada; a última conversa só sai para quem lê a chave
+  (`llm-dlp ultima`); e a cada mensagem o llm-dlp tem de provar que é ele, respondendo a
+  um desafio com a chave. Um caminho com quebra de linha não forja mais uma linha no log.
+  **Depois de atualizar, feche o Claude Code e rode `llm-dlp parar`:** o processo antigo
+  não sabe dar a prova, e as mensagens ficam barradas até ele ser trocado.
 - **Notas da release no GitHub:** as releases 0.2.1 e 0.3.0 foram publicadas com as notas
   vazias (uma configuração do GoReleaser pulava o passo que as lê). As notas voltam a ser a
   seção da versão neste arquivo (a versão em inglês), agora com cada parágrafo numa linha

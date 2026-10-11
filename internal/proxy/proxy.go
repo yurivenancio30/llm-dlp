@@ -32,6 +32,7 @@ type Proxy struct {
 	midia   *Midia
 	vistos  *mask.Vistos
 	cliente *http.Client
+	chave   []byte // para as provas da porta local (ComChave)
 	log     *log.Logger
 	inicio  time.Time
 	reqs    atomic.Int64
@@ -57,15 +58,38 @@ var hopByHop = map[string]bool{"connection": true, "keep-alive": true, "proxy-co
 	"trailer": true, "transfer-encoding": true, "upgrade": true, "host": true, "content-length": true,
 	"accept-encoding": true, "content-encoding": true}
 
+// ComChave liga as provas da porta local (ver local.go). Sem chave, a última conversa não é
+// servida e o proxy não prova quem é.
+func (p *Proxy) ComChave(chave []byte) *Proxy {
+	p.chave = chave
+	return p
+}
+
 func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if !Local(r) {
+		p.log.Printf("RECUSADO %s %s: não veio de um programa local (Host %q, Origin %q)", r.Method, limpo(r.URL.Path),
+			limpo(r.Host), limpo(r.Header.Get("Origin")))
+		recusarNaoLocal(w)
+		return
+	}
 	if r.URL.Path == "/__llm-dlp/saude" {
 		w.Header().Set("content-type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{"ok": true, "servico": "llm-dlp", "versao": Versao, "commit": versao.Commit, "pid": os.Getpid(),
-			"requisicoes": p.reqs.Load(), "no_ar_desde": p.inicio.Format(time.RFC3339)})
+		info := map[string]any{"ok": true, "servico": "llm-dlp", "versao": Versao, "commit": versao.Commit, "pid": os.Getpid(),
+			"requisicoes": p.reqs.Load(), "no_ar_desde": p.inicio.Format(time.RFC3339)}
+		if d := r.URL.Query().Get("desafio"); len(p.chave) > 0 && desafioValido(d) {
+			info["prova"] = Prova(p.chave, "saude\x00"+d)
+		}
+		json.NewEncoder(w).Encode(info)
 		return
 	}
 	if r.URL.Path == "/__llm-dlp/ultima" {
 		w.Header().Set("content-type", "application/json")
+		if !ProvaConfere(p.chave, "ultima", r.Header.Get(CabecalhoProva)) {
+			// a conversa (mesmo mascarada) é só de quem lê a chave: use o comando "llm-dlp ultima"
+			w.WriteHeader(http.StatusForbidden)
+			w.Write([]byte(`{"erro":"use o comando: llm-dlp ultima"}` + "\n"))
+			return
+		}
 		if b := p.ultima.Load(); b != nil {
 			w.Write(*b)
 		} else {
@@ -92,7 +116,7 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				p.recusar(w, r, err.Error())
 				return
 			}
-			p.log.Printf("AVISO %s %s: enviado sem máscara (%v)", r.Method, r.URL.Path, err)
+			p.log.Printf("AVISO %s %s: enviado sem máscara (%v)", r.Method, limpo(r.URL.Path), err)
 			semMascara = true
 		} else {
 			corpo, entradas, lote = novo, ents, l
@@ -122,7 +146,7 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	resp, err := p.cliente.Do(req)
 	if err != nil {
 		http.Error(w, "llm-dlp: falha ao contatar a API: "+err.Error(), http.StatusBadGateway)
-		p.log.Printf("ERRO %s %s: upstream: %v", r.Method, r.URL.Path, err)
+		p.log.Printf("ERRO %s %s: upstream: %v", r.Method, limpo(r.URL.Path), err)
 		return
 	}
 	if lote != nil {
@@ -162,7 +186,7 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		p.vistos.SalvarSeSujo()
 	}
 	p.m.Persistir()
-	p.log.Printf("%s %s -> %d | %d substituições | %d colisões | mascarar %s | total %s%s%s", r.Method, r.URL.Path, resp.StatusCode,
+	p.log.Printf("%s %s -> %d | %d substituições | %d colisões | mascarar %s | total %s%s%s", r.Method, limpo(r.URL.Path), resp.StatusCode,
 		len(entradas), tab.Conflitos, tMascara.Round(time.Millisecond), time.Since(t0).Round(time.Millisecond), erroAPI, errSufixo(err))
 }
 
@@ -194,7 +218,7 @@ func errSufixo(err error) string {
 }
 
 func (p *Proxy) recusar(w http.ResponseWriter, r *http.Request, motivo string) {
-	p.log.Printf("RECUSADO %s %s: %s", r.Method, r.URL.Path, motivo)
+	p.log.Printf("RECUSADO %s %s: %s", r.Method, limpo(r.URL.Path), motivo)
 	w.Header().Set("content-type", "application/json")
 	w.WriteHeader(http.StatusBadGateway)
 	json.NewEncoder(w).Encode(map[string]any{"type": "error", "error": map[string]string{

@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -38,11 +39,21 @@ func ultima(args []string) error {
 	if err != nil {
 		return err
 	}
-	resp, err := http.Get("http://" + endereco(cfg) + "/__llm-dlp/ultima")
+	// a conversa, mesmo mascarada, só sai para quem lê a chave (proxy/local.go)
+	chave, err := mask.Chave(config.Caminho("chave"))
+	if err != nil {
+		return err
+	}
+	pedido, _ := http.NewRequest("GET", "http://"+endereco(cfg)+"/__llm-dlp/ultima", nil)
+	pedido.Header.Set(proxy.CabecalhoProva, proxy.Prova(chave, "ultima"))
+	resp, err := http.DefaultClient.Do(pedido)
 	if err != nil {
 		return fmt.Errorf("o llm-dlp não está no ar: %w", err)
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusForbidden {
+		return errors.New("o llm-dlp no ar não aceitou a prova: ele é de outra versão ou usa outra chave (rode llm-dlp status)")
+	}
 	var req struct {
 		Messages []struct {
 			Role    string `json:"role"`

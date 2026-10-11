@@ -76,6 +76,8 @@ into a secret everywhere.
 |---|---|
 | llm-dlp is down | Claude Code cannot send the message |
 | The request is not JSON, or has something it does not know how to handle | Refused with an error; nothing is sent |
+| The request does not come from a program on this machine (a page in the browser) | Refused; nothing is sent (see [the local port](security.md#the-local-port)) |
+| Another program answers on llm-dlp's port | The message is blocked: it cannot prove it is llm-dlp |
 | An image or PDF that could not be verified (OCR missing, unreadable file) | The file does not go out: it is removed from the request, and the model gets a note in its place with the reason. The conversation goes on |
 | Someone deletes the configuration (with the lock installed) | Claude Code refuses to work |
 

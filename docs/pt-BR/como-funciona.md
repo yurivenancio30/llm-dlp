@@ -75,6 +75,8 @@ em todo lugar.
 |---|---|
 | O llm-dlp está fora do ar | O Claude Code não consegue enviar a mensagem |
 | A requisição não é JSON, ou tem algo que ele não sabe tratar | Recusada com erro; nada é enviado |
+| A requisição não vem de um programa desta máquina (uma página no navegador) | Recusada; nada é enviado (ver [a porta local](seguranca.md#a-porta-local)) |
+| Outro programa responde na porta do llm-dlp | A mensagem é barrada: ele não consegue provar que é o llm-dlp |
 | Imagem ou PDF que não deu para verificar (falta o OCR, arquivo ilegível) | O arquivo não sai: é retirado da requisição, e o modelo recebe no lugar um aviso com o motivo. A conversa continua |
 | Alguém apaga a configuração (com a trava instalada) | O Claude Code se recusa a funcionar |
 

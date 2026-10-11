@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,6 +18,7 @@ import (
 	"time"
 
 	"github.com/yurivenancio30/llm-dlp/internal/config"
+	"github.com/yurivenancio30/llm-dlp/internal/mask"
 	"github.com/yurivenancio30/llm-dlp/internal/ocr"
 	"github.com/yurivenancio30/llm-dlp/internal/proxy"
 	"github.com/yurivenancio30/llm-dlp/internal/versao"
@@ -27,7 +30,7 @@ func servir() error {
 	if ate, ok := emergenciaAtiva(); ok {
 		return servirEmergencia(ate)
 	}
-	cfg, _, _, vistos, m, err := carregarTudo()
+	cfg, chave, _, vistos, m, err := carregarTudo()
 	if err != nil {
 		return err
 	}
@@ -44,7 +47,7 @@ func servir() error {
 		lg.Printf("AVISO enviados.log: %v (o histórico pode ser regravado no cache uma vez)", err)
 	}
 	go vigiarEmergencia(false) // se o administrador ligar a emergência, sai e o supervisor troca de modo
-	srv := &http.Server{Handler: proxy.Novo(cfg, m, vistos, lg), ReadHeaderTimeout: 30 * time.Second}
+	srv := &http.Server{Handler: proxy.Novo(cfg, m, vistos, lg).ComChave(chave), ReadHeaderTimeout: 30 * time.Second}
 	return srv.Serve(ln)
 }
 
@@ -111,21 +114,52 @@ type infoSaude struct {
 	Servico string `json:"servico"`
 	Modo    string `json:"modo"`
 	Ate     string `json:"ate"`
+	Prova   string `json:"prova"`
+	// SemProva: algo responde na porta dizendo ser o llm-dlp, mas não provou
+	SemProva bool `json:"-"`
 }
 
+// saude pergunta a quem está na porta se é o llm-dlp, e exige a prova: a resposta a um desafio
+// novo, que só quem lê a chave calcula (proxy.Prova). Dizer "sou o llm-dlp" não basta: outro
+// programa que pegue a porta enquanto o llm-dlp está fora do ar receberia a conversa sem máscara
+// e a credencial da API. No modo emergência não há prova (o repasse não carrega a chave, que
+// pode ser justamente o que quebrou): vale o arquivo que só o administrador grava.
 func saude(cfg config.Config) (infoSaude, bool) {
 	var s infoSaude
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return s, false
+	}
+	desafio := hex.EncodeToString(b)
 	c := http.Client{Timeout: 700 * time.Millisecond}
-	r, err := c.Get("http://" + endereco(cfg) + "/__llm-dlp/saude")
+	r, err := c.Get("http://" + endereco(cfg) + "/__llm-dlp/saude?desafio=" + desafio)
 	if err != nil {
 		return s, false
 	}
 	defer r.Body.Close()
-	// não basta responder 200: tem que ser o llm-dlp (outro programa na porta não conta)
-	ok := r.StatusCode == 200 && json.NewDecoder(io.LimitReader(r.Body, 4096)).Decode(&s) == nil &&
-		s.OK && s.Servico == "llm-dlp"
-	return s, ok
+	if r.StatusCode != 200 || json.NewDecoder(io.LimitReader(r.Body, 4096)).Decode(&s) != nil || !s.OK || s.Servico != "llm-dlp" {
+		return infoSaude{}, false
+	}
+	if s.Modo == "emergencia" {
+		if _, ativa := emergenciaAtiva(); ativa {
+			return s, true
+		}
+		s.SemProva = true
+		return s, false
+	}
+	chave, err := mask.Chave(config.Caminho("chave"))
+	if err != nil || !proxy.ProvaConfere(chave, "saude\x00"+desafio, s.Prova) {
+		s.SemProva = true
+		return s, false
+	}
+	return s, true
 }
+
+// errSemProva: o que responde na porta não é este llm-dlp (uma versão anterior ainda no ar, ou
+// outro programa).
+var errSemProva = errors.New("o programa que responde na porta do llm-dlp não provou ser o seu llm-dlp. " +
+	"Se você acabou de atualizar: feche o Claude Code, rode \"llm-dlp parar\" e abra de novo. " +
+	"Se não: outro programa está usando a porta")
 
 func saudavel(cfg config.Config) bool {
 	_, ok := saude(cfg)
@@ -139,8 +173,12 @@ func garantir() error {
 	if err != nil {
 		return err
 	}
-	if saudavel(cfg) {
+	info, ok := saude(cfg)
+	if ok {
 		return nil
+	}
+	if info.SemProva {
+		return errSemProva // subir outro não adianta: a porta está ocupada
 	}
 	eu, _ := os.Executable()
 	sup := exec.Command(eu, "supervisionar")
@@ -183,20 +221,28 @@ func verificar() error {
 		return barrar(fmt.Sprintf("o Claude Code não está apontando para o llm-dlp (ANTHROPIC_BASE_URL=%q, esperado %q)", atual, esperado))
 	}
 	info, ok := saude(cfg)
-	if !ok {
+	if !ok && !info.SemProva {
 		garantir()
-		if info, ok = saude(cfg); !ok {
-			return barrar("o llm-dlp está fora do ar e não consegui subi-lo; veja " + config.Caminho("llm-dlp.log") +
-				". Para usar o Claude sem máscara enquanto conserta: rode, no seu terminal, sudo llm-dlp emergencia")
-		}
+		info, ok = saude(cfg)
 	}
+	if !ok {
+		if info.SemProva {
+			return barrar(errSemProva.Error())
+		}
+		return barrar("o llm-dlp está fora do ar e não consegui subi-lo; veja " + config.Caminho("llm-dlp.log") +
+			". Para usar o Claude sem máscara enquanto conserta: rode, no seu terminal, sudo llm-dlp emergencia")
+	}
+	// avisos só para você (systemMessage não vai para a API: zero tokens)
+	aviso := ""
 	if info.Modo == "emergencia" {
-		// aviso só para você (systemMessage não vai para a API: zero tokens)
 		ate := info.Ate
 		if t, err := time.Parse(time.RFC3339, info.Ate); err == nil {
 			ate = t.Local().Format("15:04")
 		}
-		json.NewEncoder(os.Stdout).Encode(map[string]string{"systemMessage": "⚠️ llm-dlp em MODO EMERGÊNCIA: mensagens SEM máscara até " + ate + " (sudo llm-dlp emergencia sair)"})
+		aviso = "⚠️ llm-dlp em MODO EMERGÊNCIA: mensagens SEM máscara até " + ate + " (sudo llm-dlp emergencia sair)"
+	}
+	if aviso != "" {
+		json.NewEncoder(os.Stdout).Encode(map[string]string{"systemMessage": aviso})
 	}
 	return nil
 }
@@ -228,6 +274,9 @@ func status() error {
 	json.Unmarshal(b, &info)
 	if aviso := binarioNovo(info.Commit, info.PID); aviso != "" {
 		fmt.Println("⚠️  " + aviso + ": rode llm-dlp parar com o Claude Code fechado para aplicar (ele volta sozinho na próxima mensagem)")
+	}
+	if _, ok := saude(cfg); !ok {
+		fmt.Println("⚠️  " + errSemProva.Error())
 	}
 	if falta := faltaOCR(cfg); falta != "" && cfg.OCR.Modo == "mascarar" {
 		fmt.Printf("⚠️  sem OCR (falta %s): imagens e PDFs não são enviados. Para instalar: %s\n", falta, ocr.DicaInstalacao())

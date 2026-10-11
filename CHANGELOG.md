@@ -13,6 +13,16 @@ matters to whoever changes the code.
 
 ### Program
 
+- **The local port is protected from web pages and from other users.** A page open in the
+  browser could reach the port through DNS rebinding and read the last (masked)
+  conversation, and so could any other user of the machine; a program that took the port
+  while llm-dlp was down passed for it and would receive the unmasked conversation and the
+  API credential. Now a request that does not use the local address, or that comes from a
+  web page, is refused; the last conversation only goes out to whoever reads the key
+  (`llm-dlp ultima`); and on every message llm-dlp has to prove it is itself by answering a
+  challenge with the key. A request path with a line break no longer forges a log line.
+  **After updating, close Claude Code and run `llm-dlp parar`:** the old process cannot
+  give the proof, and the messages are blocked until it is replaced.
 - **Release notes on GitHub:** the releases 0.2.1 and 0.3.0 were published with empty notes
   (a GoReleaser setting skipped the step that reads them). The notes are the section of the
   version in this file again, now with each paragraph on one line, links that work from the
