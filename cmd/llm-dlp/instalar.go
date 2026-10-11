@@ -161,7 +161,7 @@ Em dois passos (OCR e trava) ele usa sudo: a sua senha será pedida nessa hora.`
 	}
 
 	// 4. Claude Code
-	passo(4, "Claude Code", "faz o Claude Code passar pelo llm-dlp. Muda o ~/.claude/settings.json (com backup):")
+	passo(4, "Claude Code", "só para quem usa o Claude Code (com o Gemini CLI, o opencode ou o Copilot, responda n: eles\n      são apontados à mão, ver o README). Faz o Claude Code passar pelo llm-dlp. Muda o\n      ~/.claude/settings.json (com backup):")
 	fmt.Printf(`        • ANTHROPIC_BASE_URL=http://%s  → as mensagens passam pelo llm-dlp
         • ao abrir uma sessão: "llm-dlp garantir"   → sobe o llm-dlp se não estiver no ar
         • a cada mensagem:     "llm-dlp verificar"  → barra a mensagem se algo estiver errado
@@ -185,14 +185,17 @@ Em dois passos (OCR e trava) ele usa sudo: a sua senha será pedida nessa hora.`
 			fmt.Println("      ✓ llm-dlp no ar")
 		}
 	} else {
-		fmt.Println("      – pulado (o Claude Code NÃO está protegido)")
+		fmt.Println("      – pulado (se você usa o Claude Code, ele NÃO está protegido)")
 	}
+	comClaude := claudeLigado(home, cfg)
 
 	// 5. trava
 	passo(5, "Trava contra vazamento silencioso (recomendada)",
 		"se a configuração do passo 4 for apagada, o Claude Code iria direto para a API sem máscara.\n      A trava faz o Claude Code se recusar a funcionar fora do llm-dlp. Fica numa pasta do sistema,\n      que o agente não consegue alterar — por isso precisa de sudo:")
 	if travaInstalada(endereco(cfg)) {
 		fmt.Println("      ✓ trava já instalada")
+	} else if !comClaude {
+		fmt.Println("      – pulado: a trava é do Claude Code, que não foi ligado no passo 4")
 	} else {
 		if v := versaoClaudeCode(); v != "" && versaoMenor(v, "2.1.285") {
 			fmt.Printf("      ! seu Claude Code está na %s; a trava exige a 2.1.285 ou mais nova. Atualize e rode o llm-dlp instalar de novo.\n", v)
@@ -213,21 +216,42 @@ Em dois passos (OCR e trava) ele usa sudo: a sua senha será pedida nessa hora.`
 			fmt.Println("  ✗", nao)
 		}
 	}
-	ok(saudavel(cfg), "llm-dlp no ar", "llm-dlp fora do ar, ou de uma versão anterior: feche o Claude Code e rode llm-dlp parar")
-	ok(claudeLigado(home, cfg), "Claude Code passa pelo llm-dlp", "Claude Code NÃO passa pelo llm-dlp: rode o llm-dlp instalar de novo e aceite o passo 4")
+	nada := func(msg string) { fmt.Println("  –", msg) }
+	switch {
+	case saudavel(cfg):
+		fmt.Println("  ✓ llm-dlp no ar")
+	case comClaude:
+		ok(false, "", "llm-dlp fora do ar, ou de uma versão anterior: feche o Claude Code e rode llm-dlp parar")
+	default:
+		nada("llm-dlp ainda não está no ar: com outro cliente, ele sobe com llm-dlp garantir (o README mostra como deixar isso automático)")
+	}
+	if comClaude {
+		ok(true, "Claude Code passa pelo llm-dlp", "")
+	} else {
+		nada("Claude Code não ligado (passo 4 pulado). Se você usa o Claude Code, rode o llm-dlp instalar de novo e aceite o passo 4")
+	}
 	ok(faltaOCR(cfg) == "", "OCR de imagens e PDFs", "sem OCR: imagens e PDFs não são enviados (para instalar: "+ocr.DicaInstalacao()+")")
-	ok(travaInstalada(endereco(cfg)), "trava instalada", "sem trava: rode o llm-dlp instalar de novo e aceite o passo 5")
+	switch {
+	case travaInstalada(endereco(cfg)):
+		fmt.Println("  ✓ trava instalada")
+	case comClaude:
+		ok(false, "", "sem trava: rode o llm-dlp instalar de novo e aceite o passo 5")
+	default:
+		nada("sem trava (ela é só do Claude Code)")
+	}
 	if len(cfg.DominiosInternos) > 0 || contarTermos(cfg) > 0 {
 		fmt.Println("  ✓ domínios internos e nomes protegidos configurados")
 	} else {
 		fmt.Println("  – sem domínio interno nem nomes protegidos (opcional: rode o llm-dlp instalar de novo para informar)")
 	}
-	fmt.Println("\nPara valer: feche e abra o Claude Code (no VS Code, recarregue a janela).")
+	if comClaude {
+		fmt.Println("\nPara valer: feche e abra o Claude Code (no VS Code, recarregue a janela).")
+	}
 	fmt.Println(`
 Outros clientes, em beta (Gemini CLI, opencode, Copilot com a sua chave): esta instalação não
-os aponta para o llm-dlp nem os trava. Você põe o endereço no cliente, e ele fica protegido
-enquanto apontar para cá. Como fazer: docs/pt-BR/configuracao.md, seção "Outros clientes e APIs
-(beta)".`)
+os aponta para o llm-dlp nem os trava. Falta pôr o endereço do llm-dlp no cliente; ele fica
+protegido enquanto apontar para cá. Como fazer, cliente por cliente: README, seção
+"Gemini CLI, opencode e Copilot (beta)".`)
 	return nil
 }
 
