@@ -52,11 +52,13 @@ Other clients work with the same masking, but you point them by hand and they ha
 
 | Client | Status | Installed and locked by `llm-dlp instalar` |
 |---|---|---|
-| Claude Code | **Stable** | Yes |
-| Gemini CLI | Beta | No |
+| Claude Code, with a subscription (Pro, Max) or an API key | **Stable** | Yes |
+| Gemini CLI, with a Google account or a Gemini API key | Beta | No |
+| Codex CLI, with a ChatGPT subscription or an OpenAI API key | Beta | No |
 | opencode | Beta | No |
 | GitHub Copilot (CLI and VS Code), with your own key | Beta | No |
-| Any other client of the Anthropic, Gemini or OpenAI (Chat Completions) API | Beta | No |
+| Any other client of the Anthropic, Gemini or OpenAI (Chat Completions, Responses) API | Beta | No |
+| GitHub Copilot with the GitHub subscription (the models GitHub hosts) | **Not supported** | Copilot does not let you change the address it talks to |
 
 ### What beta means
 
@@ -82,13 +84,13 @@ Other clients work with the same masking, but you point them by hand and they ha
 | What goes out is masked and what comes back is unmasked (text, tool calls and results, files the agent writes, images and PDFs) | Yes | Yes, the same engine |
 | `llm-dlp ultima` and the log | Yes | Yes |
 | Pointed to llm-dlp by `llm-dlp instalar` | Yes (step 4) | **No.** You set the address in the client, as in the tables below |
-| llm-dlp is started for you | Yes, when a session opens | **No.** A function in `~/.bashrc` runs `llm-dlp garantir` before opening the client ([README](../README.md#gemini-cli-opencode-and-copilot-beta)). Without it, if llm-dlp is not running, the client gets "connection refused" and nothing goes out |
-| Account types that go through llm-dlp | Every one (Claude Code always talks to the Anthropic API) | **Only an API key.** The Gemini CLI with *Login with Google* or Vertex AI, and Copilot with the models GitHub hosts, talk to other servers and go out **unmasked** |
+| llm-dlp is started for you | Yes, when a session opens | **No.** A function in `~/.bashrc` runs `llm-dlp garantir` before opening the client ([README](../README.md#gemini-cli-codex-opencode-and-copilot-beta)). Without it, if llm-dlp is not running, the client gets "connection refused" and nothing goes out |
+| Account types that go through llm-dlp | Subscription (Pro, Max) and API key: Claude Code always talks to the Anthropic API | The ones pointed in [Client by client](#client-by-client): the Gemini CLI with a Google account or an API key, Codex with a ChatGPT subscription or an API key. **Not** Vertex AI, and **not** Copilot with the models GitHub hosts: they talk to other servers and go out **unmasked** |
 | Check on every message (llm-dlp is running, is the right version and proves it is itself) | Yes | **No** |
 | Lock: the client refuses to work outside llm-dlp | Yes (step 5) | **No.** If the address is removed from the client's configuration, the client talks straight to the API, unmasked, and nothing warns you |
 
 The step by step, with the lines for `~/.bashrc`, is in the
-[README](../README.md#gemini-cli-opencode-and-copilot-beta).
+[README](../README.md#gemini-cli-codex-opencode-and-copilot-beta).
 
 In short: with another client, the protection lasts while its address points to llm-dlp. Check
 it with `llm-dlp ultima` after the first message: it must show your conversation, with the
@@ -103,19 +105,24 @@ straight through (llm-dlp does not store it or write it to the log).
 |---|---|---|
 | Anthropic | `http://127.0.0.1:8787` | Messages (`/v1/messages`) |
 | Gemini | `http://127.0.0.1:8787/gemini` | `generateContent`, `streamGenerateContent`, `countTokens` |
+| Gemini with a Google account (Code Assist, the Gemini CLI's *Login with Google*) | `http://127.0.0.1:8787/codeassist` | The same, inside the Code Assist envelope. The account methods (login, quota, experiments) carry no conversation and go through as they came |
+| ChatGPT subscription (Codex) | `http://127.0.0.1:8787/chatgpt` | Responses |
 | Gemini, OpenAI-compatible address | `http://127.0.0.1:8787/gemini/v1beta/openai` | Chat Completions |
-| OpenAI | `http://127.0.0.1:8787/openai/v1` | Chat Completions |
+| OpenAI | `http://127.0.0.1:8787/openai/v1` | Chat Completions and Responses |
 | xAI (Grok) | `http://127.0.0.1:8787/xai/v1` | Chat Completions |
-| Another one (OpenRouter, a company gateway) | add it to `provedores`, with its `upstream` | `formato`: `openai`, `gemini` or `anthropic` |
+| Another one (OpenRouter, a company gateway) | add it to `provedores`, with its `upstream` | `formato`: `openai`, `responses`, `gemini`, `codeassist` or `anthropic` |
 
-A path that ends in `/chat/completions` is always read as Chat Completions, whatever the
-provider.
+A path that ends in `/chat/completions` is always read as Chat Completions, and one that ends
+in `/responses`, as Responses, whatever the provider.
 
 ### Client by client
 
 | Client | How to point it | Checked how |
 |---|---|---|
 | Gemini CLI, with an API key | `export GOOGLE_GEMINI_BASE_URL=http://127.0.0.1:8787/gemini` and `GEMINI_API_KEY`, with the key chosen in `~/.gemini/settings.json` (`"security": {"auth": {"selectedType": "gemini-api-key"}}`). Without that choice it stops with "Invalid auth method selected" | Running (0.63.0), real API, following the README on a clean home folder |
+| Gemini CLI, with a Google account (*Login with Google*) | `export CODE_ASSIST_ENDPOINT=http://127.0.0.1:8787/codeassist` | **Not checked with a real account yet.** The format follows the Gemini CLI source code and is covered by the automated tests |
+| Codex CLI, with a ChatGPT subscription | In `~/.codex/config.toml`: `model_provider = "llm-dlp"` and `[model_providers.llm-dlp]` with `base_url = "http://127.0.0.1:8787/chatgpt"`, `wire_api = "responses"`, `requires_openai_auth = true` | **Not checked with a real account yet.** The format follows the Codex source code and is covered by the automated tests |
+| Codex CLI, with an OpenAI API key | The same provider, with `base_url = "http://127.0.0.1:8787/openai/v1"` and `env_key = "OPENAI_API_KEY"` (instead of `requires_openai_auth`) | **Not checked with a real key yet** (automated tests only) |
 | opencode (`google` provider) | In `opencode.json`: `"provider": {"google": {"options": {"baseURL": "http://127.0.0.1:8787/gemini/v1beta"}}}`, and the key in `GOOGLE_GENERATIVE_AI_API_KEY` | Running (1.19.0), real API, following the README on a clean home folder |
 | GitHub Copilot CLI, with your own key | `export COPILOT_PROVIDER_BASE_URL=http://127.0.0.1:8787/openai/v1` (or `/xai/v1`, or another address of the table above), plus `COPILOT_PROVIDER_API_KEY` and `COPILOT_MODEL` | Running (1.0.95), real API, with the caveat below |
 | GitHub Copilot in VS Code, with your own key | "Chat: Manage Language Models" > "Custom Endpoint". In the model's `url`: `http://127.0.0.1:8787/openai/v1/chat/completions` (API type Chat Completions) or `http://127.0.0.1:8787/v1/messages` (API type Messages) | **Not checked.** It follows the VS Code documentation; the format is the same as the Copilot CLI's |
@@ -131,13 +138,16 @@ About Copilot:
 - **Only Copilot with your own key goes through llm-dlp** (the Copilot CLI's own provider,
   or the "Custom Endpoint" of VS Code). The models that GitHub hosts and the suggestions while
   you type talk to GitHub's servers, cannot be pointed elsewhere and are **not protected**.
+  Covering them would need llm-dlp to intercept the HTTPS connection (a local certificate
+  authority trusted by the machine), which is what corporate gateways do for Copilot. That is
+  not done: it is a decision of its own, with its own risks.
 - The Copilot CLI was checked with a Gemini model, through the OpenAI-compatible address of
   Gemini. These two do not work together on their own: Gemini refuses the `"refusal": null`
   that the Copilot CLI sends back from the second message on, with or without llm-dlp. In the
   test, a relay after llm-dlp removed that field. With the OpenAI and the xAI APIs, the format
   is covered by the automated tests (against a fake API), not by a run against the real API.
-- Only Chat Completions has a reader. The Responses API (`/v1/responses`) falls into the
-  generic mode below.
+- Chat Completions and Responses have a reader. Other OpenAI APIs (Assistants, Realtime) fall
+  into the generic mode below.
 
 ### What is left out
 

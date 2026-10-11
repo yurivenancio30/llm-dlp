@@ -22,12 +22,21 @@ matters to whoever changes the code.
 
 ### Program
 
+- **Subscriptions, in beta.** Besides the API key, llm-dlp now also serves the Gemini CLI with
+  a Google account (*Login with Google*: the Code Assist API, under `/codeassist`) and Codex
+  with a ChatGPT subscription (under `/chatgpt`). New reader for the OpenAI Responses format,
+  the one Codex uses, with the key too (`/openai/v1/responses`): text, tool calls, the
+  `apply_patch` patch and the shell command are unmasked on the way back, in streaming too.
+  Built-in providers `codeassist` and `chatgpt`. The account methods of Code Assist (login,
+  quota) go through as they came. Not yet checked with a real account. Claude Code was
+  already covered with a subscription (Pro, Max); GitHub Copilot with the GitHub subscription
+  is not, since it does not let you change its address.
 - The README explains how to connect each client. Installation is split into installing
   llm-dlp (the same for everyone) and connecting your client: Claude Code (steps 4 and 5) or
   the beta clients, with the lines for `~/.bashrc` (the client's address and a function that
-  starts llm-dlp before opening it). It also says that the Gemini CLI only goes through
-  llm-dlp with an API key: with *Login with Google* it talks to another API, unmasked. These
-  steps were followed as written on a clean home folder, with the Gemini CLI and opencode.
+  starts llm-dlp before opening it), and says which kinds of account go through llm-dlp and
+  which go out unmasked (Vertex AI, Copilot with the GitHub subscription). The steps of the
+  Gemini CLI with an API key and of opencode were followed as written on a clean home folder.
 - The example at the top of the README now goes step by step: the file the agent reads, what
   the API receives, what the model writes and what is saved on your disk, with a table of
   how to read each pseudonym.

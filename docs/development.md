@@ -244,11 +244,15 @@ proxy.ServeHTTP                      receives the request
 ## Plugging in another LLM API
 
 llm-dlp understands the format of the Anthropic API (`/v1/messages`), that of Gemini
-(`generateContent`, in `gemini.go`) and that of OpenAI (Chat Completions, in `openai.go`). The
-last two are the model for the next: the request did not get a masker of its own, it is **seen
-in the Anthropic shape** (`ponteGemini`, `ponteOpenAI`) and goes through the same path, so the
-conversation memory, the command hints, the freezing and the images work the same; only the
-way back (`voltaGemini`, `voltaOpenAI`) is written for the format. The destination is chosen
+(`generateContent`, in `gemini.go`, also inside the Code Assist envelope of the Gemini CLI with
+a Google account, `ponteCodeAssist`) and those of OpenAI (Chat Completions, in `openai.go`, and
+Responses, in `responses.go`, the one Codex uses). The others are the model for the next: the
+request did not get a masker of its own, it is **seen in the Anthropic shape** (`ponteGemini`,
+`ponteOpenAI`, `ponteResponses`) and goes through the same path, so the conversation memory,
+the command hints, the freezing and the images work the same; only the way back
+(`voltaGemini`, `voltaOpenAI`, `voltaResponses`) is written for the format. The code of a
+format only runs for requests on its own path, and `isolamento_test.go` checks that a Claude
+Code request goes out byte for byte the same with or without it. The destination is chosen
 by the path (`Proxy.destino`, with the `provedores` of the configuration).
 
 What already works and what is missing for a format that has no reader yet (the OpenAI

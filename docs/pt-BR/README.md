@@ -9,8 +9,9 @@
 Proxy local que **mascara dado sensível entre você e a LLM**. A API do modelo só vê
 pseudônimos; você, o seu terminal e os arquivos que o agente escreve veem os valores reais.
 
-Feito para o **Claude Code** (estável). O Gemini CLI, o opencode e o GitHub Copilot com a sua
-chave também funcionam, **em beta** (ver [Clientes atendidos](#clientes-atendidos)).
+Feito para o **Claude Code** (estável), com assinatura (Pro, Max) ou chave de API. O Gemini
+CLI, o Codex, o opencode e o GitHub Copilot com a sua chave também funcionam, **em beta** (ver
+[Clientes atendidos](#clientes-atendidos)).
 
 ```
           sua máquina                                             │ internet
@@ -101,10 +102,12 @@ máquina. `pg_dump`, `postgresql` e `5432` ficam como estão: nome público não
 
 | Cliente | Status | Como é ligado |
 |---|---|---|
-| Claude Code (terminal, VS Code, JetBrains) | **Estável** | Pelo `llm-dlp instalar`, com trava: o Claude Code se recusa a funcionar fora do llm-dlp |
-| Gemini CLI, com chave de API do Gemini | Beta | À mão, no `~/.bashrc` ([como](#gemini-cli-opencode-e-copilot-beta)). Sem trava |
+| Claude Code (terminal, VS Code, JetBrains), com assinatura (Pro, Max) ou chave de API | **Estável** | Pelo `llm-dlp instalar`, com trava: o Claude Code se recusa a funcionar fora do llm-dlp |
+| Gemini CLI, com conta Google ou chave de API do Gemini | Beta | À mão, no `~/.bashrc` ([como](#gemini-cli-codex-opencode-e-copilot-beta)). Sem trava |
+| Codex CLI, com assinatura do ChatGPT ou chave de API da OpenAI | Beta | À mão, no `~/.codex/config.toml`. Sem trava |
 | opencode, com o provedor `google` | Beta | À mão, no `~/.bashrc` e no `opencode.json`. Sem trava |
 | GitHub Copilot CLI e VS Code, com a sua chave | Beta | À mão. Sem trava |
+| GitHub Copilot com a assinatura do GitHub | **Não atendido** | O Copilot não deixa trocar o endereço dos modelos que o GitHub hospeda |
 
 > [!WARNING]
 > **Os clientes em beta não têm trava.** A proteção vale enquanto o endereço do cliente
@@ -183,7 +186,7 @@ ele pula o que já está pronto) e – é o que você escolheu não configurar.
 Os passos 4 e 5 fizeram tudo. Feche e abra o Claude Code (no VS Code, recarregue a janela) e
 confira com `llm-dlp status`.
 
-#### Gemini CLI, opencode e Copilot (beta)
+#### Gemini CLI, Codex, opencode e Copilot (beta)
 
 > [!WARNING]
 > Beta, e sem trava: leia o aviso em [Clientes atendidos](#clientes-atendidos).
@@ -195,9 +198,18 @@ O `llm-dlp instalar` não mexe nesses clientes. Para cada um, você acrescenta a
   o cliente. Só o Claude Code sobe o llm-dlp sozinho: sem a função, depois de reiniciar a
   máquina o cliente recebe "conexão recusada". Nada vaza, mas não funciona.
 
-**Gemini CLI.** Só com **chave de API** do Gemini (do Google AI Studio). Com *Login with
-Google* ou Vertex AI, o Gemini CLI fala com outra API do Google, que o llm-dlp não lê: **a
-conversa sai sem máscara**.
+**Gemini CLI.** Cada tipo de conta fala com uma API diferente do Google, com uma linha
+própria. O Vertex AI não é coberto: com ele, **a conversa sai sem máscara**.
+
+Com a sua conta Google (*Login with Google*, o plano gratuito e o Google AI Pro):
+
+```bash
+# ~/.bashrc
+export CODE_ASSIST_ENDPOINT=http://127.0.0.1:8787/codeassist
+gemini() { llm-dlp garantir && command gemini "$@"; }
+```
+
+Com **chave de API** do Gemini (do Google AI Studio):
 
 ```bash
 # ~/.bashrc
@@ -206,12 +218,33 @@ export GOOGLE_GEMINI_BASE_URL=http://127.0.0.1:8787/gemini
 gemini() { llm-dlp garantir && command gemini "$@"; }
 ```
 
-E, no `~/.gemini/settings.json`, escolha a chave de API (ou escolha *Use Gemini API Key* na
-primeira vez que ele abrir):
+Com a chave de API, escolha-a também no `~/.gemini/settings.json` (ou escolha *Use Gemini API
+Key* na primeira vez que ele abrir):
 
 ```json
 { "security": { "auth": { "selectedType": "gemini-api-key" } } }
 ```
+
+**Codex CLI**, com a sua assinatura do ChatGPT (entre com `codex login`, como sempre):
+
+```toml
+# ~/.codex/config.toml
+model_provider = "llm-dlp"
+
+[model_providers.llm-dlp]
+name = "llm-dlp"
+base_url = "http://127.0.0.1:8787/chatgpt"
+wire_api = "responses"
+requires_openai_auth = true
+```
+
+```bash
+# ~/.bashrc
+codex() { llm-dlp garantir && command codex "$@"; }
+```
+
+Com chave de API da OpenAI, use `base_url = "http://127.0.0.1:8787/openai/v1"` e
+`env_key = "OPENAI_API_KEY"` no lugar de `requires_openai_auth = true`.
 
 **opencode**, com o provedor `google`:
 
@@ -247,9 +280,11 @@ mensagem pelo cliente e rode `llm-dlp ultima`: ele tem de mostrar essa mensagem,
 pseudônimos. Se disser *"Ainda não passou nenhuma mensagem"*, o cliente não está passando pelo
 llm-dlp: confira o endereço.
 
-As linhas do Gemini CLI e do opencode acima foram seguidas como estão numa máquina limpa (uma
-pasta pessoal nova): o agente leu um arquivo com um e-mail e um IP e escreveu outro; a API só
-recebeu os pseudônimos e o arquivo saiu com os valores reais.
+As linhas do Gemini CLI com chave de API e do opencode foram seguidas como estão numa máquina
+limpa (uma pasta pessoal nova): o agente leu um arquivo com um e-mail e um IP e escreveu outro;
+a API só recebeu os pseudônimos e o arquivo saiu com os valores reais. O Gemini CLI com conta
+Google e o Codex seguem o código-fonte dos clientes e os testes automáticos, e **ainda não
+foram conferidos com uma conta de verdade**.
 
 ### Atualizar para uma versão nova
 
@@ -280,7 +315,7 @@ em diante ele também volta sozinho.
 | A mensagem foi barrada: "não provou ser o seu llm-dlp" | Você acabou de atualizar e o processo antigo ainda está no ar: feche o Claude Code e rode `llm-dlp parar`. Se não atualizou, outro programa está usando a porta |
 | Mudei o `config.json` | `llm-dlp parar` (ele volta na próxima mensagem, com a configuração nova) |
 | Quero ver o que foi feito em cada mensagem | `~/.config/llm-dlp/llm-dlp.log` (só contagens e tempos, nunca valores) |
-| Quero desfazer tudo | `llm-dlp desinstalar` (e `sudo llm-dlp desinstalar-trava`, se instalou a trava). Depois, feche e abra o Claude Code e rode `llm-dlp parar`. Num cliente em beta, tire também as linhas dele do `~/.bashrc` (e do `opencode.json`) |
+| Quero desfazer tudo | `llm-dlp desinstalar` (e `sudo llm-dlp desinstalar-trava`, se instalou a trava). Depois, feche e abra o Claude Code e rode `llm-dlp parar`. Num cliente em beta, tire também as linhas dele do `~/.bashrc` (e do `opencode.json` ou do `~/.codex/config.toml`) |
 
 ## Mais detalhes
 

@@ -22,12 +22,21 @@ que só interessa a quem mexe no código.
 
 ### Programa
 
+- **Assinaturas, em beta.** Além da chave de API, o llm-dlp passa a atender o Gemini CLI com a
+  conta Google (*Login with Google*: a API do Code Assist, em `/codeassist`) e o Codex com a
+  assinatura do ChatGPT (em `/chatgpt`). Leitor novo para o formato Responses da OpenAI, o do
+  Codex, também com chave (`/openai/v1/responses`): o texto, as chamadas de ferramenta, o patch
+  do `apply_patch` e o comando do shell são desmascarados na volta, também em streaming.
+  Provedores embutidos `codeassist` e `chatgpt`. Os métodos da conta do Code Assist (login,
+  cota) passam como vieram. Ainda não conferido com uma conta de verdade. O Claude Code já
+  era atendido com assinatura (Pro, Max); o GitHub Copilot com a assinatura do GitHub não é,
+  porque não deixa trocar o endereço.
 - O README explica como ligar cada cliente. A instalação fica dividida em instalar o llm-dlp
   (igual para todos) e ligar o seu cliente: o Claude Code (passos 4 e 5) ou os clientes em
   beta, com as linhas do `~/.bashrc` (o endereço do cliente e uma função que sobe o llm-dlp
-  antes de abri-lo). Também diz que o Gemini CLI só passa pelo llm-dlp com chave de API: com
-  *Login with Google* ele fala com outra API, sem máscara. Esses passos foram seguidos como
-  estão escritos numa pasta pessoal limpa, com o Gemini CLI e o opencode.
+  antes de abri-lo), e diz quais tipos de conta passam pelo llm-dlp e quais saem sem máscara
+  (Vertex AI, Copilot com a assinatura do GitHub). Os passos do Gemini CLI com chave de API e do
+  opencode foram seguidos como estão escritos numa pasta pessoal limpa.
 - O exemplo do topo do README passa a ir passo a passo: o arquivo que o agente lê, o que a
   API recebe, o que o modelo escreve e o que é gravado no seu disco, com uma tabela de como
   ler cada pseudônimo.

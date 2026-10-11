@@ -224,11 +224,15 @@ proxy.ServeHTTP                      recebe a requisição
 ## Acoplar outra API de LLM
 
 O llm-dlp entende o formato da API da Anthropic (`/v1/messages`), o do Gemini
-(`generateContent`, em `gemini.go`) e o da OpenAI (Chat Completions, em `openai.go`). Os dois
-últimos são o modelo para o próximo: a requisição não ganhou um mascarador próprio, ela é
-**vista na forma da Anthropic** (`ponteGemini`, `ponteOpenAI`) e passa pelo mesmo caminho, de
-modo que a memória da conversa, as dicas dos comandos, o congelamento e as imagens valem
-igual; só a volta (`voltaGemini`, `voltaOpenAI`) é escrita para o formato. O destino é
+(`generateContent`, em `gemini.go`, também dentro do envelope do Code Assist do Gemini CLI com
+conta Google, `ponteCodeAssist`) e os da OpenAI (Chat Completions, em `openai.go`, e Responses,
+em `responses.go`, o do Codex). Os outros são o modelo para o próximo: a requisição não ganhou
+um mascarador próprio, ela é **vista na forma da Anthropic** (`ponteGemini`, `ponteOpenAI`,
+`ponteResponses`) e passa pelo mesmo caminho, de modo que a memória da conversa, as dicas dos
+comandos, o congelamento e as imagens valem igual; só a volta (`voltaGemini`, `voltaOpenAI`,
+`voltaResponses`) é escrita para o formato. O código de um formato só roda para as requisições
+do caminho dele, e o `isolamento_test.go` confere que uma requisição do Claude Code sai byte a
+byte igual com ou sem ele. O destino é
 escolhido pelo caminho (`Proxy.destino`, com os `provedores` da configuração).
 
 O que já funciona e o que falta para um formato ainda sem leitor (a API Responses da OpenAI,

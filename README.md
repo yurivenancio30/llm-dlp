@@ -9,8 +9,9 @@
 A local proxy that **masks sensitive data between you and the LLM**. The model's API only
 sees pseudonyms; you, your terminal and the files the agent writes see the real values.
 
-Made for **Claude Code** (stable). The Gemini CLI, opencode and GitHub Copilot with your own
-key also work, **in beta** (see [Supported clients](#supported-clients)).
+Made for **Claude Code** (stable), with a subscription (Pro, Max) or an API key. The Gemini
+CLI, Codex, opencode and GitHub Copilot with your own key also work, **in beta** (see
+[Supported clients](#supported-clients)).
 
 ```
           your machine                                          │ internet
@@ -106,10 +107,12 @@ command does.
 
 | Client | Status | How it is connected |
 |---|---|---|
-| Claude Code (terminal, VS Code, JetBrains) | **Stable** | By `llm-dlp instalar`, with a lock: Claude Code refuses to work outside llm-dlp |
-| Gemini CLI, with a Gemini API key | Beta | By hand, in `~/.bashrc` ([how](#gemini-cli-opencode-and-copilot-beta)). No lock |
+| Claude Code (terminal, VS Code, JetBrains), with a subscription (Pro, Max) or an API key | **Stable** | By `llm-dlp instalar`, with a lock: Claude Code refuses to work outside llm-dlp |
+| Gemini CLI, with a Google account or a Gemini API key | Beta | By hand, in `~/.bashrc` ([how](#gemini-cli-codex-opencode-and-copilot-beta)). No lock |
+| Codex CLI, with a ChatGPT subscription or an OpenAI API key | Beta | By hand, in `~/.codex/config.toml`. No lock |
 | opencode, with the `google` provider | Beta | By hand, in `~/.bashrc` and `opencode.json`. No lock |
 | GitHub Copilot CLI and VS Code, with your own key | Beta | By hand. No lock |
+| GitHub Copilot with the GitHub subscription | **Not supported** | Copilot does not let you change the address of the models GitHub hosts |
 
 > [!WARNING]
 > **Beta clients have no lock.** The protection lasts while the client's address points to
@@ -188,7 +191,7 @@ skips what is already done), and – is what you chose not to set up.
 Steps 4 and 5 did everything. Close and open Claude Code (in VS Code, reload the window) and
 check with `llm-dlp status`.
 
-#### Gemini CLI, opencode and Copilot (beta)
+#### Gemini CLI, Codex, opencode and Copilot (beta)
 
 > [!WARNING]
 > Beta, and with no lock: read the warning in [Supported clients](#supported-clients).
@@ -201,9 +204,18 @@ check with `llm-dlp status`.
   you restart the machine the client gets "connection refused". Nothing leaks, but it does not
   work.
 
-**Gemini CLI.** Only with a Gemini **API key** (from Google AI Studio). With *Login with
-Google* or Vertex AI, the Gemini CLI talks to another Google API, which llm-dlp does not read:
-**the conversation goes out unmasked**.
+**Gemini CLI.** Each kind of account talks to a different Google API, with its own line.
+Vertex AI is not covered: with it, **the conversation goes out unmasked**.
+
+With your Google account (*Login with Google*, the free plan and Google AI Pro):
+
+```bash
+# ~/.bashrc
+export CODE_ASSIST_ENDPOINT=http://127.0.0.1:8787/codeassist
+gemini() { llm-dlp garantir && command gemini "$@"; }
+```
+
+With a Gemini **API key** (from Google AI Studio):
 
 ```bash
 # ~/.bashrc
@@ -212,12 +224,33 @@ export GOOGLE_GEMINI_BASE_URL=http://127.0.0.1:8787/gemini
 gemini() { llm-dlp garantir && command gemini "$@"; }
 ```
 
-And in `~/.gemini/settings.json`, choose the API key (or pick *Use Gemini API Key* the first
-time it opens):
+With the API key, also choose it in `~/.gemini/settings.json` (or pick *Use Gemini API Key*
+the first time it opens):
 
 ```json
 { "security": { "auth": { "selectedType": "gemini-api-key" } } }
 ```
+
+**Codex CLI**, with your ChatGPT subscription (sign in with `codex login`, as usual):
+
+```toml
+# ~/.codex/config.toml
+model_provider = "llm-dlp"
+
+[model_providers.llm-dlp]
+name = "llm-dlp"
+base_url = "http://127.0.0.1:8787/chatgpt"
+wire_api = "responses"
+requires_openai_auth = true
+```
+
+```bash
+# ~/.bashrc
+codex() { llm-dlp garantir && command codex "$@"; }
+```
+
+With an OpenAI API key instead, use `base_url = "http://127.0.0.1:8787/openai/v1"` and
+`env_key = "OPENAI_API_KEY"` in place of `requires_openai_auth = true`.
 
 **opencode**, with the `google` provider:
 
@@ -253,9 +286,11 @@ message from the client and run `llm-dlp ultima`: it must show that message, wit
 pseudonyms. If it says *"Ainda não passou nenhuma mensagem"* ("no message has gone through
 yet"), the client is not going through llm-dlp: check the address.
 
-The Gemini CLI and opencode lines above were followed as they are on a clean machine (a
-new home folder): the agent read a file with an e-mail and an IP and wrote another one; the
-API only received the pseudonyms and the file came out with the real values.
+The lines of the Gemini CLI with an API key and of opencode were followed as they are on a
+clean machine (a new home folder): the agent read a file with an e-mail and an IP and wrote
+another one; the API only received the pseudonyms and the file came out with the real values.
+The Gemini CLI with a Google account and Codex follow the clients' source code and the
+automated tests, and **have not been checked with a real account yet**.
 
 ### Updating to a new version
 
@@ -286,7 +321,7 @@ open the client, and from then on it also comes back by itself.
 | The message was blocked: "não provou ser o seu llm-dlp" (did not prove it is your llm-dlp) | You have just updated and the old process is still running: close Claude Code and run `llm-dlp parar`. If you did not update, another program is using the port |
 | I changed `config.json` | `llm-dlp parar` (it comes back on the next message, with the new configuration) |
 | I want to see what was done on each message | `~/.config/llm-dlp/llm-dlp.log` (counts and times only, never values) |
-| I want to undo everything | `llm-dlp desinstalar` (and `sudo llm-dlp desinstalar-trava`, if you installed the lock). Then close and open Claude Code and run `llm-dlp parar`. With a beta client, also remove its lines from `~/.bashrc` (and from `opencode.json`) |
+| I want to undo everything | `llm-dlp desinstalar` (and `sudo llm-dlp desinstalar-trava`, if you installed the lock). Then close and open Claude Code and run `llm-dlp parar`. With a beta client, also remove its lines from `~/.bashrc` (and from `opencode.json` or `~/.codex/config.toml`) |
 
 ## More details
 
