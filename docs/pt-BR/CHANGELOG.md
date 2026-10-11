@@ -23,6 +23,12 @@ que só interessa a quem mexe no código.
   um desafio com a chave. Um caminho com quebra de linha não forja mais uma linha no log.
   **Depois de atualizar, feche o Claude Code e rode `llm-dlp parar`:** o processo antigo
   não sabe dar a prova, e as mensagens ficam barradas até ele ser trocado.
+- **Aviso quando a configuração reduz a proteção.** O `config.json` é do usuário, então um
+  comando rodado pelo agente consegue mudá-lo: desligar um detector, ou apontar o `upstream`
+  para outro servidor, que receberia as mensagens e a credencial da API. Enquanto for o
+  caso, o Claude Code mostra um aviso a cada mensagem, e o `llm-dlp status` também. O
+  `llm-dlp instalar` também passa a proibir o agente de citar a pasta do llm-dlp num
+  comando (rode de novo para receber a regra).
 - **Notas da release no GitHub:** as releases 0.2.1 e 0.3.0 foram publicadas com as notas
   vazias (uma configuração do GoReleaser pulava o passo que as lê). As notas voltam a ser a
   seção da versão neste arquivo (a versão em inglês), agora com cada parágrafo numa linha

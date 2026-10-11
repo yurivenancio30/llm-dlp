@@ -11,17 +11,26 @@ Para relatar uma vulnerabilidade, veja [SECURITY.md](SECURITY.md).
 - Nada sensível é gravado em disco pelo llm-dlp (só hashes).
 - Se algo falhar, a mensagem não sai.
 
-**Por que a trava e a emergência exigem `sudo`:** tudo que enfraquece a proteção precisa do
-administrador. Assim, nada que rode com o seu usuário, inclusive o agente induzido por uma
-página maliciosa, consegue desligar a máscara. Se o seu `sudo` não pede senha, essa barreira
-não existe.
+**Por que a trava e a emergência exigem `sudo`:** assim, nada que rode com o seu usuário,
+inclusive o agente induzido por uma página maliciosa, consegue ligar a emergência ou tirar
+a trava. Se o seu `sudo` não pede senha, essa barreira não existe.
+
+**A configuração não tem essa barreira:** o `config.json` é do seu usuário, e um comando
+rodado pelo agente consegue mudá-lo (desligar um detector, liberar imagens, apontar o
+`upstream` para outro servidor, que passaria a receber as mensagens e a credencial da API).
+As regras que o `llm-dlp instalar` põe no Claude Code proíbem o agente de ler, editar e
+citar a pasta num comando, mas isso não é uma garantia. Por isso, enquanto a configuração
+tirar proteção ou mandar as mensagens para fora da API da Anthropic, o Claude Code mostra
+um aviso **a cada mensagem**, e o `llm-dlp status` também. Se você não mudou nada e o aviso
+apareceu, confira o `config.json`.
 
 **O que não protege:**
 
 - Dado que ele não detecta (ver [Limites conhecidos](seguranca.md#limites-conhecidos)).
 - `curl` ou outro programa chamado pelo agente, que leve o dado real para fora. A proteção
   de saída vale para `WebFetch`, `WebSearch` e os conectores do claude.ai.
-- Um programa malicioso rodando com o seu próprio usuário, que pode se passar pelo proxy.
+- Um programa malicioso rodando com o seu próprio usuário: ele lê a chave, pode se passar
+  pelo proxy e mudar a configuração (isso último gera o aviso a cada mensagem).
 - O que não passa por ele: outra instalação do Claude Code (a nativa do Windows, por
   exemplo), outros clientes.
 

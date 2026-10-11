@@ -9,6 +9,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -240,11 +241,46 @@ func verificar() error {
 			ate = t.Local().Format("15:04")
 		}
 		aviso = "⚠️ llm-dlp em MODO EMERGÊNCIA: mensagens SEM máscara até " + ate + " (sudo llm-dlp emergencia sair)"
+	} else if fracos := protecaoReduzida(cfg); len(fracos) > 0 {
+		aviso = "⚠️ llm-dlp com a proteção reduzida pela configuração: " + strings.Join(fracos, "; ") +
+			". Se não foi você, confira " + config.Caminho("config.json")
 	}
 	if aviso != "" {
 		json.NewEncoder(os.Stdout).Encode(map[string]string{"systemMessage": aviso})
 	}
 	return nil
+}
+
+// protecaoReduzida: o que, na configuração em disco, tira proteção ou manda as mensagens para
+// outro lugar. A configuração é do usuário, e um agente induzido por uma página maliciosa
+// consegue mudá-la com um comando (o que só o administrador muda é a emergência). Enquanto esses
+// campos não forem travados pelo administrador, o que protege é o aviso a cada mensagem; quem
+// mudou de propósito só vê o lembrete.
+func protecaoReduzida(cfg config.Config) []string {
+	var out []string
+	if u, err := url.Parse(cfg.Upstream); err != nil || u.Scheme != "https" || u.Hostname() != "api.anthropic.com" {
+		destino := cfg.Upstream
+		if err == nil && u.Host != "" {
+			destino = u.Scheme + "://" + u.Host
+		}
+		out = append(out, "as mensagens e a credencial da API vão para "+proxy.Limpo(destino)+" (upstream), não para a API da Anthropic")
+	}
+	if !cfg.FalharFechado {
+		out = append(out, "uma falha ao mascarar manda a mensagem sem máscara (falhar_fechado = false)")
+	}
+	if cfg.OCR.Modo == "permitir" {
+		out = append(out, "imagens e PDFs saem sem verificação (ocr.modo = permitir)")
+	}
+	if !cfg.Objetos.Ligado {
+		out = append(out, "nomes de recursos internos não são mascarados (objetos.ligado = false)")
+	}
+	if len(cfg.DetectoresDesligados) > 0 {
+		out = append(out, "detectores desligados: "+proxy.Limpo(strings.Join(cfg.DetectoresDesligados, ", ")))
+	}
+	if d := os.Getenv("LLM_DLP_HOME"); d != "" {
+		out = append(out, "a configuração é lida de "+proxy.Limpo(d)+" (LLM_DLP_HOME)")
+	}
+	return out
 }
 
 func barrar(motivo string) error {
@@ -277,6 +313,9 @@ func status() error {
 	}
 	if _, ok := saude(cfg); !ok {
 		fmt.Println("⚠️  " + errSemProva.Error())
+	}
+	for _, f := range protecaoReduzida(cfg) {
+		fmt.Println("⚠️  proteção reduzida pela configuração: " + f)
 	}
 	if falta := faltaOCR(cfg); falta != "" && cfg.OCR.Modo == "mascarar" {
 		fmt.Printf("⚠️  sem OCR (falta %s): imagens e PDFs não são enviados. Para instalar: %s\n", falta, ocr.DicaInstalacao())

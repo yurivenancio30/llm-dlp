@@ -11,17 +11,26 @@ To report a vulnerability, see [SECURITY.md](../.github/SECURITY.md).
 - Nothing sensitive is written to disk by llm-dlp (only hashes).
 - If something fails, the message does not go out.
 
-**Why the lock and the emergency mode require `sudo`:** everything that weakens the
-protection needs the administrator. This way, nothing running as your user, including the
-agent induced by a malicious page, can turn the mask off. If your `sudo` does not ask for a
-password, this barrier does not exist.
+**Why the lock and the emergency mode require `sudo`:** this way, nothing running as your
+user, including the agent induced by a malicious page, can turn the emergency mode on or
+remove the lock. If your `sudo` does not ask for a password, this barrier does not exist.
+
+**The configuration does not have that barrier:** `config.json` belongs to your user, and a
+command run by the agent can change it (turn a detector off, let images through, point
+`upstream` to another server, which would then receive the messages and the API credential).
+The rules that `llm-dlp instalar` adds to Claude Code forbid the agent to read, edit and
+mention the folder in a command, but that is not a guarantee. So, while the configuration
+removes protection or sends the messages somewhere other than the Anthropic API, Claude
+Code shows a warning **on every message**, and so does `llm-dlp status`. If you changed
+nothing and the warning showed up, check `config.json`.
 
 **What it does not protect:**
 
 - Data it does not detect (see [Known limits](security.md#known-limits)).
 - `curl` or another program called by the agent that takes the real data out. The outbound
   protection applies to `WebFetch`, `WebSearch` and the claude.ai connectors.
-- A malicious program running as your own user, which can impersonate the proxy.
+- A malicious program running as your own user: it reads the key, can impersonate the proxy
+  and change the configuration (the latter raises the warning on every message).
 - What does not go through it: another Claude Code installation (the native Windows one, for
   example), other clients.
 

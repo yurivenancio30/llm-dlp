@@ -27,6 +27,7 @@ const arquivoTrava = "/etc/claude-code/managed-settings.json"
 var denyLLMDLP = []string{
 	"Read(~/.config/llm-dlp/**)",    // a chave e os hashes nunca são lidos pelo agente
 	"Edit(~/.config/llm-dlp/**)",    // nem alterados
+	"Bash(*.config/llm-dlp*)",       // nem por um comando (a configuração decide o que é mascarado e para onde vai)
 	"Bash(*llm-dlp emergencia*)",    // o agente não tenta ligar a emergência (a barreira real é o sudo)
 	"Bash(*managed-settings.json*)", // nem mexer na trava
 }

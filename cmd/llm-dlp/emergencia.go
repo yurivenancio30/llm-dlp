@@ -27,8 +27,10 @@ import (
 //
 // Só o administrador liga (sudo): o estado fica em dirEmergencia, que só o root escreve.
 // O proxy roda como o usuário e apenas LÊ esse arquivo. Assim, nada que rode com o seu
-// usuário — inclusive o agente, induzido por uma página maliciosa — consegue desligar a
-// máscara. (Se o seu sudo não pede senha, essa barreira não existe.)
+// usuário — inclusive o agente, induzido por uma página maliciosa — consegue ligar a
+// emergência. (Se o seu sudo não pede senha, essa barreira não existe. A configuração não tem
+// essa barreira: quem a muda para tirar proteção gera um aviso a cada mensagem, ver
+// protecaoReduzida.)
 //
 // O repasse não carrega config/chave/detectores: funciona mesmo se o que quebrou foi isso.
 

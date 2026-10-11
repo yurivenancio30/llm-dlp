@@ -9,6 +9,11 @@ say what each one is for.
 
 File `~/.config/llm-dlp/config.json`. After changing it, run `llm-dlp parar`.
 
+While the configuration removes protection (`falhar_fechado` off, `ocr.modo` set to
+`permitir`, `objetos` off, any detector turned off) or `upstream` is not the Anthropic API,
+Claude Code shows a warning on every message (see [Security](security.md)). The warning
+does not go to the API.
+
 | Field | What it is for | Default |
 |---|---|---|
 | `dominios_internos` | Pieces that identify your internal hostnames (`["empresa"]` catches `mysql.empresa.intra`) | empty |
@@ -40,7 +45,7 @@ Names accepted in `detectores_desligados`: `segredo`, `email`, `ip`, `host`, `cp
 | `llm-dlp instalar` | Installs and configures everything, explaining each step |
 | `sudo llm-dlp instalar-trava` | Claude Code only works when going through llm-dlp (the lock) |
 | `llm-dlp desinstalar` / `sudo llm-dlp desinstalar-trava` | Undoes it |
-| `llm-dlp status` | Shows whether it is running, in which mode and at which commit. Warns if a new binary is installed but not yet running, and if OCR is missing |
+| `llm-dlp status` | Shows whether it is running, in which mode and at which commit. Warns if a new binary is installed but not yet running, if OCR is missing and if the configuration reduces the protection |
 | `llm-dlp parar` | Stops the proxy (it comes back on the next message) |
 | `sudo llm-dlp emergencia [30m\|sair]` | Lets Claude through unmasked for a limited time |
 | `llm-dlp importar-pessoas FILE.csv --grupo CODE:NAME:EMAIL` | Teaches people |

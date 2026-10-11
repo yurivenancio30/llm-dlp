@@ -6,6 +6,11 @@
 
 Arquivo `~/.config/llm-dlp/config.json`. Depois de mudar, rode `llm-dlp parar`.
 
+Enquanto a configuração tirar proteção (`falhar_fechado` desligado, `ocr.modo` em
+`permitir`, `objetos` desligado, algum detector desligado) ou o `upstream` não for a API da
+Anthropic, o Claude Code mostra um aviso a cada mensagem (ver
+[Segurança](seguranca.md)). O aviso não vai para a API.
+
 | Campo | Para quê | Padrão |
 |---|---|---|
 | `dominios_internos` | Trechos que identificam os seus hostnames internos (`["empresa"]` pega `mysql.empresa.intra`) | vazio |
@@ -37,7 +42,7 @@ Nomes aceitos em `detectores_desligados`: `segredo`, `email`, `ip`, `host`, `cpf
 | `llm-dlp instalar` | Instala e configura tudo, explicando cada passo |
 | `sudo llm-dlp instalar-trava` | O Claude Code só funciona passando pelo llm-dlp |
 | `llm-dlp desinstalar` / `sudo llm-dlp desinstalar-trava` | Desfaz |
-| `llm-dlp status` | Mostra se está no ar, em que modo e qual commit. Avisa se há um binário novo instalado que ainda não está no ar, e se falta o OCR |
+| `llm-dlp status` | Mostra se está no ar, em que modo e qual commit. Avisa se há um binário novo instalado que ainda não está no ar, se falta o OCR e se a configuração reduz a proteção |
 | `llm-dlp parar` | Para o proxy (ele volta na próxima mensagem) |
 | `sudo llm-dlp emergencia [30m\|sair]` | Libera o Claude sem máscara por tempo limitado |
 | `llm-dlp importar-pessoas ARQ.csv --grupo COD:NOME:EMAIL` | Ensina pessoas |

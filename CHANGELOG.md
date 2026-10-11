@@ -23,6 +23,12 @@ matters to whoever changes the code.
   challenge with the key. A request path with a line break no longer forges a log line.
   **After updating, close Claude Code and run `llm-dlp parar`:** the old process cannot
   give the proof, and the messages are blocked until it is replaced.
+- **Warning when the configuration reduces the protection.** `config.json` belongs to the
+  user, so a command run by the agent can change it: turn a detector off, or point
+  `upstream` to another server, which would receive the messages and the API credential.
+  While that is the case, Claude Code shows a warning on every message and so does
+  `llm-dlp status`. `llm-dlp instalar` also forbids the agent to mention the llm-dlp folder
+  in a command (run it again to get the rule).
 - **Release notes on GitHub:** the releases 0.2.1 and 0.3.0 were published with empty notes
   (a GoReleaser setting skipped the step that reads them). The notes are the section of the
   version in this file again, now with each paragraph on one line, links that work from the
