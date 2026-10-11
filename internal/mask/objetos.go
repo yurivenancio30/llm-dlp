@@ -291,11 +291,31 @@ func (m *Masker) entAprendido(v string) (string, bool) {
 	return ent, ok && hoje()-visto <= validadeObj
 }
 
+// servidoresComoHost: um servidor achado pela estrutura (o host de uma string de conexão, de um
+// YAML) que é um hostname do domínio interno passa a ter o tipo "host", o mesmo que o detector de
+// hostname dá a ele fora da estrutura. Assim o mesmo servidor tem UM pseudônimo em qualquer lugar
+// (antes: host_x7k2... dentro da URL e x7k2....invalid solto no texto, e o modelo via dois).
+func (m *Masker) servidoresComoHost(out []Achado) {
+	if len(m.cfg.DominiosInternos) == 0 {
+		return
+	}
+	for i, a := range out {
+		if a.Tipo != prefTipoObj+"servidor" {
+			continue
+		}
+		h := strings.ToLower(a.Real)
+		if ix := reHost.FindStringIndex(h); ix != nil && ix[0] == 0 && ix[1] == len(h) && m.interno(h) && !strings.HasSuffix(h, ".invalid") {
+			out[i].Tipo = "host"
+		}
+	}
+}
+
 // unificarObjetos: o mesmo nome real fica com UM tipo (e, portanto, um pseudônimo) no texto,
 // mesmo quando regras diferentes o acham com tipos diferentes ("dir_..." numa linha e
 // "svc_..." noutra para a mesma pasta). Vale o tipo com que o nome já foi aprendido; se não
 // foi, o da primeira ocorrência no texto (no mesmo trecho, a ordem do tipo, como em aplicarT).
 func (m *Masker) unificarObjetos(out []Achado) {
+	m.servidoresComoHost(out)
 	var ix []int
 	for i, a := range out {
 		if ehObjeto(a.Tipo) {

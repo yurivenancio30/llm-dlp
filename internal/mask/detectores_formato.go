@@ -39,6 +39,19 @@ var (
 	fakeNet = netip.MustParsePrefix("240.0.0.0/4") // faixa reservada (RFC 1112): só pseudônimos
 )
 
+// naAutoridadeDeURL: a posição i está na autoridade de uma URL ("esquema://usuario:senha@host"),
+// antes de qualquer "/", "?" ou "#". Ali, "senha@host" não é e-mail: é a senha e o servidor,
+// que os leitores de conexão e de senha mascaram cada um com o seu tipo. Um e-mail no caminho ou
+// nos parâmetros da URL (?email=...) continua sendo e-mail.
+func naAutoridadeDeURL(s string, i int) bool {
+	ini := i
+	for ini > 0 && !branco(s[ini-1]) && !strings.ContainsRune("\"'`<>()[]{},;", rune(s[ini-1])) {
+		ini--
+	}
+	k := strings.LastIndex(s[ini:i], "://")
+	return k >= 0 && !strings.ContainsAny(s[ini+k+3:i], "/?#")
+}
+
 func (m *Masker) interno(h string) bool {
 	for _, d := range m.cfg.DominiosInternos {
 		if d != "" && strings.Contains(h, strings.ToLower(d)) {
@@ -257,7 +270,7 @@ func (m *Masker) detectarBase(s string) []Achado {
 	}
 	if on("email") && strings.IndexByte(s, '@') >= 0 {
 		for _, ix := range reEmail.FindAllStringIndex(s, -1) {
-			if m.emailLiberado(s[ix[0]:ix[1]]) {
+			if m.emailLiberado(s[ix[0]:ix[1]]) || naAutoridadeDeURL(s, ix[0]) {
 				continue
 			}
 			add(ix[0], ix[1], "email")

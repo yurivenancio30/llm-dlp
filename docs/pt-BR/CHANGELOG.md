@@ -11,6 +11,15 @@ que só interessa a quem mexe no código.
 
 ## [Não lançado]
 
+### Mascaramento
+
+- Uma string de conexão (`esquema://usuario:senha@servidor/banco`) tem cada parte mascarada
+  com o seu tipo. Antes, uma senha sem símbolo era lida como e-mail junto com o servidor
+  (`senha@servidor` virava um pseudônimo de e-mail), uma senha terminada em `!` ou `.` deixava
+  esse caractere em claro, e o servidor tinha um pseudônimo dentro da URL (`host_...`) e outro
+  no resto do texto (`....invalid`). Agora o servidor do domínio interno tem o mesmo
+  pseudônimo em todo lugar, e a senha é mascarada até o `@`.
+
 ### Programa
 
 - O README explica como ligar cada cliente. A instalação fica dividida em instalar o llm-dlp

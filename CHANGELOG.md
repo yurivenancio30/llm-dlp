@@ -11,6 +11,15 @@ matters to whoever changes the code.
 
 ## [Unreleased]
 
+### Masking
+
+- A connection string (`scheme://user:password@server/database`) gets each part masked with
+  its own type. Before, a password with no symbol was read as an e-mail together with the
+  server (`password@server` became an e-mail pseudonym), a password that ended in `!` or `.`
+  left that character in the clear, and the server had one pseudonym inside the URL
+  (`host_...`) and another one elsewhere in the text (`....invalid`). Now the server of the
+  internal domain has the same pseudonym everywhere, and the password is masked up to the `@`.
+
 ### Program
 
 - The README explains how to connect each client. Installation is split into installing

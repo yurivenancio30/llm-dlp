@@ -66,8 +66,9 @@ func (m *Masker) acharSenhas(s, baixo string, add func(ini, fim int, tipo string
 			if re == reSenhaAtrib && reSufixoArquivo.MatchString(s[ix[2]:ix[3]]) {
 				continue // nome de arquivo: "PasswordEncoder.java:123", "secrets.yaml: ..."
 			}
-			for fim > ini && strings.ContainsRune(".,;:!?)]}", rune(s[fim-1])) {
-				fim-- // pontuação da frase, não da senha
+			// pontuação da frase, não da senha. Na URL, não: a senha vai até o "@" (Senha!@host)
+			for re != reSenhaURL && fim > ini && strings.ContainsRune(".,;:!?)]}", rune(s[fim-1])) {
+				fim--
 			}
 			if fim-ini >= 3 && pareceSenha(s[ini:fim], fraca) {
 				add(ini, fim, "segredo")
