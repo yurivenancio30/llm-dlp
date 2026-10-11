@@ -3404,6 +3404,13 @@ pedido. Aplicar a memória é um passo depois do memo e não muda a chave do mem
 - **Não reescreve o passado.** O que já foi enviado continua congelado (`memoria_enviados.go`): as
   decisões novas valem só para texto que ainda não saiu. Um texto antigo que trazia a palavra
   em claro continua igual, para o cache de prompt da API continuar valendo.
+- **O texto do Claude Code é prosa.** O system e as definições das ferramentas são mandados
+  antes da conversa e ficam congelados; quando o registro recomeça (versão ou configuração
+  nova), são mascarados de novo, agora com a memória da conversa inteira. Uma tabela `billing`
+  trocava a palavra dentro do cabeçalho `x-anthropic-billing-header`, e a API passava a
+  responder 429 a toda mensagem daquela conversa. Nesses textos a palavra comum que chega
+  pela memória fica como palavra (como na prosa), e o cabeçalho e a frase de identidade do
+  Claude Code passam intactos, com prova pela forma exata (`proxy/requisicao.go`).
 - **Vale para** as mensagens do usuário e as saídas de comando. Não vale para os blocos de
   thinking (intocados nos dois sentidos) nem para o texto do assistente (ver *Quem escreveu*).
 - **Palavra genérica não entra.** Uma palavra da referência pública derivada (`default`,

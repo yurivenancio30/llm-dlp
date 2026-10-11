@@ -11,6 +11,17 @@ matters to whoever changes the code.
 
 ## [Unreleased]
 
+### Masking
+
+- **Claude Code's own text is no longer damaged.** A common word that the conversation
+  learned as a name (a `billing` table) was replaced inside the system prompt and the tool
+  definitions whenever they were masked again (after an update, for example). With the word
+  replaced inside `x-anthropic-billing-header`, the API stopped recognizing Claude Code and
+  answered 429 to every message of that conversation, which stayed stuck. Now a common word
+  stays a word in these texts (as in the prose of the messages), and Claude Code's header and
+  identity sentence go through untouched, proven by their exact shape. A conversation that
+  was stuck works again after the update.
+
 ### Program
 
 - Fewer files at the root of the repository: `CONTRIBUTING.md` and `SECURITY.md` moved to

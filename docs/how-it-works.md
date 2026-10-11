@@ -86,6 +86,21 @@ OCR makes mistakes (it reads `@` as `Q`, for example), in images llm-dlp covers 
 needed: everything that looks like an e-mail, domain, IP or long number. A PDF with text
 becomes masked text; a scanned PDF becomes covered images.
 
+## Claude Code's own text
+
+The system prompt and the tool definitions are written by Claude Code, but they can carry
+your data (the working folder, `CLAUDE.md`, the description of an MCP tool). They are masked
+like everything else, with two differences:
+
+- A common word that the conversation learned as a name (a `billing` table) stays a word in
+  these texts, as in the prose of the messages. Where it is the name (in the data, in a
+  command), it is masked.
+- The two blocks Claude Code uses to identify itself to the API go through untouched: the
+  `x-anthropic-billing-header` header (only with its exact shape: short `name=value` pairs,
+  no free text) and the identity sentence (only when it is, whole, one of its public
+  sentences). With one word replaced in them, the API stops recognizing Claude Code and
+  answers 429 to every message of that conversation.
+
 ## Tools that go out to the internet
 
 When Claude uses a tool, the pseudonym is swapped for the real value before the tool runs.

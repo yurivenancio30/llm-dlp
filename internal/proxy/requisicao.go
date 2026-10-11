@@ -9,6 +9,7 @@ import (
 	"hash"
 	"io"
 	"net/http"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -224,8 +225,17 @@ type walker struct {
 	assist bool
 	// mensagem: dentro do conteúdo de uma mensagem (fora de um resultado de ferramenta)
 	mensagem bool
-	// prosa: texto da mensagem, do usuário ou do assistente (não entrada nem saída de ferramenta)
+	// prosa: texto da mensagem, do usuário ou do assistente (não entrada nem saída de ferramenta),
+	// e texto do cliente
 	prosa bool
+	// cliente: system ou definição de ferramenta, o texto que o Claude Code escreve (instruções,
+	// descrições, schema). É mascarado como os outros, mas a palavra comum que a conversa
+	// aprendeu como nome fica como palavra (como na prosa): "billing" é tabela no dado e palavra
+	// na instrução.
+	cliente bool
+	// fixo: bloco de texto do system, onde o texto fixo do cliente (textoFixoDoCliente) passa
+	// intacto
+	fixo bool
 }
 
 // midia trata um bloco de imagem/PDF; devolve os blocos que o substituem.
@@ -262,6 +272,10 @@ func ehBase64(b map[string]any) bool {
 func (w walker) s(v string) string {
 	if w.assist && !w.daWeb {
 		return w.escrito(v)
+	}
+	if w.fixo && textoFixoDoCliente(v) {
+		w.pos.doTexto() // não é dado nem fonte de decisão
+		return v
 	}
 	if f, _ := mask.SepararFonte(w.dica); w.col != nil && f == mask.FonteSistema {
 		w.pos.doTexto() // catálogo de sistema: não é fonte de decisão (mask/memoria_rastreamento.go)
@@ -303,6 +317,28 @@ func (w walker) escrito(v string) string {
 	out, e := mascarar(v, w.daWeb, w.pos.doTexto(), w.dica)
 	*w.ents = append(*w.ents, e...)
 	return out
+}
+
+// Texto fixo do cliente: os dois blocos do system com que o Claude Code se identifica à API. A
+// API só aceita a requisição como do Claude Code com eles intactos; com uma palavra trocada, ela
+// responde 429 a toda mensagem da conversa. Não levam dado do usuário, e só passam com prova:
+//
+//   - o cabeçalho ("x-anthropic-billing-header: cc_version=2.1.296.c17; cc_entrypoint=cli;") pela
+//     forma exata: o nome dele e pares nome=valor curtos, sem espaço nem texto livre;
+//   - a frase de identidade por ser, inteira, uma das frases públicas do Claude Code.
+//
+// O mesmo texto com qualquer coisa a mais é um texto como os outros.
+var (
+	reCabecalhoCliente = regexp.MustCompile(`^x-anthropic-billing-header:( ?[a-z][a-z0-9_]{1,23}=[A-Za-z0-9._-]{1,64};)+ ?$`)
+	frasesDoCliente    = map[string]bool{
+		"You are Claude Code, Anthropic's official CLI for Claude.":                                      true,
+		"You are Claude Code, Anthropic's official CLI for Claude, running within the Claude Agent SDK.": true,
+		"You are a Claude agent, built on Anthropic's Claude Agent SDK.":                                 true,
+	}
+)
+
+func textoFixoDoCliente(v string) bool {
+	return frasesDoCliente[v] || len(v) <= 400 && reCabecalhoCliente.MatchString(v)
 }
 
 // web: as ferramentas da lista ferramentas_sem_desmascarar (WebFetch, WebSearch) trazem
@@ -550,7 +586,9 @@ func (w walker) requisicaoAnthropic(v any) any {
 		}
 		switch k {
 		case "system":
-			req[k] = w.conteudo(val)
+			ws := w
+			ws.cliente, ws.fixo = true, true
+			req[k] = ws.conteudo(val)
 		case "messages":
 			if msgs, ok := val.([]any); ok {
 				w.idsWeb = w.idsDaWeb(msgs)
@@ -572,6 +610,7 @@ func (w walker) requisicaoAnthropic(v any) any {
 				for _, t := range ts {
 					if tm, ok := t.(map[string]any); ok {
 						w.unidade(tm, func(w walker) {
+							w.cliente, w.prosa = true, true
 							for _, tk := range chaves(tm) {
 								if tk != "name" && tk != "type" {
 									tm[tk] = w.generico(tm[tk])
@@ -599,7 +638,7 @@ func (w walker) conteudo(v any) any {
 	case string:
 		var out string
 		w.unidade(c, func(w walker) {
-			w.prosa = w.mensagem
+			w.prosa = w.mensagem || w.cliente
 			out = w.s(c)
 		})
 		return out
@@ -638,7 +677,7 @@ func (w walker) bloco(b map[string]any) map[string]any {
 		return b // gerados do lado da API
 	case "text":
 		if s, ok := b["text"].(string); ok {
-			w.prosa = w.mensagem
+			w.prosa = w.mensagem || w.cliente
 			b["text"] = w.s(s)
 		}
 		return b

@@ -85,6 +85,21 @@ OCR erra (lê `@` como `Q`, por exemplo), em imagem o llm-dlp cobre a mais: tudo
 e-mail, domínio, IP ou número longo. PDF com texto vira texto mascarado; PDF escaneado vira
 imagens cobertas.
 
+## O texto do próprio Claude Code
+
+O system e as definições das ferramentas são escritos pelo Claude Code, mas podem levar dado
+seu (a pasta de trabalho, o `CLAUDE.md`, a descrição de uma ferramenta de MCP). São mascarados
+como o resto, com duas diferenças:
+
+- A palavra comum que a conversa aprendeu como nome (uma tabela `billing`) fica como palavra
+  nesses textos, como na prosa das mensagens. Onde ela é o nome (no dado, num comando), é
+  mascarada.
+- Os dois blocos com que o Claude Code se identifica à API passam intactos: o cabeçalho
+  `x-anthropic-billing-header` (só com a forma exata: pares `nome=valor` curtos, sem texto
+  livre) e a frase de identidade (só quando é, inteira, uma das frases públicas dele). Com
+  uma palavra trocada neles, a API deixa de reconhecer o Claude Code e responde 429 a toda
+  mensagem daquela conversa.
+
 ## Ferramentas que vão para a internet
 
 Quando o Claude usa uma ferramenta, o pseudônimo é trocado pelo valor real antes de ela

@@ -3410,6 +3410,13 @@ request. Applying the memory is a step after the memo and does not change the me
 - **It does not rewrite the past.** What was already sent stays frozen (`memoria_enviados.go`): the
   new decisions hold only for text that has not gone out yet. An old text that brought the word
   in the clear stays the same, so the API's prompt cache stays valid.
+- **Claude Code's text is prose.** The system prompt and the tool definitions are sent before
+  the conversation and stay frozen; when the record restarts (new version or configuration),
+  they are masked again, now with the memory of the whole conversation. A `billing` table
+  replaced the word inside the `x-anthropic-billing-header` header, and the API started
+  answering 429 to every message of that conversation. In these texts a common word that
+  arrives through the memory stays a word (as in prose), and Claude Code's header and identity
+  sentence go through untouched, proven by their exact shape (`proxy/requisicao.go`).
 - **It applies to** the user's messages and the command outputs. It does not apply to
   thinking blocks (untouched in both directions) nor to the assistant's text (see *Who wrote it*).
 - **A generic word does not enter.** A word of the derived public reference (`default`,

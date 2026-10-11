@@ -11,6 +11,17 @@ que só interessa a quem mexe no código.
 
 ## [Não lançado]
 
+### Mascaramento
+
+- **O texto do próprio Claude Code não é mais estragado.** A palavra comum que a conversa
+  aprendeu como nome (uma tabela `billing`) era trocada dentro do system e das definições
+  das ferramentas sempre que eles eram mascarados de novo (depois de uma atualização, por
+  exemplo). Com a palavra trocada dentro do `x-anthropic-billing-header`, a API deixava de
+  reconhecer o Claude Code e respondia 429 a toda mensagem daquela conversa, que ficava
+  presa. Agora a palavra comum fica como palavra nesses textos (como na prosa das
+  mensagens), e o cabeçalho e a frase de identidade do Claude Code passam intactos, com
+  prova pela forma exata. A conversa que estava presa volta a funcionar depois de atualizar.
+
 ### Programa
 
 - Menos arquivos na raiz do repositório: `CONTRIBUTING.md` e `SECURITY.md` foram para
