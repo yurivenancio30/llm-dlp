@@ -306,8 +306,10 @@ func simular(args []string) error {
 func simularSessao(arq string, cfg config.Config, m *mask.Masker, limite, janela int) error {
 	// a API falsa: guarda o corpo que recebeu e devolve, em pedaços, o último texto
 	var recebido []byte
+	ecoCortado := false
 	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		recebido, _ = io.ReadAll(r.Body)
+		ecoCortado = false
 		var req struct {
 			Messages []struct {
 				Content any `json:"content"`
@@ -321,6 +323,7 @@ func simularSessao(arq string, cfg config.Config, m *mask.Masker, limite, janela
 			}
 		}
 		if len(eco) > 4000 {
+			ecoCortado = true
 			eco = eco[:4000]
 			for len(eco) > 0 && eco[len(eco)-1]&0xC0 == 0x80 {
 				eco = eco[:len(eco)-1]
@@ -391,13 +394,23 @@ func simularSessao(arq string, cfg config.Config, m *mask.Masker, limite, janela
 		escritas, escritasMascaradas, escritasDif, escritasComSobra, escritasWeb int
 		difPorFerramenta                                                         = map[string]int{}
 	)
+	// a conversa de um subagente: no arquivo da sessão, vem marcada como lateral (isSidechain) e é
+	// pulada; no arquivo do próprio subagente (subagents/agent-*.jsonl), é toda lateral e é ela
+	// que se repete. Quem decide é a primeira mensagem do arquivo.
+	lateral, primeira := false, true
 	for sc.Scan() && reqs < limite {
 		var e struct {
 			Type        string         `json:"type"`
 			IsSidechain bool           `json:"isSidechain"`
 			Message     map[string]any `json:"message"`
 		}
-		if json.Unmarshal(sc.Bytes(), &e) != nil || e.IsSidechain || (e.Type != "user" && e.Type != "assistant") || e.Message == nil {
+		if json.Unmarshal(sc.Bytes(), &e) != nil || (e.Type != "user" && e.Type != "assistant") || e.Message == nil {
+			continue
+		}
+		if primeira {
+			lateral, primeira = e.IsSidechain, false
+		}
+		if e.IsSidechain != lateral {
 			continue
 		}
 		role, _ := e.Message["role"].(string)
@@ -427,9 +440,6 @@ func simularSessao(arq string, cfg config.Config, m *mask.Masker, limite, janela
 		if ts := textosDoConteudo(mm["content"]); len(ts) > 0 {
 			esperado = ts[len(ts)-1]
 		}
-		if len(esperado) > 4000 {
-			esperado = "" // o eco é cortado: não dá para comparar
-		}
 		recebido = nil
 		t0 := time.Now()
 		resp, err := http.Post(px.URL+"/v1/messages", "application/json", bytes.NewReader(corpo))
@@ -456,8 +466,9 @@ func simularSessao(arq string, cfg config.Config, m *mask.Masker, limite, janela
 			motivos[mot]++
 			continue
 		}
-		// 1) ida e volta
-		if esperado != "" && resposta != esperado {
+		// 1) ida e volta. O eco cortado (o texto mascarado passou de 4000 bytes, mesmo com o
+		// original abaixo disso: o pseudônimo pode ser maior que o valor) não dá para comparar.
+		if esperado != "" && !ecoCortado && resposta != esperado {
 			idaVoltaDif++
 		}
 		// 1b) a escrita: a chamada de ferramenta que "o modelo escreveu" com pseudônimos voltou
@@ -608,6 +619,9 @@ func simularSessao(arq string, cfg config.Config, m *mask.Masker, limite, janela
 		nome = arq[i+1:]
 	}
 	fmt.Printf("### %.8s: %d requisições simuladas (conversa de até %d KB), %d com imagem\n", nome, reqs, janela>>10, imagens)
+	if reqs == 0 {
+		fmt.Println("    ATENÇÃO: nenhuma requisição repetida: o arquivo não tem mensagem do usuário que o simular leia. Nada foi conferido.")
+	}
 	fmt.Printf("    aceitas: %d | recusadas pelo llm-dlp: %d %v | erros de conexão: %d\n", reqs-recusadas, recusadas, motivos, erros)
 	fmt.Printf("    resposta voltou diferente do original: %d\n", idaVoltaDif)
 	fmt.Printf("    escrita (chamada de ferramenta que o modelo escreve com pseudônimos): %d conferidas, %d tinham valor mascarado\n", escritas, escritasMascaradas)
