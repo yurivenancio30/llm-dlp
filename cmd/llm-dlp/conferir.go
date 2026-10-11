@@ -16,6 +16,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"reflect"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -188,6 +190,26 @@ func simularSessao(arq string, cfg config.Config, m *mask.Masker, limite, janela
 				"delta": map[string]any{"type": "text_delta", "text": string(rs[i:min(i+9, len(rs))])}})
 		}
 		ev("content_block_stop", map[string]any{"type": "content_block_stop", "index": 0})
+		// a escrita: a última chamada de ferramenta da conversa volta como se o modelo a tivesse
+		// escrito agora, com os pseudônimos que recebeu, em pedaços (como a API manda)
+		var conteudos []any
+		for _, m := range req.Messages {
+			conteudos = append(conteudos, m.Content)
+		}
+		if uso := ultimoUso(conteudos); uso != nil {
+			ev("content_block_start", map[string]any{"type": "content_block_start", "index": 1,
+				"content_block": map[string]any{"type": "tool_use", "id": "toolu_simulacao", "name": uso["name"], "input": map[string]any{}}})
+			var in bytes.Buffer
+			enc := json.NewEncoder(&in)
+			enc.SetEscapeHTML(false)
+			enc.Encode(uso["input"])
+			rs := []rune(strings.TrimRight(in.String(), "\n"))
+			for i := 0; i < len(rs); i += 11 {
+				ev("content_block_delta", map[string]any{"type": "content_block_delta", "index": 1,
+					"delta": map[string]any{"type": "input_json_delta", "partial_json": string(rs[i:min(i+11, len(rs))])}})
+			}
+			ev("content_block_stop", map[string]any{"type": "content_block_stop", "index": 1})
+		}
 	}))
 	defer api.Close()
 	cfg.Upstream = api.URL
@@ -217,6 +239,10 @@ func simularSessao(arq string, cfg config.Config, m *mask.Masker, limite, janela
 		tiposSobra                                                                 = map[string]int{}
 	)
 	depurar := map[string]int{}
+	var (
+		escritas, escritasMascaradas, escritasDif, escritasComSobra, escritasWeb int
+		difPorFerramenta                                                         = map[string]int{}
+	)
 	for sc.Scan() && reqs < limite {
 		var e struct {
 			Type        string         `json:"type"`
@@ -263,8 +289,9 @@ func simularSessao(arq string, cfg config.Config, m *mask.Masker, limite, janela
 			erros++
 			continue
 		}
-		resposta := lerTextoSSE(resp.Body)
+		corpoResp, _ := io.ReadAll(resp.Body)
 		resp.Body.Close()
+		resposta := lerTextoSSE(bytes.NewReader(corpoResp))
 		tempos = append(tempos, time.Since(t0))
 		reqs++
 		if resp.StatusCode != 200 {
@@ -284,6 +311,48 @@ func simularSessao(arq string, cfg config.Config, m *mask.Masker, limite, janela
 		// 1) ida e volta
 		if esperado != "" && resposta != esperado {
 			idaVoltaDif++
+		}
+		// 1b) a escrita: a chamada de ferramenta que "o modelo escreveu" com pseudônimos voltou
+		// igual à original? É o que o Claude Code grava no arquivo ou roda no terminal.
+		var conteudos []any
+		for _, c := range conversa {
+			conteudos = append(conteudos, c.raw["content"])
+		}
+		if uso := ultimoUso(conteudos); uso != nil {
+			nome, _ := uso["name"].(string)
+			voltou, ok := entradaDaResposta(corpoResp)
+			switch {
+			case cfg.SemDesmascarar(nome):
+				escritasWeb++ // vai para a internet: fica com os pseudônimos, de propósito
+			case ok:
+				escritas++
+				orig, _ := json.Marshal(uso["input"])
+				var env struct {
+					Messages []struct {
+						Content any `json:"content"`
+					} `json:"messages"`
+				}
+				json.Unmarshal(recebido, &env)
+				var enviados []any
+				for _, m := range env.Messages {
+					enviados = append(enviados, m.Content)
+				}
+				if e := ultimoUso(enviados); e != nil {
+					if b, _ := json.Marshal(e["input"]); !bytes.Equal(b, orig) {
+						escritasMascaradas++
+					}
+				}
+				var a, b any
+				json.Unmarshal(orig, &a)
+				json.Unmarshal(voltou, &b)
+				if !reflect.DeepEqual(a, b) {
+					escritasDif++
+					difPorFerramenta[nome]++
+					if len(reCaraDePseudo.FindAll(voltou, -1)) > len(reCaraDePseudo.FindAll(orig, -1)) {
+						escritasComSobra++
+					}
+				}
+			}
 		}
 		// 2) algo que o próprio llm-dlp detectou sobrou em outro ponto do que foi enviado?
 		var env struct {
@@ -393,10 +462,53 @@ func simularSessao(arq string, cfg config.Config, m *mask.Masker, limite, janela
 	fmt.Printf("### %.8s: %d requisições simuladas (conversa de até %d KB), %d com imagem\n", nome, reqs, janela>>10, imagens)
 	fmt.Printf("    aceitas: %d | recusadas pelo llm-dlp: %d %v | erros de conexão: %d\n", reqs-recusadas, recusadas, motivos, erros)
 	fmt.Printf("    resposta voltou diferente do original: %d\n", idaVoltaDif)
+	fmt.Printf("    escrita (chamada de ferramenta que o modelo escreve com pseudônimos): %d conferidas, %d tinham valor mascarado\n", escritas, escritasMascaradas)
+	fmt.Printf("    escrita que voltou diferente da original: %d %v, das quais %d com pseudônimo sobrando | para a internet (ficam mascaradas): %d\n",
+		escritasDif, difPorFerramenta, escritasComSobra, escritasWeb)
 	fmt.Printf("    valor detectado que sobrou em outro ponto da requisição: %d ocorrências em %d requisições %v\n", sobras, comSobra, tiposSobra)
 	fmt.Printf("    requisições em que uma mensagem antiga mudou (cache refeito): %d\n", mudouCache)
 	fmt.Printf("    tempo por requisição (ida, API falsa e volta): mediana %s | 95%% abaixo de %s | máximo %s\n", q(.5), q(.95), q(1))
 	return nil
+}
+
+// reCaraDePseudo: o que tem a forma de um pseudônimo do llm-dlp (para contar o que sobrou).
+var reCaraDePseudo = regexp.MustCompile(`p\.[a-z2-7]{8}@d[a-z2-7]{4}\.invalid|\bh[a-z2-7]{8}\.invalid|\b[a-z]{1,5}_[a-z2-7]{8}\b|\b[A-Z]{2,12}-[a-z2-7]{8}\b|Pessoa [a-z2-7]{8}`)
+
+// ultimoUso: a última chamada de ferramenta (tool_use) dos conteúdos das mensagens.
+func ultimoUso(conteudos []any) map[string]any {
+	for i := len(conteudos) - 1; i >= 0; i-- {
+		blocos, _ := conteudos[i].([]any)
+		for j := len(blocos) - 1; j >= 0; j-- {
+			if b, _ := blocos[j].(map[string]any); b != nil && b["type"] == "tool_use" {
+				return b
+			}
+		}
+	}
+	return nil
+}
+
+// entradaDaResposta junta a entrada da chamada de ferramenta de uma resposta em streaming.
+func entradaDaResposta(b []byte) ([]byte, bool) {
+	var out bytes.Buffer
+	achou := false
+	for _, l := range strings.Split(string(b), "\n") {
+		if !strings.HasPrefix(l, "data: ") {
+			continue
+		}
+		var ev struct {
+			Type  string
+			Delta struct {
+				Type        string
+				PartialJSON string `json:"partial_json"`
+			}
+		}
+		json.Unmarshal([]byte(l[6:]), &ev)
+		if ev.Delta.Type == "input_json_delta" {
+			achou = true
+			out.WriteString(ev.Delta.PartialJSON)
+		}
+	}
+	return out.Bytes(), achou
 }
 
 // lerTextoSSE junta o texto de uma resposta em streaming (ou devolve o corpo, se for um erro).
