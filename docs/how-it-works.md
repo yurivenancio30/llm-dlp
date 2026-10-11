@@ -23,7 +23,7 @@ result for each text. Only what is new is examined.
 | Real value | What the API sees |
 |---|---|
 | `joao.silva@empresa.com.br` | `p.mxvotcyt@didl3.invalid` |
-| `JOAO CARLOS SILVA` | `Pessoa mxvotcyt` (same identifier as the e-mail, if it is the same person) |
+| `Joao Carlos Silva` / `JOAO CARLOS SILVA` | `Pessoa mxvotcyt` / `PESSOA MXVOTCYT` (same identifier as the e-mail, if it is the same person; the case follows the name, and each spelling comes back as it was) |
 | `B123456` (João's user code) | `USUARIO-mxvotcyt` |
 | `10.42.7.15` | `250.153.31.15` (the same subnet becomes the same fake subnet) |
 | `mysql-dh.empresa.intra` | `mysql-x7k2.invalid` |

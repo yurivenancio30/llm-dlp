@@ -23,8 +23,14 @@ que só interessa a quem mexe no código.
   em que aparece. Ele identifica um recurso do cliente (um workspace do Fabric, um tenant do
   Azure). O id de um aplicativo OAuth (`client_id`, `app_id`) fica: ele não é segredo (RFC 6749,
   2.2).
-- Os dois casos foram achados repetindo uma sessão real do Microsoft Fabric: nomes que o
-  próprio llm-dlp tinha reconhecido saíam sem máscara em saídas de comando novas.
+- O pseudônimo de uma pessoa segue a caixa do nome: `MARIA DA SILVA` vira `PESSOA ABCD2345`,
+  `maria da silva` vira `pessoa abcd2345`, `Maria da Silva` continua `Pessoa abcd2345` (a mesma
+  pessoa, o mesmo identificador). Antes, toda grafia voltava como a primeira vista na conversa:
+  um relatório que o modelo escrevia com o nome em maiúsculas era gravado com outra caixa, e um
+  Edit com o nome em maiúsculas no `old_string` podia não casar com o arquivo.
+- Os casos foram achados repetindo uma sessão real do Microsoft Fabric: nomes que o próprio
+  llm-dlp tinha reconhecido saíam sem máscara em saídas de comando novas, e 7 das 7.790
+  gravações de arquivo e comandos voltavam com um nome de pessoa em outra caixa.
 
 ### Programa
 

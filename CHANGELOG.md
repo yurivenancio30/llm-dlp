@@ -22,8 +22,15 @@ matters to whoever changes the code.
   `tenant_id=X`, `"id": "X"`) is masked as a document, and from then on in the other places it
   appears. It identifies a resource of the client (a Fabric workspace, an Azure tenant). The id
   of an OAuth application (`client_id`, `app_id`) stays: it is not a secret (RFC 6749, 2.2).
-- Both were found replaying a real Microsoft Fabric session: names that llm-dlp itself had
-  recognized went out unmasked in new command output.
+- The pseudonym of a person follows the case of the name: `MARIA DA SILVA` becomes
+  `PESSOA ABCD2345`, `maria da silva` becomes `pessoa abcd2345`, `Maria da Silva` stays
+  `Pessoa abcd2345` (the same person, the same identifier). Before, every spelling came back
+  as the first one seen in the conversation: a report the model wrote with the name in capitals
+  was saved with it capitalized differently, and an Edit whose `old_string` had the name in
+  capitals could fail to match the file.
+- These were found replaying a real Microsoft Fabric session: names that llm-dlp itself had
+  recognized went out unmasked in new command output, and 7 of the 7,790 file writes and
+  commands came back with a person's name in another case.
 
 ### Program
 
