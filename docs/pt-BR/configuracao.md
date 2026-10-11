@@ -45,7 +45,8 @@ Nomes aceitos em `detectores_desligados`: `segredo`, `email`, `ip`, `host`, `cpf
 | `llm-dlp testar < arquivo` | Mostra a versão mascarada de um texto |
 | `llm-dlp testar-midia ARQ DIR` | Processa uma imagem ou PDF e grava o resultado em DIR |
 | `llm-dlp medir ARQ.jsonl` | Tempo e cobertura sobre uma sessão antiga do Claude Code (só contagens) |
-| `llm-dlp versao` | Versão e commit do binário |
+| `llm-dlp versao` | Versão e commit do binário (também `--version`) |
+| `llm-dlp ajuda` | A lista de comandos (também `--help`) |
 
 `garantir`, `verificar`, `servir` e `supervisionar` são internos: quem chama são os ganchos
 do Claude Code e o supervisor.

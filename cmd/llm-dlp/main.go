@@ -13,41 +13,62 @@ import (
 
 // llm-dlp: ponto de entrada e lista de comandos.
 
-const ajuda = `llm-dlp — mascara dado sensível entre você e a LLM
+const ajuda = `llm-dlp %s — mascara dado sensível entre você e a LLM (Claude Code)
 
-Instalação
-  llm-dlp instalar              instala e configura tudo, explicando cada passo
+Uso: llm-dlp COMANDO [argumentos]
+
+Instalar e atualizar
+  llm-dlp instalar              instala e configura tudo, explicando cada passo (pode rodar de novo)
   sudo llm-dlp instalar-trava   (recomendado) o Claude Code só funciona passando pelo llm-dlp
-  llm-dlp desinstalar           desfaz a configuração do Claude Code (sudo llm-dlp desinstalar-trava para a trava)
+  llm-dlp desinstalar           desfaz a configuração do Claude Code
+  sudo llm-dlp desinstalar-trava
+                                tira a trava
+  Para atualizar: rode o install.sh de novo (o comando está no README), feche o Claude Code
+  e rode "llm-dlp parar".
 
-Uso diário (normalmente você não precisa de nada disto)
-  llm-dlp status                mostra se está no ar e em que modo
+Dia a dia (normalmente você não precisa de nada disto)
+  llm-dlp status                mostra se está no ar, em qual versão, e o que falta (OCR, binário novo)
+  llm-dlp parar                 para o llm-dlp, com o Claude Code fechado; ele volta sozinho na próxima
+                                mensagem, já com o programa e a configuração novos
   llm-dlp importar-pessoas ARQ.csv --grupo COD:NOME:EMAIL [--separador-nome /]
-                                ensina nomes/e-mails de pessoas (guardados só como hash)
+                                ensina nomes e e-mails de pessoas (guardados só como hash)
   sudo llm-dlp emergencia [30m|sair]
                                 se o llm-dlp quebrar: libera o Claude SEM máscara por tempo limitado
 
-Diagnóstico
+Conferir o que é mascarado
   llm-dlp ultima [N]            mostra as últimas N mensagens como a API recebeu (já mascaradas)
-  llm-dlp simular SESSAO.jsonl  reproduz uma sessão antiga do Claude Code pelo llm-dlp, sem falar com a API, e confere
-  llm-dlp colunas ARQ           mostra como os campos de um arquivo são entendidos (o que será mascarado)
-  llm-dlp testar < arquivo      mostra a versão mascarada de um texto
-  llm-dlp testar-midia ARQ DIR  processa uma imagem/PDF como o proxy e grava o resultado em DIR
-  llm-dlp medir ARQ.jsonl...    custo e cobertura sobre transcripts (só contagens)
-  llm-dlp versao
+  llm-dlp testar < ARQ          mostra a versão mascarada de um texto
+  llm-dlp testar-midia ARQ DIR  processa uma imagem ou PDF como o proxy e grava o resultado em DIR
+  llm-dlp colunas ARQ           mostra como os campos de um arquivo são entendidos
+  llm-dlp simular SESSAO.jsonl  repete uma sessão antiga do Claude Code, sem falar com a API, e confere
+  llm-dlp medir ARQ.jsonl...    tempo e cobertura sobre sessões antigas (só contagens)
 
-Internos (chamados pelos hooks e pelo supervisor)
-  garantir, verificar, servir, supervisionar, parar
+Outros
+  llm-dlp versao                mostra a versão e o commit (também: --version)
+  llm-dlp ajuda                 mostra esta ajuda (também: --help, -h)
+
+Configuração: %s (depois de mudar: llm-dlp parar)
+Log:          %s
+Documentação: https://github.com/yurivenancio30/llm-dlp
+
+Internos (quem chama são os ganchos do Claude Code e o supervisor):
+  garantir, verificar, servir, supervisionar
 `
+
+func textoAjuda() string {
+	return fmt.Sprintf(ajuda, versao.Versao, config.Caminho("config.json"), config.Caminho("llm-dlp.log"))
+}
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Print(ajuda)
+		fmt.Print(textoAjuda())
 		os.Exit(2)
 	}
 	cmd, args := os.Args[1], os.Args[2:]
 	var err error
 	switch cmd {
+	case "ajuda", "help", "--help", "-h":
+		fmt.Print(textoAjuda())
 	case "servir":
 		err = servir()
 	case "supervisionar":
@@ -84,10 +105,11 @@ func main() {
 		err = instalarTrava(false)
 	case "desinstalar-trava":
 		err = instalarTrava(true)
-	case "versao", "--version":
+	case "versao", "--version", "-v":
 		fmt.Println("llm-dlp", versao.Completa())
 	default:
-		fmt.Print(ajuda)
+		fmt.Fprintf(os.Stderr, "llm-dlp: comando desconhecido: %q\n\n", cmd)
+		fmt.Fprint(os.Stderr, textoAjuda())
 		os.Exit(2)
 	}
 	if err != nil {

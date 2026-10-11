@@ -30,6 +30,9 @@ que só interessa a quem mexe no código.
   (continua sem sair nunca) e o modelo recebe um aviso no lugar, com o motivo e o comando
   que instala o OCR. O `llm-dlp status` avisa quando falta o OCR.
 - O log mostra o tipo e a mensagem de um erro da API (`| API: rate_limit_error: ...`).
+- `llm-dlp --help` (e `ajuda`, `-h`) mostra a ajuda e sai com 0; comando desconhecido diz
+  qual foi. A ajuda mostra a versão, como atualizar, o `parar` e onde ficam a configuração
+  e o log.
 - Menos arquivos na raiz do repositório: `CONTRIBUTING.md` e `SECURITY.md` foram para
   `.github/` (o GitHub continua mostrando os dois), e o README em português para
   `docs/pt-BR/README.md`.

@@ -48,7 +48,8 @@ Names accepted in `detectores_desligados`: `segredo`, `email`, `ip`, `host`, `cp
 | `llm-dlp testar < file` | Shows the masked version of a text |
 | `llm-dlp testar-midia FILE DIR` | Processes an image or PDF and writes the result to DIR |
 | `llm-dlp medir FILE.jsonl` | Time and coverage over an old Claude Code session (counts only) |
-| `llm-dlp versao` | Version and commit of the binary |
+| `llm-dlp versao` | Version and commit of the binary (also `--version`) |
+| `llm-dlp ajuda` | The list of commands (also `--help`) |
 
 `garantir`, `verificar`, `servir` and `supervisionar` are internal: they are called by the
 Claude Code hooks and by the supervisor.
