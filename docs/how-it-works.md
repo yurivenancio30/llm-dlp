@@ -189,7 +189,7 @@ How to read it:
 ## The log
 
 Each request produces one line in `~/.config/llm-dlp/llm-dlp.log`, with counts and times
-only:
+(never values):
 
 ```
 POST /v1/messages -> 200 | 245 substituições | 0 colisões | mascarar 9ms | total 2.97s
@@ -202,5 +202,6 @@ POST /v1/messages -> 200 | 245 substituições | 0 colisões | mascarar 9ms | to
 | `colisões` | Pseudonyms that would stand for two different real values. Pseudonyms are short, so this is rare but possible, and more common with IPs (the fake subnet has few combinations). The outbound text stays masked; only the swap back of that pseudonym is not made, so it is not replaced with the wrong value. At worst, you see a pseudonym in a response |
 | `mascarar` | Time spent by llm-dlp |
 | `total` | Total time, dominated by the model's response |
+| `API: type: message` | Only when the API answers with an error: its type and the beginning of its message, as it came (the API only received pseudonyms). It is what tells, for example, a 429 for the account limit from a 429 for a rejected request |
 
 An `AVISO` line says why an image or a PDF was removed from a request.

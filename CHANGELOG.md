@@ -29,6 +29,7 @@ matters to whoever changes the code.
   refused with a 502, on every message from then on. Now the file is removed from the
   request (it still never goes out) and the model gets a note in its place, with the reason
   and the command that installs OCR. `llm-dlp status` warns when OCR is missing.
+- The log shows the type and the message of an API error (`| API: rate_limit_error: ...`).
 - Fewer files at the root of the repository: `CONTRIBUTING.md` and `SECURITY.md` moved to
   `.github/` (GitHub still shows them), and the Portuguese README to `docs/pt-BR/README.md`.
 

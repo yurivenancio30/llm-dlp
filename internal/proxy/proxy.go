@@ -83,6 +83,7 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	var entradas []mask.Entrada
 	var lote *mask.Lote
+	semMascara := false
 	if len(bytes.TrimSpace(corpo)) > 0 {
 		novo, ents, l, err := p.mascararCorpo(r, corpo)
 		if err != nil {
@@ -92,6 +93,7 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			p.log.Printf("AVISO %s %s: enviado sem máscara (%v)", r.Method, r.URL.Path, err)
+			semMascara = true
 		} else {
 			corpo, entradas, lote = novo, ents, l
 			if strings.HasPrefix(r.URL.Path, "/v1/messages") && !strings.Contains(r.URL.Path, "count_tokens") && len(corpo) > 2000 {
@@ -136,15 +138,22 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(resp.StatusCode)
 
 	ct := resp.Header.Get("content-type")
+	erroAPI := ""
 	switch {
 	case strings.HasPrefix(ct, "text/event-stream"):
 		err = p.desmascararSSE(w, resp.Body, tab)
-	case strings.Contains(ct, "json") && !tab.Vazia():
+	case strings.Contains(ct, "json") && (!tab.Vazia() || resp.StatusCode >= 400):
 		var b []byte
 		b, err = io.ReadAll(resp.Body)
 		if err == nil {
-			_, err = w.Write(desmascararJSONResposta(b, tab, p.cfg.SemDesmascarar,
-				func(s string) string { return p.m.RegistrarResposta(s, tab) }))
+			if resp.StatusCode >= 400 && !semMascara {
+				erroAPI = resumoDoErro(b)
+			}
+			if !tab.Vazia() {
+				b = desmascararJSONResposta(b, tab, p.cfg.SemDesmascarar,
+					func(s string) string { return p.m.RegistrarResposta(s, tab) })
+			}
+			_, err = w.Write(b)
 		}
 	default:
 		_, err = io.Copy(w, resp.Body)
@@ -153,8 +162,28 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		p.vistos.SalvarSeSujo()
 	}
 	p.m.Persistir()
-	p.log.Printf("%s %s -> %d | %d substituições | %d colisões | mascarar %s | total %s%s", r.Method, r.URL.Path, resp.StatusCode,
-		len(entradas), tab.Conflitos, tMascara.Round(time.Millisecond), time.Since(t0).Round(time.Millisecond), errSufixo(err))
+	p.log.Printf("%s %s -> %d | %d substituições | %d colisões | mascarar %s | total %s%s%s", r.Method, r.URL.Path, resp.StatusCode,
+		len(entradas), tab.Conflitos, tMascara.Round(time.Millisecond), time.Since(t0).Round(time.Millisecond), erroAPI, errSufixo(err))
+}
+
+// resumoDoErro: o tipo e o começo da mensagem de um erro da API, como ela mandou, para o log
+// (um 429 de limite da conta e um 429 de requisição recusada só se distinguem pela mensagem).
+// A API só recebeu pseudônimos, e a mensagem não passa pela volta: não há dado real nela.
+func resumoDoErro(b []byte) string {
+	var e struct {
+		Error struct {
+			Type    string `json:"type"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if json.Unmarshal(b, &e) != nil || e.Error.Type == "" && e.Error.Message == "" {
+		return ""
+	}
+	msg := []rune(strings.Join(strings.Fields(e.Error.Message), " "))
+	if len(msg) > 200 {
+		msg = append(msg[:200], '…')
+	}
+	return " | API: " + e.Error.Type + ": " + string(msg)
 }
 
 func errSufixo(err error) string {

@@ -182,3 +182,33 @@ func TestMidiaBloqueadaPelaConfiguracao(t *testing.T) {
 		t.Error("o PDF bloqueado saiu")
 	}
 }
+
+// O erro da API vai para o log com o tipo e a mensagem (é o que distingue um 429 de outro).
+func TestErroDaAPINoLog(t *testing.T) {
+	lg := &logSeguro{}
+	cfg := config.Padrao()
+	m, err := mask.NovoMasker(cfg, []byte("0123456789abcdef0123456789abcdef"), nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("content-type", "application/json")
+		w.WriteHeader(429)
+		w.Write([]byte(`{"type":"error","error":{"type":"rate_limit_error","message":"This request would exceed\n your limit"}}`))
+	}))
+	cfg.Upstream = up.URL
+	px := httptest.NewServer(Novo(cfg, m, nil, log.New(lg, "", 0)))
+	defer func() { up.Close(); px.Close() }()
+	resp, err := http.Post(px.URL+"/v1/messages", "application/json", strings.NewReader(`{"model":"x","messages":[{"role":"user","content":"oi, tudo bem?"}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != 429 || !bytes.Contains(b, []byte("rate_limit_error")) {
+		t.Fatalf("o erro devia chegar ao cliente como veio: %d %s", resp.StatusCode, b)
+	}
+	if !strings.Contains(lg.String(), "-> 429") || !strings.Contains(lg.String(), "| API: rate_limit_error: This request would exceed your limit") {
+		t.Errorf("log: %s", lg.String())
+	}
+}

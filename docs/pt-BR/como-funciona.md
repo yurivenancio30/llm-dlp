@@ -185,7 +185,8 @@ Como ler:
 
 ## O log
 
-Cada requisição gera uma linha em `~/.config/llm-dlp/llm-dlp.log`, só com contagens e tempos:
+Cada requisição gera uma linha em `~/.config/llm-dlp/llm-dlp.log`, com contagens e tempos
+(nunca valores):
 
 ```
 POST /v1/messages -> 200 | 245 substituições | 0 colisões | mascarar 9ms | total 2.97s
@@ -198,6 +199,7 @@ POST /v1/messages -> 200 | 245 substituições | 0 colisões | mascarar 9ms | to
 | `colisões` | Pseudônimos que valeriam para dois valores reais diferentes. Os pseudônimos são curtos, então isso é raro, mas possível, e mais comum em IPs (a sub-rede falsa tem poucas combinações). A ida continua mascarada; só a volta daquele pseudônimo não é feita, para não trocar pelo valor errado. No pior caso, você vê um pseudônimo numa resposta |
 | `mascarar` | Tempo gasto pelo llm-dlp |
 | `total` | Tempo total, dominado pela resposta do modelo |
+| `API: tipo: mensagem` | Só quando a API responde com erro: o tipo e o começo da mensagem dela, como ela mandou (ela só recebeu pseudônimos). É o que distingue, por exemplo, um 429 de limite da conta de um 429 de requisição recusada |
 
 Uma linha `AVISO` diz por que uma imagem ou um PDF foi retirado de uma requisição.
 

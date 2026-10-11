@@ -29,6 +29,7 @@ que só interessa a quem mexe no código.
   com 502, em toda mensagem dali em diante. Agora o arquivo é retirado da requisição
   (continua sem sair nunca) e o modelo recebe um aviso no lugar, com o motivo e o comando
   que instala o OCR. O `llm-dlp status` avisa quando falta o OCR.
+- O log mostra o tipo e a mensagem de um erro da API (`| API: rate_limit_error: ...`).
 - Menos arquivos na raiz do repositório: `CONTRIBUTING.md` e `SECURITY.md` foram para
   `.github/` (o GitHub continua mostrando os dois), e o README em português para
   `docs/pt-BR/README.md`.
