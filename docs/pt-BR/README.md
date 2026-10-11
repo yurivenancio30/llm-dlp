@@ -104,9 +104,9 @@ máquina. `pg_dump`, `postgresql` e `5432` ficam como estão: nome público não
 |---|---|---|
 | Claude Code (terminal, VS Code, JetBrains), com assinatura (Pro, Max) ou chave de API | **Estável** | Pelo `llm-dlp instalar`, com trava: o Claude Code se recusa a funcionar fora do llm-dlp |
 | Gemini CLI, com conta Google ou chave de API do Gemini | Beta | À mão, no `~/.bashrc` ([como](#gemini-cli-codex-opencode-e-copilot-beta)). Sem trava |
-| Codex CLI, com assinatura do ChatGPT ou chave de API da OpenAI | Beta | À mão, no `~/.codex/config.toml`. Sem trava |
-| opencode, com o provedor `google` | Beta | À mão, no `~/.bashrc` e no `opencode.json`. Sem trava |
-| GitHub Copilot CLI e VS Code, com a sua chave | Beta | À mão. Sem trava |
+| Codex CLI, com assinatura do ChatGPT ou chave de API da OpenAI | Beta | À mão, no `~/.codex/config.toml` e no `~/.bashrc` ([como](#gemini-cli-codex-opencode-e-copilot-beta)). Sem trava |
+| opencode, com o provedor `google` | Beta | À mão, no `opencode.json` e no `~/.bashrc` ([como](#gemini-cli-codex-opencode-e-copilot-beta)). Sem trava |
+| GitHub Copilot CLI e VS Code, com a sua chave | Beta | À mão, no `~/.bashrc` ([como](#gemini-cli-codex-opencode-e-copilot-beta)). Sem trava |
 | GitHub Copilot com a assinatura do GitHub | **Não atendido** | O Copilot não deixa trocar o endereço dos modelos que o GitHub hospeda |
 
 > [!WARNING]
@@ -191,12 +191,22 @@ confira com `llm-dlp status`.
 > [!WARNING]
 > Beta, e sem trava: leia o aviso em [Clientes atendidos](#clientes-atendidos).
 
-O `llm-dlp instalar` não mexe nesses clientes. Para cada um, você acrescenta ao `~/.bashrc`:
+O `llm-dlp instalar` não mexe nesses clientes. Para cada um, você configura duas coisas:
 
-- **o endereço do llm-dlp** no lugar do endereço da API do cliente;
-- **uma função com o nome do cliente** que sobe o llm-dlp (`llm-dlp garantir`) antes de abrir
-  o cliente. Só o Claude Code sobe o llm-dlp sozinho: sem a função, depois de reiniciar a
-  máquina o cliente recebe "conexão recusada". Nada vaza, mas não funciona.
+- **o endereço do llm-dlp** no lugar do endereço da API do cliente, onde o cliente o lê
+  (tabela abaixo);
+- **uma função com o nome do cliente** no `~/.bashrc`, que sobe o llm-dlp (`llm-dlp garantir`)
+  antes de abrir o cliente. Só o Claude Code sobe o llm-dlp sozinho: sem a função, depois de
+  reiniciar a máquina o cliente recebe "conexão recusada". Nada vaza, mas não funciona.
+
+| Cliente | Conta | Onde vai o endereço |
+|---|---|---|
+| Gemini CLI | Conta Google (*Login with Google*) | `CODE_ASSIST_ENDPOINT`, no `~/.bashrc` |
+| Gemini CLI | Chave de API do Gemini | `GOOGLE_GEMINI_BASE_URL`, no `~/.bashrc` |
+| Codex CLI | Assinatura do ChatGPT | Um provedor no `~/.codex/config.toml` |
+| Codex CLI | Chave de API da OpenAI | Um provedor no `~/.codex/config.toml` |
+| opencode | Chave de API do Gemini | `baseURL` do provedor `google`, no `opencode.json` |
+| GitHub Copilot CLI | A sua chave da OpenAI ou da xAI | `COPILOT_PROVIDER_BASE_URL`, no `~/.bashrc` |
 
 **Gemini CLI.** Cada tipo de conta fala com uma API diferente do Google, com uma linha
 própria. O Vertex AI não é coberto: com ele, **a conversa sai sem máscara**.
@@ -225,7 +235,10 @@ Key* na primeira vez que ele abrir):
 { "security": { "auth": { "selectedType": "gemini-api-key" } } }
 ```
 
-**Codex CLI**, com a sua assinatura do ChatGPT (entre com `codex login`, como sempre):
+**Codex CLI.** O Codex lê o endereço de um provedor no `~/.codex/config.toml` (crie o arquivo
+se ele não existir; o `model_provider` vai no topo, antes de qualquer `[seção]`).
+
+Com a sua assinatura do ChatGPT (entre com `codex login`, como sempre):
 
 ```toml
 # ~/.codex/config.toml
@@ -238,13 +251,29 @@ wire_api = "responses"
 requires_openai_auth = true
 ```
 
+Com **chave de API** da OpenAI:
+
+```toml
+# ~/.codex/config.toml
+model_provider = "llm-dlp"
+
+[model_providers.llm-dlp]
+name = "llm-dlp"
+base_url = "http://127.0.0.1:8787/openai/v1"
+wire_api = "responses"
+env_key = "OPENAI_API_KEY"
+```
+
+E, nos dois casos:
+
 ```bash
 # ~/.bashrc
+export OPENAI_API_KEY="sua-chave"     # só com a chave de API
 codex() { llm-dlp garantir && command codex "$@"; }
 ```
 
-Com chave de API da OpenAI, use `base_url = "http://127.0.0.1:8787/openai/v1"` e
-`env_key = "OPENAI_API_KEY"` no lugar de `requires_openai_auth = true`.
+Só o provedor `llm-dlp` passa pelo llm-dlp: se você trocar o Codex para outro provedor
+(`--profile`, `-c model_provider=...`), ele fala direto com a API.
 
 **opencode**, com o provedor `google`:
 

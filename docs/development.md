@@ -255,17 +255,18 @@ format only runs for requests on its own path, and `isolamento_test.go` checks t
 Code request goes out byte for byte the same with or without it. The destination is chosen
 by the path (`Proxy.destino`, with the `provedores` of the configuration).
 
-What already works and what is missing for a format that has no reader yet (the OpenAI
-Responses API, for example):
+What a format with no reader gets today, and what to do to give it one (`responses.go` is
+the most recent example to follow):
 
-| Part | Today, with another API | What to do |
+| Part | Today, with no reader | What to do |
 |---|---|---|
-| Client | Any client that accepts changing the API address can point to llm-dlp | Set the client's variable (like Claude Code's `ANTHROPIC_BASE_URL`) and `upstream` in `config.json` |
-| Outbound (request) | A path other than `/v1/messages` falls into the generic mode: **every text in the JSON is masked**. It is safe, but masks even fields that did not need it | In `requisicao.go`, write a function like `requisicaoAnthropic` for the new format: which fields carry user text, which may never change, where the images come. Pick the function by the path in `mascararCorpo` |
-| Images | Only the Anthropic format is handled. In the generic mode, an image in another format does not go through OCR | In the new function, send the image blocks to `Midia.Processar` |
-| Inbound without streaming | The `text`, `content` and `input` fields of the JSON are unmasked | Add the fields of the new format in `desmascararJSONResposta` (`resposta.go`) |
-| Inbound with streaming | **It is not unmasked**: you would see the pseudonyms. Nothing leaks | In `resposta.go`, handle the events of the new format the way `desmascararSSE` does: find the field that carries the text and pass it through `mask.Fluxo`, which takes care of a pseudonym split between two chunks |
-| More than one API at the same time | No: there is a single `upstream` | Choose the destination by the request path in `proxy.go` |
+| Address | Any API can be served under `/<name>`, with a provider in `provedores` (`formato` and `upstream`) | For a provider that comes built in, add it to `config.ProvedoresPadrao`. If the format is recognized by the path (like `/chat/completions` and `/responses`), add it to `Proxy.destino` |
+| Outbound (request) | Generic mode: **every text in the JSON is masked**. It is safe, but masks even fields that did not need it | Write `ponteX(v any) (map[string]any, func(), bool)` in a file of its own: a view of the request in the Anthropic shape (`system`, `messages`, `tools`) whose texts are written back to the original JSON by the returned function. Register it in the map of `mascararCorpo` (`requisicao.go`). Fields that may never change go to `chavesIntocaveisPonte` |
+| Images and PDFs | In the generic mode they do not go through OCR | In the bridge, show them as `image` and `document` blocks, as `ponteGemini` does |
+| Inbound without streaming | The `text`, `content` and `input` fields of the JSON are unmasked | Write `desmascararXJSON` and choose it by `formato` in `proxy.go` |
+| Inbound with streaming | **It is not unmasked**: you would see the pseudonyms. Nothing leaks | Write `desmascararSSEX`, with a `voltaX` that passes each text through its own `mask.Fluxo` (it takes care of a pseudonym split between two chunks), and choose it by `formato` in `proxy.go` |
+| `llm-dlp ultima` | Does not show the conversation | Add the `formato` to the list that keeps the last request (`proxy.go`) and read its messages in `mensagensDaUltima` (`cmd/llm-dlp/conferir.go`) |
+| Isolation | — | Add the format to `isolamento_test.go`: malformed requests and responses, and a Claude Code request that stays the same |
 
 The `mask` package depends on no API format: it receives text and returns text. All the work
 for a new API stays in `internal/proxy`.

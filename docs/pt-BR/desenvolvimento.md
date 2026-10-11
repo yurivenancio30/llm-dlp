@@ -235,17 +235,18 @@ do caminho dele, e o `isolamento_test.go` confere que uma requisição do Claude
 byte igual com ou sem ele. O destino é
 escolhido pelo caminho (`Proxy.destino`, com os `provedores` da configuração).
 
-O que já funciona e o que falta para um formato ainda sem leitor (a API Responses da OpenAI,
-por exemplo):
+O que um formato sem leitor tem hoje, e o que fazer para dar um leitor a ele (o
+`responses.go` é o exemplo mais recente a seguir):
 
-| Parte | Hoje, com outra API | O que fazer |
+| Parte | Hoje, sem leitor | O que fazer |
 |---|---|---|
-| Cliente | Qualquer cliente que aceite trocar o endereço da API pode apontar para o llm-dlp | Configurar a variável do cliente (como o `ANTHROPIC_BASE_URL` do Claude Code) e o `upstream` no `config.json` |
-| Ida (requisição) | Um caminho que não seja `/v1/messages` cai no modo genérico: **todo texto do JSON é mascarado**. É seguro, mas mascara até campos que não precisava | Em `requisicao.go`, escrever uma função como `requisicaoAnthropic` para o formato novo: quais campos levam texto do usuário, quais nunca podem mudar, onde vêm as imagens. Escolher a função pelo caminho em `mascararCorpo` |
-| Imagens | Só o formato da Anthropic é tratado. No modo genérico, imagem em outro formato não passa pelo OCR | Na função nova, mandar os blocos de imagem para `Midia.Processar` |
-| Volta sem streaming | Os campos `text`, `content` e `input` do JSON são desmascarados | Acrescentar os campos do formato novo em `desmascararJSONResposta` (`resposta.go`) |
-| Volta com streaming | **Não é desmascarada**: você veria os pseudônimos. Nada vaza | Em `resposta.go`, tratar os eventos do formato novo como `desmascararSSE` faz: achar o campo que traz o texto e passá-lo por `mask.Fluxo`, que cuida do pseudônimo cortado entre dois pedaços |
-| Mais de uma API ao mesmo tempo | Não: há um `upstream` só | Escolher o destino pelo caminho da requisição em `proxy.go` |
+| Endereço | Qualquer API pode ser atendida em `/<nome>`, com um provedor em `provedores` (`formato` e `upstream`) | Para um provedor que já vem embutido, acrescentá-lo em `config.ProvedoresPadrao`. Se o formato é reconhecido pelo caminho (como `/chat/completions` e `/responses`), acrescentá-lo em `Proxy.destino` |
+| Ida (requisição) | Modo genérico: **todo texto do JSON é mascarado**. É seguro, mas mascara até campos que não precisava | Escrever `ponteX(v any) (map[string]any, func(), bool)` num arquivo próprio: uma visão da requisição na forma da Anthropic (`system`, `messages`, `tools`) cujos textos a função devolvida grava de volta no JSON original. Registrá-la no mapa do `mascararCorpo` (`requisicao.go`). Campos que nunca podem mudar vão para `chavesIntocaveisPonte` |
+| Imagens e PDFs | No modo genérico, não passam pelo OCR | Na ponte, mostrá-los como blocos `image` e `document`, como faz o `ponteGemini` |
+| Volta sem streaming | Os campos `text`, `content` e `input` do JSON são desmascarados | Escrever `desmascararXJSON` e escolhê-lo pelo `formato` em `proxy.go` |
+| Volta com streaming | **Não é desmascarada**: você veria os pseudônimos. Nada vaza | Escrever `desmascararSSEX`, com um `voltaX` que passa cada texto pelo seu próprio `mask.Fluxo` (ele cuida do pseudônimo cortado entre dois pedaços), e escolhê-lo pelo `formato` em `proxy.go` |
+| `llm-dlp ultima` | Não mostra a conversa | Acrescentar o `formato` à lista que guarda a última requisição (`proxy.go`) e ler as mensagens dele em `mensagensDaUltima` (`cmd/llm-dlp/conferir.go`) |
+| Isolamento | — | Acrescentar o formato ao `isolamento_test.go`: requisições e respostas malformadas, e uma requisição do Claude Code que continua igual |
 
 O pacote `mask` não depende do formato de nenhuma API: recebe texto e devolve texto. Todo o
 trabalho de uma API nova fica em `internal/proxy`.

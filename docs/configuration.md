@@ -42,8 +42,8 @@ Names accepted in `detectores_desligados`: `segredo`, `email`, `ip`, `host`, `cp
 ## Other clients and APIs (beta)
 
 > [!WARNING]
-> **Beta.** Everything in this section (the Gemini and OpenAI formats, and the Gemini CLI,
-> opencode and Copilot clients) is beta. Only Claude Code is stable. Beta clients have **no
+> **Beta.** Everything in this section (the Gemini, Code Assist and OpenAI formats, and the
+> Gemini CLI, Codex, opencode and Copilot clients) is beta. Only Claude Code is stable. Beta clients have **no
 > lock**: if the client stops pointing to llm-dlp, it talks straight to the API, unmasked, and
 > nothing warns you. Read [what beta means](#what-beta-means) before using them with real data.
 
@@ -79,17 +79,17 @@ Other clients work with the same masking, but you point them by hand and they ha
 
 ### Claude Code and the beta clients
 
-| | Claude Code (stable) | Gemini CLI, opencode, Copilot and other clients (beta) |
+| | Claude Code (stable) | Gemini CLI, Codex, opencode, Copilot and other clients (beta) |
 |---|---|---|
 | What goes out is masked and what comes back is unmasked (text, tool calls and results, files the agent writes, images and PDFs) | Yes | Yes, the same engine |
 | `llm-dlp ultima` and the log | Yes | Yes |
-| Pointed to llm-dlp by `llm-dlp instalar` | Yes (step 4) | **No.** You set the address in the client, as in the tables below |
+| Pointed to llm-dlp by `llm-dlp instalar` | Yes (step 4) | **No.** You set the address where the client reads it (`~/.bashrc`, `~/.codex/config.toml`, `opencode.json`), as in the tables below |
 | llm-dlp is started for you | Yes, when a session opens | **No.** A function in `~/.bashrc` runs `llm-dlp garantir` before opening the client ([README](../README.md#gemini-cli-codex-opencode-and-copilot-beta)). Without it, if llm-dlp is not running, the client gets "connection refused" and nothing goes out |
 | Account types that go through llm-dlp | Subscription (Pro, Max) and API key: Claude Code always talks to the Anthropic API | The ones pointed in [Client by client](#client-by-client): the Gemini CLI with a Google account or an API key, Codex with a ChatGPT subscription or an API key. **Not** Vertex AI, and **not** Copilot with the models GitHub hosts: they talk to other servers and go out **unmasked** |
 | Check on every message (llm-dlp is running, is the right version and proves it is itself) | Yes | **No** |
 | Lock: the client refuses to work outside llm-dlp | Yes (step 5) | **No.** If the address is removed from the client's configuration, the client talks straight to the API, unmasked, and nothing warns you |
 
-The step by step, with the lines for `~/.bashrc`, is in the
+The step by step, with the lines for each file, is in the
 [README](../README.md#gemini-cli-codex-opencode-and-copilot-beta).
 
 In short: with another client, the protection lasts while its address points to llm-dlp. Check
@@ -158,10 +158,10 @@ About Copilot:
   only one left untouched.
 - Audio, video and other attached files that are neither an image nor a PDF are removed, with
   a note in their place: llm-dlp has no way to verify them.
-- The summary of the model's reasoning (`thought`, `reasoning_content`) comes back with the
-  pseudonyms, not unmasked.
-- **Generic mode.** A request that none of the readers understands (another `formato`, the
-  Responses API) has every text masked, and its streaming response comes back with the
+- The summary of the model's reasoning (`thought`, `reasoning_content`, the `reasoning` items
+  of Responses) comes back with the pseudonyms, not unmasked.
+- **Generic mode.** A request that none of the readers understands (another `formato`, another
+  OpenAI API) has every text masked, and its streaming response comes back with the
   pseudonyms. Nothing leaks, but the client receives pseudonyms: do not use an agent this way.
 
 ## Commands
@@ -183,7 +183,8 @@ About Copilot:
 | `llm-dlp ajuda` | The list of commands (also `--help`) |
 
 `garantir`, `verificar`, `servir` and `supervisionar` are internal: they are called by the
-Claude Code hooks and by the supervisor.
+Claude Code hooks and by the supervisor. `garantir` (starts llm-dlp if it is not running) is
+also the one in the `~/.bashrc` function of the beta clients.
 
 ## Updating llm-dlp
 

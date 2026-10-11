@@ -33,8 +33,9 @@ matters to whoever changes the code.
   is not, since it does not let you change its address.
 - The README explains how to connect each client. Installation is split into installing
   llm-dlp (the same for everyone) and connecting your client: Claude Code (steps 4 and 5) or
-  the beta clients, with the lines for `~/.bashrc` (the client's address and a function that
-  starts llm-dlp before opening it), and says which kinds of account go through llm-dlp and
+  the beta clients, with a table of where each one reads the address (`~/.bashrc`,
+  `~/.codex/config.toml`, `opencode.json`), the lines for each account type and a function in
+  `~/.bashrc` that starts llm-dlp before opening the client, and says which kinds of account go through llm-dlp and
   which go out unmasked (Vertex AI, Copilot with the GitHub subscription). The steps of the
   Gemini CLI with an API key and of opencode were followed as written on a clean home folder.
 - The example at the top of the README now goes step by step: the file the agent reads, what

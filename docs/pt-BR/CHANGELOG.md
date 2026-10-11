@@ -33,8 +33,9 @@ que só interessa a quem mexe no código.
   porque não deixa trocar o endereço.
 - O README explica como ligar cada cliente. A instalação fica dividida em instalar o llm-dlp
   (igual para todos) e ligar o seu cliente: o Claude Code (passos 4 e 5) ou os clientes em
-  beta, com as linhas do `~/.bashrc` (o endereço do cliente e uma função que sobe o llm-dlp
-  antes de abri-lo), e diz quais tipos de conta passam pelo llm-dlp e quais saem sem máscara
+  beta, com uma tabela de onde cada um lê o endereço (`~/.bashrc`, `~/.codex/config.toml`,
+  `opencode.json`), as linhas de cada tipo de conta e uma função no `~/.bashrc` que sobe o
+  llm-dlp antes de abrir o cliente, e diz quais tipos de conta passam pelo llm-dlp e quais saem sem máscara
   (Vertex AI, Copilot com a assinatura do GitHub). Os passos do Gemini CLI com chave de API e do
   opencode foram seguidos como estão escritos numa pasta pessoal limpa.
 - O exemplo do topo do README passa a ir passo a passo: o arquivo que o agente lê, o que a

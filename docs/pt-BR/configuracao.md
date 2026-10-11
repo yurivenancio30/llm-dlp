@@ -39,8 +39,8 @@ Nomes aceitos em `detectores_desligados`: `segredo`, `email`, `ip`, `host`, `cpf
 ## Outros clientes e APIs (beta)
 
 > [!WARNING]
-> **Beta.** Tudo nesta seção (os formatos do Gemini e da OpenAI, e os clientes Gemini CLI,
-> opencode e Copilot) está em beta. Só o Claude Code é estável. Os clientes em beta **não têm
+> **Beta.** Tudo nesta seção (os formatos do Gemini, do Code Assist e da OpenAI, e os clientes
+> Gemini CLI, Codex, opencode e Copilot) está em beta. Só o Claude Code é estável. Os clientes em beta **não têm
 > trava**: se o cliente deixar de apontar para o llm-dlp, ele fala direto com a API, sem
 > máscara, e nada avisa. Leia [o que é beta](#o-que-é-beta) antes de usá-los com dado real.
 
@@ -77,17 +77,17 @@ não têm trava.
 
 ### Claude Code e os clientes em beta
 
-| | Claude Code (estável) | Gemini CLI, opencode, Copilot e outros clientes (beta) |
+| | Claude Code (estável) | Gemini CLI, Codex, opencode, Copilot e outros clientes (beta) |
 |---|---|---|
 | O que sai é mascarado e o que volta é desmascarado (texto, chamadas e resultados de ferramenta, arquivos que o agente escreve, imagens e PDFs) | Sim | Sim, o mesmo motor |
 | `llm-dlp ultima` e o log | Sim | Sim |
-| Apontado para o llm-dlp pelo `llm-dlp instalar` | Sim (passo 4) | **Não.** Você põe o endereço no cliente, como nas tabelas abaixo |
+| Apontado para o llm-dlp pelo `llm-dlp instalar` | Sim (passo 4) | **Não.** Você põe o endereço onde o cliente o lê (`~/.bashrc`, `~/.codex/config.toml`, `opencode.json`), como nas tabelas abaixo |
 | O llm-dlp sobe sozinho | Sim, ao abrir uma sessão | **Não.** Uma função no `~/.bashrc` roda `llm-dlp garantir` antes de abrir o cliente ([README](README.md#gemini-cli-codex-opencode-e-copilot-beta)). Sem ela, se o llm-dlp não estiver no ar, o cliente recebe "conexão recusada" e nada sai |
 | Tipos de conta que passam pelo llm-dlp | Assinatura (Pro, Max) e chave de API: o Claude Code fala sempre com a API da Anthropic | Os apontados em [Cliente por cliente](#cliente-por-cliente): o Gemini CLI com conta Google ou chave de API, o Codex com assinatura do ChatGPT ou chave de API. **Não** o Vertex AI, e **não** o Copilot com os modelos que o GitHub hospeda: eles falam com outros servidores e saem **sem máscara** |
 | Conferência a cada mensagem (o llm-dlp está no ar, é da versão certa e prova que é ele) | Sim | **Não** |
 | Trava: o cliente se recusa a funcionar fora do llm-dlp | Sim (passo 5) | **Não.** Se o endereço for tirado da configuração do cliente, ele fala direto com a API, sem máscara, e nada avisa |
 
-O passo a passo, com as linhas do `~/.bashrc`, está no
+O passo a passo, com as linhas de cada arquivo, está no
 [README](README.md#gemini-cli-codex-opencode-e-copilot-beta).
 
 Em resumo: com outro cliente, a proteção vale enquanto o endereço dele apontar para o llm-dlp.
@@ -157,10 +157,10 @@ Sobre o Copilot:
   que fica intacto.
 - Áudio, vídeo e outros arquivos anexados que não são imagem nem PDF são retirados, com uma
   nota no lugar: o llm-dlp não tem como verificá-los.
-- O resumo do raciocínio do modelo (`thought`, `reasoning_content`) volta com os pseudônimos,
-  sem desmascarar.
-- **Modo genérico.** Uma requisição que nenhum leitor entende (outro `formato`, a API
-  Responses) tem todo texto mascarado, e a resposta em streaming volta com os pseudônimos. Nada
+- O resumo do raciocínio do modelo (`thought`, `reasoning_content`, os itens `reasoning` do
+  Responses) volta com os pseudônimos, sem desmascarar.
+- **Modo genérico.** Uma requisição que nenhum leitor entende (outro `formato`, outra API da
+  OpenAI) tem todo texto mascarado, e a resposta em streaming volta com os pseudônimos. Nada
   vaza, mas o cliente recebe pseudônimos: não use um agente assim.
 
 ## Comandos
@@ -182,7 +182,8 @@ Sobre o Copilot:
 | `llm-dlp ajuda` | A lista de comandos (também `--help`) |
 
 `garantir`, `verificar`, `servir` e `supervisionar` são internos: quem chama são os ganchos
-do Claude Code e o supervisor.
+do Claude Code e o supervisor. O `garantir` (sobe o llm-dlp se ele não estiver rodando) é
+também o da função do `~/.bashrc` dos clientes em beta.
 
 ## Atualizar o llm-dlp
 
