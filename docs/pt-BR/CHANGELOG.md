@@ -9,7 +9,14 @@ Em cada versão: **Mascaramento** é o que passou a ser (ou deixou de ser) masca
 **Programa** é comando, instalação, configuração, desempenho e documentação; **Código** é o
 que só interessa a quem mexe no código.
 
-## [Não lançado]
+## [0.6.0] - 2026-10-11
+
+Três correções do mascaramento, achadas repetindo uma sessão real do Microsoft Fabric: um nome
+já conhecido passa a ser mascarado também dentro de uma palavra maior, o GUID de um campo de id
+passa a ser mascarado, e o nome de uma pessoa volta na caixa em que foi escrito (antes, um
+arquivo podia ser gravado com o nome em outra caixa). O README põe os clientes em beta numa
+tabela só e diz quais rodam no VS Code. Depois de atualizar, feche o Claude Code e rode
+`llm-dlp parar`.
 
 ### Mascaramento
 

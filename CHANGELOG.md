@@ -9,7 +9,13 @@ In each version: **Masking** is what started (or stopped) being masked; **Progra
 commands, installation, configuration, performance and documentation; **Code** is what only
 matters to whoever changes the code.
 
-## [Unreleased]
+## [0.6.0] - 2026-10-11
+
+Three masking fixes found replaying a real Microsoft Fabric session: a name already known is
+masked inside a longer word too, a GUID of an id field is masked, and a person's name comes
+back in the case it was written (before, a file could be saved with a name in another case).
+The README fits the beta clients in one table and says which run in VS Code. After updating,
+close Claude Code and run `llm-dlp parar`.
 
 ### Masking
 
