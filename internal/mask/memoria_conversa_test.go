@@ -116,7 +116,7 @@ func TestMemoriaQuemEscreveu(t *testing.T) {
 	tab := NovaTabela(ents)
 	ps := ""
 	for _, e := range ents {
-		if e.Real == nsComum && casePrincipal(e.Pseudo, e.Real) {
+		if e.Real == nsComum && casePrincipal(e.Pseudo, e.Real, e.Tipo) {
 			ps = e.Pseudo
 		}
 	}
@@ -154,7 +154,7 @@ func TestQuemEscreveuEmDisco(t *testing.T) {
 	tab := NovaTabela(ents)
 	ps := ""
 	for _, e := range ents {
-		if e.Real == nsComum && casePrincipal(e.Pseudo, e.Real) {
+		if e.Real == nsComum && casePrincipal(e.Pseudo, e.Real, e.Tipo) {
 			ps = e.Pseudo
 		}
 	}

@@ -634,7 +634,7 @@ func simularSessao(arq string, cfg config.Config, m *mask.Masker, limite, janela
 }
 
 // reCaraDePseudo: o que tem a forma de um pseudônimo do llm-dlp (para contar o que sobrou).
-var reCaraDePseudo = regexp.MustCompile(`p\.[a-z2-7]{8}@d[a-z2-7]{4}\.invalid|\bh[a-z2-7]{8}\.invalid|\b[a-z]{1,5}_[a-z2-7]{8}\b|\b[A-Z]{2,12}-[a-z2-7]{8}\b|[Pp]essoa [a-z2-7]{8}|PESSOA [A-Z2-7]{8}`)
+var reCaraDePseudo = regexp.MustCompile(`p\.[a-z2-7]{8}@d[a-z2-7]{4}\.invalid|\bh[a-z2-7]{8}\.invalid|\b[a-z]{1,5}_[a-z2-7]{8}\b|\b(?:[A-Z]{2,12}|[a-z]{2,12}|[A-Z][a-z]{1,11})-[a-z2-7]{8}\b|[Pp]essoa [a-z2-7]{8}|PESSOA [A-Z2-7]{8}`)
 
 // ultimoUso: a última chamada de ferramenta (tool_use) dos conteúdos das mensagens.
 func ultimoUso(conteudos []any) map[string]any {

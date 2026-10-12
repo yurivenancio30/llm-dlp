@@ -2,9 +2,16 @@ package proxy
 
 import (
 	"encoding/json"
+	"io"
+	"log"
 	"net/http"
+	"net/http/httptest"
+	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/yurivenancio30/llm-dlp/internal/config"
+	"github.com/yurivenancio30/llm-dlp/internal/mask"
 )
 
 // A mesma pessoa escrita em caixas diferentes volta cada uma como estava: o relatório que o
@@ -38,6 +45,121 @@ func TestPessoaVoltaComACaixaDeCadaGrafia(t *testing.T) {
 	}
 	if volta != texto {
 		t.Errorf("a volta mudou a caixa:\n quer %q\n veio %q", texto, volta)
+	}
+}
+
+// montarEcoCaixa: o proxy com um termo cadastrado ("sgp", a sigla de uma empresa inventada) e
+// uma API falsa que responde com a resposta que resp monta a partir do corpo que recebeu.
+func montarEcoCaixa(t *testing.T, corpos *[][]byte, resp respFalsa) *httptest.Server {
+	t.Helper()
+	cfg := config.Padrao()
+	cfg.Termos = []config.Termo{{Rotulo: "empresa", Valores: []string{"sgp"}}}
+	m, err := mask.NovoMasker(cfg, []byte("0123456789abcdef0123456789abcdef"), nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		*corpos = append(*corpos, b)
+		resp(b, w)
+	}))
+	cfg.Upstream = up.URL
+	px := httptest.NewServer(Novo(cfg, m, nil, log.New(io.Discard, "", 0)))
+	t.Cleanup(func() { up.Close(); px.Close() })
+	return px
+}
+
+// ultimaEntradaRecebida: a entrada (já mascarada) da última chamada de ferramenta que a API recebeu.
+func ultimaEntradaRecebida(corpo []byte) string {
+	var req struct {
+		Messages []struct {
+			Content json.RawMessage `json:"content"`
+		} `json:"messages"`
+	}
+	json.Unmarshal(corpo, &req)
+	var in json.RawMessage
+	for _, mm := range req.Messages {
+		var bs []map[string]json.RawMessage
+		if json.Unmarshal(mm.Content, &bs) == nil {
+			for _, b := range bs {
+				if string(b["type"]) == `"tool_use"` {
+					in = b["input"]
+				}
+			}
+		}
+	}
+	return string(in)
+}
+
+// O mesmo nome em grafias de caixa diferentes (a sigla da empresa "SgP", "sgp" e "SGP"; o login
+// "etl_carga" e "ETL_CARGA"; a tabela de SQL em maiúsculas num SELECT e em minúsculas noutro) volta
+// cada um como estava na escrita do modelo: o comando e o arquivo que ele escreve com os
+// pseudônimos que viu saem iguais ao original. Antes, o termo e o login tinham UM pseudônimo para
+// todas as grafias e a volta trazia sempre a primeira ("echo SgP sgp SGP" voltava "echo SgP SgP
+// SgP"). Caso tirado da forma de 21 escritas que voltavam diferentes, só pela caixa, numa
+// repetição de sessão real (os nomes aqui são inventados).
+func TestEscritaVoltaComACaixaDeCadaGrafia(t *testing.T) {
+	var corpos [][]byte
+	// o modelo repete a última chamada de ferramenta com os pseudônimos que viu
+	px := montarEcoCaixa(t, &corpos, func(corpo []byte, w http.ResponseWriter) {
+		w.Header().Set("content-type", "text/event-stream")
+		sse(w, "", ultimaEntradaRecebida(corpo), "", 5)
+	})
+	cmd := `echo SgP sgp SGP && psql -U etl_carga -c "select valor_bruto from vendas.propostas_ativas" && ` +
+		`psql -U ETL_CARGA -c "SELECT VALOR_BRUTO FROM VENDAS.PROPOSTAS_ATIVAS"`
+	arquivo := "-- carga da SgP (sgp_carga.sql)\n" +
+		"SELECT p.ID, p.Valor_Bruto FROM VENDAS.PROPOSTAS_ATIVAS p;\n" +
+		"select valor_bruto from vendas.propostas_ativas; -- SGP\n"
+	usuarios := `[{"login": "etl_carga", "ativo": true}, {"login": "ETL_CARGA", "ativo": false}]`
+	for _, in := range []map[string]any{
+		{"command": cmd},
+		{"file_path": "/tmp/carga.sql", "content": arquivo},
+	} {
+		uso := map[string]any{"type": "tool_use", "id": "t1", "name": "Bash", "input": in}
+		_, volta := enviarLer(t, px, true, []any{
+			msg("user", "a tabela VENDAS.PROPOSTAS_ATIVAS da SgP: SELECT ID, Valor_Bruto FROM VENDAS.PROPOSTAS_ATIVAS"),
+			msg("assistant", "vou ver os logins"),
+			msg("user", "os logins: "+usuarios),
+			msg("assistant", []any{uso})})
+		corpo := string(corpos[len(corpos)-1])
+		for _, real := range []string{"SgP", "sgp", "SGP", "etl_carga", "ETL_CARGA", "propostas_ativas", "PROPOSTAS_ATIVAS"} {
+			if strings.Contains(corpo, real) {
+				t.Errorf("%q saiu em claro", real)
+			}
+		}
+		var got map[string]any
+		if err := json.Unmarshal([]byte(volta), &got); err != nil {
+			t.Fatalf("entrada inválida: %q", volta)
+		}
+		for k, v := range in {
+			if got[k] != v {
+				t.Errorf("a escrita voltou com outra caixa (%s):\n quer %q\n veio %q", k, v, got[k])
+			}
+		}
+	}
+}
+
+// O modelo reescreve a caixa do pseudônimo da sigla, que só apareceu em maiúsculas ("SGP"): em
+// minúsculas num caminho, com a inicial maiúscula numa frase, toda em maiúsculas. Nenhuma dessas
+// formas sobra como pseudônimo, e todas voltam à sigla como ela entrou (o modelo que troca a caixa
+// do pseudônimo não inventa uma pasta "/dados/sgp" que não existe), como os nomes de objeto.
+func TestEscritaComOutraCaixaDoPseudonimo(t *testing.T) {
+	var corpos [][]byte
+	reEmpresa := regexp.MustCompile(`\bEMPRESA-[a-z2-7]{8}\b`)
+	px := montarEcoCaixa(t, &corpos, func(corpo []byte, w http.ResponseWriter) {
+		emp := reEmpresa.FindString(string(corpo))
+		cmd := "ls /dados/" + strings.ToLower(emp) + "/ && echo " + "Empresa" + strings.TrimPrefix(emp, "EMPRESA") + " " + strings.ToUpper(emp)
+		arg, _ := json.Marshal(map[string]string{"command": cmd})
+		w.Header().Set("content-type", "text/event-stream")
+		sse(w, "", string(arg), "", 4)
+	})
+	_, volta := enviarLer(t, px, true, []any{msg("user", "a sigla SGP aparece no relatório")})
+	if c := string(corpos[0]); !reEmpresa.MatchString(c) {
+		t.Fatalf("premissa: a sigla não foi mascarada: %s", c)
+	}
+	const quer = "ls /dados/SGP/ && echo SGP SGP"
+	if cmd := comandoDaEntrada(t, volta); cmd != quer {
+		t.Errorf("o pseudônimo em outra caixa não voltou à sigla como ela entrou:\n quer %q\n veio %q", quer, cmd)
 	}
 }
 

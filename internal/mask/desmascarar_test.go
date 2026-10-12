@@ -78,6 +78,44 @@ func TestFluxoJSON(t *testing.T) {
 	}
 }
 
+// Um tipo com rótulo (termo cadastrado, código de usuário: a chave do id não tem caixa) em três
+// grafias de caixa: um pseudônimo por grafia, e a volta devolve cada uma como estava. A variante
+// (o modelo reescreveu a caixa do pseudônimo) volta a uma grafia que apareceu, a em maiúsculas
+// para o pseudônimo todo em maiúsculas, e nunca toma o lugar de outra: "sao paulo" tem o mesmo id
+// de "SÃO PAULO" e fica como estava.
+func TestRotuloComACaixaDaGrafia(t *testing.T) {
+	m := novoTeste(t) // termo cadastrado: "Projeto Fenix"
+	s := "o Projeto Fenix (PROJETO FENIX no ERP, projeto fenix no git) e o login u1001 / U1001"
+	mas, ents := m.Mascarar(s)
+	if strings.Contains(strings.ToLower(mas), "fenix") {
+		t.Fatalf("premissa: o termo não foi mascarado: %s", mas)
+	}
+	tab := NovaTabela(ents)
+	if volta := tab.Desmascarar(mas, false); volta != s {
+		t.Errorf("a volta mudou a caixa:\n quer %q\n veio %q\n mascarado %q", s, volta, mas)
+	}
+	ps := m.Pseudonimo("t:projeto", "PROJETO FENIX")
+	id := strings.TrimPrefix(ps, "PROJETO-")
+	if ps == id || m.Pseudonimo("t:projeto", "projeto fenix") != "projeto-"+id || m.Pseudonimo("t:projeto", "Projeto Fenix") != "Projeto-"+id {
+		t.Fatalf("formas do pseudônimo: %s %s %s", ps, m.Pseudonimo("t:projeto", "projeto fenix"), m.Pseudonimo("t:projeto", "Projeto Fenix"))
+	}
+	if v := tab.Desmascarar("PROJETO-"+strings.ToUpper(id), false); v != "PROJETO FENIX" {
+		t.Errorf("variante em maiúsculas: %q", v)
+	}
+	if _, ok := valorDoCampo("nome", "projeto-"+id); ok {
+		t.Errorf("o pseudônimo em minúsculas foi tratado como valor de campo")
+	}
+
+	sp, spAcento := "sao paulo", "SÃO PAULO"
+	pA, pa := m.Pseudonimo("t:cidade", spAcento), m.Pseudonimo("t:cidade", sp)
+	tab = NovaTabela([]Entrada{{pA, spAcento, "t:cidade"}, {pa, sp, "t:cidade"}})
+	for ps, quer := range map[string]string{pA: spAcento, pa: sp, strings.ToUpper(pA): spAcento, "Cidade" + strings.TrimPrefix(pA, "CIDADE"): spAcento} {
+		if v := tab.Desmascarar(ps, false); v != quer {
+			t.Errorf("%s: quer %q, veio %q", ps, quer, v)
+		}
+	}
+}
+
 // Colisão: dois reais com o mesmo pseudônimo nunca são desmascarados (seria escolher um).
 func TestColisaoNaoDesmascara(t *testing.T) {
 	tab := NovaTabela([]Entrada{

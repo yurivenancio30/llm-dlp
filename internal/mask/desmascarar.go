@@ -37,20 +37,21 @@ func NovaTabela(entradas []Entrada) *Tabela {
 	// sub-rede falsa de IP): desmascarar escolheria um dos dois e poderia, p.ex., apontar um
 	// comando para o host errado. Nesses casos o pseudônimo fica sem desmascarar.
 	conflito, conflitoIP := map[string]bool{}, map[string]bool{}
-	// primeiro os pseudônimos como saíram, depois as variantes de caixa (que o modelo pode
-	// escrever): a variante de uma grafia nunca toma o lugar do pseudônimo de outra
+	// primeiro os pseudônimos como saíram, depois os que o modelo escreveu noutra caixa (um texto
+	// do assistente reenviado como a API o mandou): a variante de uma grafia nunca toma o lugar
+	// do pseudônimo de outra
 	ord := make([]Entrada, 0, len(entradas))
+	var outras []Entrada
 	for _, e := range entradas {
-		if !ehObjeto(e.Tipo) || casePrincipal(e.Pseudo, e.Real) {
+		if casePrincipal(e.Pseudo, e.Real, e.Tipo) {
 			ord = append(ord, e)
+		} else {
+			outras = append(outras, e)
 		}
 	}
 	nPrinc := len(ord)
-	for _, e := range entradas {
-		if ehObjeto(e.Tipo) && !casePrincipal(e.Pseudo, e.Real) {
-			ord = append(ord, e)
-		}
-	}
+	ord = append(ord, outras...)
+	var base []Entrada // um por pseudônimo, para as variantes de caixa
 	for k, e := range ord {
 		if _, ok := t.m[e.Pseudo]; ok && k >= nPrinc {
 			continue // variante de caixa que coincide com um pseudônimo já registrado
@@ -65,6 +66,9 @@ func NovaTabela(entradas []Entrada) *Tabela {
 		}
 		t.m[e.Pseudo] = e.Real
 		t.tipo[e.Pseudo] = e.Tipo
+		if e.Tipo == "nome" || pseudoComCaixa(e.Tipo) {
+			base = append(base, e)
+		}
 		if reIPFalso.MatchString(e.Pseudo) && strings.Count(e.Pseudo, ".") == 3 && strings.Count(e.Real, ".") == 3 {
 			f, r := e.Pseudo[:strings.LastIndex(e.Pseudo, ".")], e.Real[:strings.LastIndex(e.Real, ".")]
 			if atual, ok := t.ipPref[f]; ok && atual != r {
@@ -73,13 +77,20 @@ func NovaTabela(entradas []Entrada) *Tabela {
 			t.ipPref[f] = r
 		}
 	}
-	// as outras caixas do pseudônimo de uma pessoa, depois de todas as grafias que apareceram:
-	// a variante nunca toma o lugar de uma grafia real ("Maria da Silva" fica como estava)
-	for _, e := range entradas {
-		if e.Tipo != "nome" || conflito[e.Pseudo] {
+	// as outras caixas do pseudônimo (de uma pessoa, de um objeto, de um tipo com rótulo), depois
+	// de todas as grafias que apareceram: a variante nunca toma o lugar de uma grafia real
+	// ("Maria da Silva" e "propostas" ficam como estavam)
+	for _, e := range base {
+		if conflito[e.Pseudo] {
 			continue
 		}
-		for _, v := range variantesNome(e.Pseudo, e.Real) {
+		var vs []Entrada
+		if e.Tipo == "nome" {
+			vs = variantesNome(e.Pseudo, e.Real)
+		} else {
+			vs = variantesCaixa(e.Pseudo, e.Real, e.Tipo, t.m)
+		}
+		for _, v := range vs {
 			if _, ok := t.m[v.Pseudo]; !ok {
 				t.m[v.Pseudo], t.tipo[v.Pseudo] = v.Real, v.Tipo
 			}
@@ -128,16 +139,22 @@ func NovaTabela(entradas []Entrada) *Tabela {
 	return t
 }
 
-// casa devolve o fim do pseudônimo mais longo que começa em s[i], ou -1.
-// casePrincipal: o pseudônimo de objeto tem a caixa com que pseudoObjeto o gera para esta
-// grafia (e não é uma variante de caixa): minúsculo para nome minúsculo, prefixo em maiúsculas
-// e ID minúsculo para nome em maiúsculas, prefixo com a primeira maiúscula para caixa mista.
-func casePrincipal(ps, real string) bool {
-	i := strings.IndexByte(ps, '_')
+// casePrincipal: o pseudônimo tem a caixa com que é gerado para esta grafia (e não é uma
+// variante de caixa). Objeto (pseudoObjeto): minúsculo para nome minúsculo, prefixo em maiúsculas
+// e ID minúsculo para nome em maiúsculas, prefixo com a primeira maiúscula para caixa mista. Tipo
+// com rótulo: a forma de pseudoRotulo. Os outros tipos não têm variante.
+func casePrincipal(ps, real, tipo string) bool {
+	if !pseudoComCaixa(tipo) {
+		return true
+	}
+	i := strings.LastIndexByte(ps, sepPseudo(tipo))
 	if i <= 0 {
 		return true
 	}
 	pref, id := ps[:i], ps[i+1:]
+	if !ehObjeto(tipo) {
+		return rotuloPrincipal(pref, id, real)
+	}
 	switch {
 	case strings.ToLower(real) == real:
 		return ps == strings.ToLower(ps)
@@ -147,6 +164,7 @@ func casePrincipal(ps, real string) bool {
 	return pref == pref[:1]+strings.ToLower(pref[1:]) && pref[:1] == strings.ToUpper(pref[:1]) && id != strings.ToLower(id)
 }
 
+// casa devolve o fim do pseudônimo mais longo que começa em s[i], ou -1.
 func (t *Tabela) casa(s string, i int) int {
 	if i+4 <= len(s) {
 		k2 := uint32(s[i])<<8 | uint32(s[i+1])

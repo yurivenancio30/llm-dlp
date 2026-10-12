@@ -3,8 +3,11 @@ package mask
 import (
 	"fmt"
 	"net/netip"
+	"regexp"
 	"sort"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 // Troca dos achados por pseudônimos.
@@ -56,17 +59,11 @@ func (m *Masker) aplicarT(s string, achados []Achado) (string, []Entrada, []trec
 	return b.String(), entradas, ts
 }
 
+// entradaDe acrescenta a entrada de um trecho trocado. As outras caixas do pseudônimo, que o
+// modelo pode escrever ("T_abc", "t_abc", "T_ABC"), não entram aqui: NovaTabela as acrescenta
+// depois de todas as grafias que apareceram (ver variantesCaixa).
 func entradaDe(entradas []Entrada, ps, real, tipo string) []Entrada {
 	entradas = append(entradas, Entrada{ps, real, tipo})
-	if ehObjeto(tipo) { // o modelo pode reescrever a caixa ("T_abc", "t_abc", "T_ABC")
-		if i := strings.IndexByte(ps, '_'); i > 0 {
-			for _, alt := range []string{strings.ToUpper(ps[:i]) + ps[i:], strings.ToLower(ps), strings.ToUpper(ps)} {
-				if alt != ps {
-					entradas = append(entradas, Entrada{alt, real, tipo})
-				}
-			}
-		}
-	}
 	if tipo == "email" { // o modelo às vezes cita só o domínio: "dxxxx.invalid" volta a ser o domínio real
 		if i, j := strings.LastIndexByte(ps, '@'), strings.LastIndexByte(real, '@'); i >= 0 && j >= 0 {
 			entradas = append(entradas, Entrada{ps[i+1:], real[j+1:], "dominio"})
@@ -148,21 +145,167 @@ func (m *Masker) Pseudonimo(tipo, real string) string {
 		return "SEGREDO-" + m.p.ID("segredo", real)
 	case "usuario":
 		// código de uma pessoa importada: mesmo id do nome e do e-mail dela
+		pid := ""
 		if m.pessoas != nil {
-			if pid := m.pessoas.PID(m.p, "codigo", NormNome(real)); pid != "" {
-				return "USUARIO-" + pid
-			}
+			pid = m.pessoas.PID(m.p, "codigo", NormNome(real))
 		}
-		return "USUARIO-" + m.p.ID("usuario", NormNome(real))
-	case "cpf", "cnpj", "pis", "cnh", "telefone", "cep", "cartao", "rg", "conta":
+		if pid == "" {
+			pid = m.p.ID("usuario", NormNome(real))
+		}
+		return pseudoRotulo("USUARIO", pid, real)
+	}
+	if tiposNumericos[tipo] {
 		if tipo == "cnpj" && CNPJAlfaValido(real) { // o formato novo tem letras: não vale só os dígitos
 			return "CNPJ-" + m.p.ID(tipo, NormNome(real))
 		}
 		return strings.ToUpper(tipo) + "-" + m.p.ID(tipo, canonNum(real))
-	default:
-		rot := strings.TrimPrefix(strings.TrimPrefix(tipo, "x:"), "t:")
-		return strings.ToUpper(rot) + "-" + m.p.ID(tipo, NormNome(real))
 	}
+	rot := strings.TrimPrefix(strings.TrimPrefix(tipo, "x:"), "t:")
+	return pseudoRotulo(strings.ToUpper(rot), m.p.ID(tipo, NormNome(real)), real)
+}
+
+// tiposNumericos: o pseudônimo vem só dos dígitos (canonNum).
+var tiposNumericos = conj("cpf", "cnpj", "pis", "cnh", "telefone", "cep", "cartao", "rg", "conta")
+
+// pseudoComCaixa: o pseudônimo do tipo segue a caixa da grafia real, e a volta acrescenta as
+// outras caixas dele (variantesCaixa): os objetos (pseudoObjeto) e os tipos com rótulo cuja chave
+// não tem caixa (pseudoRotulo: usuário, termo cadastrado, padrão extra, endereço...). Pessoa tem
+// as próprias formas (variantesNome); e-mail, host, IP, segredo e números, não.
+func pseudoComCaixa(tipo string) bool {
+	if ehObjeto(tipo) {
+		return true
+	}
+	switch tipo {
+	case "email", "nome", "ip", "host", "segredo", "dominio":
+		return false
+	}
+	return !tiposNumericos[tipo]
+}
+
+// sepPseudo: o separador entre o prefixo e o id do pseudônimo ("T_abc", "EMPRESA-abc").
+func sepPseudo(tipo string) byte {
+	if ehObjeto(tipo) {
+		return '_'
+	}
+	return '-'
+}
+
+// pseudoRotulo: rótulo + id, na caixa da grafia, como o nome de pessoa: o mesmo valor escrito
+// "SGP", "sgp" e "SgP" (a chave do id não tem caixa) sai "EMPRESA-x", "empresa-x" e "Empresa-x",
+// e a volta devolve cada grafia como estava. Sem letras, a forma de sempre (rótulo em maiúsculas).
+// O id fica em minúsculas em todas: as três formas custam os mesmos tokens.
+func pseudoRotulo(rot, id, real string) string {
+	ps := formaRotulo(rot, id, real)
+	if ps[:len(rot)] != rot { // len(ps) > len(rot): ps = rot na caixa da grafia + "-" + id
+		registrarPseudo(ps) // as formas novas não têm a cara que rePseudoPronto conhece (ver ehPseudoRotulo)
+	}
+	return ps
+}
+
+// formaRotulo: o pseudônimo de pseudoRotulo, sem registrar.
+func formaRotulo(rot, id, real string) string {
+	switch caixaDe(real) {
+	case 'a':
+		rot = strings.ToLower(rot)
+	case 'M':
+		rot = capitalizar(rot)
+	}
+	return rot + "-" + id
+}
+
+// rotuloPrincipal: ps (rot + "-" + id) é a forma que formaRotulo dá para a grafia real? Sem
+// montar a string (NovaTabela pergunta isso de cada entrada).
+func rotuloPrincipal(rot, id, real string) bool {
+	if id != strings.ToLower(id) {
+		return false
+	}
+	switch caixaDe(real) {
+	case 'a':
+		return rot == strings.ToLower(rot)
+	case 'M':
+		r, n := utf8.DecodeRuneInString(rot)
+		return unicode.ToUpper(r) == r && rot[n:] == strings.ToLower(rot[n:])
+	}
+	return rot == strings.ToUpper(rot)
+}
+
+// caixaDe: 'A' (só maiúsculas), 'a' (só minúsculas), 'M' (as duas) ou 0 (nenhuma letra com
+// caixa), sem alocar.
+func caixaDe(s string) byte {
+	maius, minus := false, false
+	for _, r := range s {
+		if r < utf8.RuneSelf {
+			maius = maius || 'A' <= r && r <= 'Z'
+			minus = minus || 'a' <= r && r <= 'z'
+			continue
+		}
+		maius = maius || unicode.ToLower(r) != r
+		minus = minus || unicode.ToUpper(r) != r
+	}
+	switch {
+	case maius && minus:
+		return 'M'
+	case maius:
+		return 'A'
+	case minus:
+		return 'a'
+	}
+	return 0
+}
+
+// capitalizar: a primeira letra em maiúscula, o resto em minúsculas.
+func capitalizar(s string) string {
+	r, n := utf8.DecodeRuneInString(s)
+	if n == 0 {
+		return s
+	}
+	return string(unicode.ToUpper(r)) + strings.ToLower(s[n:])
+}
+
+// rePseudoRotulo: a FORMA de um pseudônimo de rótulo em qualquer caixa. Só a forma não basta
+// ("maria-fernanda" tem essa cara): ver ehPseudoRotulo.
+var rePseudoRotulo = regexp.MustCompile(`^[A-Za-z:]+-[a-zA-Z2-7]{8}$`)
+
+// ehPseudoRotulo: v é um pseudônimo de rótulo em minúsculas ou com só a primeira maiúscula gerado
+// por nós (a forma em maiúsculas, a de sempre, rePseudoPronto já reconhece)?
+func ehPseudoRotulo(v string) bool {
+	if !rePseudoRotulo.MatchString(v) {
+		return false
+	}
+	_, ok := pseudosGerados.Load(strings.ToLower(v))
+	return ok
+}
+
+// variantesCaixa: as outras caixas do pseudônimo de um objeto ou de um tipo com rótulo, que o
+// modelo pode escrever ("T_abc", "t_abc", "T_ABC", "Empresa-x"). A variante volta ao valor real
+// como ele entrou: o modelo que troca a caixa de um pseudônimo não inventa uma grafia nova
+// ("/dados/SGP" e "/dados/sgp" são duas pastas). Cada forma que uma grafia gera já está em m
+// quando a grafia apareceu (e então a variante não entra); a toda em maiúsculas, que nenhuma
+// grafia gera, volta à grafia em maiúsculas quando ela apareceu. m: o de:para já montado.
+func variantesCaixa(ps, real, tipo string, m map[string]string) []Entrada {
+	i := strings.LastIndexByte(ps, sepPseudo(tipo))
+	if i <= 0 {
+		return nil
+	}
+	pref := ps[:i]
+	alts := [4]string{strings.ToUpper(pref) + ps[i:], strings.ToLower(ps), strings.ToUpper(ps)}
+	if !ehObjeto(tipo) {
+		alts[3] = capitalizar(pref) + ps[i:] // "Empresa-x": a forma da grafia com caixa mista
+	}
+	var out []Entrada
+	for k, alt := range alts {
+		if alt == "" || alt == ps {
+			continue
+		}
+		r := real
+		if k == 2 { // "T_ABC": a grafia do "T_abc" (em maiúsculas), se apareceu
+			if g, ok := m[strings.ToUpper(pref)+strings.ToLower(ps[i:])]; ok && mesmoValor(tipo, g, real) {
+				r = g
+			}
+		}
+		out = append(out, Entrada{alt, r, tipo})
+	}
+	return out
 }
 
 // caixaNome: 'A' para nome todo em maiúsculas, 'a' para todo em minúsculas, 'M' para o resto.
