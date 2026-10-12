@@ -191,3 +191,26 @@ func BenchmarkMemoriaVarrer1MB(b *testing.B) {
 		mm.varrer(s, nil)
 	}
 }
+
+// O marcador de comentário só vale fora de aspas; "--x" colado numa letra é opção de comando e
+// "#3" é numeração.
+func TestEmComentario(t *testing.T) {
+	casos := map[string]bool{
+		"# carrega as faturas":                    true,
+		"select 1 -- faturas":                     true,
+		"x = 1 // faturas":                        true,
+		`print("a # b") # faturas`:                true,
+		"pg_dump --schema=faturas":                false,
+		`rotulo = "lote #3: faturas"`:             false,
+		`msg = "total // faturas"`:                false,
+		"ver o item #3 faturas":                   false,
+		"SELECT '--' || faturas FROM t":           false,
+		"echo 'a -- b' faturas":                   false,
+		"# comentário com 'aspas' antes: faturas": true,
+	}
+	for s, quer := range casos {
+		if got := emComentario(s, strings.LastIndex(s, "faturas")); got != quer {
+			t.Errorf("%q: emComentario=%v, esperado %v", s, got, quer)
+		}
+	}
+}

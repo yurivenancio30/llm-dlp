@@ -56,19 +56,47 @@ func (f filtroMem) pula(s string, a, b int, nm *nomeMem) bool {
 }
 
 // emComentario: s[a] está depois de um marcador de comentário na mesma linha (--, #, //, /*),
-// que começa a linha ou vem depois de um espaço.
+// que começa a linha ou vem depois de um espaço, fora de aspas. Não são comentário: "--x"
+// colado numa letra ou dígito (opção de comando: --schema=x) e "#" seguido de dígito (#3).
 func emComentario(s string, a int) bool {
 	ini := inicioLinhaJ(s, a)
 	l := s[ini:a]
+	var aspa byte
 	for i := 0; i < len(l); i++ {
+		c := l[i]
+		if aspa != 0 { // dentro de uma string: o marcador é texto
+			if c == '\\' {
+				i++
+			} else if c == aspa {
+				aspa = 0
+			}
+			continue
+		}
+		if c == '"' || c == '\'' || c == '`' {
+			aspa = c
+			continue
+		}
 		if i > 0 && l[i-1] != ' ' && l[i-1] != '\t' {
 			continue
 		}
+		depois := byte(' ') // o que vem depois do marcador (pode ser o próprio nome, em s[a])
 		switch {
-		case l[i] == '#':
+		case c == '#':
+			if ini+i+1 < len(s) {
+				depois = s[ini+i+1]
+			}
+			if depois < '0' || depois > '9' {
+				return true
+			}
+		case i+1 < len(l) && (l[i:i+2] == "//" || l[i:i+2] == "/*"):
 			return true
-		case i+1 < len(l) && (l[i:i+2] == "--" || l[i:i+2] == "//" || l[i:i+2] == "/*"):
-			return true
+		case i+1 < len(l) && l[i:i+2] == "--":
+			if ini+i+2 < len(s) {
+				depois = s[ini+i+2]
+			}
+			if !ehAlnum(depois) {
+				return true
+			}
 		}
 	}
 	return false
