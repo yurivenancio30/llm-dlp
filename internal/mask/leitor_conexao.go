@@ -34,6 +34,7 @@ var (
 	reURNGrupo     = regexp.MustCompile(`urn:li:corpGroup:([\w.\-@]+)`)
 	reURNPainel    = regexp.MustCompile(`urn:li:(?:chart|dashboard):\([\w-]+,([\w.\-]+)\)`)
 	reURNCampo     = regexp.MustCompile(`urn:li:schemaField:\(urn:li:dataset:\([^()]*\),([\w.\-\[\]=]+)\)`)
+	reURNAplicacao = regexp.MustCompile(`urn:li:application:([\w.\-]+)`) // a aplicação (sistema) do cliente
 	reDbtRef       = regexp.MustCompile(`\{\{[^}]*?\bref\(\s*['"]([\w.\-]+)['"](?:\s*,\s*['"]([\w.\-]+)['"])?\s*\)`)
 	reDbtSource    = regexp.MustCompile(`\{\{[^}]*?\bsource\(\s*['"]([\w.\-]+)['"]\s*,\s*['"]([\w.\-]+)['"]\s*\)`)
 	reConnID       = regexp.MustCompile(`\b\w*conn_id\s*=\s*['"]([\w.\-]+)['"]`)
@@ -220,7 +221,7 @@ func acharConexoes(s string, add func(ObjAchado)) {
 		for _, u := range []struct {
 			re  *regexp.Regexp
 			ent string
-		}{{reURNInstancia, "servidor"}, {reURNGrupo, "usuario"}, {reURNPainel, "servico"}, {reURNCampo, "coluna"}} {
+		}{{reURNInstancia, "servidor"}, {reURNGrupo, "usuario"}, {reURNPainel, "servico"}, {reURNCampo, "coluna"}, {reURNAplicacao, "servico"}} {
 			for _, m := range u.re.FindAllStringSubmatchIndex(s, -1) {
 				if v := s[m[2]:m[3]]; !publicoDev(v) {
 					add(ObjAchado{m[2], m[3], u.ent, "urn", true})

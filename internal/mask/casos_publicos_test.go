@@ -134,6 +134,9 @@ func TestBenchURNs(t *testing.T) {
 	conferirBench(t, []casoBench{
 		{nome: "urns", src: "\"actor\": \"urn:li:corpuser:joao.silva.hx\",\n\"instance\": \"urn:li:dataPlatformInstance:(urn:li:dataPlatform:airflow,airflow-prd-hx)\",\n\"dataset\": \"urn:li:dataset:(urn:li:dataPlatform:postgres,pedido_hx,PROD)\"\n",
 			mascarar: []string{"joao.silva.hx", "airflow-prd-hx", "pedido_hx"}, manter: []string{"airflow", "postgres", "PROD", "dataPlatform"}},
+		// a aplicação (sistema) do cliente, mesmo uma sigla curta
+		{nome: "urn de aplicação", src: "\"application\": \"urn:li:application:SGP\"\n",
+			mascarar: []string{"SGP"}, manter: []string{"application", "urn:li"}},
 	})
 }
 
