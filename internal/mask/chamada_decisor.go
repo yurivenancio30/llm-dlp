@@ -176,6 +176,32 @@ func palavraDecidivel(v string) bool {
 
 func numerico(v string) bool { return v != "" && v[0] >= '0' && v[0] <= '9' }
 
+// rotuloDeCampo: a palavra que termina em s[b] é o rótulo de um "campo: valor" ou
+// "campo=valor" (JSON, YAML, .env, log, dict do Python): o nome do campo, nunca o nome do
+// registro. Não são rótulo "x::y", "x://", "x==y" nem "host:5432" e "12:30" (porta e hora).
+func rotuloDeCampo(s string, b int) bool {
+	if b < len(s) && (s[b] == '"' || s[b] == '\'') {
+		b++
+	}
+	for b < len(s) && (s[b] == ' ' || s[b] == '\t') {
+		b++
+	}
+	if b >= len(s) {
+		return false
+	}
+	var prox byte
+	if b+1 < len(s) {
+		prox = s[b+1]
+	}
+	switch s[b] {
+	case ':':
+		return prox != ':' && prox != '/' && !(prox >= '0' && prox <= '9')
+	case '=':
+		return prox != '='
+	}
+	return false
+}
+
 // ---- segmentos de um nome já mascarado (B4) ---------------------------------------------
 
 // segmentos: a palavra que é segmento de um nome de objeto já achado no texto ("payments" em
@@ -324,7 +350,7 @@ func identidadeBloco(c *TextoCtx, e extChamada, cob faixas, bloco []registro) {
 		dec[i] = make([]bool, len(r.ps))
 		for k, p := range r.ps {
 			v := s[p.a:p.b]
-			if !palavraDecidivel(v) || e.prog[hpal(v)] {
+			if !palavraDecidivel(v) || e.prog[hpal(v)] || rotuloDeCampo(s, p.b) {
 				continue
 			}
 			// unidade: a palavra logo depois de um número, separada por um espaço só ("2 days")

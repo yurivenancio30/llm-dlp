@@ -351,3 +351,38 @@ func TestMidiaMemoNaoGuardaCacheControl(t *testing.T) {
 		t.Fatal("imagem sem nada a cobrir deve sair como veio")
 	}
 }
+
+// O rótulo de um campo ("email": ...) não é o nome do registro: numa saída em JSON de um comando
+// que lista um substantivo no plural (o inventário do decisor), as chaves continuam chaves e o
+// "nome" do registro com CPF é de pessoa.
+func TestChavesDoJSONContinuamChaves(t *testing.T) {
+	var recebido []byte
+	_, px := montar(t, func(w http.ResponseWriter, r *http.Request) {
+		recebido, _ = io.ReadAll(r.Body)
+		w.Header().Set("content-type", "application/json")
+		io.WriteString(w, `{"id":"m","type":"message","role":"assistant","content":[{"type":"text","text":"ok"}]}`)
+	})
+	saida := "{\n  \"nome\": \"Fabio Augusto Leme\",\n  \"cpf\": \"" + cpf + "\",\n  \"email\": \"fabio.leme@acme-seguros.com.br\",\n  \"telefone\": \"(81) 99876-5432\"\n}\n"
+	corpo, _ := json.Marshal(map[string]any{"model": "x", "max_tokens": 10, "messages": []any{
+		map[string]any{"role": "user", "content": "veja o cliente 1"},
+		map[string]any{"role": "assistant", "content": []any{
+			map[string]any{"type": "tool_use", "id": "t1", "name": "Bash", "input": map[string]any{"command": "curl -s localhost:8080/api/clientes/1"}}}},
+		map[string]any{"role": "user", "content": []any{
+			map[string]any{"type": "tool_result", "tool_use_id": "t1", "content": saida}}},
+	}})
+	resp, err := http.Post(px.URL+"/v1/messages", "application/json", bytes.NewReader(corpo))
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	for _, chave := range []string{`\"nome\":`, `\"cpf\":`, `\"email\":`, `\"telefone\":`} {
+		if !strings.Contains(string(recebido), chave) {
+			t.Errorf("a chave %s virou pseudônimo: %s", chave, recebido)
+		}
+	}
+	for _, real := range []string{"Fabio Augusto Leme", cpf, "fabio.leme@acme-seguros.com.br", "(81) 99876-5432"} {
+		if strings.Contains(string(recebido), real) {
+			t.Errorf("passou %q: %s", real, recebido)
+		}
+	}
+}
