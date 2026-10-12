@@ -9,7 +9,7 @@ In each version: **Masking** is what started (or stopped) being masked; **Progra
 commands, installation, configuration, performance and documentation; **Code** is what only
 matters to whoever changes the code.
 
-## [Unreleased]
+## [0.7.0] - 2026-10-12
 
 Masking measured with canaries (fake data planted in 21 output formats, 8 kinds of code file
 and a multi-turn conversation, through the whole proxy): a person's name in a JSON, XML,

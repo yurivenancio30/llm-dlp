@@ -5,7 +5,7 @@ package versao
 // Versao: a versão do llm-dlp, no formato MAIOR.MENOR.CORREÇÃO (ver docs/pt-BR/versoes.md). É a única
 // fonte: a tag do git (v0.2.0) e a primeira seção do CHANGELOG.md têm de dizer o mesmo, e
 // TestVersaoBateComOChangelog confere.
-const Versao = "0.6.0"
+const Versao = "0.7.0"
 
 // Commit: preenchido por -ldflags "-X .../internal/versao.Commit=abc1234" (o Makefile faz).
 // "-mod" no fim: compilado com mudanças não commitadas.

@@ -9,7 +9,7 @@ Em cada versão: **Mascaramento** é o que passou a ser (ou deixou de ser) masca
 **Programa** é comando, instalação, configuração, desempenho e documentação; **Código** é o
 que só interessa a quem mexe no código.
 
-## [Não lançado]
+## [0.7.0] - 2026-10-12
 
 Mascaramento medido com canários (dados falsos plantados em 21 formatos de saída, 8 tipos de
 arquivo de código e uma conversa de várias rodadas, pelo proxy inteiro): o nome de uma pessoa
