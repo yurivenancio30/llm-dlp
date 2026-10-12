@@ -148,6 +148,12 @@ func TestFormatosGenericos(t *testing.T) {
 		{"SQL INSERT lido pelo Claude Code (número de linha)", "1\t-- dump\n2\tINSERT INTO clientes (id, nome_cliente, num_cpf, dt_nascimento) VALUES\n3\t(1, 'Maria Aparecida Lopes', '" + cpf + "', '1998-04-13'),\n4\t(2, 'Jose Antonio Reis', '" + cpf + "', '1984-08-17');\n", []string{"Maria Aparecida Lopes", "Jose Antonio Reis", cpf, "1998-04-13", "1984-08-17"}},
 		{"linhas coladas sem cabeçalho, com CPF", "Maria Aparecida Lopes | " + gerarCPF("529982247") + " | maria.3@gmail.com\nJose Antonio Reis | " + gerarCPF("529982247") + " | jose.4@gmail.com\n", []string{"Maria Aparecida Lopes", "Jose Antonio Reis"}},
 		{"dado pessoal sensível em tabela", "paciente\ttipo_sanguineo\tdeficiencia\nMarcos Vinicius Paz\tAB-\tauditiva\n", []string{"Marcos Vinicius Paz", "AB-", "auditiva"}},
+		// "nome" sozinho num registro chave-valor com outro campo de pessoa, como na tabela
+		{"campo 'nome' em JSON com cpf no mesmo registro", "{\n  \"nome\": \"Fabio Augusto Leme\",\n  \"cpf\": \"" + cpf + "\"\n}", []string{"Fabio Augusto Leme", cpf}},
+		{"idem, JSON minificado numa lista", `[{"id":1,"nome":"Fabio Augusto Leme","documento":"` + cpf + `"}]`, []string{"Fabio Augusto Leme", cpf}},
+		{"idem, dict do Python", "{'nome': 'Fabio Augusto Leme', 'cpf': '" + cpf + "'}", []string{"Fabio Augusto Leme", cpf}},
+		{"idem, XML com um campo por linha", "<cliente>\n  <nome>Fabio Augusto Leme</nome>\n  <cpf>" + cpf + "</cpf>\n</cliente>", []string{"Fabio Augusto Leme", cpf}},
+		{"idem, YAML", "cliente:\n  nome: Fabio Augusto Leme\n  telefone: (31) 98888-7777\n", []string{"Fabio Augusto Leme", "(31) 98888-7777"}},
 	}
 	for _, c := range casos {
 		out, _ := novoTeste(t).Mascarar(c.texto)
@@ -164,6 +170,7 @@ func TestFormatosGenericos(t *testing.T) {
 		"name: Deploy to Production\non: push\njobs:\n  build:\n    name: Build and Test\n",
 		"| Sistema | Status | Dono do processo |\n|---|---|---|\n| SIS_A | ativo | TI |\n",
 		"<produto><nome>CDB Liquidez</nome><tipo>renda fixa</tipo></produto>",
+		"{\n  \"nome\": \"Plano Ouro Anual\",\n  \"preco\": 10\n}", // "nome" sem outro campo de pessoa no registro
 		"func login(user string) error { return nil } // login: ver docs",
 		"cliente = buscar_cliente(id)\nresponsavel = None\n",
 		// listas de colunas em SQL e em texto não são cabeçalho de tabela

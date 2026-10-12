@@ -24,7 +24,7 @@ var rePseudoPronto = regexp.MustCompile(`^(?:[A-Z:]+-[a-z2-7]{8}|[Pp]essoa [a-z2
 // "Fulano de Tal / Beltrana Souza" são duas pessoas: cada parte é um achado.
 func marcar(s string, ini, fim int, classe string, add func(ini, fim int, tipo string)) {
 	if classe == "nomesolto" {
-		return // só vale em tabela, onde vira "nomecompleto" (ver cabecalho)
+		return // só vale em tabela ou registro com outro campo de pessoa, onde vira "nomecompleto" (ver cabecalho e nomeNoRegistro)
 	}
 	if (classe == "nome" || classe == "nomecompleto") && strings.ContainsAny(s[ini:fim], "/;&") {
 		for p := ini; p < fim; {
@@ -131,22 +131,17 @@ func valorDoCampo(classe, v string) (string, bool) {
 func (m *Masker) acharCampos(s string, add func(ini, fim int, tipo string)) {
 	for i := 0; i < len(s); i++ {
 		c := s[i]
-		if c != ':' && c != '=' {
+		if !separadorDeCampo(s, i) {
 			continue
 		}
-		prox, ant := byte(0), byte(0)
+		prox := byte(0)
 		if i+1 < len(s) {
 			prox = s[i+1]
 		}
-		if i > 0 {
-			ant = s[i-1]
-		}
-		// não são separadores de campo: "::", "==", "!=", "<=", ">=", ":=" (vale o "="), "://"
-		if (c == ':' && (prox == ':' || prox == '=' || prox == '/' || ant == ':')) ||
-			(c == '=' && (prox == '=' || ant == '=' || ant == '!' || ant == '<' || ant == '>')) {
-			continue
-		}
 		classe := m.classeAntes(s, i)
+		if classe == "nomesolto" {
+			classe = m.nomeNoRegistro(s, i) // "nome" sozinho: de pessoa só com outro campo de pessoa ao lado
+		}
 		if classe == "" {
 			continue
 		}
@@ -206,6 +201,123 @@ func (m *Masker) acharCampos(s string, add func(ini, fim int, tipo string)) {
 			marcar(s, ini, fim, classe, add)
 		}
 	}
+}
+
+// separadorDeCampo: s[i] é o ":" ou "=" de um "campo: valor" ou "campo=valor". Não são: "::",
+// "==", "!=", "<=", ">=", ":=" (vale o "="), "://".
+func separadorDeCampo(s string, i int) bool {
+	c := s[i]
+	if c != ':' && c != '=' {
+		return false
+	}
+	prox, ant := byte(0), byte(0)
+	if i+1 < len(s) {
+		prox = s[i+1]
+	}
+	if i > 0 {
+		ant = s[i-1]
+	}
+	return !(c == ':' && (prox == ':' || prox == '=' || prox == '/' || ant == ':')) &&
+		!(c == '=' && (prox == '=' || ant == '=' || ant == '!' || ant == '<' || ant == '>'))
+}
+
+// nomeNoRegistro: "nome" ou "name" sozinho é nome de pessoa, como numa tabela (ver
+// cabecalho), quando o MESMO registro tem outro campo sensível ({"nome": x, "cpf": y},
+// <nome>x</nome><cpf>y</cpf>, nome=x cpf=y). O nome de um produto ou de um recurso fica.
+// O registro termina em s[i] (o separador ou o "</" do campo): o "{...}" em volta; sem
+// chaves, as linhas vizinhas com o mesmo recuo (XML, YAML, .env) ou a própria linha (log).
+func (m *Masker) nomeNoRegistro(s string, i int) string {
+	a, b := registroEm(s, i)
+	for k := a; k < b; k++ {
+		var c string
+		switch {
+		case k == i:
+			continue
+		case s[k] == ':' || s[k] == '=':
+			if separadorDeCampo(s, k) {
+				c = m.classeAntes(s, k)
+			}
+		case s[k] == '<' && k+1 < b && s[k+1] == '/':
+			if f := strings.IndexByte(s[k+2:b], '>'); f > 0 && f <= 60 {
+				c = m.classe(s[k+2 : k+2+f])
+			}
+		}
+		if c != "" && c != "nomesolto" {
+			return "nomecompleto"
+		}
+	}
+	return ""
+}
+
+// registroEm: o registro em volta de s[i] (ver nomeNoRegistro), com teto de tamanho.
+func registroEm(s string, i int) (int, int) {
+	const teto = 8 << 10
+	prof := 0
+	for a := i - 1; a >= 0 && i-a <= teto; a-- {
+		switch s[a] {
+		case '}':
+			prof++
+		case '{':
+			if prof > 0 {
+				prof--
+				continue
+			}
+			p := 0
+			for b := a + 1; b < len(s) && b-a <= 2*teto; b++ {
+				switch s[b] {
+				case '{':
+					p++
+				case '}':
+					if p == 0 {
+						return a, b + 1
+					}
+					p--
+				}
+			}
+			return a, min(len(s), a+2*teto)
+		case '\n':
+			if prof == 0 && a > 0 && s[a-1] == '\n' {
+				a = -1 // linha em branco antes de qualquer "{": não está entre chaves
+			}
+		}
+		if a < 0 {
+			break
+		}
+	}
+	// sem chaves: as linhas vizinhas não vazias com o mesmo recuo
+	ini := strings.LastIndexByte(s[:i], '\n') + 1
+	recuo := func(l int) int {
+		n := 0
+		for l+n < len(s) && (s[l+n] == ' ' || s[l+n] == '\t') {
+			n++
+		}
+		return n
+	}
+	r := recuo(ini)
+	a := ini
+	for n := 0; n < 60 && a > 0; n++ {
+		p := strings.LastIndexByte(s[:a-1], '\n') + 1
+		if p == a-1 || recuo(p) != r || p+r >= len(s) || s[p+r] == '\n' {
+			break
+		}
+		a = p
+	}
+	b := fimDaLinhaEm(s, i)
+	for n := 0; n < 60 && b < len(s); n++ {
+		p := b + 1
+		if p >= len(s) || s[p] == '\n' || recuo(p) != r || p+r >= len(s) || s[p+r] == '\n' {
+			break
+		}
+		b = fimDaLinhaEm(s, p)
+	}
+	return a, b
+}
+
+func fimDaLinhaEm(s string, i int) int {
+	if j := strings.IndexByte(s[i:], '\n'); j >= 0 {
+		return i + j
+	}
+	return len(s)
 }
 
 // depoisPrefixoLiteral: se s[j:] começa com um prefixo de literal de string do Python (r, b,
@@ -415,7 +527,10 @@ func (m *Masker) acharXML(s string, add func(ini, fim int, tipo string)) {
 		}
 		rotulo := s[pos : pos+f]
 		classe := m.classe(rotulo)
-		if classe == "" || classe == "nomesolto" {
+		if classe == "nomesolto" {
+			classe = m.nomeNoRegistro(s, fecha)
+		}
+		if classe == "" {
 			continue
 		}
 		// o valor é o que está entre o ">" da abertura e o "</"
