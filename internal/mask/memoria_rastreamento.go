@@ -318,6 +318,26 @@ func fonteArquivo(f string) bool {
 	return false
 }
 
+// extDocumento: arquivos de documentação em texto (o conteúdo é prosa, menos os blocos de código).
+var extDocumento = map[string]bool{"md": true, "markdown": true, "mdx": true, "txt": true, "rst": true, "adoc": true, "asciidoc": true}
+
+// fonteDocumento: todo arquivo da fonte é documentação (com um arquivo de código junto, vale a
+// regra do código, que protege mais).
+func fonteDocumento(f string) bool {
+	n := 0
+	for _, x := range strings.Split(f, ",") {
+		if x == "" || strings.HasPrefix(x, "cmd:") {
+			continue
+		}
+		k := strings.LastIndexByte(x, '.')
+		if k < 0 || !extDocumento[x[k+1:]] {
+			return false
+		}
+		n++
+	}
+	return n > 0
+}
+
 // FonteSistema: a fonte de uma saída que descreve ou lista um catálogo de sistema (DESC/SHOW em
 // SNOWFLAKE.ACCOUNT_USAGE, information_schema...). A estrutura listada é documentação pública:
 // a saída não é fonte de decisão (como o texto do assistente) e só recebe o contágio dos nomes

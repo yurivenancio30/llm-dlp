@@ -12,7 +12,9 @@ import (
 //     traduziu de um pseudônimo nesse comando (essa é nome, não programa). Uma regex
 //     '.*cpf.*' que o script escreveu sai como o script a escreveu.
 //   - Comentário e texto corrido: a memória não troca palavra comum (sem cara de identificador)
-//     dentro de comentário (--, #, //, /* */ na linha). Em texto corrido (três ou mais palavras
+//     dentro de comentário (--, #, //, /* */ na linha, fora de aspas) na frase do usuário ou do
+//     modelo; num dado (saída de ferramenta, arquivo lido), só a coluna e o índice ficam de
+//     fora: o nome de recurso que a requisição provou continua nome (procedência). Em texto corrido (três ou mais palavras
 //     de prosa seguidas), não troca a palavra comum que é nome de coluna ou de índice: é o
 //     vocabulário do modelo de dados (a coluna "nome" de um catálogo não troca o "nome" de uma
 //     frase), o mesmo motivo por que o vistos não propaga coluna. Nome de recurso (namespace,
@@ -26,7 +28,14 @@ import (
 // filtroMem: o que a memória não pode trocar num texto.
 type filtroMem struct {
 	prog map[uint32]bool // palavras do programa (a dica da saída)
+	// saida: o texto é dado (saída de ferramenta, arquivo lido), não frase do usuário nem do
+	// modelo. Aí vale a procedência (ver pula).
+	saida bool
 }
+
+// colunaOuIndice: o vocabulário do modelo de dados, que a memória não leva para a prosa nem
+// para outro arquivo (o mesmo motivo por que o vistos não propaga coluna).
+func colunaOuIndice(ent string) bool { return ent == "coluna" || ent == "indice" }
 
 func filtroDe(dica string) filtroMem {
 	_, ext := partesDica(dica)
@@ -49,10 +58,13 @@ func (f filtroMem) pula(s string, a, b int, nm *nomeMem) bool {
 	if f.prog != nil && f.prog[hpal(v)] {
 		return true
 	}
-	if emComentario(s, a) {
+	// procedência: num dado (saída de ferramenta, arquivo), o nome de recurso que esta
+	// requisição já provou (é o que está na memória) continua nome dentro de um comentário; a
+	// palavra comum só vale como palavra na frase do usuário ou do modelo
+	if emComentario(s, a) && !(f.saida && !colunaOuIndice(nm.ent)) {
 		return true
 	}
-	return (nm.ent == "coluna" || nm.ent == "indice") && emProsa(s, a, b)
+	return colunaOuIndice(nm.ent) && emProsa(s, a, b)
 }
 
 // emComentario: s[a] está depois de um marcador de comentário na mesma linha (--, #, //, /*),

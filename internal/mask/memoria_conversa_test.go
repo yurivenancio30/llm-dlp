@@ -214,3 +214,56 @@ func TestEmComentario(t *testing.T) {
 		}
 	}
 }
+
+// Procedência: num dado (saída de ferramenta, arquivo lido), o nome de recurso que a requisição
+// provou continua nome dentro de um comentário; na mensagem do usuário, o comentário colado
+// continua fora do alcance da memória, como antes.
+func TestProcedenciaEmComentarioDoDado(t *testing.T) {
+	m := novoTeste(t)
+	sql := "SELECT valor FROM " + tabComum + " WHERE id = 1 AND x = 2"
+	arquivo := "def carregar():\n    # carrega as " + tabComum + " do dia\n    return 1\n"
+	l, outs, _ := loteCom(m, sql, arquivo)
+	if strings.Contains(outs[1], tabComum) {
+		t.Fatalf("o nome provado no SQL ficou em claro no comentário do arquivo: %s", outs[1])
+	}
+	colado := "olha isto:\n# carrega as " + tabComum + " do dia"
+	if o, _ := l.MascararDicaProsa(colado, false, posTeste(colado), ""); !strings.Contains(o, tabComum) {
+		t.Fatalf("na mensagem do usuário o comentário devia ficar como antes: %s", o)
+	}
+}
+
+// Arquivo de documentação (README, prompt de agente) é prosa fora dos blocos de código: a
+// palavra comum que a memória traz fica como palavra; no bloco de código e num arquivo de
+// código, a procedência vale.
+func TestDocumentoEProsaForaDoCodigo(t *testing.T) {
+	tab := "pro" + "postas" // tabela de palavra comum (está na lista)
+	if !palavraComum(tab) {
+		t.Fatalf("premissa: %q devia ser palavra comum", tab)
+	}
+	m := novoTeste(t)
+	sql := "SELECT valor FROM " + tab + " WHERE id = 1 AND x = 2"
+	doc := "# Guia\n\nO time revisa as " + tab + " toda semana.\n\n```sql\nselect * from " + tab + " -- as " + tab + " do dia\n```\n"
+	codigo := "def carregar():\n    # carrega as " + tab + " do dia\n    return 1\n"
+	itens := []ItemLote{
+		{S: sql, Pos: posTeste(sql)},
+		{S: doc, Pos: posTeste(doc), Dica: ComFonte("readme.md", "")},
+		{S: codigo, Pos: posTeste(codigo), Dica: ComFonte("carga.py", "")},
+	}
+	l := m.NovoLote()
+	l.Aquecer(itens)
+	l.Memoria(itens, nil)
+	var outs []string
+	for _, it := range itens {
+		o, _ := l.MascararDica(it.S, false, it.Pos, it.Dica)
+		outs = append(outs, o)
+	}
+	if !strings.Contains(outs[1], "revisa as "+tab+" toda") {
+		t.Errorf("na prosa do README a palavra comum devia ficar: %s", outs[1])
+	}
+	if strings.Contains(outs[1], "from "+tab) || strings.Contains(outs[1], "-- as "+tab) {
+		t.Errorf("no bloco de código do README o nome devia ser mascarado: %s", outs[1])
+	}
+	if strings.Contains(outs[2], tab) {
+		t.Errorf("no arquivo de código o nome devia ser mascarado: %s", outs[2])
+	}
+}

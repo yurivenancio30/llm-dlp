@@ -251,20 +251,25 @@ func (l *Lote) comMemoria(s string, r resultado, dica string) resultado {
 		l.mem = &memoria{exata: map[string][]nomeMem{}, semCaixa: map[string][]nomeMem{}}
 	}
 	f := filtroDe(dica)
+	f.saida = !l.prosa && !l.escrevendo
 	extra := l.mem.varrerF(s, r.trechos, f)
 	if !l.escrevendo && fonteArquivo(l.fonteAtual) {
-		// palavra comum provada numa fonte não contamina OUTRO arquivo lido (o vocabulário do
-		// arquivo é dele: "status" no app.js não é a coluna do schema.sql); a conversa e as
-		// saídas sem arquivo (kubectl logs, git branch) recebem o contágio
+		// coluna provada numa fonte não contamina OUTRO arquivo lido (o vocabulário do arquivo
+		// é dele: "status" no app.js não é a coluna do schema.sql); a conversa e as saídas sem
+		// arquivo (kubectl logs, git branch) recebem o contágio. Nome de recurso (tabela,
+		// schema, banco...) provado nesta requisição vale em qualquer arquivo (procedência).
 		k := extra[:0]
 		for _, x := range extra {
-			if v := s[x.Ini:x.Fim]; caraDeIdentificador(v) || l.provadoNaFonte(v) {
+			if v := s[x.Ini:x.Fim]; caraDeIdentificador(v) || l.provadoNaFonte(v) || !colunaOuIndice(strings.TrimPrefix(x.Tipo, prefTipoObj)) {
 				k = append(k, x)
 			}
 		}
 		extra = k
 	}
 	extra = l.semComunsNaProsa(s, extra)
+	if !l.escrevendo && fonteDocumento(l.fonteAtual) {
+		extra = l.semComunsNoDocumento(s, extra)
+	}
 	ts := l.juntarTrechos(r.trechos, extra)
 	l.provAtual = map[string]bool{}
 	for _, d := range r.decididos {
@@ -310,6 +315,88 @@ func (l *Lote) semComunsNaProsa(s string, xs []trecho) []trecho {
 		}
 	}
 	return out
+}
+
+// semComunsNoDocumento: num arquivo de documentação (README, prompt de agente, notas), o texto
+// fora dos blocos de código é prosa, como a mensagem do usuário: a palavra comum que a memória
+// trouxe fica como palavra. Dentro de um bloco de código (``` ou ~~~), a procedência vale como
+// em qualquer código.
+func (l *Lote) semComunsNoDocumento(s string, xs []trecho) []trecho {
+	if len(xs) == 0 {
+		return xs
+	}
+	cercas := blocosDeCodigo(s)
+	out := xs[:0:0]
+	for _, x := range xs {
+		if !dentroDe(cercas, x.Ini) && l.m.comumLivre(s[x.Ini:x.Fim]) {
+			continue
+		}
+		out = append(out, x)
+	}
+	return out
+}
+
+// blocosDeCodigo: os trechos de s entre cercas de código do Markdown (``` ou ~~~ no começo da
+// linha, depois do número de linha do Read, se houver). Cerca sem fechamento vai até o fim.
+func blocosDeCodigo(s string) [][2]int {
+	var out [][2]int
+	aberto := -1
+	for ini := 0; ini < len(s); {
+		fim := strings.IndexByte(s[ini:], '\n')
+		if fim < 0 {
+			fim = len(s)
+		} else {
+			fim += ini
+		}
+		c := conteudoDaLinha(s, ini, fim)
+		if strings.HasPrefix(s[c:fim], "```") || strings.HasPrefix(s[c:fim], "~~~") {
+			if aberto < 0 {
+				aberto = ini
+			} else {
+				out = append(out, [2]int{aberto, fim})
+				aberto = -1
+			}
+		}
+		ini = fim + 1
+	}
+	if aberto >= 0 {
+		out = append(out, [2]int{aberto, len(s)})
+	}
+	return out
+}
+
+// conteudoDaLinha: onde começa o conteúdo da linha s[ini:fim], depois do recuo e do número de
+// linha que o Read do Claude Code põe ("    12→" ou "12\t").
+func conteudoDaLinha(s string, ini, fim int) int {
+	i := ini
+	for i < fim && (s[i] == ' ' || s[i] == '\t') {
+		i++
+	}
+	j := i
+	for j < fim && s[j] >= '0' && s[j] <= '9' {
+		j++
+	}
+	if j > i {
+		if strings.HasPrefix(s[j:fim], "→") {
+			return j + len("→")
+		}
+		if j < fim && s[j] == '\t' {
+			return j + 1
+		}
+	}
+	for i < fim && i-ini < 8 && (s[i] == ' ' || s[i] == '\t') {
+		i++
+	}
+	return i
+}
+
+func dentroDe(fs [][2]int, p int) bool {
+	for _, f := range fs {
+		if p >= f[0] && p < f[1] {
+			return true
+		}
+	}
+	return false
 }
 
 // mudouTipo: algum trecho mudou de tipo (âncora por posição corrigiu o genérico).
