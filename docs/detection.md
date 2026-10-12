@@ -95,6 +95,7 @@ printed by pandas (`print(df)`, with or without the index), `to_csv`, `to_markdo
 | "name" + whose it is | A person's name | `NOM_DATA_OWNER`, `nm_titular`, `customer_name` |
 | "code" or "id" + whose it is | User code | `COD_USU_OWNER`, `id_cliente`, `user_id` |
 | Only whose it is | A person's name, if the value has a first and a last name | `Cliente`, `Responsável`, `Owner` |
+| Only "name" | A person's name, if the same record has another personal field (`cpf`, `telefone`...): the table row, the `{...}` around it (JSON, Python dict), the neighbouring lines with the same indent (XML, YAML) or the log line. Otherwise it stays: `<produto><nome>CDB</nome>` | `nome`, `name` |
 
 There is also a check on the value: in a name column it must be letters and spaces; in a CPF
 column it must have digits. This avoids masking a `NULL` or a repeated header.

@@ -595,7 +595,7 @@ Two major formats, plus two special ones:
 | JDBC | `\bjdbc:(sqlserver|oracle:thin|postgresql|mysql(\+srv)?(:loadbalance|:replication)?|db2|snowflake|bigquery):` |
 | Key=value pairs | ≥2 `key=value` pairs separated by `;` (ODBC/ADO.NET) or by a space (libpq), **and** at least one key from the vocabulary (section 3). Without a known key, it does not fire. |
 | TNS (Oracle Net) | `(DESCRIPTION=` or `(ADDRESS=` with `(HOST=`; `name = (DESCRIPTION=...)` in tnsnames.ora |
-| DataHub URN | `urn:li:(dataset|corpuser|corpGroup|dataJob|dataFlow|schemaField|dataPlatform):` |
+| DataHub URN | `urn:li:(dataset|corpuser|corpGroup|dataJob|dataFlow|schemaField|dataPlatform|application):` |
 
 Boundary of the string: it ends at a space, quotes, `` ` ``, an unbalanced `)`, `<`, `>` or the end
 of the line. For ODBC/ADO.NET, a value between `{}` (ODBC) or quotes (ADO.NET) may contain `;`.
@@ -631,6 +631,7 @@ Pseudonyms: `HOST_` server/host/account, `DB_` database/catalog/service/SID, `SC
 | corpuser / corpGroup URN | `urn:li:corpuser:<id>` | USR |
 | dataFlow / dataJob URN | `(orchestrator,flow_id,cluster)` / `(<flowUrn>,job_id)` | never; SVC; SVC (cluster is free text, e.g. prod); SVC |
 | schemaField URN | `(<datasetUrn>,<field_path>)` | recursive on the dataset; column (type from the column detector) |
+| application URN | `urn:li:application:<name>` | SVC (even a short acronym: the URN is the proof) |
 
 ### 3. Public vocabulary (never mask)
 
@@ -3424,6 +3425,18 @@ request. Applying the memory is a step after the memo and does not change the me
 - **A generic word does not enter.** A word of the derived public reference (`default`,
   `public`, `api`...) decided in an inventory is masked there, but does not enter the memory
   (`Decisao.Generica`): propagating `default` to the whole conversation would mask half of the text.
+- **Where it holds back** (`memoria_conversa_freios.go`): a word that is in the program of the
+  tool call, a word inside a code comment, a column or index name in prose, a common word in
+  prose and a common word in another file read. In **data** (a command output, a file read; not
+  the user's message, not the assistant's text) a resource name (table, schema, database,
+  server, service...) skips the comment and the other-file brakes: the proof is where the value
+  came from, not where it appears again (`# carrega as propostas do dia` in a `.py` read after
+  `\dt`). Columns and indexes keep both brakes (a `status` column does not mask `status` in
+  another file). A **documentation file** (`.md`, `markdown`, `.mdx`, `.txt`, `.rst`, `.adoc`,
+  `.asciidoc`) is prose outside its code blocks (` ``` ` or `~~~` fences): a common word there
+  stays a word.
+- **What is a comment.** A marker inside quotes is text, `--` glued to a letter or digit is a
+  command option (`pg_dump --schema=x`), and `#` followed by a digit is a number (`lote #3`).
 
 ### Who wrote it
 
@@ -3462,7 +3475,8 @@ without depending on a separator. In a block of 3 or more parallel records (the 
 candidates, with a slack of 1), the position in which all the values are distinct, next to
 positions with repeated values, is **identity**: it is the key of the inventory. A list with one
 item per line, all distinct, is also identity. Numbers, dates, durations,
-versions and the public reference are left out.
+versions and the public reference are left out, and so is a field label: a word followed by
+`:` or `=` (`"email": ...`, `telefone=...`) is a key, never the identity of a record.
 
 ### Decision for a common word, and echo
 

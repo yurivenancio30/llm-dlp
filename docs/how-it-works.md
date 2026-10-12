@@ -24,7 +24,7 @@ result for each text. Only what is new is examined.
 |---|---|
 | `joao.silva@empresa.com.br` | `p.mxvotcyt@didl3.invalid` |
 | `Joao Carlos Silva` / `JOAO CARLOS SILVA` | `Pessoa mxvotcyt` / `PESSOA MXVOTCYT` (same identifier as the e-mail, if it is the same person; the case follows the name, and each spelling comes back as it was) |
-| `B123456` (João's user code) | `USUARIO-mxvotcyt` |
+| `B123456` (João's user code) | `USUARIO-mxvotcyt` (`usuario-mxvotcyt` for `b123456`: as with a name, the case follows the value) |
 | `10.42.7.15` | `250.153.31.15` (the same subnet becomes the same fake subnet) |
 | `mysql-dh.empresa.intra` | `mysql-x7k2.invalid` |
 | `529.982.247-25` | `CPF-irvikcpk` |

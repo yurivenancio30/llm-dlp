@@ -9,6 +9,51 @@ Em cada versão: **Mascaramento** é o que passou a ser (ou deixou de ser) masca
 **Programa** é comando, instalação, configuração, desempenho e documentação; **Código** é o
 que só interessa a quem mexe no código.
 
+## [Não lançado]
+
+Mascaramento medido com canários (dados falsos plantados em 21 formatos de saída, 8 tipos de
+arquivo de código e uma conversa de várias rodadas, pelo proxy inteiro): o nome de uma pessoa
+num registro JSON, XML, dict Python ou YAML é mascarado, as chaves de um objeto JSON continuam
+chaves, um nome que a requisição provou continua mascarado no código e nas saídas seguintes, e
+cada grafia de um termo ou código de usuário volta na sua caixa. Os nomes em claro no código
+caíram de 107 para 75 de 253 numa conversa nova, e de 73 para 41 com os dados antes na
+requisição. Depois de atualizar, feche o Claude Code e rode `llm-dlp parar`.
+
+### Mascaramento
+
+- Um campo chamado só `nome` ou `name` é nome de pessoa quando o mesmo registro tem outro
+  campo pessoal (`cpf`, `telefone`...), como já era numa tabela: o `{...}` em volta (JSON, dict
+  Python), as linhas vizinhas com o mesmo recuo (XML, YAML, `.env`) ou a linha (log). Um
+  registro sem nenhum o deixa como está (`<produto><nome>CDB</nome>...`). Antes, o nome saía em
+  claro em JSON, JSON minificado, XML e dict Python.
+- As chaves de um objeto JSON (e de YAML, `.env`, `chave=valor`) nunca são tomadas como os
+  nomes de um inventário. Com um comando que cita um substantivo no plural
+  (`curl .../api/clientes/1`), `"email"` e `"telefone"` eram mascarados como objetos e o modelo
+  via o JSON sem as chaves.
+- Em dado (uma saída de comando, um arquivo lido), um nome de recurso que a requisição provou
+  (tabela, schema, banco, servidor, serviço...) continua mascarado dentro de um comentário e em
+  outro arquivo lido: a prova é de onde o valor veio. Antes, `# carrega as propostas do dia`
+  num `.py` lido depois de um `\dt` saía em claro. Na prosa nada muda: a mensagem do usuário, a
+  resposta do modelo e, fora dos blocos de código, um arquivo de documentação (`.md`, `.mdx`,
+  `.txt`, `.rst`, `.adoc`), onde uma palavra comum continua palavra. Colunas e índices ficam
+  como antes (uma coluna `status` não mascara `status` em outro arquivo).
+- Um marcador de comentário entre aspas é texto, `--` colado numa letra é opção de comando, e
+  `#` seguido de dígito é número: `pg_dump --schema=comercial` e `"lote #3: propostas"`
+  liberavam nomes como se fossem comentário.
+- A aplicação de uma URN do DataHub (`urn:li:application:SGP`) é mascarada, mesmo uma sigla
+  curta.
+- O pseudônimo de um termo, de um código de usuário e dos outros tipos com rótulo segue a caixa
+  do valor, como o de uma pessoa: `SGP` vira `EMPRESA-abcd2345`, `sgp` vira `empresa-abcd2345`,
+  `SgP` vira `Empresa-abcd2345` (o mesmo identificador). Antes, toda grafia voltava como a
+  primeira vista, e um comando ou arquivo que o modelo escrevia podia voltar com a caixa trocada
+  (`echo SgP sgp SGP` virava `echo SgP SgP SgP`). Achado em 21 de 6.841 gravações repetindo uma
+  sessão real.
+
+### Código
+
+- O `llm-dlp simular` conta as formas novas de pseudônimo quando procura um pseudônimo que
+  ficou numa gravação.
+
 ## [0.6.0] - 2026-10-11
 
 Três correções do mascaramento, achadas repetindo uma sessão real do Microsoft Fabric: um nome

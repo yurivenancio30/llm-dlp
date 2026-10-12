@@ -24,7 +24,7 @@ resultado de cada texto. Só o que é novo é examinado.
 |---|---|
 | `joao.silva@empresa.com.br` | `p.mxvotcyt@didl3.invalid` |
 | `Joao Carlos Silva` / `JOAO CARLOS SILVA` | `Pessoa mxvotcyt` / `PESSOA MXVOTCYT` (mesmo identificador do e-mail, se for a mesma pessoa; a caixa segue a do nome, e cada grafia volta como estava) |
-| `B123456` (código do João) | `USUARIO-mxvotcyt` |
+| `B123456` (código do João) | `USUARIO-mxvotcyt` (`usuario-mxvotcyt` para `b123456`: como no nome, a caixa segue a do valor) |
 | `10.42.7.15` | `250.153.31.15` (mesma sub-rede vira a mesma sub-rede falsa) |
 | `mysql-dh.empresa.intra` | `mysql-x7k2.invalid` |
 | `529.982.247-25` | `CPF-irvikcpk` |

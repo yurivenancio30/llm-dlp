@@ -589,7 +589,7 @@ Dois grandes formatos, mais dois especiais:
 | JDBC | `\bjdbc:(sqlserver|oracle:thin|postgresql|mysql(\+srv)?(:loadbalance|:replication)?|db2|snowflake|bigquery):` |
 | Pares chave=valor | ≥2 pares `chave=valor` separados por `;` (ODBC/ADO.NET) ou por espaço (libpq), **e** pelo menos uma chave do vocabulário (seção 3). Sem chave conhecida, não dispara. |
 | TNS (Oracle Net) | `(DESCRIPTION=` ou `(ADDRESS=` com `(HOST=`; `nome = (DESCRIPTION=...)` em tnsnames.ora |
-| URN DataHub | `urn:li:(dataset|corpuser|corpGroup|dataJob|dataFlow|schemaField|dataPlatform):` |
+| URN DataHub | `urn:li:(dataset|corpuser|corpGroup|dataJob|dataFlow|schemaField|dataPlatform|application):` |
 
 Fronteira da string: termina em espaço, aspas, `` ` ``, `)` não balanceado, `<`, `>` ou fim
 de linha. Para ODBC/ADO.NET, valor entre `{}` (ODBC) ou aspas (ADO.NET) pode conter `;`.
@@ -625,6 +625,7 @@ Pseudônimos: `HOST_` servidor/host/conta, `DB_` database/catalog/service/SID, `
 | URN corpuser / corpGroup | `urn:li:corpuser:<id>` | USR |
 | URN dataFlow / dataJob | `(orquestrador,flow_id,cluster)` / `(<flowUrn>,job_id)` | nunca; SVC; SVC (cluster é texto livre, ex.: prod); SVC |
 | URN schemaField | `(<datasetUrn>,<field_path>)` | recursivo no dataset; coluna (tipo do detector de coluna) |
+| URN application | `urn:li:application:<nome>` | SVC (mesmo uma sigla curta: a URN é a prova) |
 
 ### 3. Vocabulário público (nunca mascarar)
 
@@ -3418,6 +3419,19 @@ pedido. Aplicar a memória é um passo depois do memo e não muda a chave do mem
 - **Palavra genérica não entra.** Uma palavra da referência pública derivada (`default`,
   `public`, `api`...) decidida num inventário é mascarada ali, mas não entra na memória
   (`Decisao.Generica`): propagar `default` para toda a conversa mascararia metade do texto.
+- **Onde ela se segura** (`memoria_conversa_freios.go`): palavra que está no programa da
+  chamada de ferramenta, palavra dentro de um comentário de código, nome de coluna ou índice na
+  prosa, palavra comum na prosa e palavra comum em outro arquivo lido. Em **dado** (uma saída de
+  comando, um arquivo lido; não a mensagem do usuário, não o texto do assistente) um nome de
+  recurso (tabela, schema, banco, servidor, serviço...) passa pelos freios de comentário e de
+  outro arquivo: a prova é de onde o valor veio, não onde ele reaparece
+  (`# carrega as propostas do dia` num `.py` lido depois de um `\dt`). Colunas e índices
+  continuam com os dois freios (uma coluna `status` não mascara `status` em outro arquivo). Um
+  **arquivo de documentação** (`.md`, `markdown`, `.mdx`, `.txt`, `.rst`, `.adoc`, `.asciidoc`)
+  é prosa fora dos blocos de código (cercas ` ``` ` ou `~~~`): ali uma palavra comum continua
+  palavra.
+- **O que é comentário.** Um marcador entre aspas é texto, `--` colado numa letra ou dígito é
+  opção de comando (`pg_dump --schema=x`), e `#` seguido de dígito é número (`lote #3`).
 
 ### Quem escreveu
 
@@ -3456,7 +3470,8 @@ sem depender de separador. Num bloco de 3 ou mais registros paralelos (mesmo nú
 candidatos, com folga de 1), a posição em que todos os valores são distintos, ao lado de
 posições com valores repetidos, é **identidade**: é a chave do inventário. Uma lista com um
 item por linha, todos distintos, também é identidade. Ficam de fora números, datas, durações,
-versões e a referência pública.
+versões e a referência pública, e também um rótulo de campo: uma palavra seguida de `:` ou `=`
+(`"email": ...`, `telefone=...`) é chave, nunca a identidade de um registro.
 
 ### Decisão para palavra comum e eco
 

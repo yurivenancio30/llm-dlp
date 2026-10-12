@@ -90,6 +90,7 @@ JSON, e as linhas do openpyxl (`('NOME', 'CPF')`).
 | "nome" + de quem é | Nome de pessoa | `NOM_DATA_OWNER`, `nm_titular`, `customer_name` |
 | "código" ou "id" + de quem é | Código de usuário | `COD_USU_OWNER`, `id_cliente`, `user_id` |
 | Só de quem é | Nome de pessoa, se o valor tiver nome e sobrenome | `Cliente`, `Responsável`, `Owner` |
+| Só "nome" | Nome de pessoa, se o mesmo registro tiver outro campo pessoal (`cpf`, `telefone`...): a linha da tabela, o `{...}` em volta (JSON, dict Python), as linhas vizinhas com o mesmo recuo (XML, YAML) ou a linha do log. Senão fica: `<produto><nome>CDB</nome>` | `nome`, `name` |
 
 Há também uma checagem no valor: numa coluna de nome, tem que ser letras e espaços; numa de
 CPF, tem que ter dígitos. Isso evita mascarar um `NULL` ou um cabeçalho repetido.

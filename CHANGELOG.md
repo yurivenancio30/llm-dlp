@@ -9,6 +9,48 @@ In each version: **Masking** is what started (or stopped) being masked; **Progra
 commands, installation, configuration, performance and documentation; **Code** is what only
 matters to whoever changes the code.
 
+## [Unreleased]
+
+Masking measured with canaries (fake data planted in 21 output formats, 8 kinds of code file
+and a multi-turn conversation, through the whole proxy): a person's name in a JSON, XML,
+Python dict or YAML record is masked, the keys of a JSON object stay keys, a name the request
+proved stays masked in the code and the output that follow, and each spelling of a term or
+user code comes back in its own case. Names in clear in code went from 107 to 75 of 253 in a
+new conversation, and from 73 to 41 with the data earlier in the request. After updating,
+close Claude Code and run `llm-dlp parar`.
+
+### Masking
+
+- A field called only `nome` or `name` is a person's name when the same record has another
+  personal field (`cpf`, `telefone`...), as it already was in a table: the `{...}` around it
+  (JSON, Python dict), the neighbouring lines with the same indent (XML, YAML, `.env`) or the
+  line (log). A record without one keeps it (`<produto><nome>CDB</nome>...`). Before, the name
+  went out in clear in JSON, minified JSON, XML and a Python dict.
+- The keys of a JSON object (and of YAML, `.env`, `key=value`) are never taken as the names
+  in an inventory. With a command that names a plural noun (`curl .../api/clientes/1`),
+  `"email"` and `"telefone"` were masked as objects and the model saw the JSON without its keys.
+- In data (a command output, a file read), a resource name the request proved (table, schema,
+  database, server, service...) stays masked inside a comment and in another file read: the
+  proof is where the value came from. Before, `# carrega as propostas do dia` in a `.py` read
+  after `\dt` went out in clear. In prose nothing changes: the user's message, the model's
+  reply and, outside code blocks, a documentation file (`.md`, `.mdx`, `.txt`, `.rst`,
+  `.adoc`), where a common word stays a word. Columns and indexes keep the old behaviour (a
+  `status` column does not mask `status` in another file).
+- A comment marker inside quotes is text, `--` glued to a letter is a command option, and `#`
+  followed by a digit is a number: `pg_dump --schema=comercial` and `"lote #3: propostas"`
+  released names as if they were comments.
+- The application of a DataHub URN (`urn:li:application:SGP`) is masked, even a short acronym.
+- The pseudonym of a term, a user code and the other labelled types follows the case of the
+  value, as a person's does: `SGP` becomes `EMPRESA-abcd2345`, `sgp` becomes `empresa-abcd2345`,
+  `SgP` becomes `Empresa-abcd2345` (the same identifier). Before, every spelling came back as the
+  first one seen, so a command or file the model wrote could come back with the case changed
+  (`echo SgP sgp SGP` became `echo SgP SgP SgP`). Found in 21 of 6,841 writes replaying a
+  real session.
+
+### Code
+
+- `llm-dlp simular` counts the new pseudonym forms when it looks for a pseudonym left in a write.
+
 ## [0.6.0] - 2026-10-11
 
 Three masking fixes found replaying a real Microsoft Fabric session: a name already known is
