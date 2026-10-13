@@ -82,9 +82,9 @@ Um formato só, para todas as famílias:
 
 São **duas chaves diferentes**, por tipo de entidade:
 
-- `mascarar`: o nome desse tipo é trocado por pseudônimo **onde foi reconhecido** (na posição
+- `mask` (mascarar): o nome desse tipo é trocado por pseudônimo **onde foi reconhecido** (na posição
   estrutural). Padrão: todos os tipos ligados.
-- `propagar`: o nome desse tipo, depois de aprendido, é trocado também **em qualquer outro
+- `propagate` (propagar): o nome desse tipo, depois de aprendido, é trocado também **em qualquer outro
   lugar** (texto solto, outro arquivo). Padrão: ligado para servidor, database, schema, tabela,
   procedure, usuário, namespace, serviço, bucket e fila; **desligado para coluna**, porque nomes
   como `user_id` e `created_at` existem em todo código.
@@ -93,16 +93,16 @@ O que não estiver listado fica no padrão. Exemplo para manter as colunas legí
 nem propagar) e esconder o resto:
 
 ```json
-"objetos": {
-  "ligado": true,
-  "mascarar": { "coluna": false },
-  "propagar": { }
+"objects": {
+  "enabled": true,
+  "mask": { "coluna": false },
+  "propagate": { }
 }
 ```
 
 Onde cada chave é aplicada:
 
-| Etapa | `mascarar` | `propagar` |
+| Etapa | `mask` | `propagate` |
 |---|---|---|
 | Decisão de cada trecho devolvido pelos leitores, antes da troca | trecho de tipo desligado é descartado e o texto fica como está | — |
 | Aprendizado (memória e `vistos.json`) | tipo desligado não é guardado | tipo desligado é guardado só para a posição estrutural, sem marca de propagação |
@@ -115,7 +115,7 @@ legível onde aparece como coluna, e isso revela o nome da tabela.
 ### Freios da propagação
 
 Um nome aprendido só é propagado se tiver **cara de identificador** (`_`, dígito, ponto, hífen
-entre partes ou mistura de caixa), se o seu tipo estiver em `propagar` e se a evidência for
+entre partes ou mistura de caixa), se o seu tipo estiver em `propagate` e se a evidência for
 **forte**:
 
 - posição inequívoca: o nome de objeto depois de `CREATE`/`ALTER`/`FROM`/`JOIN`/`INTO`/`UPDATE`
@@ -3008,13 +3008,13 @@ esquema que não seja de banco, armazenamento, fila ou git), o host é servidor 
 interno: rótulo único sem ponto (`http://wiki-interna/`) ou terminado em `.local` (RFC 6762),
 `.internal` (reserva da ICANN, 2024), `.home.arpa` (RFC 8375), `.svc`/`.cluster.local` (DNS do
 Kubernetes), `.intra`, `.intranet`, `.interno`, `.corp`, `.lan`, `.localdomain`. O usuário antes do
-`@` também. Domínio público fica (os do cliente vão em `dominios_internos`). Fora de URL, um nome
+`@` também. Domínio público fica (os do cliente vão em `internal_domains`). Fora de URL, um nome
 com esses sufixos (`db01.corp:5432`, `redis.vendas.svc.cluster.local`) também é servidor, se tiver
 dígito ou hífen, ou dois rótulos antes do sufixo, e não for atributo de código (`threading.local()`)
 nem pacote Java (`org.foo.internal`).
 
 **Termo cadastrado dentro de um identificador** (leitor `termo-embutido`, ligado quando há
-`termos` de uma palavra só). O detector de termos troca a palavra inteira; este troca o
+`terms` de uma palavra só). O detector de termos troca a palavra inteira; este troca o
 identificador com cara de identificador que tem o termo como pedaço inteiro (separado por
 `_ . -` ou camelCase): termo `acmex` pega `acmex_pedidos`, `dbAcmexVendas01`, `svc-acmex-carga`,
 mas não `acmexvendas` nem `macmex_x`. O tipo vem da posição (depois de `FROM`/`JOIN` → tabela,
@@ -3242,7 +3242,7 @@ Código: `internal/mask/leitor_nuvem.go` (nuvem, IP público) e `leitor_endereco
 | Google Cloud | texto com `projects/`; `projects/<p>/<coleção>/<nome>` ou `projects/<p>/locations/<l>/<coleção>/<nome>` |
 | DOMINIO\usuario | texto com `\`; domínio NetBIOS (maiúsculas, dígitos, `-`; 2 a 15) antes da barra |
 | ssh/scp/sftp/rsync | o comando como palavra, e na mesma linha um argumento `usuario@host[:caminho]` |
-| IP público (opção `ip_publico`) | IPv4 com 3 pontos ou IPv6 com 2+ `:` |
+| IP público (opção `public_ip`) | IPv4 com 3 pontos ou IPv6 com 2+ `:` |
 
 ### 2. Posição → tipo de entidade
 
@@ -3299,10 +3299,10 @@ servidor em 34.120.10.5 (com ip_publico ligado)        →  servidor em HOST_...
 ### 6. Casos difíceis e limites
 
 - IP público vem **desligado**: um IP de serviço público (CDN, API) também seria trocado, e o
-  modelo perde a referência. Ligue com `objetos.ip_publico`.
+  modelo perde a referência. Ligue com `objects.public_ip`.
 - Em ARN de IAM sem caminho (`role/nome`) o nome é servico; em `user/nome`, usuario.
 - `ssh host` sem usuário: o host só é mascarado se outro leitor o pegar (sufixo interno,
-  `dominios_internos`).
+  `internal_domains`).
 - `DOMINIO\usuario` com usuário que tem espaço não é lido.
 - Nome de recurso do Google Cloud fora de `projects/...` (`gs://`, `bq://`) fica com outros leitores.
 

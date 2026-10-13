@@ -100,7 +100,7 @@ command does.
 
 | Client | Status | How it is connected |
 |---|---|---|
-| Claude Code (terminal, VS Code, JetBrains), with a subscription (Pro, Max) or an API key | **Stable** | By `llm-dlp instalar`, with a lock: Claude Code refuses to work outside llm-dlp |
+| Claude Code (terminal, VS Code, JetBrains), with a subscription (Pro, Max) or an API key | **Stable** | By `llm-dlp install`, with a lock: Claude Code refuses to work outside llm-dlp |
 | Gemini CLI (terminal, also inside VS Code), with a Google account or an API key | Beta | By hand, with no lock ([how](#gemini-cli-codex-opencode-and-copilot-beta)) |
 | Codex (CLI and VS Code extension), with a ChatGPT subscription or an API key | Beta | By hand, with no lock |
 | opencode (terminal and VS Code), with the `google` provider | Beta | By hand, with no lock |
@@ -125,7 +125,7 @@ curl -fsSL https://raw.githubusercontent.com/yurivenancio30/llm-dlp/main/install
 ```
 
 The [script](install.sh) downloads the binary of the latest release for your machine (amd64
-or arm64), checks its SHA-256 against the published checksums and runs `llm-dlp instalar`.
+or arm64), checks its SHA-256 against the published checksums and runs `llm-dlp install`.
 
 <details>
 <summary>Other ways: read the script first, download by hand, a specific version, build from source</summary>
@@ -144,7 +144,7 @@ page (`llm-dlp_X.Y.Z_linux_amd64.tar.gz` or `..._arm64.tar.gz`, and `checksums.t
 ```bash
 sha256sum -c checksums.txt --ignore-missing     # must print "OK"
 tar -xzf llm-dlp_*_linux_*.tar.gz llm-dlp
-./llm-dlp instalar
+./llm-dlp install
 ```
 
 **A specific version, or only the binary** (without running the setup):
@@ -159,12 +159,12 @@ builds but has not been fully tested yet, and for whoever is going to change the
 
 ```bash
 git clone https://github.com/yurivenancio30/llm-dlp.git && cd llm-dlp && make build
-./bin/llm-dlp instalar
+./bin/llm-dlp install
 ```
 
 </details>
 
-`instalar` asks what it needs, in 5 steps (in Portuguese; answer `s` for yes, `n` for no):
+`install` asks what it needs, in 5 steps (in Portuguese; answer `s` for yes, `n` for no):
 
 | Step | What happens | You answer |
 |---|---|---|
@@ -174,7 +174,7 @@ git clone https://github.com/yurivenancio30/llm-dlp.git && cd llm-dlp && make bu
 | 4. Claude Code | Connects Claude Code to llm-dlp (with a backup of `~/.claude/settings.json`) | **Yes if you use Claude Code; otherwise no** |
 | 5. Lock | Makes Claude Code refuse to work outside llm-dlp | **Yes if you use Claude Code** (and the `sudo` password); skipped otherwise |
 
-At the end it shows a summary. ✓ is done, ✗ is missing (run `llm-dlp instalar` again: it
+At the end it shows a summary. ✓ is done, ✗ is missing (run `llm-dlp install` again: it
 skips what is already done), and – is what you chose not to set up.
 
 ### 2. Connect your client
@@ -189,7 +189,7 @@ check with `llm-dlp status`.
 > [!WARNING]
 > Beta, and with no lock: read the warning in [Supported clients](#supported-clients).
 
-`llm-dlp instalar` does not touch these clients. For each one you set the address of llm-dlp
+`llm-dlp install` does not touch these clients. For each one you set the address of llm-dlp
 where the client reads it, and a function in `~/.bashrc` that starts llm-dlp before the
 client (only Claude Code starts it by itself; without it, after a restart the client gets
 "connection refused": nothing leaks, but it does not work).
@@ -205,7 +205,7 @@ client (only Claude Code starts it by itself; without it, after a restart the cl
 
 ```bash
 # ~/.bashrc: the export of the table, and one function per client (gemini, codex, opencode, copilot)
-gemini() { llm-dlp garantir && command gemini "$@"; }
+gemini() { llm-dlp ensure && command gemini "$@"; }
 ```
 
 ```toml
@@ -220,10 +220,10 @@ requires_openai_auth = true                   # API key: env_key = "OPENAI_API_K
 ```
 
 **In VS Code**, the integrated terminal works like any other. An extension (Codex, Copilot)
-does not go through the function: run `llm-dlp garantir` once after turning on the machine,
+does not go through the function: run `llm-dlp ensure` once after turning on the machine,
 and from then on llm-dlp comes back by itself.
 
-**Check it:** send a message and run `llm-dlp ultima`. It must show that message, with the
+**Check it:** send a message and run `llm-dlp last`. It must show that message, with the
 pseudonyms; if it says *"Ainda não passou nenhuma mensagem"*, the client is not going through
 llm-dlp. Only what is pointed goes through: another provider or account talks straight to the
 API. What was checked with each client is in [Client by client](docs/configuration.md#client-by-client).
@@ -231,7 +231,7 @@ API. What was checked with each client is in [Client by client](docs/configurati
 ### Updating to a new version
 
 ```bash
-llm-dlp atualizar
+llm-dlp update
 ```
 
 It downloads the latest release, checks it against the release's `checksums.txt` and puts the
@@ -241,7 +241,7 @@ the previous one by itself. The installation command above does the same when ll
 already installed. Your configuration and your key do not change. How it works:
 [Updating llm-dlp](docs/configuration.md#updating-llm-dlp).
 
-From 0.7.0 or older, which do not have `llm-dlp atualizar`, run the installation command above
+From 0.7.0 or older, which do not have `llm-dlp update`, run the installation command above
 once, between messages: those versions cannot hand over the port, and an answer that is being
 written is cut (Claude Code repeats it). From then on, updates cut nothing.
 
@@ -257,15 +257,15 @@ open the client, and from then on it also comes back by itself.
 | Situation | What happens / what to do |
 |---|---|
 | I want to see whether everything is fine | `llm-dlp status` |
-| I want to see what the API received | `llm-dlp ultima` (the last messages, with the pseudonyms) |
-| I want to know which version I have | `llm-dlp versao` (what changed in each one: [CHANGELOG.md](CHANGELOG.md)) |
+| I want to see what the API received | `llm-dlp last` (the last messages, with the pseudonyms) |
+| I want to know which version I have | `llm-dlp version` (what changed in each one: [CHANGELOG.md](CHANGELOG.md)) |
 | llm-dlp went down | It comes back by itself in ~1 s. While it is out, no message goes out |
-| It does not come back, and I need Claude to fix it | `sudo llm-dlp emergencia 30m` lets Claude through **unmasked** for a limited time. Use a new session, with no client data. It goes back to normal when the time is up, or with `sudo llm-dlp emergencia sair`. Every message shows a warning |
+| It does not come back, and I need Claude to fix it | `sudo llm-dlp emergency 30m` lets Claude through **unmasked** for a limited time. Use a new session, with no client data. It goes back to normal when the time is up, or with `sudo llm-dlp emergency sair`. Every message shows a warning |
 | The image or PDF did not reach the model | OCR is missing: the model says so in its answer, and `llm-dlp status` shows the installation command. After installing, send the file again |
-| The message was blocked: "não provou ser o seu llm-dlp" (did not prove it is your llm-dlp) | A process of a version up to 0.3.0 is still running: close Claude Code and run `llm-dlp parar`. If not, another program is using the port |
-| I changed `config.json` | `llm-dlp recarregar` (applies it without taking llm-dlp offline) |
+| The message was blocked: "não provou ser o seu llm-dlp" (did not prove it is your llm-dlp) | A process of a version up to 0.3.0 is still running: close Claude Code and run `llm-dlp stop`. If not, another program is using the port |
+| I changed `config.json` | `llm-dlp reload` (applies it without taking llm-dlp offline) |
 | I want to see what was done on each message | `~/.config/llm-dlp/llm-dlp.log` (counts and times only, never values) |
-| I want to undo everything | `llm-dlp desinstalar` (and `sudo llm-dlp desinstalar-trava`, if you installed the lock). Then close and open Claude Code and run `llm-dlp parar`. With a beta client, also remove its lines from `~/.bashrc` (and from `opencode.json` or `~/.codex/config.toml`) |
+| I want to undo everything | `llm-dlp uninstall` (and `sudo llm-dlp uninstall-lock`, if you installed the lock). Then close and open Claude Code and run `llm-dlp stop`. With a beta client, also remove its lines from `~/.bashrc` (and from `opencode.json` or `~/.codex/config.toml`) |
 
 ## More details
 

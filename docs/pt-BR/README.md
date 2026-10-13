@@ -95,7 +95,7 @@ máquina. `pg_dump`, `postgresql` e `5432` ficam como estão: nome público não
 
 | Cliente | Status | Como é ligado |
 |---|---|---|
-| Claude Code (terminal, VS Code, JetBrains), com assinatura (Pro, Max) ou chave de API | **Estável** | Pelo `llm-dlp instalar`, com trava: o Claude Code se recusa a funcionar fora do llm-dlp |
+| Claude Code (terminal, VS Code, JetBrains), com assinatura (Pro, Max) ou chave de API | **Estável** | Pelo `llm-dlp install`, com trava: o Claude Code se recusa a funcionar fora do llm-dlp |
 | Gemini CLI (terminal, também dentro do VS Code), com conta Google ou chave de API | Beta | À mão, sem trava ([como](#gemini-cli-codex-opencode-e-copilot-beta)) |
 | Codex (CLI e extensão do VS Code), com assinatura do ChatGPT ou chave de API | Beta | À mão, sem trava |
 | opencode (terminal e VS Code), com o provedor `google` | Beta | À mão, sem trava |
@@ -120,7 +120,7 @@ curl -fsSL https://raw.githubusercontent.com/yurivenancio30/llm-dlp/main/install
 ```
 
 O [script](../../install.sh) baixa o binário da versão mais recente para a sua máquina (amd64 ou
-arm64), confere a soma SHA-256 com a publicada na release e roda o `llm-dlp instalar`.
+arm64), confere a soma SHA-256 com a publicada na release e roda o `llm-dlp install`.
 
 <details>
 <summary>Outras formas: ler o script antes, baixar à mão, uma versão específica, compilar do código</summary>
@@ -139,7 +139,7 @@ sh install.sh
 ```bash
 sha256sum -c checksums.txt --ignore-missing     # tem de mostrar "OK"
 tar -xzf llm-dlp_*_linux_*.tar.gz llm-dlp
-./llm-dlp instalar
+./llm-dlp install
 ```
 
 **Uma versão específica, ou só o binário** (sem rodar a configuração):
@@ -154,12 +154,12 @@ compila mas ainda não foi testado por completo, e para quem vai mexer no códig
 
 ```bash
 git clone https://github.com/yurivenancio30/llm-dlp.git && cd llm-dlp && make build
-./bin/llm-dlp instalar
+./bin/llm-dlp install
 ```
 
 </details>
 
-O `instalar` pergunta o que precisa, em 5 passos (responda `s` para sim, `n` para não):
+O `install` pergunta o que precisa, em 5 passos (responda `s` para sim, `n` para não):
 
 | Passo | O que acontece | Você responde |
 |---|---|---|
@@ -169,7 +169,7 @@ O `instalar` pergunta o que precisa, em 5 passos (responda `s` para sim, `n` par
 | 4. Claude Code | Liga o Claude Code ao llm-dlp (com backup do `~/.claude/settings.json`) | **Sim, se você usa o Claude Code; senão, não** |
 | 5. Trava | Faz o Claude Code se recusar a funcionar fora do llm-dlp | **Sim, se você usa o Claude Code** (e a senha do `sudo`); pulado nos outros casos |
 
-No fim, ele mostra um resumo. ✓ é feito, ✗ é o que falta (rode `llm-dlp instalar` de novo:
+No fim, ele mostra um resumo. ✓ é feito, ✗ é o que falta (rode `llm-dlp install` de novo:
 ele pula o que já está pronto) e – é o que você escolheu não configurar.
 
 ### 2. Ligue o seu cliente
@@ -184,7 +184,7 @@ confira com `llm-dlp status`.
 > [!WARNING]
 > Beta, e sem trava: leia o aviso em [Clientes atendidos](#clientes-atendidos).
 
-O `llm-dlp instalar` não mexe nesses clientes. Para cada um, você põe o endereço do llm-dlp
+O `llm-dlp install` não mexe nesses clientes. Para cada um, você põe o endereço do llm-dlp
 onde o cliente o lê, e uma função no `~/.bashrc` que sobe o llm-dlp antes do cliente (só o
 Claude Code o sobe sozinho; sem ela, depois de reiniciar a máquina o cliente recebe "conexão
 recusada": nada vaza, mas não funciona).
@@ -200,7 +200,7 @@ recusada": nada vaza, mas não funciona).
 
 ```bash
 # ~/.bashrc: o export da tabela, e uma função por cliente (gemini, codex, opencode, copilot)
-gemini() { llm-dlp garantir && command gemini "$@"; }
+gemini() { llm-dlp ensure && command gemini "$@"; }
 ```
 
 ```toml
@@ -215,10 +215,10 @@ requires_openai_auth = true                   # chave de API: env_key = "OPENAI_
 ```
 
 **No VS Code**, o terminal integrado funciona como qualquer outro. Uma extensão (Codex,
-Copilot) não passa pela função: rode `llm-dlp garantir` uma vez depois de ligar a máquina, e
+Copilot) não passa pela função: rode `llm-dlp ensure` uma vez depois de ligar a máquina, e
 dali em diante o llm-dlp volta sozinho.
 
-**Confira:** mande uma mensagem e rode `llm-dlp ultima`. Ele tem de mostrar essa mensagem, com
+**Confira:** mande uma mensagem e rode `llm-dlp last`. Ele tem de mostrar essa mensagem, com
 os pseudônimos; se disser *"Ainda não passou nenhuma mensagem"*, o cliente não está passando
 pelo llm-dlp. Só passa o que foi apontado: outro provedor ou outra conta fala direto com a API.
 O que foi conferido em cada cliente está em [Cliente por cliente](configuracao.md#cliente-por-cliente).
@@ -226,7 +226,7 @@ O que foi conferido em cada cliente está em [Cliente por cliente](configuracao.
 ### Atualizar para uma versão nova
 
 ```bash
-llm-dlp atualizar
+llm-dlp update
 ```
 
 Ele baixa a release mais nova, confere com o `checksums.txt` da release e põe a versão nova no
@@ -236,7 +236,7 @@ comando de instalação de cima faz o mesmo quando o llm-dlp já está instalado
 configuração e a sua chave não mudam. Como funciona:
 [Atualizar o llm-dlp](configuracao.md#atualizar-o-llm-dlp).
 
-Da 0.7.0 ou anterior, que não têm o `llm-dlp atualizar`, rode o comando de instalação de cima
+Da 0.7.0 ou anterior, que não têm o `llm-dlp update`, rode o comando de instalação de cima
 uma vez, entre uma mensagem e outra: essas versões não sabem passar a porta, e uma resposta que
 estiver sendo escrita é cortada (o Claude Code repete). Daí em diante, atualizar não corta nada.
 
@@ -252,15 +252,15 @@ em diante ele também volta sozinho.
 | Situação | O que acontece / o que fazer |
 |---|---|
 | Quero ver se está tudo certo | `llm-dlp status` |
-| Quero ver o que a API recebeu | `llm-dlp ultima` (as últimas mensagens, com os pseudônimos) |
-| Quero saber qual versão tenho | `llm-dlp versao` (o que mudou em cada uma: [CHANGELOG.md](CHANGELOG.md)) |
+| Quero ver o que a API recebeu | `llm-dlp last` (as últimas mensagens, com os pseudônimos) |
+| Quero saber qual versão tenho | `llm-dlp version` (o que mudou em cada uma: [CHANGELOG.md](CHANGELOG.md)) |
 | O llm-dlp caiu | Volta sozinho em ~1 s. Enquanto estiver fora, nenhuma mensagem sai |
-| Ele não volta, e preciso do Claude para consertar | `sudo llm-dlp emergencia 30m` libera o Claude **sem máscara** por tempo limitado. Use uma sessão nova, sem dados de cliente. Volta ao normal no fim do prazo, ou com `sudo llm-dlp emergencia sair`. Cada mensagem mostra um aviso |
+| Ele não volta, e preciso do Claude para consertar | `sudo llm-dlp emergency 30m` libera o Claude **sem máscara** por tempo limitado. Use uma sessão nova, sem dados de cliente. Volta ao normal no fim do prazo, ou com `sudo llm-dlp emergency sair`. Cada mensagem mostra um aviso |
 | A imagem ou o PDF não chegou ao modelo | Falta o OCR: o modelo avisa na resposta, e o `llm-dlp status` mostra o comando de instalação. Depois de instalar, mande o arquivo de novo |
-| A mensagem foi barrada: "não provou ser o seu llm-dlp" | Um processo de uma versão até a 0.3.0 ainda está no ar: feche o Claude Code e rode `llm-dlp parar`. Se não, outro programa está usando a porta |
-| Mudei o `config.json` | `llm-dlp recarregar` (aplica sem tirar o llm-dlp do ar) |
+| A mensagem foi barrada: "não provou ser o seu llm-dlp" | Um processo de uma versão até a 0.3.0 ainda está no ar: feche o Claude Code e rode `llm-dlp stop`. Se não, outro programa está usando a porta |
+| Mudei o `config.json` | `llm-dlp reload` (aplica sem tirar o llm-dlp do ar) |
 | Quero ver o que foi feito em cada mensagem | `~/.config/llm-dlp/llm-dlp.log` (só contagens e tempos, nunca valores) |
-| Quero desfazer tudo | `llm-dlp desinstalar` (e `sudo llm-dlp desinstalar-trava`, se instalou a trava). Depois, feche e abra o Claude Code e rode `llm-dlp parar`. Num cliente em beta, tire também as linhas dele do `~/.bashrc` (e do `opencode.json` ou do `~/.codex/config.toml`) |
+| Quero desfazer tudo | `llm-dlp uninstall` (e `sudo llm-dlp uninstall-lock`, se instalou a trava). Depois, feche e abra o Claude Code e rode `llm-dlp stop`. Num cliente em beta, tire também as linhas dele do `~/.bashrc` (e do `opencode.json` ou do `~/.codex/config.toml`) |
 
 ## Mais detalhes
 

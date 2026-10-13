@@ -129,7 +129,7 @@ receive only the pseudonym, always, even if `config.json` has another list: they
 Anthropic's servers, outside your machine.
 
 The side effect: searching the web, or a connector, for something that was masked finds
-nothing. To change the list of web tools, edit `ferramentas_sem_desmascarar` in
+nothing. To change the list of web tools, edit `tools_never_unmasked` in
 `config.json`.
 
 ## Performance

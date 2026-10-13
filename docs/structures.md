@@ -86,9 +86,9 @@ A single format, for every family:
 
 There are **two different switches**, per entity type:
 
-- `mascarar` (mask): a name of that type is replaced with a pseudonym **where it was
+- `mask`: a name of that type is replaced with a pseudonym **where it was
   recognized** (in the structural position). Default: every type on.
-- `propagar` (propagate): a name of that type, once learned, is also replaced **anywhere
+- `propagate`: a name of that type, once learned, is also replaced **anywhere
   else** (loose text, another file). Default: on for server, database, schema, table,
   procedure, user, namespace, service, bucket and queue; **off for column**, because names
   like `user_id` and `created_at` exist in every codebase.
@@ -97,16 +97,16 @@ What is not listed stays at the default. Example to keep columns readable (neith
 propagate) and hide the rest:
 
 ```json
-"objetos": {
-  "ligado": true,
-  "mascarar": { "coluna": false },
-  "propagar": { }
+"objects": {
+  "enabled": true,
+  "mask": { "coluna": false },
+  "propagate": { }
 }
 ```
 
 Where each switch is applied:
 
-| Stage | `mascarar` | `propagar` |
+| Stage | `mask` | `propagate` |
 |---|---|---|
 | Decision on each span returned by the readers, before the replacement | a span of a type that is off is discarded and the text stays as it is | — |
 | Learning (memory and `vistos.json`) | a type that is off is not stored | a type that is off is stored only for the structural position, with no propagation mark |
@@ -119,7 +119,7 @@ readable where it appears as a column, and that reveals the table name.
 ### Propagation guards
 
 A learned name is only propagated if it **looks like an identifier** (`_`, digit, dot,
-hyphen between parts or mixed case), if its type is in `propagar` and if the evidence is
+hyphen between parts or mixed case), if its type is in `propagate` and if the evidence is
 **strong**:
 
 - unambiguous position: the object name after `CREATE`/`ALTER`/`FROM`/`JOIN`/`INTO`/`UPDATE`
@@ -3014,13 +3014,13 @@ scheme that is not a database, storage, queue or git one), the host is a **stron
 internal: a single label with no dot (`http://wiki-interna/`) or ending in `.local` (RFC 6762),
 `.internal` (ICANN reservation, 2024), `.home.arpa` (RFC 8375), `.svc`/`.cluster.local` (Kubernetes
 DNS), `.intra`, `.intranet`, `.interno`, `.corp`, `.lan`, `.localdomain`. The user before the
-`@` too. A public domain stays (the client's ones go in `dominios_internos`). Outside a URL, a name
+`@` too. A public domain stays (the client's ones go in `internal_domains`). Outside a URL, a name
 with those suffixes (`db01.corp:5432`, `redis.vendas.svc.cluster.local`) is also a server, if it has a
 digit or a hyphen, or two labels before the suffix, and is not a code attribute (`threading.local()`)
 nor a Java package (`org.foo.internal`).
 
 **Registered term inside an identifier** (the `termo-embutido` reader, on when there are
-one-word `termos`). The term detector replaces the whole word; this one replaces the
+one-word `terms`). The term detector replaces the whole word; this one replaces the
 identifier-looking identifier that has the term as a whole piece (separated by
 `_ . -` or camelCase): the term `acmex` catches `acmex_pedidos`, `dbAcmexVendas01`, `svc-acmex-carga`,
 but not `acmexvendas` nor `macmex_x`. The type comes from the position (after `FROM`/`JOIN` → table,
@@ -3248,7 +3248,7 @@ Code: `internal/mask/leitor_nuvem.go` (cloud, public IP) and `leitor_enderecos.g
 | Google Cloud | text with `projects/`; `projects/<p>/<collection>/<name>` or `projects/<p>/locations/<l>/<collection>/<name>` |
 | DOMAIN\user | text with `\`; NetBIOS domain (uppercase, digits, `-`; 2 to 15) before the backslash |
 | ssh/scp/sftp/rsync | the command as a word, and on the same line an argument `user@host[:path]` |
-| Public IP (option `ip_publico`) | IPv4 with 3 dots or IPv6 with 2+ `:` |
+| Public IP (option `public_ip`) | IPv4 with 3 dots or IPv6 with 2+ `:` |
 
 ### 2. Position → entity type
 
@@ -3305,10 +3305,10 @@ servidor em 34.120.10.5 (with ip_publico on)           →  servidor em HOST_...
 ### 6. Hard cases and limits
 
 - Public IP comes **off**: an IP of a public service (CDN, API) would also be replaced, and the
-  model loses the reference. Turn it on with `objetos.ip_publico`.
+  model loses the reference. Turn it on with `objects.public_ip`.
 - In an IAM ARN without a path (`role/name`) the name is a service; in `user/name`, a user.
 - `ssh host` without a user: the host is only masked if another reader catches it (internal suffix,
-  `dominios_internos`).
+  `internal_domains`).
 - `DOMAIN\user` with a user that has a space is not read.
 - A Google Cloud resource name outside `projects/...` (`gs://`, `bq://`) is left to other readers.
 

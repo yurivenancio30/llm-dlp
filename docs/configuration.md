@@ -7,36 +7,41 @@ say what each one is for.
 
 ## Configuration
 
-File `~/.config/llm-dlp/config.json`. After changing it, run `llm-dlp recarregar`: it applies
+File `~/.config/llm-dlp/config.json`. After changing it, run `llm-dlp reload`: it applies
 the change without taking llm-dlp offline.
 
-While the configuration removes protection (`falhar_fechado` off, `ocr.modo` set to
-`permitir`, `objetos` off, any detector turned off) or `upstream` is not the Anthropic API,
+Up to 0.8.0 the fields had Portuguese names (`porta`, `dominios_internos`, `termos`...). They
+are still read, and `llm-dlp update` rewrites the file with the names below (keeping the previous
+one as `config.json.bak-DATE`). Going back to an older version with `llm-dlp update --version`
+converts the file back, since an older version would ignore the new names.
+
+While the configuration removes protection (`fail_closed` off, `ocr.mode` set to
+`allow`, `objects` off, any detector turned off) or `upstream` is not the Anthropic API,
 Claude Code shows a warning on every message (see [Security](security.md)). The warning
 does not go to the API.
 
 | Field | What it is for | Default |
 |---|---|---|
-| `dominios_internos` | Pieces that identify your internal hostnames (`["empresa"]` catches `mysql.empresa.intra`) | empty |
-| `emails_liberados` | E-mails that go through unmasked | empty |
-| `dominios_email_liberados` | E-mail domains that go through unmasked | `example.com`, `anthropic.com`… |
-| `papeis_host` | First part of the hostname that may stay visible (`mysql` in `mysql-x7k2.invalid`) | `mysql`, `postgres`, `redis`… |
-| `campos_extras` | Extra words for the field names | empty |
-| `padroes_extras` | Your own regexes | empty |
-| `termos` | Exact words to mask | empty |
-| `detectores_desligados` | Detectors to turn off (list below) | empty |
-| `detectores_opcionais` | Detectors to turn on. Today only `quase`: sex, age, marital status, occupation, nationality, income, latitude/longitude | empty |
-| `ferramentas_sem_desmascarar` | Web tools: they receive pseudonyms only, and what they bring is not remembered. The claude.ai connectors (`mcp__claude_ai_*`) always receive pseudonyms only, regardless of this list | `WebFetch`, `WebSearch` |
-| `documentos_sem_contexto` | Masks digit-only CPF and CNPJ even without the word "cpf"/"cnpj" nearby, if the check digit matches. About 1 in 100 random numbers of that length also matches and is masked needlessly | `true` |
-| `falhar_fechado` | Refuses what it does not know how to mask. When off, a failure while masking sends the request **unmasked** (only a warning is logged). An image or PDF that could not be verified never goes out, whatever the value of this field. Turning it off is not recommended | `true` |
-| `ocr` | `modo` (`mascarar`, `bloquear` or `permitir`: mask, block or allow), `idioma` (language), `max_paginas` (maximum pages), paths of tesseract and poppler. With `bloquear`, and with `mascarar` when the file cannot be verified (OCR missing, unreadable file), it is removed from the request and the model gets a note in its place | `mascarar`, `por`, 30 |
-| `objetos` | Internal resource names (see [What is detected](detection.md#5-internal-resource-names-by-structure)). `ligado` (on); `mascarar` (mask) and `propagar` (propagate): maps type → `true`/`false` (types: `servidor`, `database`, `schema`, `tabela`, `coluna`, `procedure`, `indice`, `usuario`, `namespace`, `servico`, `bucket`, `fila`). E.g. `{"mascarar": {"coluna": false}}` leaves the columns readable | on; masks all; propagates all except `coluna` and `indice` |
-| `objetos.ip_publico` | Also masks public IPv4 and IPv6 as a server name (`HOST_...`). `::1`, link-local, documentation ranges and the public DNS servers (`8.8.8.8`, `1.1.1.1`, `9.9.9.9`...) stay. A private IP is always masked by the `ip` detector | off |
-| `porta` | Local port of the proxy | 8787 |
+| `internal_domains` | Pieces that identify your internal hostnames (`["empresa"]` catches `mysql.empresa.intra`) | empty |
+| `allowed_emails` | E-mails that go through unmasked | empty |
+| `allowed_email_domains` | E-mail domains that go through unmasked | `example.com`, `anthropic.com`… |
+| `host_roles` | First part of the hostname that may stay visible (`mysql` in `mysql-x7k2.invalid`) | `mysql`, `postgres`, `redis`… |
+| `extra_fields` | Extra words for the field names | empty |
+| `extra_patterns` | Your own regexes | empty |
+| `terms` | Exact words to mask | empty |
+| `disabled_detectors` | Detectors to turn off (list below) | empty |
+| `optional_detectors` | Detectors to turn on. Today only `quase`: sex, age, marital status, occupation, nationality, income, latitude/longitude | empty |
+| `tools_never_unmasked` | Web tools: they receive pseudonyms only, and what they bring is not remembered. The claude.ai connectors (`mcp__claude_ai_*`) always receive pseudonyms only, regardless of this list | `WebFetch`, `WebSearch` |
+| `documents_without_context` | Masks digit-only CPF and CNPJ even without the word "cpf"/"cnpj" nearby, if the check digit matches. About 1 in 100 random numbers of that length also matches and is masked needlessly | `true` |
+| `fail_closed` | Refuses what it does not know how to mask. When off, a failure while masking sends the request **unmasked** (only a warning is logged). An image or PDF that could not be verified never goes out, whatever the value of this field. Turning it off is not recommended | `true` |
+| `ocr` | `mode` (`mask`, `block` or `allow`), `language`, `max_pages` (maximum pages), paths of tesseract and poppler. With `block`, and with `mask` when the file cannot be verified (OCR missing, unreadable file), it is removed from the request and the model gets a note in its place | `mask`, `por`, 30 |
+| `objects` | Internal resource names (see [What is detected](detection.md#5-internal-resource-names-by-structure)). `enabled`; `mask` and `propagate`: maps type → `true`/`false` (types: `servidor`, `database`, `schema`, `tabela`, `coluna`, `procedure`, `indice`, `usuario`, `namespace`, `servico`, `bucket`, `fila`). E.g. `{"mask": {"coluna": false}}` leaves the columns readable | on; masks all; propagates all except `coluna` and `indice` |
+| `objects.public_ip` | Also masks public IPv4 and IPv6 as a server name (`HOST_...`). `::1`, link-local, documentation ranges and the public DNS servers (`8.8.8.8`, `1.1.1.1`, `9.9.9.9`...) stay. A private IP is always masked by the `ip` detector | off |
+| `port` | Local port of the proxy | 8787 |
 | `upstream` | Address of the API | `https://api.anthropic.com` |
-| `provedores` | **Beta.** Other APIs served on the same port, under the path `/<name>` (see [Other clients and APIs](#other-clients-and-apis-beta)). Each one has `upstream` and `formato` (`gemini`, `openai` or `anthropic`; any other value falls into the generic mode) | `gemini`, `openai` and `xai`, each with the address of its API |
+| `providers` | **Beta.** Other APIs served on the same port, under the path `/<name>` (see [Other clients and APIs](#other-clients-and-apis-beta)). Each one has `upstream` and `format` (`gemini`, `openai` or `anthropic`; any other value falls into the generic mode) | `gemini`, `openai` and `xai`, each with the address of its API |
 
-Names accepted in `detectores_desligados`: `segredo`, `email`, `ip`, `host`, `cpf`, `cnpj`,
+Names accepted in `disabled_detectors`: `segredo`, `email`, `ip`, `host`, `cpf`, `cnpj`,
 `pis`, `cnh`, `rg`, `telefone`, `cep`, `cartao`, `conta`, `pix`, `endereco`, `nascimento`,
 `nome`, `campo` (detection by the field name), `usuario`, `doc`, `iban`, `processo`, `mac`.
 
@@ -48,10 +53,10 @@ Names accepted in `detectores_desligados`: `segredo`, `email`, `ip`, `host`, `cp
 > lock**: if the client stops pointing to llm-dlp, it talks straight to the API, unmasked, and
 > nothing warns you. Read [what beta means](#what-beta-means) before using them with real data.
 
-llm-dlp was built around Claude Code, and `llm-dlp instalar` sets up **only Claude Code**.
+llm-dlp was built around Claude Code, and `llm-dlp install` sets up **only Claude Code**.
 Other clients work with the same masking, but you point them by hand and they have no lock.
 
-| Client | Status | Installed and locked by `llm-dlp instalar` |
+| Client | Status | Installed and locked by `llm-dlp install` |
 |---|---|---|
 | Claude Code, with a subscription (Pro, Max) or an API key | **Stable** | Yes |
 | Gemini CLI (terminal, also inside VS Code), with a Google account or a Gemini API key | Beta | No |
@@ -68,7 +73,7 @@ Other clients work with the same masking, but you point them by hand and they ha
   much less than the Claude Code path.
 - **It may change in a MINOR version**, without the notice that the
   [versions table](versioning.md#what-each-number-means) gives to stable features: the
-  addresses, the `provedores` field and what is read in each format.
+  addresses, the `providers` field and what is read in each format.
 - **It is isolated from Claude Code.** The code of each format only runs for requests on its
   own path (`/gemini`, `/openai`, `/xai`...). A request from Claude Code goes out byte for
   byte the same with or without these providers, and a malformed request or response from
@@ -83,9 +88,9 @@ Other clients work with the same masking, but you point them by hand and they ha
 | | Claude Code (stable) | Gemini CLI, Codex, opencode, Copilot and other clients (beta) |
 |---|---|---|
 | What goes out is masked and what comes back is unmasked (text, tool calls and results, files the agent writes, images and PDFs) | Yes | Yes, the same engine |
-| `llm-dlp ultima` and the log | Yes | Yes |
-| Pointed to llm-dlp by `llm-dlp instalar` | Yes (step 4) | **No.** You set the address where the client reads it (`~/.bashrc`, `~/.codex/config.toml`, `opencode.json`), as in the tables below |
-| llm-dlp is started for you | Yes, when a session opens | **No.** A function in `~/.bashrc` runs `llm-dlp garantir` before opening the client ([README](../README.md#gemini-cli-codex-opencode-and-copilot-beta)). Without it, if llm-dlp is not running, the client gets "connection refused" and nothing goes out |
+| `llm-dlp last` and the log | Yes | Yes |
+| Pointed to llm-dlp by `llm-dlp install` | Yes (step 4) | **No.** You set the address where the client reads it (`~/.bashrc`, `~/.codex/config.toml`, `opencode.json`), as in the tables below |
+| llm-dlp is started for you | Yes, when a session opens | **No.** A function in `~/.bashrc` runs `llm-dlp ensure` before opening the client ([README](../README.md#gemini-cli-codex-opencode-and-copilot-beta)). Without it, if llm-dlp is not running, the client gets "connection refused" and nothing goes out |
 | Account types that go through llm-dlp | Subscription (Pro, Max) and API key: Claude Code always talks to the Anthropic API | The ones pointed in [Client by client](#client-by-client): the Gemini CLI with a Google account or an API key, Codex with a ChatGPT subscription or an API key. **Not** Vertex AI, the Gemini Code Assist extension or Copilot with the models GitHub hosts: they talk to other servers and go out **unmasked** |
 | Check on every message (llm-dlp is running, is the right version and proves it is itself) | Yes | **No** |
 | Lock: the client refuses to work outside llm-dlp | Yes (step 5) | **No.** If the address is removed from the client's configuration, the client talks straight to the API, unmasked, and nothing warns you |
@@ -94,7 +99,7 @@ The step by step, with the lines for each file, is in the
 [README](../README.md#gemini-cli-codex-opencode-and-copilot-beta).
 
 In short: with another client, the protection lasts while its address points to llm-dlp. Check
-it with `llm-dlp ultima` after the first message: it must show your conversation, with the
+it with `llm-dlp last` after the first message: it must show your conversation, with the
 pseudonyms.
 
 ### Which address to give the client
@@ -111,7 +116,7 @@ straight through (llm-dlp does not store it or write it to the log).
 | Gemini, OpenAI-compatible address | `http://127.0.0.1:8787/gemini/v1beta/openai` | Chat Completions |
 | OpenAI | `http://127.0.0.1:8787/openai/v1` | Chat Completions and Responses |
 | xAI (Grok) | `http://127.0.0.1:8787/xai/v1` | Chat Completions |
-| Another one (OpenRouter, a company gateway) | add it to `provedores`, with its `upstream` | `formato`: `openai`, `responses`, `gemini`, `codeassist` or `anthropic` |
+| Another one (OpenRouter, a company gateway) | add it to `providers`, with its `upstream` | `format`: `openai`, `responses`, `gemini`, `codeassist` or `anthropic` |
 
 A path that ends in `/chat/completions` is always read as Chat Completions, and one that ends
 in `/responses`, as Responses, whatever the provider.
@@ -124,11 +129,11 @@ in `/responses`, as Responses, whatever the provider.
 | Gemini CLI, with a Google account (*Login with Google*) | `export CODE_ASSIST_ENDPOINT=http://127.0.0.1:8787/codeassist` | **Not checked with a real account yet.** The format follows the Gemini CLI source code and is covered by the automated tests |
 | Codex CLI, with a ChatGPT subscription | In `~/.codex/config.toml`: `model_provider = "llm-dlp"` and `[model_providers.llm-dlp]` with `base_url = "http://127.0.0.1:8787/chatgpt"`, `wire_api = "responses"`, `requires_openai_auth = true` | **Not checked with a real account yet.** The format follows the Codex source code and is covered by the automated tests |
 | Codex CLI, with an OpenAI API key | The same provider, with `base_url = "http://127.0.0.1:8787/openai/v1"` and `env_key = "OPENAI_API_KEY"` (instead of `requires_openai_auth`) | **Not checked with a real key yet** (automated tests only) |
-| Codex extension for VS Code | Reads the same `~/.codex/config.toml` as the CLI. It does not go through the `~/.bashrc` function: run `llm-dlp garantir` once after turning on the machine | **Not checked.** OpenAI's documentation says the CLI and the extension share the configuration |
+| Codex extension for VS Code | Reads the same `~/.codex/config.toml` as the CLI. It does not go through the `~/.bashrc` function: run `llm-dlp ensure` once after turning on the machine | **Not checked.** OpenAI's documentation says the CLI and the extension share the configuration |
 | Gemini CLI inside VS Code (integrated terminal, *Gemini CLI Companion*) | The same lines as the Gemini CLI: it is the same program, in the editor's terminal | Like the Gemini CLI |
 | opencode (`google` provider) | In `opencode.json`: `"provider": {"google": {"options": {"baseURL": "http://127.0.0.1:8787/gemini/v1beta"}}}`, and the key in `GOOGLE_GENERATIVE_AI_API_KEY` | Running (1.19.0), real API, following the README on a clean home folder |
 | GitHub Copilot CLI, with your own key | `export COPILOT_PROVIDER_BASE_URL=http://127.0.0.1:8787/openai/v1` (or `/xai/v1`, or another address of the table above), plus `COPILOT_PROVIDER_API_KEY` and `COPILOT_MODEL` | Running (1.0.95), real API, with the caveat below |
-| GitHub Copilot in VS Code, with your own key | "Chat: Manage Language Models" > "Custom Endpoint". In the model's `url`: `http://127.0.0.1:8787/openai/v1/chat/completions` (API type Chat Completions) or `http://127.0.0.1:8787/v1/messages` (API type Messages). Like the Codex extension, start llm-dlp with `llm-dlp garantir` | **Not checked.** It follows the VS Code documentation; the format is the same as the Copilot CLI's |
+| GitHub Copilot in VS Code, with your own key | "Chat: Manage Language Models" > "Custom Endpoint". In the model's `url`: `http://127.0.0.1:8787/openai/v1/chat/completions` (API type Chat Completions) or `http://127.0.0.1:8787/v1/messages` (API type Messages). Like the Codex extension, start llm-dlp with `llm-dlp ensure` | **Not checked.** It follows the VS Code documentation; the format is the same as the Copilot CLI's |
 | Google SDKs (`google-genai`) | The base address option (`http_options.base_url` / `httpOptions.baseUrl`) with `http://127.0.0.1:8787/gemini` | **Not checked** with an SDK running |
 | `curl` | `curl http://127.0.0.1:8787/gemini/v1beta/models/MODEL:generateContent -H "x-goog-api-key: $KEY" ...` | Real API, with and without streaming, and with a tool call |
 
@@ -163,7 +168,7 @@ About Copilot:
   a note in their place: llm-dlp has no way to verify them.
 - The summary of the model's reasoning (`thought`, `reasoning_content`, the `reasoning` items
   of Responses) comes back with the pseudonyms, not unmasked.
-- **Generic mode.** A request that none of the readers understands (another `formato`, another
+- **Generic mode.** A request that none of the readers understands (another `format`, another
   OpenAI API) has every text masked, and its streaming response comes back with the
   pseudonyms. Nothing leaks, but the client receives pseudonyms: do not use an agent this way.
 
@@ -171,38 +176,41 @@ About Copilot:
 
 | Command | What it does |
 |---|---|
-| `llm-dlp instalar` | Installs and configures everything, explaining each step |
-| `sudo llm-dlp instalar-trava` | Claude Code only works when going through llm-dlp (the lock) |
-| `llm-dlp desinstalar` / `sudo llm-dlp desinstalar-trava` | Undoes it |
-| `llm-dlp atualizar [--versao X.Y.Z] [--arquivo FILE.tar.gz]` | Downloads the latest version (or the one asked for), checks it and puts it in place of the one running, without taking llm-dlp offline (see [Updating llm-dlp](#updating-llm-dlp)) |
-| `llm-dlp recarregar` | Puts the installed binary in the air again, with the configuration as it is now, without taking llm-dlp offline |
+| `llm-dlp install` | Installs and configures everything, explaining each step |
+| `sudo llm-dlp install-lock` | Claude Code only works when going through llm-dlp (the lock) |
+| `llm-dlp uninstall` / `sudo llm-dlp uninstall-lock` | Undoes it |
+| `llm-dlp update [--version X.Y.Z] [--file FILE.tar.gz]` | Downloads the latest version (or the one asked for), checks it and puts it in place of the one running, without taking llm-dlp offline (see [Updating llm-dlp](#updating-llm-dlp)) |
+| `llm-dlp reload` | Puts the installed binary in the air again, with the configuration as it is now, without taking llm-dlp offline |
 | `llm-dlp status` | Shows whether it is running, in which mode and at which commit. Warns if a new binary is installed but not yet running, if OCR is missing and if the configuration reduces the protection |
-| `llm-dlp parar` | Stops the proxy (it comes back on the next message). To update or apply the configuration, use `atualizar` or `recarregar`, which do not leave the port empty |
-| `sudo llm-dlp emergencia [30m\|sair]` | Lets Claude through unmasked for a limited time |
-| `llm-dlp importar-pessoas FILE.csv --grupo CODE:NAME:EMAIL` | Teaches people |
-| `llm-dlp colunas FILE` | Shows how the fields of a file are understood |
-| `llm-dlp testar < file` | Shows the masked version of a text |
-| `llm-dlp testar-midia FILE DIR` | Processes an image or PDF and writes the result to DIR |
-| `llm-dlp medir FILE.jsonl` | Time and coverage over an old Claude Code session (counts only) |
-| `llm-dlp versao` | Version and commit of the binary (also `--version`) |
-| `llm-dlp ajuda` | The list of commands (also `--help`) |
+| `llm-dlp stop` | Stops the proxy (it comes back on the next message). To update or apply the configuration, use `update` or `reload`, which do not leave the port empty |
+| `sudo llm-dlp emergency [30m\|off]` | Lets Claude through unmasked for a limited time |
+| `llm-dlp import-people FILE.csv --group CODE:NAME:EMAIL` | Teaches people |
+| `llm-dlp columns FILE` | Shows how the fields of a file are understood |
+| `llm-dlp test < file` | Shows the masked version of a text |
+| `llm-dlp test-media FILE DIR` | Processes an image or PDF and writes the result to DIR |
+| `llm-dlp measure FILE.jsonl` | Time and coverage over an old Claude Code session (counts only) |
+| `llm-dlp version` | Version and commit of the binary (also `--version`) |
+| `llm-dlp help` | The list of commands (also `--help`) |
 
-`garantir`, `verificar`, `servir` and `supervisionar` are internal: they are called by the
-Claude Code hooks and by the supervisor. `garantir` (starts llm-dlp if it is not running) is
+Up to 0.8.0 the commands had Portuguese names (`atualizar`, `parar`, `ultima`...); they still
+work.
+
+`ensure`, `check`, `serve` and `supervise` are internal: they are called by the
+Claude Code hooks and by the supervisor. `ensure` (starts llm-dlp if it is not running) is
 also the one in the `~/.bashrc` function of the beta clients.
 
 ## Updating llm-dlp
 
 ```bash
-llm-dlp atualizar                   # the latest release
-llm-dlp atualizar --versao 0.7.1    # a given version (also to go back to an earlier one)
-llm-dlp atualizar --arquivo llm-dlp_0.7.1_linux_amd64.tar.gz   # a package already downloaded
+llm-dlp update                   # the latest release
+llm-dlp update --version 0.7.1    # a given version (also to go back to an earlier one)
+llm-dlp update --file llm-dlp_0.7.1_linux_amd64.tar.gz   # a package already downloaded
 ```
 
 What it does, in order:
 
 1. Downloads the package for this machine and checks its SHA-256 against the `checksums.txt`
-   published with the release (with `--arquivo`, it uses the package you gave).
+   published with the release (with `--file`, it uses the package you gave).
 2. Puts the new binary in `~/.local/bin/llm-dlp` and keeps the previous one next to it
    (`llm-dlp.bak-DATE`; only the latest copy is kept).
 3. Asks the supervisor for the swap. The supervisor is what holds the port (the proxy only
@@ -225,10 +233,10 @@ requests wait in the queue until the next proxy (about a second), instead of bei
 
 The installation command (`curl ... | sh`) does the same when llm-dlp is already installed in
 `~/.local/bin`. Building from source, `make instalar` installs the binary and runs
-`llm-dlp recarregar`, which does steps 3 to 5 with the installed binary (it is also what
+`llm-dlp reload`, which does steps 3 to 5 with the installed binary (it is also what
 applies a change in `config.json`).
 
-**From 0.7.0 or older** (no `llm-dlp atualizar`): run the installation command once. In those
+**From 0.7.0 or older** (no `llm-dlp update`): run the installation command once. In those
 versions the proxy holds the port itself: the new supervisor takes the port the moment the old
 one exits (a few milliseconds), but an answer that was being written is cut (Claude Code
 repeats it). Do it between messages.

@@ -17,7 +17,7 @@ São cinco jeitos de reconhecer um dado. Qualquer um basta.
 | Telefone | `(11) 98765-4321`, `+55 11 98765-4321` |
 | Endereço | `Rua das Flores, 123` |
 | IP de rede interna | `10.42.7.15`, `192.168.0.10` |
-| Hostname interno | `mysql.empresa.intra` (os que contêm um dos seus `dominios_internos`) |
+| Hostname interno | `mysql.empresa.intra` (os que contêm um dos seus `internal_domains`) |
 | Conta internacional (IBAN) | `GB82 WEST 1234 5698 7654 32` |
 | Processo judicial | `0001234-56.2023.8.13.0024` |
 | Endereço MAC | `aa:bb:cc:dd:ee:ff` |
@@ -104,9 +104,9 @@ completa: veja [Ensinar o llm-dlp](deteccao.md#ensinar-o-llm-dlp).
 
 | Como ficou conhecido | O que passa a valer |
 |---|---|
-| Você importou a pessoa (`importar-pessoas`) | O nome, o e-mail e o código dela são reconhecidos em qualquer lugar e em qualquer grafia ("João Silva", "JOAO SILVA") |
+| Você importou a pessoa (`import-people`) | O nome, o e-mail e o código dela são reconhecidos em qualquer lugar e em qualquer grafia ("João Silva", "JOAO SILVA") |
 | O valor já foi mascarado uma vez pelos jeitos 2 ou 3 | É reconhecido depois sozinho, sem a palavra ou o campo ao lado |
-| Você listou em `termos` ou `padroes_extras` | Sempre mascarado |
+| Você listou em `terms` ou `extra_patterns` | Sempre mascarado |
 
 Código de usuário curto ou sem dígito (`jsilva`, `ana`) só é mascarado junto do nome do
 campo: procurá-lo no texto inteiro mascararia a palavra em todo lugar. Contas de serviço
@@ -129,7 +129,7 @@ de cada formato estão descritas em [estruturas.md](estruturas.md). Já ligadas:
 | Terraform, Ansible, CloudFormation, ARM/Bicep, CI | Valores literais de atributos que são nomes (`name`, `bucket`, `identifier`, `*Name`…; o nome local do recurso, referências e região ficam), conta da nuvem, hosts do inventário, runners próprios. `name` de bloco aninhado só vale no bloco `metadata` (provedor do Kubernetes: `metadata { name = ... }`) |
 | Chave-valor | Em YAML, JSON, TOML, INI, `.env`, `.properties`, XML e opções `--chave valor`: o valor de uma chave cujo último pedaço indica nome de recurso (`host`, `database`, `schema`, `user`, `bucket`, `topic`, `namespace`, `service`, `repo`, `account`…). Tópico/fila com ponto (`KAFKA_TOPIC=fin.notas.emitidas`, `kafka.topic=`, `topic:`) vale quando todos os pedaços são minúsculos e nenhum é receptor ou atributo de código (`cfg.topic`), domínio público ou extensão de arquivo. Valor que é expressão de código fica |
 | Endereços e caminhos | Host interno em URL ou solto (rótulo único ou `.local`, `.internal`, `.corp`…), buckets e filas (`s3://`, `gs://`, `abfss://`, `amqp://`, `kafka://`), remotos do git (organização e repositório), pacotes internos (`go.mod`, groupId, escopo npm), usuário em `/home/usuario/` e pastas, `DOMINIO\usuario`, `ssh usuario@host` |
-| Nuvem | ARN da AWS, `/subscriptions/…` do Azure, `projects/…` do GCP: conta e recurso. IP público e IPv6 só com `objetos.ip_publico` ligado |
+| Nuvem | ARN da AWS, `/subscriptions/…` do Azure, `projects/…` do GCP: conta e recurso. IP público e IPv6 só com `objects.public_ip` ligado |
 | Código, em qualquer linguagem | O texto entre aspas ao lado de um nome que contém uma palavra de tipo (`DB_HOST = "x"`, `#define DB_NAME "x"`, `connect(host="x")`, `{ queue: 'x' }`, `'bucket' => 'x'`, `@Table(name = "x")`, `@KafkaListener(topics = "x")`, `getenv("BUCKET", "x")`, `process.env.X \|\| 'x'`), ou passado a uma função cujo nome contém a palavra de tipo (`assertQueue("x")`, `new QueueClient(c, "x")`, `createBucket("x")`, `inNamespace("x")`), também dentro de uma lista (`subscribe(List.of("x"))`). Numa chamada de conexão (`connect`, `dial`, `Redis`...), o texto seguido de um número de porta é o servidor (`connect('cache01', 6379)`). O nome da variável, da função e da classe fica |
 | Linha de comando | `-h`/`-d`/`-U`/`-S` quando o comando tem pelo menos duas delas, `-n` com um recurso ou subcomando de operação, `deploy/x`, `svc/x`, `ns/x`..., `host:/caminho` do `scp`/`rsync` |
 | Caminhos fora da pasta pessoal | Qualquer caminho absoluto com 2 ou mais níveis cujo primeiro nível (com 4 ou mais caracteres) não é diretório público do sistema nem rota web (`/dados/Relatorios/...`); `/srv`, `/opt`, `/data`, `/mnt`, `/media`, `/var/www` (cada pasta), `/var/lib`, `/var/log`, `/etc` (só pastas com cara de identificador), outras unidades (`D:\...`) e `\\servidor\compartilhamento\...`. Diretórios públicos do sistema ficam |
@@ -137,7 +137,7 @@ de cada formato estão descritas em [estruturas.md](estruturas.md). Já ligadas:
 | URLs de nuvem | Azure Storage (`<conta>.blob/dfs/file/queue/table.core.windows.net/<contêiner>`), Service Bus (`sb://<namespace>.servicebus.windows.net` e `EntityPath`), fila do SQS (`sqs.<região>.amazonaws.com/<conta>/<fila>`); ID de recurso do Azure com o tipo de cada recurso |
 | Default de placeholder | `${NOME:valor}` (Spring) e `${NOME:-valor}` (shell, compose): o nome diz o tipo do valor; uma URL no default tem o host interno mascarado |
 | Variável de ambiente em lista | `- name: DB_HOST` + `value: x` (Kubernetes, CI) segue a regra de `DB_HOST: x` |
-| Nome da empresa embutido | Identificador que contém um dos seus `termos` como pedaço (`acme_pedidos`) |
+| Nome da empresa embutido | Identificador que contém um dos seus `terms` como pedaço (`acme_pedidos`) |
 
 Uma tabela só é lida como catálogo quando todas as células do cabeçalho têm forma de
 identificador (sem espaço, operador ou unidade). Nome de servidor não diferencia maiúsculas
@@ -181,13 +181,13 @@ Nome e código de pessoa não têm formato. Para que sejam reconhecidos em qualq
 importe uma lista que você já tenha:
 
 ```bash
-llm-dlp importar-pessoas owners.csv --grupo COD_USUARIO:NOME:EMAIL --separador-nome /
+llm-dlp import-people owners.csv --group COD_USUARIO:NOME:EMAIL --name-separator /
 ```
 
-- `--grupo` diz quais colunas do CSV têm o código, o nome e o e-mail de cada pessoa. Pode
+- `--group` diz quais colunas do CSV têm o código, o nome e o e-mail de cada pessoa. Pode
   repetir a opção para mais de um conjunto de colunas, e deixar uma parte vazia
   (`COD_STEWARD:NOM_STEWARD:`).
-- `--separador-nome` é para quando a célula traz o nome seguido de outra coisa
+- `--name-separator` é para quando a célula traz o nome seguido de outra coisa
   (`Fulano / Área X`): vale só a parte antes do separador.
 - Tudo é guardado **só como hash**. Nome, código e e-mail da mesma pessoa ganham o mesmo
   identificador.
@@ -201,15 +201,15 @@ registro sozinho.
 Para ver como o llm-dlp entende os campos de um arquivo, e quais ele não reconhece:
 
 ```bash
-llm-dlp colunas clientes.csv
+llm-dlp columns clientes.csv
 ```
 
 Para ensinar os que faltam, no `config.json`:
 
 ```json
-"campos_extras": [
-  {"tipo": "usuario", "palavras": ["chapa", "re"]},
-  {"tipo": "pessoa",  "palavras": ["cooperado", "segurado"]}
+"extra_fields": [
+  {"type": "usuario", "words": ["chapa", "re"]},
+  {"type": "pessoa",  "words": ["cooperado", "segurado"]}
 ]
 ```
 
@@ -222,9 +222,9 @@ Para ensinar os que faltam, no `config.json`:
 ### Códigos e termos próprios
 
 ```json
-"padroes_extras": [{"rotulo": "matricula", "regex": "\\bMAT\\d{6}\\b"}],
-"termos": [{"rotulo": "projeto", "valores": ["Projeto Fenix"]}]
+"extra_patterns": [{"label": "matricula", "regex": "\\bMAT\\d{6}\\b"}],
+"terms": [{"label": "projeto", "values": ["Projeto Fenix"]}]
 ```
 
-`padroes_extras` é para o que tem formato (uma regex). `termos` é para palavras exatas, como
+`extra_patterns` é para o que tem formato (uma regex). `terms` é para palavras exatas, como
 o nome de um projeto ou de um sistema que não pode sair.

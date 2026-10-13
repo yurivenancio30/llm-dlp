@@ -9,6 +9,54 @@ In each version: **Masking** is what started (or stopped) being masked; **Progra
 commands, installation, configuration, performance and documentation; **Code** is what only
 matters to whoever changes the code.
 
+## [Unreleased]
+
+Commands, their options and the configuration fields are now in English (`llm-dlp update`,
+`llm-dlp stop`, `internal_domains`...). The Portuguese names keep working, so nothing has to be
+changed by hand: updating rewrites `config.json` with the new names and switches the Claude
+Code hooks. Messages on the screen are still in Portuguese.
+
+### Program
+
+- Commands: `install`, `uninstall`, `install-lock`, `uninstall-lock`, `update`, `reload`,
+  `stop`, `emergency`, `import-people`, `columns`, `test`, `test-media`, `simulate`, `measure`,
+  `last`, `version`, `help`, and the internal `ensure`, `check`, `serve` and `supervise`. The
+  old names still work (the hooks already installed call `garantir` and `verificar`); `help`
+  lists only the new ones.
+- Options: `--yes`, `--version`, `--file`, `--group`, `--name-separator`, `--window` and
+  `emergency off` (before: `--sim`, `--versao`, `--arquivo`, `--grupo`, `--separador-nome`,
+  `--janela` and `sair`). The old ones still work.
+- `config.json` fields: `port`, `providers` (`format`), `internal_domains`, `allowed_emails`,
+  `allowed_email_domains`, `host_roles`, `extra_patterns` (`label`), `terms` (`label`,
+  `values`), `disabled_detectors`, `optional_detectors`, `extra_fields` (`type`, `words`),
+  `documents_without_context`, `fail_closed`, `ocr` (`mode`: `mask`, `block` or `allow`;
+  `language`, `max_pages`, `strict_pdf`), `tools_never_unmasked` and `objects` (`enabled`,
+  `mask`, `propagate`, `public_ip`). The Portuguese names are still read (with both, the English
+  one wins). `llm-dlp update` and the installation command rewrite the file with the new names
+  once the new version is running, keeping the previous one as `config.json.bak-DATE`; fields
+  llm-dlp does not know stay as they are.
+- Going back to a version before 0.9.0 (`llm-dlp update --version 0.8.0`, or the installation
+  command with `--version`): the file goes back to the Portuguese names before that version
+  starts, and the hooks go back to `garantir` and `verificar`. An older version would ignore the
+  English fields and stop masking what they ask for (internal domains, terms...). When going
+  back, the installation command now leaves the update to the version already installed, which
+  knows how to convert the file.
+- Unchanged: the detector names (in `disabled_detectors`), the types in `extra_fields` and in
+  `objects.mask` and `objects.propagate`, the pseudonym prefixes, the log and the
+  `/__llm-dlp/` addresses.
+- The release notes no longer say to close Claude Code and run `llm-dlp stop` after the
+  installation command: since 0.8.0 it updates without going offline.
+
+### Code
+
+- The tests of `cmd/llm-dlp` run with the home folder in a temporary directory (`TestMain`):
+  `install`, `uninstall` and `update` change `~/.claude` and `~/.local/bin`, and a test can no
+  longer touch the real ones.
+- `internal/config/nomes_antigos.go`: the old field names, read on load and converted in the
+  file in both directions (`MigrarArquivo`).
+- The supervisor still starts the proxy as `servir` and re-executes itself as `supervisionar`:
+  after going back, an older version understands those names.
+
 ## [0.8.0] - 2026-10-13
 
 Updating no longer takes llm-dlp offline, and neither does the proxy going down: the supervisor

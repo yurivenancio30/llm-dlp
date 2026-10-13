@@ -40,7 +40,7 @@ cmd/llm-dlp/            the command-line program
 internal/proxy/         the server that sits between Claude Code and the API
 internal/mask/          detection and replacement with pseudonyms (depends on no API)
 internal/mask/dados/    lists embedded in the binary (almost all generated)
-internal/config/        reading of config.json
+internal/config/        reading of config.json (and of the field names before 0.9.0)
 internal/ocr/           reading of text in images and PDFs (tesseract, poppler)
 internal/versao/        the version number and the commit
 install.sh              installer: downloads the release binary and runs the setup
@@ -58,13 +58,13 @@ CHANGELOG.md            what changed in each version
 
 ```
 cmd/llm-dlp/
-  main.go               entry point and list of commands
-  servico.go            servir, supervisionar, garantir, verificar, status, parar
+  main.go               entry point, list of commands and their names before 0.9.0
+  servico.go            serve, supervise, ensure, check, status, stop
   troca.go              the supervisor: holds the port and lends it to the proxy; swap on SIGHUP
-  atualizar.go          atualizar (download, checksum, swap, going back) and recarregar
-  instalar.go           instalar, desinstalar and the lock
-  conferir.go           simular: replays an old session against a fake API
-  ferramentas.go        importar-pessoas, testar, testar-midia, medir, colunas
+  atualizar.go          update (download, checksum, swap, going back) and reload
+  instalar.go           install, uninstall, the lock and the hooks
+  conferir.go           simulate: replays an old session against a fake API
+  ferramentas.go        import-people, test, test-media, measure, columns
   emergencia.go         emergency mode (requires sudo)
 
 internal/proxy/
@@ -255,19 +255,19 @@ the command hints, the freezing and the images work the same; only the way back
 (`voltaGemini`, `voltaOpenAI`, `voltaResponses`) is written for the format. The code of a
 format only runs for requests on its own path, and `isolamento_test.go` checks that a Claude
 Code request goes out byte for byte the same with or without it. The destination is chosen
-by the path (`Proxy.destino`, with the `provedores` of the configuration).
+by the path (`Proxy.destino`, with the `providers` of the configuration).
 
 What a format with no reader gets today, and what to do to give it one (`responses.go` is
 the most recent example to follow):
 
 | Part | Today, with no reader | What to do |
 |---|---|---|
-| Address | Any API can be served under `/<name>`, with a provider in `provedores` (`formato` and `upstream`) | For a provider that comes built in, add it to `config.ProvedoresPadrao`. If the format is recognized by the path (like `/chat/completions` and `/responses`), add it to `Proxy.destino` |
+| Address | Any API can be served under `/<name>`, with a provider in `providers` (`format` and `upstream`) | For a provider that comes built in, add it to `config.ProvedoresPadrao`. If the format is recognized by the path (like `/chat/completions` and `/responses`), add it to `Proxy.destino` |
 | Outbound (request) | Generic mode: **every text in the JSON is masked**. It is safe, but masks even fields that did not need it | Write `ponteX(v any) (map[string]any, func(), bool)` in a file of its own: a view of the request in the Anthropic shape (`system`, `messages`, `tools`) whose texts are written back to the original JSON by the returned function. Register it in the map of `mascararCorpo` (`requisicao.go`). Fields that may never change go to `chavesIntocaveisPonte` |
 | Images and PDFs | In the generic mode they do not go through OCR | In the bridge, show them as `image` and `document` blocks, as `ponteGemini` does |
-| Inbound without streaming | The `text`, `content` and `input` fields of the JSON are unmasked | Write `desmascararXJSON` and choose it by `formato` in `proxy.go` |
-| Inbound with streaming | **It is not unmasked**: you would see the pseudonyms. Nothing leaks | Write `desmascararSSEX`, with a `voltaX` that passes each text through its own `mask.Fluxo` (it takes care of a pseudonym split between two chunks), and choose it by `formato` in `proxy.go` |
-| `llm-dlp ultima` | Does not show the conversation | Add the `formato` to the list that keeps the last request (`proxy.go`) and read its messages in `mensagensDaUltima` (`cmd/llm-dlp/conferir.go`) |
+| Inbound without streaming | The `text`, `content` and `input` fields of the JSON are unmasked | Write `desmascararXJSON` and choose it by `format` in `proxy.go` |
+| Inbound with streaming | **It is not unmasked**: you would see the pseudonyms. Nothing leaks | Write `desmascararSSEX`, with a `voltaX` that passes each text through its own `mask.Fluxo` (it takes care of a pseudonym split between two chunks), and choose it by `format` in `proxy.go` |
+| `llm-dlp last` | Does not show the conversation | Add the `format` to the list that keeps the last request (`proxy.go`) and read its messages in `mensagensDaUltima` (`cmd/llm-dlp/conferir.go`) |
 | Isolation | — | Add the format to `isolamento_test.go`: malformed requests and responses, and a Claude Code request that stays the same |
 
 The `mask` package depends on no API format: it receives text and returns text. All the work
@@ -309,7 +309,7 @@ model.
 | Automatic suite | Each detector, round trip, streaming, and each kind of data at every cut position of a large text | `make test` |
 | Reader variations | Each case of each reader in every spelling variation (letter case, spaces, quoting, comments, punctuation, 2–4 parts, `$ # -` and accents, several on a line, inside JSON), plus prose with SQL between backticks | `go test ./internal/mask -run Variacoes` |
 | Load and stress | Memory with 1.2 GB of text, 120 thousand learned values, conversations in parallel, API down, 32 MB request | `LLM_DLP_ESTRESSE=1 go test ./... -run Estresse` |
-| Real sessions | Replays an old Claude Code session through llm-dlp, against a local fake API (nothing leaves the machine), and checks refusals, round trip (of the text and of the tool calls the model writes: what goes to a generated file or to the terminal), cache and time | `llm-dlp simular SESSAO.jsonl` |
+| Real sessions | Replays an old Claude Code session through llm-dlp, against a local fake API (nothing leaves the machine), and checks refusals, round trip (of the text and of the tool calls the model writes: what goes to a generated file or to the terminal), cache and time | `llm-dlp simulate SESSAO.jsonl` |
 | Transport matrix | Each content (catalog, connection, Snowflake config, manifest, buckets, ORM) in 15 layouts (CSV, `;`, TAB, `\|`, box, fixed width, borders, tuples, HTML, vertical, JSON, JSONL, `k=v`, loose column, `uniq -c`) and 11 transports (raw, Read, `cat -n`, `grep -n`, diff, markdown, escaped JSON, ANSI, CRLF, quotation, log): the same names masked in every cell (target 95%) and an exact round trip; the negatives have nothing masked in any cell | `go test ./internal/mask -run Matriz -v` |
 | Fuzzing | The normalization map, the round trip through the readers and the SQL scan against the regexes it replaced | `go test ./internal/mask -run '^$' -fuzz FuzzIdaVolta -fuzztime 60s` (and `FuzzNormalizar`, `FuzzVarreduraSQL`) |
 | False positives | Per rule: findings in a public corpus (third-party code and documentation) and, in real sessions, how many learned names exist in the public corpus (limit 2%). Counts only; test key and configuration | `LLM_DLP_CORPUS=dir1:dir2 go test ./internal/mask -run MedirCorpus -v` and, with `LLM_DLP_SESSOES=~/.claude/projects`, `-run MedirSessoes` |
@@ -325,4 +325,4 @@ To repeat this test, run Claude Code **in an isolated environment** (for example
 `--allowedTools` is not enough: it only adds permissions, and your global settings may let
 the agent read other files.
 
-During use, `llm-dlp ultima` shows the last messages exactly as the API received them.
+During use, `llm-dlp last` shows the last messages exactly as the API received them.

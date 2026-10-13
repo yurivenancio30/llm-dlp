@@ -9,6 +9,54 @@ Em cada versão: **Mascaramento** é o que passou a ser (ou deixou de ser) masca
 **Programa** é comando, instalação, configuração, desempenho e documentação; **Código** é o
 que só interessa a quem mexe no código.
 
+## [Não lançado]
+
+Os comandos, as opções deles e os campos da configuração agora são em inglês (`llm-dlp update`,
+`llm-dlp stop`, `internal_domains`...). Os nomes em português continuam funcionando, então não
+é preciso mudar nada à mão: atualizar regrava o `config.json` com os nomes novos e troca os
+ganchos do Claude Code. As mensagens na tela continuam em português.
+
+### Programa
+
+- Comandos: `install`, `uninstall`, `install-lock`, `uninstall-lock`, `update`, `reload`,
+  `stop`, `emergency`, `import-people`, `columns`, `test`, `test-media`, `simulate`, `measure`,
+  `last`, `version`, `help`, e os internos `ensure`, `check`, `serve` e `supervise`. Os nomes
+  antigos continuam funcionando (os ganchos já instalados chamam `garantir` e `verificar`); o
+  `help` lista só os novos.
+- Opções: `--yes`, `--version`, `--file`, `--group`, `--name-separator`, `--window` e
+  `emergency off` (antes: `--sim`, `--versao`, `--arquivo`, `--grupo`, `--separador-nome`,
+  `--janela` e `sair`). As antigas continuam funcionando.
+- Campos do `config.json`: `port`, `providers` (`format`), `internal_domains`,
+  `allowed_emails`, `allowed_email_domains`, `host_roles`, `extra_patterns` (`label`), `terms`
+  (`label`, `values`), `disabled_detectors`, `optional_detectors`, `extra_fields` (`type`,
+  `words`), `documents_without_context`, `fail_closed`, `ocr` (`mode`: `mask`, `block` ou
+  `allow`; `language`, `max_pages`, `strict_pdf`), `tools_never_unmasked` e `objects`
+  (`enabled`, `mask`, `propagate`, `public_ip`). Os nomes em português continuam sendo lidos
+  (com os dois, vale o em inglês). O `llm-dlp update` e o comando de instalação regravam o
+  arquivo com os nomes novos quando a versão nova já está no ar, guardando o anterior em
+  `config.json.bak-DATA`; campos que o llm-dlp não conhece ficam como estão.
+- Voltar para uma versão anterior à 0.9.0 (`llm-dlp update --version 0.8.0`, ou o comando de
+  instalação com `--version`): o arquivo volta aos nomes em português antes de ela subir, e os
+  ganchos voltam para `garantir` e `verificar`. Uma versão anterior ignoraria os campos em
+  inglês e deixaria de mascarar o que eles pedem (domínios internos, termos...). Ao voltar, o
+  comando de instalação agora deixa a atualização com a versão já instalada, que sabe converter
+  o arquivo.
+- Sem mudança: os nomes dos detectores (em `disabled_detectors`), os tipos em `extra_fields` e
+  em `objects.mask` e `objects.propagate`, os prefixos dos pseudônimos, o log e os endereços
+  `/__llm-dlp/`.
+- As notas da versão não mandam mais fechar o Claude Code e rodar `llm-dlp stop` depois do
+  comando de instalação: desde a 0.8.0 ele atualiza sem tirar do ar.
+
+### Código
+
+- Os testes de `cmd/llm-dlp` rodam com a pasta pessoal num diretório temporário (`TestMain`):
+  `install`, `uninstall` e `update` mexem no `~/.claude` e no `~/.local/bin`, e um teste não
+  consegue mais tocar nos de verdade.
+- `internal/config/nomes_antigos.go`: os nomes antigos dos campos, lidos ao carregar e
+  convertidos no arquivo nos dois sentidos (`MigrarArquivo`).
+- O supervisor continua subindo o proxy como `servir` e se reexecutando como `supervisionar`:
+  depois de voltar, uma versão anterior entende esses nomes.
+
 ## [0.8.0] - 2026-10-13
 
 Atualizar não tira mais o llm-dlp do ar, e o proxy cair também não: agora quem segura a porta é

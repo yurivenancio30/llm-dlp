@@ -128,7 +128,7 @@ recebem só o pseudônimo, sempre, mesmo que o `config.json` tenha outra lista: 
 servidores da Anthropic, fora da sua máquina.
 
 O efeito colateral: pesquisar na web, ou num conector, algo que foi mascarado não acha nada.
-Para mudar a lista das ferramentas da web, edite `ferramentas_sem_desmascarar` no
+Para mudar a lista das ferramentas da web, edite `tools_never_unmasked` no
 `config.json`.
 
 ## Desempenho

@@ -18,7 +18,7 @@ a trava. Se o seu `sudo` não pede senha, essa barreira não existe.
 **A configuração não tem essa barreira:** o `config.json` é do seu usuário, e um comando
 rodado pelo agente consegue mudá-lo (desligar um detector, liberar imagens, apontar o
 `upstream` para outro servidor, que passaria a receber as mensagens e a credencial da API).
-As regras que o `llm-dlp instalar` põe no Claude Code proíbem o agente de ler, editar e
+As regras que o `llm-dlp install` põe no Claude Code proíbem o agente de ler, editar e
 citar a pasta num comando, mas isso não é uma garantia. Por isso, enquanto a configuração
 tirar proteção ou mandar as mensagens para fora da API da Anthropic, o Claude Code mostra
 um aviso **a cada mensagem**, e o `llm-dlp status` também. Se você não mudou nada e o aviso
@@ -53,19 +53,19 @@ chegam nesse endereço. O que cada um consegue:
 | Quem tenta | O que acontece |
 |---|---|
 | Uma página aberta no navegador, que aponta o próprio domínio para `127.0.0.1` (DNS rebinding) ou manda a requisição de outro site | Recusada (403). Só é atendido quem chama pelo endereço local (`127.0.0.1`, `localhost`) e não é uma página da web. Nada vai para a API |
-| Outro usuário da máquina querendo ler a sua última conversa (mascarada) | Não lê: ela só sai com uma prova que só quem lê a sua `chave` calcula. É o que o comando `llm-dlp ultima` faz |
+| Outro usuário da máquina querendo ler a sua última conversa (mascarada) | Não lê: ela só sai com uma prova que só quem lê a sua `chave` calcula. É o que o comando `llm-dlp last` faz |
 | Outro programa que ocupa a porta enquanto o llm-dlp está fora do ar, para receber a conversa sem máscara e a credencial da API | A cada mensagem, o Claude Code pergunta à porta se é o llm-dlp e exige a resposta a um desafio novo, que só quem lê a `chave` calcula. Sem a prova, a mensagem é barrada |
 
 Quem roda com o **seu** usuário lê a chave e passa pelas três barreiras (ver "O que não
 protege", acima).
 
 Quem segura a porta é o supervisor, não o proxy: quando o proxy cai ou é trocado
-(`llm-dlp atualizar`, `llm-dlp recarregar`), a porta continua aberta, e nenhum outro programa
+(`llm-dlp update`, `llm-dlp reload`), a porta continua aberta, e nenhum outro programa
 consegue pegá-la no meio. A janela da última linha acima fica só para quando o próprio
-supervisor não está no ar (antes da primeira sessão, ou depois de um `llm-dlp parar`).
+supervisor não está no ar (antes da primeira sessão, ou depois de um `llm-dlp stop`).
 
 Ao atualizar de uma versão até a 0.3.0, o processo antigo ainda no ar não sabe dar essa
-prova, e as mensagens são barradas até você fechar o Claude Code e rodar `llm-dlp parar`.
+prova, e as mensagens são barradas até você fechar o Claude Code e rodar `llm-dlp stop`.
 
 ## Limites conhecidos
 
@@ -73,11 +73,11 @@ prova, e as mensagens são barradas até você fechar o Claude Code e rodar `llm
 
 - Nome de pessoa que não é conhecido e aparece sem nome de campo (texto corrido, ou um
   pedaço de CSV lido sem a linha de cabeçalho).
-- Campo com nome fora do vocabulário, até você acrescentar em `campos_extras`.
+- Campo com nome fora do vocabulário, até você acrescentar em `extra_fields`.
 - **Nome de recurso interno (banco, schema, tabela, sistema) que só aparece em frases**, sem
   nunca ter passado por uma estrutura que o llm-dlp reconheça (ver
   [O que é detectado](deteccao.md#5-nomes-de-recursos-internos-pela-estrutura)). Para mascarar
-  um nome sempre, use `termos`.
+  um nome sempre, use `terms`.
 - Dado pessoal sensível (saúde, religião, etnia) em texto corrido. Só é detectado num campo
   com esse nome.
 - Valores financeiros (saldo, renda, limite). O que os liga a uma pessoa (nome, CPF, conta)
@@ -122,7 +122,7 @@ Comportamentos que são escolhas, não defeitos:
 | Comportamento | Por quê |
 |---|---|
 | Só IPs de rede interna são mascarados | IP público (de um serviço na internet) não identifica a empresa nem uma pessoa, e mascará-lo atrapalharia o diagnóstico de rede |
-| Domínios públicos não são mascarados | `github.com`, `pypi.org`, nomes de arquivo (`config.py`) têm formato de domínio; mascará-los piora as respostas sem proteger nada. Só os `dominios_internos` são mascarados |
+| Domínios públicos não são mascarados | `github.com`, `pypi.org`, nomes de arquivo (`config.py`) têm formato de domínio; mascará-los piora as respostas sem proteger nada. Só os `internal_domains` são mascarados |
 | E-mail precisa de domínio com ponto | `joao@localhost`, `root@servidor` e `ssh usuario@host` não são tratados como e-mail (seriam falsos positivos em comandos). E-mail escrito por extenso (`joao [at] empresa`) também não é reconhecido |
 | `WebFetch`, `WebSearch` e conectores do claude.ai recebem pseudônimos | O que vai para fora da máquina não pode levar o dado real. Efeito: pesquisar na web ou num conector algo mascarado não acha nada |
 | O que vem da web não é lembrado | Uma senha de exemplo numa página não é segredo seu. É mascarada onde aparece, mas não vira segredo em todo lugar |

@@ -21,7 +21,7 @@ keywords are recognized as well.
 | Phone | `(11) 98765-4321`, `+55 11 98765-4321` |
 | Address | `Rua das Flores, 123` |
 | Internal network IP | `10.42.7.15`, `192.168.0.10` |
-| Internal hostname | `mysql.empresa.intra` (the ones containing one of your `dominios_internos`) |
+| Internal hostname | `mysql.empresa.intra` (the ones containing one of your `internal_domains`) |
 | International account (IBAN) | `GB82 WEST 1234 5698 7654 32` |
 | Court case number | `0001234-56.2023.8.13.0024` |
 | MAC address | `aa:bb:cc:dd:ee:ff` |
@@ -109,9 +109,9 @@ complete: see [Teaching llm-dlp](detection.md#teaching-llm-dlp).
 
 | How it became known | What holds from then on |
 |---|---|
-| You imported the person (`importar-pessoas`) | Their name, e-mail and code are recognized anywhere and in any spelling ("João Silva", "JOAO SILVA") |
+| You imported the person (`import-people`) | Their name, e-mail and code are recognized anywhere and in any spelling ("João Silva", "JOAO SILVA") |
 | The value was already masked once by ways 2 or 3 | It is recognized later on its own, without the word or the field next to it |
-| You listed it in `termos` or `padroes_extras` | Always masked |
+| You listed it in `terms` or `extra_patterns` | Always masked |
 
 A user code that is short or has no digit (`jsilva`, `ana`) is only masked next to the field
 name: searching for it in the whole text would mask the word everywhere. Service accounts
@@ -135,7 +135,7 @@ Already enabled:
 | Terraform, Ansible, CloudFormation, ARM/Bicep, CI | Literal values of attributes that are names (`name`, `bucket`, `identifier`, `*Name`…; the resource's local name, references and region stay), cloud account, inventory hosts, self-hosted runners. `name` in a nested block only counts in the `metadata` block (Kubernetes provider: `metadata { name = ... }`) |
 | Key-value | In YAML, JSON, TOML, INI, `.env`, `.properties`, XML and `--key value` options: the value of a key whose last piece indicates a resource name (`host`, `database`, `schema`, `user`, `bucket`, `topic`, `namespace`, `service`, `repo`, `account`…). A dotted topic/queue (`KAFKA_TOPIC=fin.notas.emitidas`, `kafka.topic=`, `topic:`) counts when every piece is lowercase and none is a code receiver or attribute (`cfg.topic`), a public domain or a file extension. A value that is a code expression stays |
 | Addresses and paths | Internal host in a URL or loose (single label or `.local`, `.internal`, `.corp`…), buckets and queues (`s3://`, `gs://`, `abfss://`, `amqp://`, `kafka://`), git remotes (organization and repository), internal packages (`go.mod`, groupId, npm scope), the user in `/home/user/` and folders, `DOMAIN\user`, `ssh user@host` |
-| Cloud | AWS ARN, Azure `/subscriptions/…`, GCP `projects/…`: account and resource. Public IP and IPv6 only with `objetos.ip_publico` on |
+| Cloud | AWS ARN, Azure `/subscriptions/…`, GCP `projects/…`: account and resource. Public IP and IPv6 only with `objects.public_ip` on |
 | Code, in any language | The quoted text next to a name containing a type word (`DB_HOST = "x"`, `#define DB_NAME "x"`, `connect(host="x")`, `{ queue: 'x' }`, `'bucket' => 'x'`, `@Table(name = "x")`, `@KafkaListener(topics = "x")`, `getenv("BUCKET", "x")`, `process.env.X \|\| 'x'`), or passed to a function whose name contains the type word (`assertQueue("x")`, `new QueueClient(c, "x")`, `createBucket("x")`, `inNamespace("x")`), also inside a list (`subscribe(List.of("x"))`). In a connection call (`connect`, `dial`, `Redis`...), the text followed by a port number is the server (`connect('cache01', 6379)`). The names of the variable, the function and the class stay |
 | Command line | `-h`/`-d`/`-U`/`-S` when the command has at least two of them, `-n` with a resource or an operation subcommand, `deploy/x`, `svc/x`, `ns/x`..., `host:/path` of `scp`/`rsync` |
 | Paths outside the home folder | Any absolute path with 2 or more levels whose first level (4 or more characters) is neither a public system directory nor a web route (`/dados/Relatorios/...`); `/srv`, `/opt`, `/data`, `/mnt`, `/media`, `/var/www` (each folder), `/var/lib`, `/var/log`, `/etc` (only identifier-looking folders), other drives (`D:\...`) and `\\server\share\...`. Public system directories stay |
@@ -143,7 +143,7 @@ Already enabled:
 | Cloud URLs | Azure Storage (`<account>.blob/dfs/file/queue/table.core.windows.net/<container>`), Service Bus (`sb://<namespace>.servicebus.windows.net` and `EntityPath`), SQS queue (`sqs.<region>.amazonaws.com/<account>/<queue>`); Azure resource ID with the type of each resource |
 | Placeholder default | `${NAME:value}` (Spring) and `${NAME:-value}` (shell, compose): the name gives the type of the value; a URL in the default has its internal host masked |
 | Environment variable in a list | `- name: DB_HOST` + `value: x` (Kubernetes, CI) follows the rule of `DB_HOST: x` |
-| Embedded company name | An identifier containing one of your `termos` as a piece (`acme_pedidos`) |
+| Embedded company name | An identifier containing one of your `terms` as a piece (`acme_pedidos`) |
 
 A table is only read as a catalog when every header cell has the shape of an identifier (no
 space, operator or unit). A server name is case-insensitive (like SQL names). A lowercase
@@ -188,13 +188,13 @@ A person's name and code have no format. To have them recognized in any text, im
 you already have:
 
 ```bash
-llm-dlp importar-pessoas owners.csv --grupo COD_USUARIO:NOME:EMAIL --separador-nome /
+llm-dlp import-people owners.csv --group COD_USUARIO:NOME:EMAIL --name-separator /
 ```
 
-- `--grupo` says which CSV columns hold each person's code, name and e-mail. You can repeat
+- `--group` says which CSV columns hold each person's code, name and e-mail. You can repeat
   the option for more than one set of columns, and leave a part empty
   (`COD_STEWARD:NOM_STEWARD:`).
-- `--separador-nome` is for when the cell brings the name followed by something else
+- `--name-separator` is for when the cell brings the name followed by something else
   (`Fulano / Área X`): only the part before the separator counts.
 - Everything is stored **only as a hash**. The name, code and e-mail of the same person get
   the same identifier.
@@ -209,19 +209,19 @@ record on its own.
 To see how llm-dlp understands the fields of a file, and which ones it does not recognize:
 
 ```bash
-llm-dlp colunas clientes.csv
+llm-dlp columns clientes.csv
 ```
 
 To teach the missing ones, in `config.json`:
 
 ```json
-"campos_extras": [
-  {"tipo": "usuario", "palavras": ["chapa", "re"]},
-  {"tipo": "pessoa",  "palavras": ["cooperado", "segurado"]}
+"extra_fields": [
+  {"type": "usuario", "words": ["chapa", "re"]},
+  {"type": "pessoa",  "words": ["cooperado", "segurado"]}
 ]
 ```
 
-| Type (`tipo`) | Meaning |
+| Type (`type`) | Meaning |
 |---|---|
 | `cpf`, `cnpj`, `rg`, `cnh`, `pis`, `doc`, `nascimento`, `telefone`, `cep`, `endereco`, `usuario`, `conta`, `cartao`, `sensivel`, `nome` | The word says which data the field holds |
 | `pessoa` | The word says whose field it is (`cooperado` makes `NOME_COOPERADO` count) |
@@ -230,9 +230,9 @@ To teach the missing ones, in `config.json`:
 ### Your own codes and terms
 
 ```json
-"padroes_extras": [{"rotulo": "matricula", "regex": "\\bMAT\\d{6}\\b"}],
-"termos": [{"rotulo": "projeto", "valores": ["Projeto Fenix"]}]
+"extra_patterns": [{"label": "matricula", "regex": "\\bMAT\\d{6}\\b"}],
+"terms": [{"label": "projeto", "values": ["Projeto Fenix"]}]
 ```
 
-`padroes_extras` is for what has a format (a regex). `termos` is for exact words, such as the
+`extra_patterns` is for what has a format (a regex). `terms` is for exact words, such as the
 name of a project or a system that must not go out.

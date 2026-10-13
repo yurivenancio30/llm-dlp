@@ -22,7 +22,7 @@ cmd/llm-dlp/            o programa de linha de comando
 internal/proxy/         o servidor que fica entre o Claude Code e a API
 internal/mask/          detecção e troca por pseudônimos (não depende de nenhuma API)
 internal/mask/dados/    listas embutidas no binário (quase todas geradas)
-internal/config/        leitura do config.json
+internal/config/        leitura do config.json (e dos nomes de campo de antes da 0.9.0)
 internal/ocr/           leitura de texto em imagem e PDF (tesseract, poppler)
 internal/versao/        o número da versão e o commit
 install.sh              instalador: baixa o binário da release e roda a configuração
@@ -40,13 +40,13 @@ CHANGELOG.md            o que mudou em cada versão (em português: docs/pt-BR/C
 
 ```
 cmd/llm-dlp/
-  main.go               ponto de entrada e lista de comandos
-  servico.go            servir, supervisionar, garantir, verificar, status, parar
+  main.go               ponto de entrada, lista de comandos e os nomes deles antes da 0.9.0
+  servico.go            serve, supervise, ensure, check, status, stop
   troca.go              o supervisor: segura a porta e a empresta ao proxy; troca com SIGHUP
-  atualizar.go          atualizar (download, checksum, troca, volta) e recarregar
-  instalar.go           instalar, desinstalar e a trava
-  conferir.go           simular: reproduz uma sessão antiga contra uma API falsa
-  ferramentas.go        importar-pessoas, testar, testar-midia, medir, colunas
+  atualizar.go          update (download, checksum, troca, volta) e reload
+  instalar.go           install, uninstall, a trava e os ganchos
+  conferir.go           simulate: reproduz uma sessão antiga contra uma API falsa
+  ferramentas.go        import-people, test, test-media, measure, columns
   emergencia.go         modo emergência (exige sudo)
 
 internal/proxy/
@@ -235,19 +235,19 @@ comandos, o congelamento e as imagens valem igual; só a volta (`voltaGemini`, `
 `voltaResponses`) é escrita para o formato. O código de um formato só roda para as requisições
 do caminho dele, e o `isolamento_test.go` confere que uma requisição do Claude Code sai byte a
 byte igual com ou sem ele. O destino é
-escolhido pelo caminho (`Proxy.destino`, com os `provedores` da configuração).
+escolhido pelo caminho (`Proxy.destino`, com os `providers` da configuração).
 
 O que um formato sem leitor tem hoje, e o que fazer para dar um leitor a ele (o
 `responses.go` é o exemplo mais recente a seguir):
 
 | Parte | Hoje, sem leitor | O que fazer |
 |---|---|---|
-| Endereço | Qualquer API pode ser atendida em `/<nome>`, com um provedor em `provedores` (`formato` e `upstream`) | Para um provedor que já vem embutido, acrescentá-lo em `config.ProvedoresPadrao`. Se o formato é reconhecido pelo caminho (como `/chat/completions` e `/responses`), acrescentá-lo em `Proxy.destino` |
+| Endereço | Qualquer API pode ser atendida em `/<nome>`, com um provedor em `providers` (`format` e `upstream`) | Para um provedor que já vem embutido, acrescentá-lo em `config.ProvedoresPadrao`. Se o formato é reconhecido pelo caminho (como `/chat/completions` e `/responses`), acrescentá-lo em `Proxy.destino` |
 | Ida (requisição) | Modo genérico: **todo texto do JSON é mascarado**. É seguro, mas mascara até campos que não precisava | Escrever `ponteX(v any) (map[string]any, func(), bool)` num arquivo próprio: uma visão da requisição na forma da Anthropic (`system`, `messages`, `tools`) cujos textos a função devolvida grava de volta no JSON original. Registrá-la no mapa do `mascararCorpo` (`requisicao.go`). Campos que nunca podem mudar vão para `chavesIntocaveisPonte` |
 | Imagens e PDFs | No modo genérico, não passam pelo OCR | Na ponte, mostrá-los como blocos `image` e `document`, como faz o `ponteGemini` |
-| Volta sem streaming | Os campos `text`, `content` e `input` do JSON são desmascarados | Escrever `desmascararXJSON` e escolhê-lo pelo `formato` em `proxy.go` |
-| Volta com streaming | **Não é desmascarada**: você veria os pseudônimos. Nada vaza | Escrever `desmascararSSEX`, com um `voltaX` que passa cada texto pelo seu próprio `mask.Fluxo` (ele cuida do pseudônimo cortado entre dois pedaços), e escolhê-lo pelo `formato` em `proxy.go` |
-| `llm-dlp ultima` | Não mostra a conversa | Acrescentar o `formato` à lista que guarda a última requisição (`proxy.go`) e ler as mensagens dele em `mensagensDaUltima` (`cmd/llm-dlp/conferir.go`) |
+| Volta sem streaming | Os campos `text`, `content` e `input` do JSON são desmascarados | Escrever `desmascararXJSON` e escolhê-lo pelo `format` em `proxy.go` |
+| Volta com streaming | **Não é desmascarada**: você veria os pseudônimos. Nada vaza | Escrever `desmascararSSEX`, com um `voltaX` que passa cada texto pelo seu próprio `mask.Fluxo` (ele cuida do pseudônimo cortado entre dois pedaços), e escolhê-lo pelo `format` em `proxy.go` |
+| `llm-dlp last` | Não mostra a conversa | Acrescentar o `format` à lista que guarda a última requisição (`proxy.go`) e ler as mensagens dele em `mensagensDaUltima` (`cmd/llm-dlp/conferir.go`) |
 | Isolamento | — | Acrescentar o formato ao `isolamento_test.go`: requisições e respostas malformadas, e uma requisição do Claude Code que continua igual |
 
 O pacote `mask` não depende do formato de nenhuma API: recebe texto e devolve texto. Todo o
@@ -287,7 +287,7 @@ O `estresse_test.go` do proxy faz essas três conferências e serve de modelo.
 | Suíte automática | Cada detector, ida e volta, streaming, e cada tipo de dado em todas as posições de corte de um texto grande | `make test` |
 | Variações dos leitores | Cada caso de cada leitor em todas as variações de escrita (caixa, espaços, citações, comentários, pontuação, 2–4 partes, `$ # -` e acento, vários na linha, dentro de JSON), mais prosa com SQL entre crases | `go test ./internal/mask -run Variacoes` |
 | Carga e estresse | Memória com 1,2 GB de texto, 120 mil valores aprendidos, conversas em paralelo, API fora do ar, requisição de 32 MB | `LLM_DLP_ESTRESSE=1 go test ./... -run Estresse` |
-| Sessões reais | Reproduz uma sessão antiga do Claude Code pelo llm-dlp, contra uma API falsa local (nada sai da máquina), e confere recusas, ida e volta (do texto e das chamadas de ferramenta que o modelo escreve: o que vai para um arquivo gerado ou para o terminal), cache e tempo | `llm-dlp simular SESSAO.jsonl` |
+| Sessões reais | Reproduz uma sessão antiga do Claude Code pelo llm-dlp, contra uma API falsa local (nada sai da máquina), e confere recusas, ida e volta (do texto e das chamadas de ferramenta que o modelo escreve: o que vai para um arquivo gerado ou para o terminal), cache e tempo | `llm-dlp simulate SESSAO.jsonl` |
 | Matriz de transporte | Cada conteúdo (catálogo, conexão, config do Snowflake, manifesto, buckets, ORM) em 15 desenhos (CSV, `;`, TAB, `\|`, caixa, largura fixa, bordas, tuplas, HTML, vertical, JSON, JSONL, `k=v`, coluna solta, `uniq -c`) e 11 transportes (cru, Read, `cat -n`, `grep -n`, diff, markdown, JSON escapado, ANSI, CRLF, citação, log): os mesmos nomes mascarados em todas as células (meta 95%) e ida e volta exata; os negativos não têm nada mascarado em célula nenhuma | `go test ./internal/mask -run Matriz -v` |
 | Fuzz | Mapa da normalização, ida e volta pelos leitores e a varredura do SQL contra as regex que ela substituiu | `go test ./internal/mask -run '^$' -fuzz FuzzIdaVolta -fuzztime 60s` (e `FuzzNormalizar`, `FuzzVarreduraSQL`) |
 | Falso positivo | Por regra: achados num corpus público (código e documentação de terceiros) e, nas sessões reais, quantos nomes aprendidos existem no corpus público (limite 2%). Só contagens; chave e configuração de teste | `LLM_DLP_CORPUS=dir1:dir2 go test ./internal/mask -run MedirCorpus -v` e, com `LLM_DLP_SESSOES=~/.claude/projects`, `-run MedirSessoes` |
@@ -303,4 +303,4 @@ Para repetir esse teste, rode o Claude Code **num ambiente isolado** (por exempl
 `--allowedTools` não basta: ele só acrescenta permissões, e as suas configurações globais
 podem deixar o agente ler outros arquivos.
 
-Durante o uso, `llm-dlp ultima` mostra as últimas mensagens exatamente como a API recebeu.
+Durante o uso, `llm-dlp last` mostra as últimas mensagens exatamente como a API recebeu.

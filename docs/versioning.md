@@ -5,7 +5,7 @@
 ## How to find out the version
 
 ```bash
-llm-dlp versao        # llm-dlp 0.2.1 (4b6c73c): the installed binary
+llm-dlp version        # llm-dlp 0.2.1 (4b6c73c): the installed binary
 llm-dlp status        # the commit that is running, and a warning if the installed one is newer
 ```
 

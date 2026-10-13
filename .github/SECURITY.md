@@ -5,7 +5,7 @@
 ## Supported versions
 
 Fixes go into the latest release. Update before reporting, if you can
-(`llm-dlp versao` shows what you have).
+(`llm-dlp version` shows what you have).
 
 ## Reporting a vulnerability
 
@@ -15,13 +15,13 @@ Fixes go into the latest release. Update before reporting, if you can
 
 In the report:
 
-- the llm-dlp version (`llm-dlp versao`) and how you use it;
+- the llm-dlp version (`llm-dlp version`) and how you use it;
 - a text that reproduces the problem, **with invented values**. Never send real data: no
   real names, documents, credentials or client content. A value with the same shape is
   enough;
 - what you expected and what happened (what reached the API, what came back).
 
-`llm-dlp testar < file` shows the masked version of a text and is usually enough to
+`llm-dlp test < file` shows the masked version of a text and is usually enough to
 reproduce a detection problem.
 
 ## What counts as a vulnerability

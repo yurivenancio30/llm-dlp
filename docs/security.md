@@ -18,7 +18,7 @@ remove the lock. If your `sudo` does not ask for a password, this barrier does n
 **The configuration does not have that barrier:** `config.json` belongs to your user, and a
 command run by the agent can change it (turn a detector off, let images through, point
 `upstream` to another server, which would then receive the messages and the API credential).
-The rules that `llm-dlp instalar` adds to Claude Code forbid the agent to read, edit and
+The rules that `llm-dlp install` adds to Claude Code forbid the agent to read, edit and
 mention the folder in a command, but that is not a guarantee. So, while the configuration
 removes protection or sends the messages somewhere other than the Anthropic API, Claude
 Code shows a warning **on every message**, and so does `llm-dlp status`. If you changed
@@ -53,19 +53,19 @@ reach that address. What each one can do:
 | Who tries | What happens |
 |---|---|
 | A page open in the browser that points its own domain to `127.0.0.1` (DNS rebinding) or sends the request from another site | Refused (403). Only a caller that uses the local address (`127.0.0.1`, `localhost`) and is not a web page is served. Nothing goes to the API |
-| Another user of the machine who wants to read your last (masked) conversation | Cannot read it: it only goes out with a proof that only whoever reads your `chave` (the key) can compute. That is what the `llm-dlp ultima` command does |
+| Another user of the machine who wants to read your last (masked) conversation | Cannot read it: it only goes out with a proof that only whoever reads your `chave` (the key) can compute. That is what the `llm-dlp last` command does |
 | Another program that takes the port while llm-dlp is down, to receive the unmasked conversation and the API credential | On every message, Claude Code asks the port whether it is llm-dlp and requires the answer to a fresh challenge, which only whoever reads the key can compute. Without the proof, the message is blocked |
 
 Whoever runs as **your** user reads the key and gets through the three barriers (see "What it
 does not protect", above).
 
 The port is held by the supervisor, not by the proxy: when the proxy goes down or is swapped
-(`llm-dlp atualizar`, `llm-dlp recarregar`), the port stays open and no other program can take
+(`llm-dlp update`, `llm-dlp reload`), the port stays open and no other program can take
 it in between. The window for the last row above is only when the supervisor itself is not
-running (before the first session, or after `llm-dlp parar`).
+running (before the first session, or after `llm-dlp stop`).
 
 When updating from a version up to 0.3.0, the old process still running cannot give that
-proof, and the messages are blocked until you close Claude Code and run `llm-dlp parar`.
+proof, and the messages are blocked until you close Claude Code and run `llm-dlp stop`.
 
 ## Known limits
 
@@ -73,11 +73,11 @@ proof, and the messages are blocked until you close Claude Code and run `llm-dlp
 
 - A person's name that is not known and appears without a field name (running text, or a
   piece of CSV read without the header line).
-- A field whose name is outside the vocabulary, until you add it to `campos_extras`.
+- A field whose name is outside the vocabulary, until you add it to `extra_fields`.
 - **An internal resource name (database, schema, table, system) that only appears in
   sentences**, without ever having gone through a structure llm-dlp recognizes (see
   [What is detected](detection.md#5-internal-resource-names-by-structure)). To always mask a
-  name, use `termos`.
+  name, use `terms`.
 - Sensitive personal data (health, religion, ethnicity) in running text. It is only detected
   in a field with that name.
 - Financial values (balance, income, limit). What ties them to a person (name, CPF, account)
@@ -123,7 +123,7 @@ Behaviors that are choices, not defects:
 | Behavior | Why |
 |---|---|
 | Only internal network IPs are masked | A public IP (of a service on the internet) identifies neither the company nor a person, and masking it would get in the way of network troubleshooting |
-| Public domains are not masked | `github.com`, `pypi.org`, file names (`config.py`) have the format of a domain; masking them makes the answers worse and protects nothing. Only the `dominios_internos` are masked |
+| Public domains are not masked | `github.com`, `pypi.org`, file names (`config.py`) have the format of a domain; masking them makes the answers worse and protects nothing. Only the `internal_domains` are masked |
 | An e-mail needs a domain with a dot | `joao@localhost`, `root@servidor` and `ssh user@host` are not treated as e-mail (they would be false positives in commands). An e-mail spelled out (`joao [at] empresa`) is not recognized either |
 | `WebFetch`, `WebSearch` and claude.ai connectors receive pseudonyms | What leaves the machine cannot carry the real data. Effect: searching the web or a connector for something masked finds nothing |
 | What comes from the web is not remembered | An example password on a page is not your secret. It is masked where it appears, but does not become a secret everywhere |
