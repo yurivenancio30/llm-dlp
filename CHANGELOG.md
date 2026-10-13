@@ -9,7 +9,7 @@ In each version: **Masking** is what started (or stopped) being masked; **Progra
 commands, installation, configuration, performance and documentation; **Code** is what only
 matters to whoever changes the code.
 
-## [Unreleased]
+## [0.8.0] - 2026-10-13
 
 Updating no longer takes llm-dlp offline, and neither does the proxy going down: the supervisor
 now holds the port and only lends it to the proxy. `llm-dlp atualizar` downloads the new

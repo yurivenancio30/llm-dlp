@@ -9,7 +9,7 @@ Em cada versão: **Mascaramento** é o que passou a ser (ou deixou de ser) masca
 **Programa** é comando, instalação, configuração, desempenho e documentação; **Código** é o
 que só interessa a quem mexe no código.
 
-## [Não lançado]
+## [0.8.0] - 2026-10-13
 
 Atualizar não tira mais o llm-dlp do ar, e o proxy cair também não: agora quem segura a porta é
 o supervisor, que só a empresta ao proxy. O `llm-dlp atualizar` baixa a versão nova, confere,
