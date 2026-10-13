@@ -97,6 +97,8 @@ func atualizar(args []string) error {
 	mesmo := vNovo == vAtual && cNovo == cAtual
 	if mesmo && (!noAr || info.Commit == cNovo && info.Versao == vNovo) {
 		fmt.Printf("✓ já está na %s (%s)\n", vNovo, cNovo)
+		home, _ := os.UserHomeDir()
+		ajustarNomes(home, destino, vNovo)
 		return nil
 	}
 	// uma versão anterior aos nomes em inglês ignoraria os campos do config.json com nome novo
@@ -128,22 +130,7 @@ func atualizar(args []string) error {
 	}
 	log := config.Caminho("llm-dlp.log")
 	home, _ := os.UserHomeDir()
-	// os hooks do Claude Code e o config.json passam a usar os nomes que a versão nova conhece
-	ajustarHooks := func() {
-		if mudou, err := hooksParaVersao(home, destino, vNovo); err != nil {
-			fmt.Printf("! não consegui ajustar os hooks do Claude Code (%v); rode: llm-dlp install\n", err)
-		} else if mudou {
-			fmt.Println("✓ hooks do Claude Code com os nomes desta versão (valem nas sessões novas;" +
-				" as já abertas seguem com os de antes, que também funcionam)")
-		}
-		if !anterior {
-			if c, err := config.MigrarArquivo(false); err != nil {
-				fmt.Printf("! o config.json continua com os nomes antigos (%v); eles seguem valendo\n", err)
-			} else if c != "" {
-				fmt.Printf("✓ config.json com os nomes de campo em inglês (o anterior em %s)\n", c)
-			}
-		}
-	}
+	ajustarHooks := func() { ajustarNomes(home, destino, vNovo) }
 	if !noAr {
 		if !claudeLigado(home, cfg) {
 			limparCopias(destino, bak)
@@ -178,6 +165,26 @@ func atualizar(args []string) error {
 	return nil
 }
 
+// ajustarNomes passa os hooks do Claude Code e o config.json para os nomes que a versão v (a
+// do binário bin) conhece. Roda depois de pôr v no ar, e também quando ela já estava no ar: de
+// 0.8.0 para cá com "llm-dlp atualizar", quem rodou foi o código da 0.8.0, que não sabia
+// fazer isso (os nomes antigos seguem valendo; só não tinham sido trocados).
+func ajustarNomes(home, bin, v string) {
+	if mudou, err := hooksParaVersao(home, bin, v); err != nil {
+		fmt.Printf("! não consegui ajustar os hooks do Claude Code (%v); rode: llm-dlp install\n", err)
+	} else if mudou {
+		fmt.Println("✓ hooks do Claude Code com os nomes desta versão (valem nas sessões novas;" +
+			" as já abertas seguem com os de antes, que também funcionam)")
+	}
+	if !versaoMenor(v, primeiraEmIngles) {
+		if c, err := config.MigrarArquivo(false); err != nil {
+			fmt.Printf("! o config.json continua com os nomes antigos (%v); eles seguem valendo\n", err)
+		} else if c != "" {
+			fmt.Printf("✓ config.json com os nomes de campo em inglês (o anterior em %s)\n", c)
+		}
+	}
+}
+
 // recarregar põe no ar de novo o binário instalado, com a configuração como está agora, sem
 // tirar o llm-dlp do ar.
 func recarregar() error {
@@ -185,6 +192,7 @@ func recarregar() error {
 	if err != nil {
 		return fmt.Errorf("config: %w", err)
 	}
+	home, _ := os.UserHomeDir()
 	info, ok := saude(cfg)
 	if info.SemProva {
 		return errSemProva
@@ -194,16 +202,20 @@ func recarregar() error {
 			return errors.New("o llm-dlp no ar não responde na porta da configuração (a porta mudou?): " +
 				"feche o Claude Code, rode llm-dlp stop e depois llm-dlp install")
 		}
+		if v, _, err := versaoDe(binarioInstalado()); err == nil {
+			ajustarNomes(home, binarioInstalado(), v)
+		}
 		fmt.Println("– o llm-dlp não está no ar: ele sobe com a configuração nova quando for usado")
 		return nil
 	}
-	_, commit, err := versaoDe(binarioServico())
+	v, commit, err := versaoDe(binarioServico())
 	if err != nil {
 		return err
 	}
 	if err := trocarServico(cfg, info, commit); err != nil {
 		return fmt.Errorf("%v; o llm-dlp anterior continua no ar. Veja %s", err, config.Caminho("llm-dlp.log"))
 	}
+	ajustarNomes(home, binarioServico(), v)
 	fmt.Println("✓ configuração aplicada; o llm-dlp não saiu do ar")
 	return nil
 }
