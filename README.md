@@ -242,9 +242,10 @@ already installed. Your configuration and your key do not change. How it works:
 [Updating llm-dlp](docs/configuration.md#updating-llm-dlp).
 
 From 0.8.0, which only knows the Portuguese name, run `llm-dlp atualizar` and then
-`llm-dlp update` once: the update of 0.8.0 does not switch `config.json` and the Claude Code
-hooks to the English names (the old ones keep working). The installation command above does
-both at once.
+`llm-dlp reload` once: the update of 0.8.0 does not switch `config.json` and the Claude Code
+hooks to the English names (the old ones keep working), and if llm-dlp came from 0.7.0, its
+supervisor stays on 0.8.0 until then. On 0.9.0 or 0.9.1, the same with `llm-dlp update`. The
+installation command above does all of it at once.
 
 From 0.7.0 or older, which cannot update themselves, run the installation command above
 once, between messages: those versions cannot hand over the port, and an answer that is being

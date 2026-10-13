@@ -9,6 +9,23 @@ In each version: **Masking** is what started (or stopped) being masked; **Progra
 commands, installation, configuration, performance and documentation; **Code** is what only
 matters to whoever changes the code.
 
+## [Unreleased]
+
+When llm-dlp came from 0.7.0, its supervisor had no `supervisor.pid`: the 0.7.0 supervisor
+erased the file as it exited, right after the new one wrote it. Without it, `llm-dlp update`
+did not find the supervisor and swapped only the proxy, cutting an answer in progress (no
+request was refused: the port stayed open), the supervisor stayed on 0.8.0, and `llm-dlp stop`
+said no supervisor was running.
+
+### Program
+
+- When `supervisor.pid` is missing, llm-dlp finds the supervisor by the lock it holds
+  (`/proc/locks`) and writes the file again. `update` and `reload` then make the swap without a
+  pause and put the supervisor on the installed binary, and `stop` stops it. Coming from 0.9.0 or
+  0.9.1: `llm-dlp update`, then `llm-dlp reload` once.
+- The supervisor writes `supervisor.pid` again whenever it re-executes itself after a swap.
+- README and configuration: from 0.8.0, `llm-dlp atualizar` and then `llm-dlp reload`.
+
 ## [0.9.1] - 2026-10-13
 
 Updating from 0.8.0 with `llm-dlp atualizar` left `config.json` and the Claude Code hooks with

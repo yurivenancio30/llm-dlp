@@ -237,9 +237,10 @@ configuração e a sua chave não mudam. Como funciona:
 [Atualizar o llm-dlp](configuracao.md#atualizar-o-llm-dlp).
 
 Da 0.8.0, que só conhece o nome em português, rode `llm-dlp atualizar` e depois
-`llm-dlp update` uma vez: o update da 0.8.0 não passa o `config.json` e os ganchos do Claude
-Code para os nomes em inglês (os antigos continuam funcionando). O comando de instalação de
-cima faz as duas coisas de uma vez.
+`llm-dlp reload` uma vez: o update da 0.8.0 não passa o `config.json` e os ganchos do Claude
+Code para os nomes em inglês (os antigos continuam funcionando), e, se o llm-dlp veio da 0.7.0,
+o supervisor dele fica na 0.8.0 até lá. Na 0.9.0 ou 0.9.1, o mesmo com `llm-dlp update`. O
+comando de instalação de cima faz tudo de uma vez.
 
 Da 0.7.0 ou anterior, que não sabem se atualizar, rode o comando de instalação de cima
 uma vez, entre uma mensagem e outra: essas versões não sabem passar a porta, e uma resposta que

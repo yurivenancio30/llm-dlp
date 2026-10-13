@@ -9,6 +9,23 @@ Em cada versão: **Mascaramento** é o que passou a ser (ou deixou de ser) masca
 **Programa** é comando, instalação, configuração, desempenho e documentação; **Código** é o
 que só interessa a quem mexe no código.
 
+## [Não lançado]
+
+Quando o llm-dlp veio da 0.7.0, o supervisor dele ficava sem `supervisor.pid`: o supervisor da
+0.7.0 apagava o arquivo ao sair, logo depois de o novo gravá-lo. Sem ele, o `llm-dlp update`
+não achava o supervisor e trocava só o proxy, cortando uma resposta em andamento (nenhuma
+requisição foi recusada: a porta ficou aberta), o supervisor ficava na 0.8.0, e o
+`llm-dlp stop` dizia que não havia supervisor rodando.
+
+### Programa
+
+- Sem o `supervisor.pid`, o llm-dlp acha o supervisor pela trava que ele segura
+  (`/proc/locks`) e grava o arquivo de novo. O `update` e o `reload` passam a fazer a troca sem
+  pausa e põem o supervisor no binário instalado, e o `stop` o para. Vindo da 0.9.0 ou 0.9.1:
+  `llm-dlp update` e depois `llm-dlp reload` uma vez.
+- O supervisor grava o `supervisor.pid` de novo sempre que se reexecuta depois de uma troca.
+- README e configuração: da 0.8.0, `llm-dlp atualizar` e depois `llm-dlp reload`.
+
 ## [0.9.1] - 2026-10-13
 
 Atualizar da 0.8.0 com `llm-dlp atualizar` deixava o `config.json` e os ganchos do Claude Code

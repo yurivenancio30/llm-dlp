@@ -234,10 +234,13 @@ O comando de instalação (`curl ... | sh`) faz o mesmo quando o llm-dlp já est
 uma mudança no `config.json`).
 
 **Da 0.8.0**: rode `llm-dlp atualizar` (o nome que essa versão conhece) e depois
-`llm-dlp update` uma vez. Quem faz a atualização é o código da versão instalada, e o da 0.8.0
-não passa o `config.json` e os ganchos para os nomes em inglês; o `llm-dlp update` (ou o
-`reload`) na versão nova faz isso, mesmo quando ela já está no ar. O comando de instalação faz
-as duas coisas de uma vez.
+`llm-dlp reload` uma vez (na 0.9.0 ou 0.9.1: `llm-dlp update` e depois `llm-dlp reload`).
+Quem faz a atualização é o código da versão instalada, e o da 0.8.0 não passa o `config.json`
+e os ganchos para os nomes em inglês; o `reload` (ou o `update`) na versão nova faz isso. E,
+quando o llm-dlp veio da 0.7.0, o supervisor antigo apagou o `supervisor.pid` ao sair: sem esse
+arquivo, as atualizações até a 0.9.1 não achavam o supervisor, cortavam a resposta em andamento
+e deixavam o supervisor na 0.8.0. Da 0.9.2 em diante, o llm-dlp acha o supervisor pela trava
+dele, e o `reload` o põe no binário instalado. O comando de instalação faz tudo de uma vez.
 
 **Da 0.7.0 ou anterior** (sem comando de atualizar): rode o comando de instalação uma vez.
 Nessas versões o próprio proxy segura a porta: o supervisor novo pega a porta no instante em
