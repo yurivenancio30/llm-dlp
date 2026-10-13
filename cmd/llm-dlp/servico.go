@@ -299,15 +299,13 @@ func binarioNovo(commit string, pid int) string {
 }
 
 func parar() error {
-	if _, err := os.Stat(config.Caminho("supervisor.pid")); err != nil {
-		return errors.New("supervisor não está rodando")
-	}
 	// o número do processo pode ter sido reaproveitado pelo sistema: supervisorNoAr confere
-	// que é mesmo o supervisor do llm-dlp antes de mandar o sinal
+	// que é mesmo o supervisor do llm-dlp antes de mandar o sinal (e o acha pela trava, se o
+	// arquivo de pid sumiu)
 	pid := supervisorNoAr()
 	if pid == 0 {
 		os.Remove(config.Caminho("supervisor.pid"))
-		return errors.New("supervisor não está rodando (arquivo de pid antigo removido)")
+		return errors.New("supervisor não está rodando")
 	}
 	if err := syscall.Kill(pid, syscall.SIGTERM); err != nil {
 		return err

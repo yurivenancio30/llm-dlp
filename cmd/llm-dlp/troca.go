@@ -251,6 +251,7 @@ func supervisionar(args []string) error {
 		if drenando > 0 {
 			herdarProxy(drenando) // só para recolher quando sair
 		}
+		os.WriteFile(pidArq, []byte(meu), 0o600) // (o mesmo pid; grava de novo caso tenha sumido)
 		lg.Printf("supervisor: agora no binário instalado (pid %d); proxy %d", os.Getpid(), proxyPid)
 	} else {
 		var err error
@@ -488,22 +489,56 @@ func binarioServico() string {
 }
 
 // supervisorNoAr: o pid do supervisor, se supervisor.pid aponta para um supervisor do llm-dlp
-// vivo (o número pode ter sido reaproveitado pelo sistema); 0 se não.
+// vivo (o número pode ter sido reaproveitado pelo sistema); 0 se não. Sem o arquivo, procura
+// quem segura a trava do supervisor e grava o arquivo de novo: na passagem da 0.7.0 para a
+// 0.8.0, o supervisor antigo apagava ao sair o arquivo que o novo tinha acabado de gravar, e
+// sem ele o update não achava o supervisor (trocava o proxy cortando a resposta em andamento,
+// e o supervisor nunca era atualizado) e o stop dizia que não havia supervisor.
 func supervisorNoAr() int {
-	b, err := os.ReadFile(config.Caminho("supervisor.pid"))
+	pidArq := config.Caminho("supervisor.pid")
+	b, _ := os.ReadFile(pidArq)
+	if pid, _ := strconv.Atoi(strings.TrimSpace(string(b))); pid > 0 && ehSupervisor(pid) {
+		return pid
+	}
+	if pid := donoDaTrava(config.Caminho("supervisor.lock")); pid > 0 && ehSupervisor(pid) {
+		os.WriteFile(pidArq, []byte(strconv.Itoa(pid)), 0o600)
+		return pid
+	}
+	return 0
+}
+
+// ehSupervisor: pid é um supervisor do llm-dlp ("supervisionar", o que o llm-dlp sobe: ver
+// iniciarProxy; ou "supervise").
+func ehSupervisor(pid int) bool {
+	cmdline := linhaDeComando(pid)
+	return strings.Contains(cmdline, "supervis") && strings.Contains(cmdline, "llm-dlp")
+}
+
+// donoDaTrava: o processo que segura o flock do arquivo trava, por /proc/locks (só no Linux;
+// 0 se ninguém segura ou se não dá para saber).
+func donoDaTrava(trava string) int {
+	st, err := os.Stat(trava)
 	if err != nil {
 		return 0
 	}
-	pid, _ := strconv.Atoi(strings.TrimSpace(string(b)))
-	if pid <= 0 {
+	ino := st.Sys().(*syscall.Stat_t).Ino
+	b, err := os.ReadFile("/proc/locks")
+	if err != nil {
 		return 0
 	}
-	cmdline := linhaDeComando(pid)
-	// "supervisionar" (o que o llm-dlp sobe: ver iniciarProxy) ou "supervise"
-	if !strings.Contains(cmdline, "supervis") || !strings.Contains(cmdline, "llm-dlp") {
-		return 0
+	// "231: FLOCK  ADVISORY  WRITE 57709 08:30:1297200 0 EOF"; quem espera a trava aparece
+	// numa linha com "->"
+	for _, l := range strings.Split(string(b), "\n") {
+		c := strings.Fields(l)
+		if len(c) < 6 || c[1] != "FLOCK" {
+			continue
+		}
+		if dev := strings.Split(c[5], ":"); len(dev) == 3 && dev[2] == strconv.FormatUint(ino, 10) {
+			pid, _ := strconv.Atoi(c[4])
+			return pid
+		}
 	}
-	return pid
+	return 0
 }
 
 // esperarSair espera o processo pid terminar (até prazo).

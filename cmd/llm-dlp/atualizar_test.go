@@ -503,3 +503,47 @@ func TestBaixarReleaseConfereChecksum(t *testing.T) {
 		t.Errorf("versão pedida inválida aceita")
 	}
 }
+
+// Sem o supervisor.pid (na passagem da 0.7.0 para a 0.8.0, o supervisor antigo o apagava ao
+// sair): reload e stop acham o supervisor pela trava. O reload faz a troca sem pausa, com o
+// supervisor passando para o binário instalado, e o arquivo volta.
+func TestSupervisorSemArquivoDePid(t *testing.T) {
+	a, b := compilados(t)
+	e := novoAmbiente(t)
+	e.instalar(a)
+	if out, err := e.rodar(e.destino, "ensure"); err != nil {
+		t.Fatalf("ensure: %v\n%s", err, out)
+	}
+	antigo := e.esperarCommit("aaaaaaa")
+	sup := e.supervisor()
+	pidArq := filepath.Join(e.home, ".config", "llm-dlp", "supervisor.pid")
+	if sup <= 0 || os.Remove(pidArq) != nil {
+		t.Fatalf("supervisor.pid: %d", sup)
+	}
+
+	e.instalar(b)
+	c := e.carga(4)
+	time.Sleep(200 * time.Millisecond)
+	if out, err := e.rodar(e.destino, "reload"); err != nil {
+		t.Fatalf("reload: %v\n%s", err, out)
+	}
+	time.Sleep(300 * time.Millisecond)
+	c.parar(t, "durante o reload")
+	if r, _ := e.saude(); r.Commit != "bbbbbbb" || r.PID == antigo.PID {
+		t.Errorf("depois do reload responde %+v; esperado o bbbbbbb num processo novo", r)
+	}
+	if !strings.Contains(e.log(), fmt.Sprintf("agora no binário instalado (pid %d)", sup)) {
+		t.Errorf("o supervisor %d não fez a troca (SIGHUP) nem se reexecutou\nlog:\n%s", sup, e.log())
+	}
+	if p := e.supervisor(); p != sup {
+		t.Errorf("supervisor.pid = %d; esperado %d de volta", p, sup)
+	}
+
+	os.Remove(pidArq)
+	if out, err := e.rodar(e.destino, "stop"); err != nil {
+		t.Fatalf("stop sem o supervisor.pid: %v\n%s", err, out)
+	}
+	if !saiu(sup, 5*time.Second) {
+		t.Errorf("o supervisor (pid %d) não saiu com o stop", sup)
+	}
+}
