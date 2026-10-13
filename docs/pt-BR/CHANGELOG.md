@@ -9,7 +9,7 @@ Em cada versão: **Mascaramento** é o que passou a ser (ou deixou de ser) masca
 **Programa** é comando, instalação, configuração, desempenho e documentação; **Código** é o
 que só interessa a quem mexe no código.
 
-## [Não lançado]
+## [0.9.2] - 2026-10-13
 
 Quando o llm-dlp veio da 0.7.0, o supervisor dele ficava sem `supervisor.pid`: o supervisor da
 0.7.0 apagava o arquivo ao sair, logo depois de o novo gravá-lo. Sem ele, o `llm-dlp update`

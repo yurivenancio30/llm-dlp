@@ -9,7 +9,7 @@ In each version: **Masking** is what started (or stopped) being masked; **Progra
 commands, installation, configuration, performance and documentation; **Code** is what only
 matters to whoever changes the code.
 
-## [Unreleased]
+## [0.9.2] - 2026-10-13
 
 When llm-dlp came from 0.7.0, its supervisor had no `supervisor.pid`: the 0.7.0 supervisor
 erased the file as it exited, right after the new one wrote it. Without it, `llm-dlp update`
