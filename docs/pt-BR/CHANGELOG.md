@@ -9,7 +9,7 @@ Em cada versão: **Mascaramento** é o que passou a ser (ou deixou de ser) masca
 **Programa** é comando, instalação, configuração, desempenho e documentação; **Código** é o
 que só interessa a quem mexe no código.
 
-## [Não lançado]
+## [0.9.0] - 2026-10-13
 
 Os comandos, as opções deles e os campos da configuração agora são em inglês (`llm-dlp update`,
 `llm-dlp stop`, `internal_domains`...). Os nomes em português continuam funcionando, então não

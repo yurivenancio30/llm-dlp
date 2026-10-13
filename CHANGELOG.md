@@ -9,7 +9,7 @@ In each version: **Masking** is what started (or stopped) being masked; **Progra
 commands, installation, configuration, performance and documentation; **Code** is what only
 matters to whoever changes the code.
 
-## [Unreleased]
+## [0.9.0] - 2026-10-13
 
 Commands, their options and the configuration fields are now in English (`llm-dlp update`,
 `llm-dlp stop`, `internal_domains`...). The Portuguese names keep working, so nothing has to be
