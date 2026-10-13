@@ -9,6 +9,21 @@ Em cada versão: **Mascaramento** é o que passou a ser (ou deixou de ser) masca
 **Programa** é comando, instalação, configuração, desempenho e documentação; **Código** é o
 que só interessa a quem mexe no código.
 
+## [Não lançado]
+
+Atualizar da 0.8.0 com `llm-dlp atualizar` deixava o `config.json` e os ganchos do Claude Code
+com os nomes em português: quem faz a atualização é o código da versão instalada, e a 0.8.0 não
+conhece os nomes em inglês. Os nomes antigos continuam funcionando, então nada parou; agora o
+`llm-dlp update` e o `llm-dlp reload` fazem a troca mesmo quando a versão já está no ar.
+
+### Programa
+
+- `llm-dlp update`, quando a versão mais nova já está no ar, e `llm-dlp reload` passam o
+  `config.json` (guardando `config.json.bak-DATA`) e os ganchos para os nomes da versão
+  instalada. Vindo da 0.8.0: `llm-dlp atualizar` e depois `llm-dlp update` uma vez.
+- README e configuração: como atualizar a partir da 0.8.0, e a 0.7.0 deixa de ser descrita como
+  a última versão sem comando de atualizar.
+
 ## [0.9.0] - 2026-10-13
 
 Os comandos, as opções deles e os campos da configuração agora são em inglês (`llm-dlp update`,

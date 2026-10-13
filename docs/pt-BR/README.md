@@ -236,7 +236,12 @@ comando de instalação de cima faz o mesmo quando o llm-dlp já está instalado
 configuração e a sua chave não mudam. Como funciona:
 [Atualizar o llm-dlp](configuracao.md#atualizar-o-llm-dlp).
 
-Da 0.7.0 ou anterior, que não têm o `llm-dlp update`, rode o comando de instalação de cima
+Da 0.8.0, que só conhece o nome em português, rode `llm-dlp atualizar` e depois
+`llm-dlp update` uma vez: o update da 0.8.0 não passa o `config.json` e os ganchos do Claude
+Code para os nomes em inglês (os antigos continuam funcionando). O comando de instalação de
+cima faz as duas coisas de uma vez.
+
+Da 0.7.0 ou anterior, que não sabem se atualizar, rode o comando de instalação de cima
 uma vez, entre uma mensagem e outra: essas versões não sabem passar a porta, e uma resposta que
 estiver sendo escrita é cortada (o Claude Code repete). Daí em diante, atualizar não corta nada.
 

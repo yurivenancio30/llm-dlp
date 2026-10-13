@@ -233,7 +233,13 @@ O comando de instalação (`curl ... | sh`) faz o mesmo quando o llm-dlp já est
 `llm-dlp reload`, que faz os passos 3 a 5 com o binário instalado (é também o que aplica
 uma mudança no `config.json`).
 
-**Da 0.7.0 ou anterior** (sem `llm-dlp update`): rode o comando de instalação uma vez.
+**Da 0.8.0**: rode `llm-dlp atualizar` (o nome que essa versão conhece) e depois
+`llm-dlp update` uma vez. Quem faz a atualização é o código da versão instalada, e o da 0.8.0
+não passa o `config.json` e os ganchos para os nomes em inglês; o `llm-dlp update` (ou o
+`reload`) na versão nova faz isso, mesmo quando ela já está no ar. O comando de instalação faz
+as duas coisas de uma vez.
+
+**Da 0.7.0 ou anterior** (sem comando de atualizar): rode o comando de instalação uma vez.
 Nessas versões o próprio proxy segura a porta: o supervisor novo pega a porta no instante em
 que o antigo sai (alguns milissegundos), mas uma resposta que estava sendo escrita é cortada
 (o Claude Code repete). Faça entre uma mensagem e outra.

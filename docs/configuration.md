@@ -236,7 +236,13 @@ The installation command (`curl ... | sh`) does the same when llm-dlp is already
 `llm-dlp reload`, which does steps 3 to 5 with the installed binary (it is also what
 applies a change in `config.json`).
 
-**From 0.7.0 or older** (no `llm-dlp update`): run the installation command once. In those
+**From 0.8.0**: run `llm-dlp atualizar` (the name that version knows) and then `llm-dlp update`
+once. The update is done by the code of the version installed, and the one of 0.8.0 does not
+switch `config.json` and the hooks to the English names; `llm-dlp update` (or `reload`) on the
+new version does it, even when it is already running. The installation command does both at
+once.
+
+**From 0.7.0 or older** (no update command): run the installation command once. In those
 versions the proxy holds the port itself: the new supervisor takes the port the moment the old
 one exits (a few milliseconds), but an answer that was being written is cut (Claude Code
 repeats it). Do it between messages.

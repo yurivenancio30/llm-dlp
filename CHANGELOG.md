@@ -9,6 +9,21 @@ In each version: **Masking** is what started (or stopped) being masked; **Progra
 commands, installation, configuration, performance and documentation; **Code** is what only
 matters to whoever changes the code.
 
+## [Unreleased]
+
+Updating from 0.8.0 with `llm-dlp atualizar` left `config.json` and the Claude Code hooks with
+the Portuguese names: the update is done by the code of the version installed, and 0.8.0 does
+not know about the English names. The old names keep working, so nothing stopped; now
+`llm-dlp update` and `llm-dlp reload` switch them even when the version is already running.
+
+### Program
+
+- `llm-dlp update`, when the latest version is already running, and `llm-dlp reload` switch
+  `config.json` (keeping `config.json.bak-DATE`) and the hooks to the names of the installed
+  version. Coming from 0.8.0: `llm-dlp atualizar`, then `llm-dlp update` once.
+- README and configuration: how to update from 0.8.0, and 0.7.0 is no longer described as the
+  last version without an update command.
+
 ## [0.9.0] - 2026-10-13
 
 Commands, their options and the configuration fields are now in English (`llm-dlp update`,

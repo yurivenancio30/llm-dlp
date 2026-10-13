@@ -241,7 +241,12 @@ the previous one by itself. The installation command above does the same when ll
 already installed. Your configuration and your key do not change. How it works:
 [Updating llm-dlp](docs/configuration.md#updating-llm-dlp).
 
-From 0.7.0 or older, which do not have `llm-dlp update`, run the installation command above
+From 0.8.0, which only knows the Portuguese name, run `llm-dlp atualizar` and then
+`llm-dlp update` once: the update of 0.8.0 does not switch `config.json` and the Claude Code
+hooks to the English names (the old ones keep working). The installation command above does
+both at once.
+
+From 0.7.0 or older, which cannot update themselves, run the installation command above
 once, between messages: those versions cannot hand over the port, and an answer that is being
 written is cut (Claude Code repeats it). From then on, updates cut nothing.
 
