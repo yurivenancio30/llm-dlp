@@ -17,6 +17,7 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/config"
 	"github.com/yurivenancio30/llm-dlp/internal/mask"
 	"github.com/yurivenancio30/llm-dlp/internal/ocr"
+	"github.com/yurivenancio30/llm-dlp/internal/versao"
 )
 
 // Comandos instalar, desinstalar e a trava (managed-settings).
@@ -181,6 +182,13 @@ Em dois passos (OCR e trava) ele usa sudo: a sua senha será pedida nessa hora.`
 			fmt.Println("      ! há outro llm-dlp no ar (de antes desta instalação): feche o Claude Code e rode \"llm-dlp parar\" para este assumir")
 		} else if err != nil {
 			return err
+		} else if info, _ := saude(cfg); info.Commit != versao.Commit || info.Versao != versao.Versao {
+			// uma versão anterior no ar: troca por esta sem tirar o llm-dlp do ar
+			if err := trocarServico(cfg, info, versao.Commit); err != nil {
+				fmt.Printf("      ! a versão anterior (%s) continua no ar: %v. Tente: llm-dlp atualizar\n", info.Versao, err)
+			} else {
+				fmt.Printf("      ✓ llm-dlp no ar (a %s no lugar da %s, sem sair do ar)\n", versao.Versao, info.Versao)
+			}
 		} else {
 			fmt.Println("      ✓ llm-dlp no ar")
 		}
@@ -221,7 +229,7 @@ Em dois passos (OCR e trava) ele usa sudo: a sua senha será pedida nessa hora.`
 	case saudavel(cfg):
 		fmt.Println("  ✓ llm-dlp no ar")
 	case comClaude:
-		ok(false, "", "llm-dlp fora do ar, ou de uma versão anterior: feche o Claude Code e rode llm-dlp parar")
+		ok(false, "", "llm-dlp fora do ar: veja "+config.Caminho("llm-dlp.log"))
 	default:
 		nada("llm-dlp ainda não está no ar: com outro cliente, ele sobe com llm-dlp garantir (o README mostra como deixar isso automático)")
 	}

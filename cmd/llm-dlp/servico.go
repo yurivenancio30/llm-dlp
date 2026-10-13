@@ -7,12 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
-	"os/signal"
 	"strconv"
 	"strings"
 	"syscall"
@@ -27,16 +25,17 @@ import (
 
 // Comandos do serviço: servir, supervisionar, garantir, verificar, status, parar.
 
-func servir() error {
+// servir: o proxy. Sob o supervisor, atende na porta que ele abriu e emprestou (ver troca.go).
+func servir(args []string) error {
 	if ate, ok := emergenciaAtiva(); ok {
 		return servirEmergencia(ate)
 	}
-	cfg, chave, _, vistos, m, err := carregarTudo()
+	cfg, chave, pessoas, vistos, m, err := carregarTudo()
 	if err != nil {
 		return err
 	}
 	lg := abrirLog()
-	ln, err := net.Listen("tcp", endereco(cfg))
+	ln, emprestada, err := portaDoServico(endereco(cfg))
 	if err != nil {
 		return err
 	}
@@ -48,66 +47,12 @@ func servir() error {
 		lg.Printf("AVISO enviados.log: %v (o histórico pode ser regravado no cache uma vez)", err)
 	}
 	go vigiarEmergencia(false) // se o administrador ligar a emergência, sai e o supervisor troca de modo
-	srv := &http.Server{Handler: proxy.Novo(cfg, m, vistos, lg).ComChave(chave), ReadHeaderTimeout: 30 * time.Second}
-	return srv.Serve(ln)
-}
-
-// supervisionar mantém o proxy no ar: se ele cair, sobe de novo (espera 1s, 2s, 4s... até 10s).
-func supervisionar() error {
-	lock, err := os.OpenFile(config.Caminho("supervisor.lock"), os.O_CREATE|os.O_RDWR, 0o600)
-	if err != nil {
-		return err
-	}
-	if err := syscall.Flock(int(lock.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
-		return nil // já existe um supervisor
-	}
-	os.WriteFile(config.Caminho("supervisor.pid"), []byte(strconv.Itoa(os.Getpid())), 0o600)
-	lg := abrirLog()
-	eu, _ := os.Executable()
-	sinais := make(chan os.Signal, 1)
-	signal.Notify(sinais, syscall.SIGTERM, syscall.SIGINT)
-	espera := time.Second
-	for {
-		filho := exec.Command(eu, "servir")
-		filho.Stdout, filho.Stderr = lg.Writer(), lg.Writer()
-		if err := filho.Start(); err != nil {
-			lg.Printf("supervisor: não consegui iniciar: %v", err)
-		} else {
-			lg.Printf("supervisor: proxy iniciado (pid %d)", filho.Process.Pid)
-			fim := make(chan error, 1)
-			ini := time.Now()
-			go func() { fim <- filho.Wait() }()
-			select {
-			case s := <-sinais:
-				filho.Process.Signal(syscall.SIGTERM)
-				<-fim
-				lg.Printf("supervisor: encerrado (%v)", s)
-				os.Remove(config.Caminho("supervisor.pid"))
-				return nil
-			case err := <-fim:
-				if err == nil {
-					// saída intencional (troca de modo normal <-> emergência): volta na hora,
-					// sem a espera crescente de quando ele cai
-					lg.Printf("supervisor: troca de modo; reiniciando já")
-					espera = time.Second
-					continue
-				}
-				lg.Printf("supervisor: proxy caiu (%v); reiniciando em %s", err, espera)
-				if time.Since(ini) > time.Minute {
-					espera = time.Second
-				}
-			}
-		}
-		select {
-		case <-time.After(espera):
-		case <-sinais:
-			os.Remove(config.Caminho("supervisor.pid"))
-			return nil
-		}
-		if espera < 10*time.Second {
-			espera *= 2
-		}
-	}
+	px := proxy.Novo(cfg, m, vistos, lg).ComChave(chave).ComTroca(emprestada)
+	srv := &http.Server{Handler: px, ReadHeaderTimeout: 30 * time.Second}
+	return servirAteSinal(srv, ln, lg, func() {
+		vistos.SalvarAgora()
+		pessoas.SalvarAgora()
+	})
 }
 
 type infoSaude struct {
@@ -116,6 +61,12 @@ type infoSaude struct {
 	Modo    string `json:"modo"`
 	Ate     string `json:"ate"`
 	Prova   string `json:"prova"`
+	Versao  string `json:"versao"`
+	Commit  string `json:"commit"`
+	PID     int    `json:"pid"`
+	// Troca: o proxy está num supervisor que segura a porta e o troca com SIGHUP (troca.go);
+	// versões anteriores não dizem
+	Troca bool `json:"troca"`
 	// SemProva: algo responde na porta dizendo ser o llm-dlp, mas não provou
 	SemProva bool `json:"-"`
 }
@@ -132,7 +83,9 @@ func saude(cfg config.Config) (infoSaude, bool) {
 		return s, false
 	}
 	desafio := hex.EncodeToString(b)
-	c := http.Client{Timeout: 700 * time.Millisecond}
+	// conexão nova a cada pergunta: na troca de versão, reaproveitar a conexão perguntaria
+	// sempre ao mesmo proxy (o antigo), e o novo nunca seria visto
+	c := http.Client{Timeout: 700 * time.Millisecond, Transport: &http.Transport{DisableKeepAlives: true}}
 	r, err := c.Get("http://" + endereco(cfg) + "/__llm-dlp/saude?desafio=" + desafio)
 	if err != nil {
 		return s, false
@@ -181,8 +134,7 @@ func garantir() error {
 	if info.SemProva {
 		return errSemProva // subir outro não adianta: a porta está ocupada
 	}
-	eu, _ := os.Executable()
-	sup := exec.Command(eu, "supervisionar")
+	sup := exec.Command(binarioServico(), "supervisionar")
 	sup.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	devnull, _ := os.Open(os.DevNull)
 	sup.Stdin, sup.Stdout, sup.Stderr = devnull, devnull, devnull
@@ -315,7 +267,7 @@ func status() error {
 	}
 	json.Unmarshal(b, &info)
 	if aviso := binarioNovo(info.Commit, info.PID); aviso != "" {
-		fmt.Println("⚠️  " + aviso + ": rode llm-dlp parar com o Claude Code fechado para aplicar (ele volta sozinho na próxima mensagem)")
+		fmt.Println("⚠️  " + aviso + ": rode llm-dlp atualizar para trocar o que está no ar (sem fechar o Claude Code)")
 	}
 	if _, ok := saude(cfg); !ok {
 		fmt.Println("⚠️  " + errSemProva.Error())
@@ -347,15 +299,13 @@ func binarioNovo(commit string, pid int) string {
 }
 
 func parar() error {
-	b, err := os.ReadFile(config.Caminho("supervisor.pid"))
-	if err != nil {
+	if _, err := os.Stat(config.Caminho("supervisor.pid")); err != nil {
 		return errors.New("supervisor não está rodando")
 	}
-	pid, _ := strconv.Atoi(strings.TrimSpace(string(b)))
-	// o número do processo pode ter sido reaproveitado pelo sistema: confere que é mesmo
-	// o supervisor do llm-dlp antes de mandar o sinal
-	cmdline := linhaDeComando(pid)
-	if !strings.Contains(cmdline, "supervisionar") || !strings.Contains(cmdline, "llm-dlp") {
+	// o número do processo pode ter sido reaproveitado pelo sistema: supervisorNoAr confere
+	// que é mesmo o supervisor do llm-dlp antes de mandar o sinal
+	pid := supervisorNoAr()
+	if pid == 0 {
 		os.Remove(config.Caminho("supervisor.pid"))
 		return errors.New("supervisor não está rodando (arquivo de pid antigo removido)")
 	}
@@ -363,13 +313,10 @@ func parar() error {
 		return err
 	}
 	// espera ele sair (e soltar a trava), para um "garantir" logo em seguida não colidir
-	for i := 0; i < 50; i++ {
-		if syscall.Kill(pid, 0) != nil {
-			return nil
-		}
-		time.Sleep(100 * time.Millisecond)
+	if !esperarSair(pid, 5*time.Second) {
+		return errors.New("o supervisor não encerrou em 5s")
 	}
-	return errors.New("o supervisor não encerrou em 5s")
+	return nil
 }
 
 // linhaDeComando do processo: /proc no Linux; ps no macOS (que não tem /proc).

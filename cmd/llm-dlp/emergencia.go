@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -118,6 +117,10 @@ func servirEmergencia(ate time.Time) error {
 	if err != nil {
 		cfg = config.Padrao() // a config pode ser justamente o que quebrou
 	}
+	ln, emprestada, err := portaDoServico(endereco(cfg))
+	if err != nil {
+		return err
+	}
 	alvo, err := url.Parse(cfg.Upstream)
 	if err != nil {
 		alvo, _ = url.Parse(config.Padrao().Upstream)
@@ -134,17 +137,14 @@ func servirEmergencia(ate time.Time) error {
 	mux.HandleFunc("/__llm-dlp/saude", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("content-type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{"ok": true, "servico": "llm-dlp", "modo": "emergencia",
-			"ate": ate.Format(time.RFC3339), "versao": proxy.Versao, "commit": versao.Commit, "pid": os.Getpid()})
+			"ate": ate.Format(time.RFC3339), "versao": proxy.Versao, "commit": versao.Commit, "pid": os.Getpid(),
+			"troca": emprestada})
 	})
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		lg.Printf("EMERGÊNCIA (sem máscara): %s %s", r.Method, proxy.Limpo(r.URL.Path))
 		rp.ServeHTTP(w, r)
 	})
-	ln, err := net.Listen("tcp", endereco(cfg))
-	if err != nil {
-		return err
-	}
 	lg.Printf("EMERGÊNCIA: repasse sem máscara no ar até %s", ate.Local().Format("15:04"))
 	go vigiarEmergencia(true)
-	return (&http.Server{Handler: proxy.SoLocal(mux), ReadHeaderTimeout: 30 * time.Second}).Serve(ln)
+	return servirAteSinal(&http.Server{Handler: proxy.SoLocal(mux), ReadHeaderTimeout: 30 * time.Second}, ln, lg, nil)
 }

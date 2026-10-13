@@ -17,10 +17,12 @@ test:
 	$(GO) vet ./...
 	$(GO) test -count=1 ./...
 
-# instala o binário em ~/.local/bin (não mexe no Claude Code; para isso: llm-dlp instalar-claude)
+# instala o binário em ~/.local/bin e, se o llm-dlp estiver no ar, põe o novo no lugar sem
+# tirá-lo do ar (não mexe no Claude Code; para isso: llm-dlp instalar)
 instalar: build
 	install -D -m 0755 $(BIN) $(HOME)/.local/bin/llm-dlp
 	@echo "instalado em ~/.local/bin/llm-dlp"
+	@$(HOME)/.local/bin/llm-dlp recarregar
 
 versao:
 	@echo $(VERSAO) "($(COMMIT))"

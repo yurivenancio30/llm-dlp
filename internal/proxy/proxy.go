@@ -34,6 +34,7 @@ type Proxy struct {
 	vistos  *mask.Vistos
 	cliente *http.Client
 	chave   []byte // para as provas da porta local (ComChave)
+	troca   bool   // a porta é de um supervisor que troca o proxy sem fechá-la (ComTroca)
 	log     *log.Logger
 	inicio  time.Time
 	reqs    atomic.Int64
@@ -98,6 +99,13 @@ func (p *Proxy) ComChave(chave []byte) *Proxy {
 	return p
 }
 
+// ComTroca: a saúde diz que este proxy está num supervisor que segura a porta e o troca sem
+// fechá-la (cmd/llm-dlp/troca.go); é o que o atualizar pergunta antes de pedir a troca.
+func (p *Proxy) ComTroca(troca bool) *Proxy {
+	p.troca = troca
+	return p
+}
+
 func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if !Local(r) {
 		p.log.Printf("RECUSADO %s %s: não veio de um programa local (Host %q, Origin %q)", r.Method, limpo(r.URL.Path),
@@ -108,7 +116,8 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/__llm-dlp/saude" {
 		w.Header().Set("content-type", "application/json")
 		info := map[string]any{"ok": true, "servico": "llm-dlp", "versao": Versao, "commit": versao.Commit, "pid": os.Getpid(),
-			"requisicoes": p.reqs.Load(), "no_ar_desde": p.inicio.Format(time.RFC3339)}
+			"requisicoes": p.reqs.Load(), "no_ar_desde": p.inicio.Format(time.RFC3339),
+			"troca": p.troca}
 		if d := r.URL.Query().Get("desafio"); len(p.chave) > 0 && desafioValido(d) {
 			info["prova"] = Prova(p.chave, "saude\x00"+d)
 		}

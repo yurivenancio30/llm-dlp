@@ -23,13 +23,15 @@ Instalar e atualizar
   llm-dlp desinstalar           desfaz a configuração do Claude Code
   sudo llm-dlp desinstalar-trava
                                 tira a trava
-  Para atualizar: rode o install.sh de novo (o comando está no README), feche o Claude Code
-  e rode "llm-dlp parar".
+  llm-dlp atualizar [--versao X.Y.Z] [--arquivo ARQ.tar.gz]
+                                baixa a versão nova (ou a pedida), confere e troca a que está no ar
+                                sem tirá-lo do ar: não precisa fechar o Claude Code
 
 Dia a dia (normalmente você não precisa de nada disto)
   llm-dlp status                mostra se está no ar, em qual versão, e o que falta (OCR, binário novo)
+  llm-dlp recarregar            aplica uma mudança na configuração, sem tirar o llm-dlp do ar
   llm-dlp parar                 para o llm-dlp, com o Claude Code fechado; ele volta sozinho na próxima
-                                mensagem, já com o programa e a configuração novos
+                                mensagem
   llm-dlp importar-pessoas ARQ.csv --grupo COD:NOME:EMAIL [--separador-nome /]
                                 ensina nomes e e-mails de pessoas (guardados só como hash)
   sudo llm-dlp emergencia [30m|sair]
@@ -47,7 +49,7 @@ Outros
   llm-dlp versao                mostra a versão e o commit (também: --version)
   llm-dlp ajuda                 mostra esta ajuda (também: --help, -h)
 
-Configuração: %s (depois de mudar: llm-dlp parar)
+Configuração: %s (depois de mudar: llm-dlp recarregar)
 Log:          %s
 Documentação: https://github.com/yurivenancio30/llm-dlp
 
@@ -70,9 +72,13 @@ func main() {
 	case "ajuda", "help", "--help", "-h":
 		fmt.Print(textoAjuda())
 	case "servir":
-		err = servir()
+		err = servir(args)
 	case "supervisionar":
-		err = supervisionar()
+		err = supervisionar(args)
+	case "atualizar":
+		err = atualizar(args)
+	case "recarregar":
+		err = recarregar()
 	case "garantir":
 		err = garantir()
 	case "status":

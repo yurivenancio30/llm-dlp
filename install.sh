@@ -3,7 +3,9 @@
 #
 # Downloads the release binary for this machine, checks its SHA-256 against the checksums
 # published with the release and runs "llm-dlp instalar" (the 5-step setup, which asks before
-# changing anything).
+# changing anything). If llm-dlp is already installed in ~/.local/bin, it runs
+# "llm-dlp atualizar" instead: it swaps the binary and the proxy that is running without taking
+# llm-dlp offline (no setup questions, no need to close Claude Code).
 #
 #   curl -fsSL https://raw.githubusercontent.com/yurivenancio30/llm-dlp/main/install.sh | sh
 #
@@ -107,6 +109,14 @@ echo "Checksum OK."
 
 tar -xzf "$TMP/$ARCHIVE" -C "$TMP" llm-dlp
 chmod 0755 "$TMP/llm-dlp"
+
+# Already installed: update in place (versions without "atualizar" fall back to the setup).
+if [ -z "$NO_SETUP" ] && [ -x "$HOME/.local/bin/llm-dlp" ] &&
+	"$TMP/llm-dlp" ajuda 2>/dev/null | grep -q "llm-dlp atualizar"; then
+	echo
+	"$TMP/llm-dlp" atualizar --arquivo "$TMP/$ARCHIVE"
+	exit $?
+fi
 
 # The setup asks questions, and with "curl | sh" the standard input is the script itself:
 # answer from the terminal. Without a terminal (CI, a provisioning script), only place the
