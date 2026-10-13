@@ -9,7 +9,7 @@ Em cada versão: **Mascaramento** é o que passou a ser (ou deixou de ser) masca
 **Programa** é comando, instalação, configuração, desempenho e documentação; **Código** é o
 que só interessa a quem mexe no código.
 
-## [Não lançado]
+## [0.9.1] - 2026-10-13
 
 Atualizar da 0.8.0 com `llm-dlp atualizar` deixava o `config.json` e os ganchos do Claude Code
 com os nomes em português: quem faz a atualização é o código da versão instalada, e a 0.8.0 não

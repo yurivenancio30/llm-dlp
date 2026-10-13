@@ -9,7 +9,7 @@ In each version: **Masking** is what started (or stopped) being masked; **Progra
 commands, installation, configuration, performance and documentation; **Code** is what only
 matters to whoever changes the code.
 
-## [Unreleased]
+## [0.9.1] - 2026-10-13
 
 Updating from 0.8.0 with `llm-dlp atualizar` left `config.json` and the Claude Code hooks with
 the Portuguese names: the update is done by the code of the version installed, and 0.8.0 does
