@@ -27,6 +27,40 @@ type Vistos struct {
 	semTam   bool
 	salvo    time.Time
 	agendado bool
+	// disco: o arquivo como este processo o deixou (leu ou gravou). Se mudou, outro processo
+	// gravou (a versão nova durante a troca, ver atualizar; um comando): o que ele aprendeu é
+	// juntado antes de gravar, e uma gravação não apaga a outra.
+	disco impressaoArquivo
+}
+
+type impressaoArquivo struct {
+	mod time.Time
+	tam int64
+}
+
+func impressaoDe(path string) impressaoArquivo {
+	st, err := os.Stat(path)
+	if err != nil {
+		return impressaoArquivo{}
+	}
+	return impressaoArquivo{st.ModTime(), st.Size()}
+}
+
+// gravarTrocando grava b num arquivo temporário deste processo e troca pelo arquivo (dois
+// processos gravando ao mesmo tempo não misturam um temporário com o outro). Devolve a
+// impressão do que gravou (a troca de nome não muda data nem tamanho).
+func gravarTrocando(path string, b []byte) (impressaoArquivo, error) {
+	tmp := path + ".tmp-" + strconv.Itoa(os.Getpid())
+	if err := os.WriteFile(tmp, b, 0o600); err != nil {
+		os.Remove(tmp)
+		return impressaoArquivo{}, err
+	}
+	imp := impressaoDe(tmp)
+	if err := os.Rename(tmp, path); err != nil {
+		os.Remove(tmp)
+		return impressaoArquivo{}, err
+	}
+	return imp, nil
 }
 
 // prefTam: os tamanhos vão no mesmo arquivo, como chaves "tam:13"
@@ -58,22 +92,51 @@ func CarregarVistos(path string) (*Vistos, error) {
 	if err != nil {
 		return nil, err
 	}
+	v.disco = impressaoDe(path)
 	if json.Unmarshal(b, &v.ids) != nil {
 		v.ids = map[string]string{} // formato antigo (lista): recomeça; os valores são reaprendidos
 	}
 	for id, t := range v.ids {
-		if n, err := strconv.Atoi(strings.TrimPrefix(id, prefTam)); err == nil && strings.HasPrefix(id, prefTam) {
-			v.tam[n] = true
-			continue
-		}
-		v.n[tipoBase(t)]++
-		if strings.HasPrefix(t, "obj.") {
-			v.nObj++
-		}
+		v.contar(id, t)
 	}
 	// arquivo de antes de os tamanhos serem guardados: sem o filtro (testa todos os pedaços)
 	v.semTam = v.n["segredo"] > 0 && len(v.tam) == 0
 	return v, nil
+}
+
+// contar põe nos contadores e no filtro de tamanhos uma entrada que já está em v.ids.
+func (v *Vistos) contar(id, t string) {
+	if n, err := strconv.Atoi(strings.TrimPrefix(id, prefTam)); err == nil && strings.HasPrefix(id, prefTam) {
+		v.tam[n] = true
+		return
+	}
+	v.n[tipoBase(t)]++
+	if strings.HasPrefix(t, "obj.") {
+		v.nObj++
+	}
+}
+
+// juntarDoDisco (com v.mu travado): se outro processo gravou o arquivo depois deste, traz o
+// que só ele aprendeu. Uma entrada que este processo podou (teto) pode voltar assim; a próxima
+// poda a tira de novo.
+func (v *Vistos) juntarDoDisco() {
+	if impressaoDe(v.path) == v.disco {
+		return
+	}
+	b, err := os.ReadFile(v.path)
+	if err != nil {
+		return
+	}
+	var outro map[string]string
+	if json.Unmarshal(b, &outro) != nil {
+		return
+	}
+	for id, t := range outro {
+		if _, ok := v.ids[id]; !ok {
+			v.ids[id] = t
+			v.contar(id, t)
+		}
+	}
 }
 
 func (v *Vistos) Vazio() bool { v.mu.RLock(); defer v.mu.RUnlock(); return len(v.ids) == 0 }
@@ -227,12 +290,24 @@ func (v *Vistos) SalvarSeSujo() error {
 		return nil
 	}
 	v.salvo = time.Now()
+	v.juntarDoDisco()
 	b, _ := json.Marshal(v.ids)
 	v.sujo = false
 	v.mu.Unlock()
-	tmp := v.path + ".tmp"
-	if err := os.WriteFile(tmp, b, 0o600); err != nil {
+	imp, err := gravarTrocando(v.path, b)
+	if err != nil {
 		return err
 	}
-	return os.Rename(tmp, v.path)
+	v.mu.Lock()
+	v.disco = imp
+	v.mu.Unlock()
+	return nil
+}
+
+// SalvarAgora grava já o que estiver pendente, sem esperar o intervalo (na saída do proxy).
+func (v *Vistos) SalvarAgora() error {
+	v.mu.Lock()
+	v.salvo = time.Time{}
+	v.mu.Unlock()
+	return v.SalvarSeSujo()
 }

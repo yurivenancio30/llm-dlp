@@ -24,6 +24,7 @@ type Pessoas struct {
 	salvo     time.Time
 	codCache  sync.Map // palavra -> é código de alguém? (só em RAM)
 	nCodCache atomic.Int64
+	disco     impressaoArquivo // o arquivo como este processo o deixou (ver Vistos.disco)
 	D         struct {
 		Nomes   map[string]string `json:"nomes"`   // id(nome) -> pid
 		Emails  map[string]string `json:"emails"`  // id(email) -> pid
@@ -51,18 +52,88 @@ func CarregarPessoas(path string) (*Pessoas, error) {
 	if err := json.Unmarshal(b, &ps.D); err != nil {
 		return nil, err
 	}
+	ps.disco = impressaoDe(path)
 	return ps, nil
 }
 
+// Salvar grava o registro. Se outro processo gravou depois deste (o importar-pessoas com o
+// proxy no ar; a versão nova durante a troca), junta antes o que só o outro tem: o registro só
+// cresce, e uma gravação não apaga a outra.
 func (ps *Pessoas) Salvar() error {
-	ps.mu.RLock()
+	ps.mu.Lock()
+	ps.juntarDoDisco()
 	b, _ := json.Marshal(ps.D)
-	ps.mu.RUnlock()
-	tmp := ps.path + ".tmp"
-	if err := os.WriteFile(tmp, b, 0o600); err != nil {
+	ps.mu.Unlock()
+	imp, err := gravarTrocando(ps.path, b)
+	if err != nil {
 		return err
 	}
-	return os.Rename(tmp, ps.path)
+	ps.mu.Lock()
+	ps.disco = imp
+	ps.mu.Unlock()
+	return nil
+}
+
+// juntarDoDisco: com ps.mu travado. Um id que os dois têm fica com a pessoa deste processo.
+func (ps *Pessoas) juntarDoDisco() {
+	if impressaoDe(ps.path) == ps.disco {
+		return
+	}
+	b, err := os.ReadFile(ps.path)
+	if err != nil {
+		return
+	}
+	var outro Pessoas
+	if json.Unmarshal(b, &outro.D) != nil {
+		return
+	}
+	// sem tamanhos = registro antigo, que confere toda palavra: se um dos lados é assim, o
+	// resultado fica sem o filtro (conferir a mais nunca deixa um código passar)
+	semFiltro := len(ps.D.Codigos) > 0 && len(ps.D.TamCodigos) == 0 ||
+		len(outro.D.Codigos) > 0 && len(outro.D.TamCodigos) == 0
+	juntar := func(meu *map[string]string, dele map[string]string) {
+		for id, pid := range dele {
+			if *meu == nil {
+				*meu = map[string]string{}
+			}
+			if _, ok := (*meu)[id]; !ok {
+				(*meu)[id] = pid
+			}
+		}
+	}
+	juntar(&ps.D.Nomes, outro.D.Nomes)
+	juntar(&ps.D.Emails, outro.D.Emails)
+	juntar(&ps.D.Codigos, outro.D.Codigos)
+	for id := range outro.D.Primeiros {
+		if ps.D.Primeiros == nil {
+			ps.D.Primeiros = map[string]bool{}
+		}
+		ps.D.Primeiros[id] = true
+	}
+	if semFiltro {
+		ps.D.TamCodigos = nil
+	} else {
+		for n := range outro.D.TamCodigos {
+			if ps.D.TamCodigos == nil {
+				ps.D.TamCodigos = map[int]bool{}
+			}
+			ps.D.TamCodigos[n] = true
+		}
+	}
+	ps.codCache.Clear() // códigos novos: "não é código" guardado antes pode ter deixado de valer
+	ps.nCodCache.Store(0)
+}
+
+// SalvarAgora grava já o que estiver pendente, sem esperar o intervalo (na saída do proxy).
+func (ps *Pessoas) SalvarAgora() error {
+	ps.mu.Lock()
+	sujo := ps.sujo
+	ps.sujo = false
+	ps.mu.Unlock()
+	if !sujo {
+		return nil
+	}
+	return ps.Salvar()
 }
 
 // SalvarSeSujo grava o registro se entrou alguém novo (no máximo uma vez a cada 5 s).
