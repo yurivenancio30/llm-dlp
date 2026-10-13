@@ -7,7 +7,8 @@ say what each one is for.
 
 ## Configuration
 
-File `~/.config/llm-dlp/config.json`. After changing it, run `llm-dlp parar`.
+File `~/.config/llm-dlp/config.json`. After changing it, run `llm-dlp recarregar`: it applies
+the change without taking llm-dlp offline.
 
 While the configuration removes protection (`falhar_fechado` off, `ocr.modo` set to
 `permitir`, `objetos` off, any detector turned off) or `upstream` is not the Anthropic API,
@@ -173,8 +174,10 @@ About Copilot:
 | `llm-dlp instalar` | Installs and configures everything, explaining each step |
 | `sudo llm-dlp instalar-trava` | Claude Code only works when going through llm-dlp (the lock) |
 | `llm-dlp desinstalar` / `sudo llm-dlp desinstalar-trava` | Undoes it |
+| `llm-dlp atualizar [--versao X.Y.Z] [--arquivo FILE.tar.gz]` | Downloads the latest version (or the one asked for), checks it and puts it in place of the one running, without taking llm-dlp offline (see [Updating llm-dlp](#updating-llm-dlp)) |
+| `llm-dlp recarregar` | Puts the installed binary in the air again, with the configuration as it is now, without taking llm-dlp offline |
 | `llm-dlp status` | Shows whether it is running, in which mode and at which commit. Warns if a new binary is installed but not yet running, if OCR is missing and if the configuration reduces the protection |
-| `llm-dlp parar` | Stops the proxy (it comes back on the next message) |
+| `llm-dlp parar` | Stops the proxy (it comes back on the next message). To update or apply the configuration, use `atualizar` or `recarregar`, which do not leave the port empty |
 | `sudo llm-dlp emergencia [30m\|sair]` | Lets Claude through unmasked for a limited time |
 | `llm-dlp importar-pessoas FILE.csv --grupo CODE:NAME:EMAIL` | Teaches people |
 | `llm-dlp colunas FILE` | Shows how the fields of a file are understood |
@@ -190,35 +193,45 @@ also the one in the `~/.bashrc` function of the beta clients.
 
 ## Updating llm-dlp
 
-Installing the new binary does not replace what is running: the old process keeps running
-until it is stopped.
+```bash
+llm-dlp atualizar                   # the latest release
+llm-dlp atualizar --versao 0.7.1    # a given version (also to go back to an earlier one)
+llm-dlp atualizar --arquivo llm-dlp_0.7.1_linux_amd64.tar.gz   # a package already downloaded
+```
 
-1. Install the new binary (keep the previous one, if you want to be able to go back):
+What it does, in order:
 
-   ```bash
-   cp ~/.local/bin/llm-dlp ~/.local/bin/llm-dlp.bak-$(date +%Y%m%d-%H%M%S)
-   ```
+1. Downloads the package for this machine and checks its SHA-256 against the `checksums.txt`
+   published with the release (with `--arquivo`, it uses the package you gave).
+2. Puts the new binary in `~/.local/bin/llm-dlp` and keeps the previous one next to it
+   (`llm-dlp.bak-DATE`; only the latest copy is kept).
+3. Asks the supervisor for the swap. The supervisor is what holds the port (the proxy only
+   borrows it, as with systemd socket activation): it starts the new version on the same port
+   while the old one is still answering, and waits for the new one to say it is ready.
+4. Tells the old one to leave: it stops accepting connections, still answers what arrives on
+   the connections already open (telling the client to open the next one on the new
+   version), finishes the answers in progress and exits. The supervisor then re-executes
+   itself with the new binary, without letting go of the port.
+5. Checks that the new version answers, with its commit and the proof of the key.
 
-   With the release binary (the usual path), run the installer again; it replaces the
-   program and skips what is already done:
+The port is never empty. That matters because Claude Code sends requests in the middle of a
+turn (after a tool) without going through the hook that starts llm-dlp, and an empty port at
+that moment is "Connection refused". If the new version does not get ready within 20 s, the
+supervisor stops it, the command puts the previous binary back and says so; the old version
+never left.
 
-   ```bash
-   curl -fsSL https://raw.githubusercontent.com/yurivenancio30/llm-dlp/main/install.sh | sh
-   ~/.local/bin/llm-dlp versao        # shows the new version and commit
-   ```
+The same holds when the proxy goes down: the port stays open with the supervisor, and the
+requests wait in the queue until the next proxy (about a second), instead of being refused.
 
-   Or building from source:
+The installation command (`curl ... | sh`) does the same when llm-dlp is already installed in
+`~/.local/bin`. Building from source, `make instalar` installs the binary and runs
+`llm-dlp recarregar`, which does steps 3 to 5 with the installed binary (it is also what
+applies a change in `config.json`).
 
-   ```bash
-   make instalar
-   ~/.local/bin/llm-dlp versao
-   ```
-
-2. **Close Claude Code** (every window and session) and, in a terminal, run `llm-dlp parar`.
-   Stopping with a conversation open leaves that conversation without an answer. Check with
-   `pgrep -a llm-dlp` that no process is left.
-3. Open Claude Code: the session hook starts the new binary. Check with `llm-dlp status` (the
-   commit must be the new one, with no warning).
+**From 0.7.0 or older** (no `llm-dlp atualizar`): run the installation command once. In those
+versions the proxy holds the port itself: the new supervisor takes the port the moment the old
+one exits (a few milliseconds), but an answer that was being written is cut (Claude Code
+repeats it). Do it between messages.
 
 After updating, the first message of each conversation rewrites the cache once (the record
 of what already went out starts over with each version).

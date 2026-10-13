@@ -42,6 +42,8 @@ CHANGELOG.md            o que mudou em cada versão (em português: docs/pt-BR/C
 cmd/llm-dlp/
   main.go               ponto de entrada e lista de comandos
   servico.go            servir, supervisionar, garantir, verificar, status, parar
+  troca.go              o supervisor: segura a porta e a empresta ao proxy; troca com SIGHUP
+  atualizar.go          atualizar (download, checksum, troca, volta) e recarregar
   instalar.go           instalar, desinstalar e a trava
   conferir.go           simular: reproduz uma sessão antiga contra uma API falsa
   ferramentas.go        importar-pessoas, testar, testar-midia, medir, colunas

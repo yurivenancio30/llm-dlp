@@ -9,6 +9,50 @@ Em cada versão: **Mascaramento** é o que passou a ser (ou deixou de ser) masca
 **Programa** é comando, instalação, configuração, desempenho e documentação; **Código** é o
 que só interessa a quem mexe no código.
 
+## [Não lançado]
+
+Atualizar não tira mais o llm-dlp do ar, e o proxy cair também não: agora quem segura a porta é
+o supervisor, que só a empresta ao proxy. O `llm-dlp atualizar` baixa a versão nova, confere,
+sobe na mesma porta enquanto a antiga ainda atende, e só então deixa a antiga sair. Não precisa
+fechar o Claude Code nem rodar `llm-dlp parar`, e se a versão nova não subir, ele volta sozinho
+para a anterior. O comando de instalação faz o mesmo quando o llm-dlp já está instalado. Para
+chegar aqui a partir da 0.7.0 ou anterior, rode o comando de instalação uma vez, entre uma
+mensagem e outra.
+
+### Programa
+
+- O supervisor abre a porta uma vez e a empresta a cada proxy que sobe, como o systemd faz com
+  socket activation. Quando o proxy cai, a porta continua aberta, e as requisições esperam na
+  fila até o proxy seguinte (cerca de um segundo). Antes, o proxy segurava a porta: enquanto ele
+  estava fora, toda requisição era recusada. Derrubar o proxy com quatro clientes mandando
+  mensagens sem parar deu 19.655 "Connection refused" em cerca de um segundo na 0.7.0, e nenhum
+  agora. Esse erro chegava à tela porque o Claude Code manda requisições no meio de um turno
+  (depois de uma ferramenta) sem passar pelo gancho que sobe o llm-dlp.
+- `llm-dlp atualizar [--versao X.Y.Z] [--arquivo ARQ.tar.gz]`: baixa a release (a mais nova ou
+  a pedida), confere o SHA-256 com o `checksums.txt` da release, troca o `~/.local/bin/llm-dlp`
+  (guardando só a cópia anterior mais recente) e pede a troca ao supervisor: ele sobe a versão
+  nova na mesma porta, espera ela avisar que está pronta, e aí o antigo para de aceitar
+  conexões, ainda atende o que chegar pelas conexões já abertas (com `Connection: close`),
+  termina as respostas em andamento e sai; o supervisor se reexecuta com o binário novo sem
+  soltar a porta. Testado com quatro clientes mandando mensagens sem parar e uma resposta de 8
+  segundos no meio: nenhuma falhou e nenhuma foi cortada. Se a versão nova não ficar pronta em
+  20 s, ela é parada, o binário anterior volta e o proxy antigo nunca saiu do ar.
+- O comando de instalação (`curl ... | sh`) roda o `llm-dlp atualizar` quando o llm-dlp já está
+  instalado em `~/.local/bin`: sem as perguntas da configuração. O `llm-dlp instalar`, rodado de
+  novo com uma versão anterior no ar, troca do mesmo jeito.
+- `llm-dlp recarregar` aplica uma mudança no `config.json` sem tirar o llm-dlp do ar (antes:
+  `llm-dlp parar`). O `make instalar` o roda depois de instalar.
+- O instalador subia o supervisor a partir do arquivo que estava rodando, que o `install.sh`
+  apaga no fim: o proxy continuava no ar, mas na primeira vez que precisasse reiniciar, o
+  supervisor não achava o programa e ficava com a trava, e nada subia o llm-dlp de novo até um
+  `llm-dlp parar`. Agora o supervisor roda sempre o `~/.local/bin/llm-dlp`.
+- O `vistos.json` e o `pessoas.json` não perdem mais o que outro processo gravou: cada gravação
+  junta o que foi gravado desde a última leitura. Isso vale para as duas versões no ar juntas
+  durante uma atualização, e para o `llm-dlp importar-pessoas` com o proxy no ar (antes, a
+  gravação seguinte do proxy apagava as pessoas importadas).
+- O `llm-dlp status` sugere `llm-dlp atualizar` quando o binário instalado não é o que está no
+  ar.
+
 ## [0.7.0] - 2026-10-12
 
 Mascaramento medido com canários (dados falsos plantados em 21 formatos de saída, 8 tipos de

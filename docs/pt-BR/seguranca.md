@@ -59,6 +59,11 @@ chegam nesse endereço. O que cada um consegue:
 Quem roda com o **seu** usuário lê a chave e passa pelas três barreiras (ver "O que não
 protege", acima).
 
+Quem segura a porta é o supervisor, não o proxy: quando o proxy cai ou é trocado
+(`llm-dlp atualizar`, `llm-dlp recarregar`), a porta continua aberta, e nenhum outro programa
+consegue pegá-la no meio. A janela da última linha acima fica só para quando o próprio
+supervisor não está no ar (antes da primeira sessão, ou depois de um `llm-dlp parar`).
+
 Ao atualizar de uma versão até a 0.3.0, o processo antigo ainda no ar não sabe dar essa
 prova, e as mensagens são barradas até você fechar o Claude Code e rodar `llm-dlp parar`.
 

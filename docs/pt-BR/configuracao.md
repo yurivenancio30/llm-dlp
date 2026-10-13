@@ -4,7 +4,8 @@
 
 ## Configuração
 
-Arquivo `~/.config/llm-dlp/config.json`. Depois de mudar, rode `llm-dlp parar`.
+Arquivo `~/.config/llm-dlp/config.json`. Depois de mudar, rode `llm-dlp recarregar`: ele aplica
+a mudança sem tirar o llm-dlp do ar.
 
 Enquanto a configuração tirar proteção (`falhar_fechado` desligado, `ocr.modo` em
 `permitir`, `objetos` desligado, algum detector desligado) ou o `upstream` não for a API da
@@ -172,8 +173,10 @@ Sobre o Copilot:
 | `llm-dlp instalar` | Instala e configura tudo, explicando cada passo |
 | `sudo llm-dlp instalar-trava` | O Claude Code só funciona passando pelo llm-dlp |
 | `llm-dlp desinstalar` / `sudo llm-dlp desinstalar-trava` | Desfaz |
+| `llm-dlp atualizar [--versao X.Y.Z] [--arquivo ARQ.tar.gz]` | Baixa a versão mais nova (ou a pedida), confere e põe no lugar da que está no ar, sem tirar o llm-dlp do ar (ver [Atualizar o llm-dlp](#atualizar-o-llm-dlp)) |
+| `llm-dlp recarregar` | Põe no ar de novo o binário instalado, com a configuração como está agora, sem tirar o llm-dlp do ar |
 | `llm-dlp status` | Mostra se está no ar, em que modo e qual commit. Avisa se há um binário novo instalado que ainda não está no ar, se falta o OCR e se a configuração reduz a proteção |
-| `llm-dlp parar` | Para o proxy (ele volta na próxima mensagem) |
+| `llm-dlp parar` | Para o proxy (ele volta na próxima mensagem). Para atualizar ou aplicar a configuração, use `atualizar` ou `recarregar`, que não deixam a porta vazia |
 | `sudo llm-dlp emergencia [30m\|sair]` | Libera o Claude sem máscara por tempo limitado |
 | `llm-dlp importar-pessoas ARQ.csv --grupo COD:NOME:EMAIL` | Ensina pessoas |
 | `llm-dlp colunas ARQ` | Mostra como os campos de um arquivo são entendidos |
@@ -189,35 +192,43 @@ também o da função do `~/.bashrc` dos clientes em beta.
 
 ## Atualizar o llm-dlp
 
-Instalar o binário novo não troca o que está no ar: o processo antigo continua rodando até
-ser parado.
+```bash
+llm-dlp atualizar                   # a release mais nova
+llm-dlp atualizar --versao 0.7.1    # uma versão dada (também para voltar a uma anterior)
+llm-dlp atualizar --arquivo llm-dlp_0.7.1_linux_amd64.tar.gz   # um pacote já baixado
+```
 
-1. Instale o binário novo (guarde o anterior, se quiser poder voltar):
+O que ele faz, nesta ordem:
 
-   ```bash
-   cp ~/.local/bin/llm-dlp ~/.local/bin/llm-dlp.bak-$(date +%Y%m%d-%H%M%S)
-   ```
+1. Baixa o pacote desta máquina e confere o SHA-256 com o `checksums.txt` publicado com a
+   release (com `--arquivo`, usa o pacote que você deu).
+2. Põe o binário novo em `~/.local/bin/llm-dlp` e guarda o anterior ao lado
+   (`llm-dlp.bak-DATA`; só fica a cópia mais recente).
+3. Pede a troca ao supervisor. Quem segura a porta é o supervisor (o proxy só a recebe
+   emprestada, como no socket activation do systemd): ele sobe a versão nova na mesma porta
+   enquanto a antiga ainda atende, e espera a nova avisar que está pronta.
+4. Manda a antiga sair: ela para de aceitar conexões, ainda atende o que chegar pelas conexões
+   já abertas (avisando o cliente para abrir a próxima na versão nova), termina as respostas em
+   andamento e sai. O supervisor então se reexecuta com o binário novo, sem soltar a porta.
+5. Confere que a versão nova responde, com o commit dela e a prova da chave.
 
-   Com o binário da release (o caminho comum), rode o instalador de novo; ele troca o
-   programa e pula o que já está pronto:
+A porta nunca fica vazia. Isso importa porque o Claude Code manda requisições no meio de um
+turno (depois de uma ferramenta) sem passar pelo gancho que sobe o llm-dlp, e uma porta vazia
+nessa hora é "Connection refused". Se a versão nova não ficar pronta em 20 s, o supervisor a
+para, o comando põe o binário anterior de volta e avisa; a versão antiga nunca saiu do ar.
 
-   ```bash
-   curl -fsSL https://raw.githubusercontent.com/yurivenancio30/llm-dlp/main/install.sh | sh
-   ~/.local/bin/llm-dlp versao        # mostra a versão e o commit novos
-   ```
+O mesmo vale quando o proxy cai: a porta continua aberta com o supervisor, e as requisições
+esperam na fila até o proxy seguinte (cerca de um segundo), em vez de serem recusadas.
 
-   Ou compilando do código:
+O comando de instalação (`curl ... | sh`) faz o mesmo quando o llm-dlp já está instalado em
+`~/.local/bin`. Compilando do código, `make instalar` instala o binário e roda
+`llm-dlp recarregar`, que faz os passos 3 a 5 com o binário instalado (é também o que aplica
+uma mudança no `config.json`).
 
-   ```bash
-   make instalar
-   ~/.local/bin/llm-dlp versao
-   ```
-
-2. **Feche o Claude Code** (todas as janelas e sessões) e, num terminal, rode
-   `llm-dlp parar`. Parar com uma conversa aberta deixa essa conversa sem resposta.
-   Confira com `pgrep -a llm-dlp` que não sobrou nenhum processo.
-3. Abra o Claude Code: o gancho da sessão sobe o binário novo. Confira com `llm-dlp status`
-   (o commit tem que ser o novo, e sem aviso).
+**Da 0.7.0 ou anterior** (sem `llm-dlp atualizar`): rode o comando de instalação uma vez.
+Nessas versões o próprio proxy segura a porta: o supervisor novo pega a porta no instante em
+que o antigo sai (alguns milissegundos), mas uma resposta que estava sendo escrita é cortada
+(o Claude Code repete). Faça entre uma mensagem e outra.
 
 Depois de atualizar, a primeira mensagem de cada conversa regrava o cache uma vez (o
 registro do que já saiu recomeça a cada versão).

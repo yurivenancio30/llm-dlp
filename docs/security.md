@@ -59,6 +59,11 @@ reach that address. What each one can do:
 Whoever runs as **your** user reads the key and gets through the three barriers (see "What it
 does not protect", above).
 
+The port is held by the supervisor, not by the proxy: when the proxy goes down or is swapped
+(`llm-dlp atualizar`, `llm-dlp recarregar`), the port stays open and no other program can take
+it in between. The window for the last row above is only when the supervisor itself is not
+running (before the first session, or after `llm-dlp parar`).
+
 When updating from a version up to 0.3.0, the old process still running cannot give that
 proof, and the messages are blocked until you close Claude Code and run `llm-dlp parar`.
 

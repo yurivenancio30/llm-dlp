@@ -230,12 +230,20 @@ API. What was checked with each client is in [Client by client](docs/configurati
 
 ### Updating to a new version
 
-1. Run the installation command above again. It replaces the program and skips what is
-   already done; your configuration and your key do not change.
-2. Close your client (with Claude Code, every window) and run `llm-dlp parar`. What is
-   running is only replaced when the old process stops.
-3. Open the client again (with a beta client, the function starts the new version) and check
-   with `llm-dlp status`.
+```bash
+llm-dlp atualizar
+```
+
+It downloads the latest release, checks it against the release's `checksums.txt` and puts the
+new version in place of the one running **without taking llm-dlp offline**: no need to close
+your client, and no message fails or is cut. If the new version does not start, it goes back to
+the previous one by itself. The installation command above does the same when llm-dlp is
+already installed. Your configuration and your key do not change. How it works:
+[Updating llm-dlp](docs/configuration.md#updating-llm-dlp).
+
+From 0.7.0 or older, which do not have `llm-dlp atualizar`, run the installation command above
+once, between messages: those versions cannot hand over the port, and an answer that is being
+written is cut (Claude Code repeats it). From then on, updates cut nothing.
 
 What changed in each version is in the [CHANGELOG.md](CHANGELOG.md). After updating, the
 first message of each conversation rewrites the API cache once.
@@ -254,8 +262,8 @@ open the client, and from then on it also comes back by itself.
 | llm-dlp went down | It comes back by itself in ~1 s. While it is out, no message goes out |
 | It does not come back, and I need Claude to fix it | `sudo llm-dlp emergencia 30m` lets Claude through **unmasked** for a limited time. Use a new session, with no client data. It goes back to normal when the time is up, or with `sudo llm-dlp emergencia sair`. Every message shows a warning |
 | The image or PDF did not reach the model | OCR is missing: the model says so in its answer, and `llm-dlp status` shows the installation command. After installing, send the file again |
-| The message was blocked: "não provou ser o seu llm-dlp" (did not prove it is your llm-dlp) | You have just updated and the old process is still running: close Claude Code and run `llm-dlp parar`. If you did not update, another program is using the port |
-| I changed `config.json` | `llm-dlp parar` (it comes back on the next message, with the new configuration) |
+| The message was blocked: "não provou ser o seu llm-dlp" (did not prove it is your llm-dlp) | A process of a version up to 0.3.0 is still running: close Claude Code and run `llm-dlp parar`. If not, another program is using the port |
+| I changed `config.json` | `llm-dlp recarregar` (applies it without taking llm-dlp offline) |
 | I want to see what was done on each message | `~/.config/llm-dlp/llm-dlp.log` (counts and times only, never values) |
 | I want to undo everything | `llm-dlp desinstalar` (and `sudo llm-dlp desinstalar-trava`, if you installed the lock). Then close and open Claude Code and run `llm-dlp parar`. With a beta client, also remove its lines from `~/.bashrc` (and from `opencode.json` or `~/.codex/config.toml`) |
 

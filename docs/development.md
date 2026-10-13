@@ -60,6 +60,8 @@ CHANGELOG.md            what changed in each version
 cmd/llm-dlp/
   main.go               entry point and list of commands
   servico.go            servir, supervisionar, garantir, verificar, status, parar
+  troca.go              the supervisor: holds the port and lends it to the proxy; swap on SIGHUP
+  atualizar.go          atualizar (download, checksum, swap, going back) and recarregar
   instalar.go           instalar, desinstalar and the lock
   conferir.go           simular: replays an old session against a fake API
   ferramentas.go        importar-pessoas, testar, testar-midia, medir, colunas

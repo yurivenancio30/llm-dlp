@@ -225,12 +225,20 @@ O que foi conferido em cada cliente está em [Cliente por cliente](configuracao.
 
 ### Atualizar para uma versão nova
 
-1. Rode de novo o comando de instalação de cima. Ele troca o programa e pula o que já está
-   pronto; a sua configuração e a sua chave não mudam.
-2. Feche o seu cliente (no Claude Code, todas as janelas) e rode `llm-dlp parar`. O que está
-   no ar só é trocado quando o processo antigo para.
-3. Abra o cliente de novo (num cliente em beta, a função sobe a versão nova) e confira com
-   `llm-dlp status`.
+```bash
+llm-dlp atualizar
+```
+
+Ele baixa a release mais nova, confere com o `checksums.txt` da release e põe a versão nova no
+lugar da que está no ar **sem tirar o llm-dlp do ar**: não precisa fechar o cliente, e nenhuma
+mensagem falha nem é cortada. Se a versão nova não subir, ele volta sozinho para a anterior. O
+comando de instalação de cima faz o mesmo quando o llm-dlp já está instalado. A sua
+configuração e a sua chave não mudam. Como funciona:
+[Atualizar o llm-dlp](configuracao.md#atualizar-o-llm-dlp).
+
+Da 0.7.0 ou anterior, que não têm o `llm-dlp atualizar`, rode o comando de instalação de cima
+uma vez, entre uma mensagem e outra: essas versões não sabem passar a porta, e uma resposta que
+estiver sendo escrita é cortada (o Claude Code repete). Daí em diante, atualizar não corta nada.
 
 O que mudou em cada versão está no [CHANGELOG.md](CHANGELOG.md). Depois de
 atualizar, a primeira mensagem de cada conversa regrava o cache da API uma vez.
@@ -249,8 +257,8 @@ em diante ele também volta sozinho.
 | O llm-dlp caiu | Volta sozinho em ~1 s. Enquanto estiver fora, nenhuma mensagem sai |
 | Ele não volta, e preciso do Claude para consertar | `sudo llm-dlp emergencia 30m` libera o Claude **sem máscara** por tempo limitado. Use uma sessão nova, sem dados de cliente. Volta ao normal no fim do prazo, ou com `sudo llm-dlp emergencia sair`. Cada mensagem mostra um aviso |
 | A imagem ou o PDF não chegou ao modelo | Falta o OCR: o modelo avisa na resposta, e o `llm-dlp status` mostra o comando de instalação. Depois de instalar, mande o arquivo de novo |
-| A mensagem foi barrada: "não provou ser o seu llm-dlp" | Você acabou de atualizar e o processo antigo ainda está no ar: feche o Claude Code e rode `llm-dlp parar`. Se não atualizou, outro programa está usando a porta |
-| Mudei o `config.json` | `llm-dlp parar` (ele volta na próxima mensagem, com a configuração nova) |
+| A mensagem foi barrada: "não provou ser o seu llm-dlp" | Um processo de uma versão até a 0.3.0 ainda está no ar: feche o Claude Code e rode `llm-dlp parar`. Se não, outro programa está usando a porta |
+| Mudei o `config.json` | `llm-dlp recarregar` (aplica sem tirar o llm-dlp do ar) |
 | Quero ver o que foi feito em cada mensagem | `~/.config/llm-dlp/llm-dlp.log` (só contagens e tempos, nunca valores) |
 | Quero desfazer tudo | `llm-dlp desinstalar` (e `sudo llm-dlp desinstalar-trava`, se instalou a trava). Depois, feche e abra o Claude Code e rode `llm-dlp parar`. Num cliente em beta, tire também as linhas dele do `~/.bashrc` (e do `opencode.json` ou do `~/.codex/config.toml`) |
 

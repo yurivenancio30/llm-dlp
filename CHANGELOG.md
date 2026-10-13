@@ -9,6 +9,50 @@ In each version: **Masking** is what started (or stopped) being masked; **Progra
 commands, installation, configuration, performance and documentation; **Code** is what only
 matters to whoever changes the code.
 
+## [Unreleased]
+
+Updating no longer takes llm-dlp offline, and neither does the proxy going down: the supervisor
+now holds the port and only lends it to the proxy. `llm-dlp atualizar` downloads the new
+version, checks it, starts it on the same port while the old one is still answering, and only
+then lets the old one go. No need to close Claude Code or run `llm-dlp parar`, and if the new
+version does not start, it goes back to the previous one by itself. The installation command
+does the same when llm-dlp is already installed. To get there from 0.7.0 or older, run the
+installation command once, between messages.
+
+### Program
+
+- The supervisor opens the port once and lends it to each proxy it starts, as systemd does with
+  socket activation. When the proxy goes down, the port stays open and the requests wait in the
+  queue until the next proxy (about a second). Before, the proxy held the port: while it was
+  down, every request was refused. Killing the proxy under four clients sending nonstop gave
+  19,655 "Connection refused" in about a second on 0.7.0, and none now. That error reached the
+  screen because Claude Code sends requests in the middle of a turn (after a tool) without going
+  through the hook that starts llm-dlp.
+- `llm-dlp atualizar [--versao X.Y.Z] [--arquivo FILE.tar.gz]`: downloads the release (the
+  latest or the one asked for), checks its SHA-256 against the release's `checksums.txt`,
+  replaces `~/.local/bin/llm-dlp` (keeping only the latest previous copy) and asks the
+  supervisor for the swap: it starts the new version on the same port, waits for it to say it
+  is ready, then the old one stops accepting connections, still answers what arrives on the
+  connections already open (with `Connection: close`), finishes the answers in progress and
+  exits; the supervisor re-executes itself with the new binary without letting go of the port.
+  Tested with four clients sending messages nonstop and an 8-second answer in the middle: none
+  failed and none was cut. If the new version does not get ready within 20 s, it is stopped,
+  the previous binary goes back and the old proxy never left.
+- The installation command (`curl ... | sh`) runs `llm-dlp atualizar` when llm-dlp is already
+  installed in `~/.local/bin`: no setup questions. `llm-dlp instalar`, run again with an older
+  version running, swaps it the same way.
+- `llm-dlp recarregar` applies a change in `config.json` without taking llm-dlp offline (before:
+  `llm-dlp parar`). `make instalar` runs it after installing.
+- The installer started the supervisor from the file it was running, which `install.sh` deletes
+  at the end: the proxy kept running, but the first time it had to restart, the supervisor could
+  not find the program and kept the lock, so nothing brought llm-dlp back until
+  `llm-dlp parar`. The supervisor now always runs `~/.local/bin/llm-dlp`.
+- `vistos.json` and `pessoas.json` no longer lose what another process wrote: each write joins
+  what was written since it last read the file. That covers the two versions running together
+  during an update, and `llm-dlp importar-pessoas` with the proxy running (before, the proxy's
+  next write erased the imported people).
+- `llm-dlp status` suggests `llm-dlp atualizar` when the installed binary is not the one running.
+
 ## [0.7.0] - 2026-10-12
 
 Masking measured with canaries (fake data planted in 21 output formats, 8 kinds of code file
