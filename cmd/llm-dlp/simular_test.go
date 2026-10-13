@@ -40,7 +40,7 @@ func saidaDe(t *testing.T, f func() error) string {
 	return string(b)
 }
 
-// "llm-dlp simular" repete também o arquivo de um subagente (subagents/agent-*.jsonl), em que toda
+// "llm-dlp simulate" repete também o arquivo de um subagente (subagents/agent-*.jsonl), em que toda
 // mensagem é lateral (isSidechain). No arquivo da sessão, as laterais continuam puladas. Um arquivo
 // sem nada para repetir avisa, em vez de mostrar zeros que parecem "tudo certo".
 func TestSimularLeSubagente(t *testing.T) {

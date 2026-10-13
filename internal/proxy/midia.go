@@ -85,10 +85,10 @@ func (md *Midia) Processar(b map[string]any) ([]any, []mask.Entrada, error) {
 		return []any{b}, nil, nil
 	}
 	switch md.cfg.Modo {
-	case "permitir":
+	case "allow":
 		return []any{b}, nil, nil
-	case "bloquear":
-		return md.retirar(b, ehPDF, "o envio de imagens e PDFs está bloqueado na configuração do llm-dlp (ocr.modo = bloquear). Avise o usuário"), nil, nil
+	case "block":
+		return md.retirar(b, ehPDF, "o envio de imagens e PDFs está bloqueado na configuração do llm-dlp (ocr.mode = block). Avise o usuário"), nil, nil
 	}
 	k := sha256.Sum256([]byte(dados))
 	md.mu.Lock()

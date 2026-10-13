@@ -39,7 +39,7 @@ type Proxy struct {
 	inicio  time.Time
 	reqs    atomic.Int64
 	// a última requisição de mensagens, já mascarada (só em memória): é o que o comando
-	// "llm-dlp ultima" mostra, para conferir o que a API recebeu
+	// "llm-dlp last" mostra, para conferir o que a API recebeu
 	ultima atomic.Pointer[[]byte]
 }
 
@@ -127,9 +127,9 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/__llm-dlp/ultima" {
 		w.Header().Set("content-type", "application/json")
 		if !ProvaConfere(p.chave, "ultima", r.Header.Get(CabecalhoProva)) {
-			// a conversa (mesmo mascarada) é só de quem lê a chave: use o comando "llm-dlp ultima"
+			// a conversa (mesmo mascarada) é só de quem lê a chave: use o comando "llm-dlp last"
 			w.WriteHeader(http.StatusForbidden)
-			w.Write([]byte(`{"erro":"use o comando: llm-dlp ultima"}` + "\n"))
+			w.Write([]byte(`{"erro":"use o comando: llm-dlp last"}` + "\n"))
 			return
 		}
 		if b := p.ultima.Load(); b != nil {

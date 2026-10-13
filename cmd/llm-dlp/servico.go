@@ -112,7 +112,7 @@ func saude(cfg config.Config) (infoSaude, bool) {
 // errSemProva: o que responde na porta não é este llm-dlp (uma versão anterior ainda no ar, ou
 // outro programa).
 var errSemProva = errors.New("o programa que responde na porta do llm-dlp não provou ser o seu llm-dlp. " +
-	"Se você acabou de atualizar: feche o Claude Code, rode \"llm-dlp parar\" e abra de novo. " +
+	"Se você acabou de atualizar: feche o Claude Code, rode \"llm-dlp stop\" e abra de novo. " +
 	"Se não: outro programa está usando a porta")
 
 func saudavel(cfg config.Config) bool {
@@ -183,7 +183,7 @@ func verificar() error {
 			return barrar(errSemProva.Error())
 		}
 		return barrar("o llm-dlp está fora do ar e não consegui subi-lo; veja " + config.Caminho("llm-dlp.log") +
-			". Para usar o Claude sem máscara enquanto conserta: rode, no seu terminal, sudo llm-dlp emergencia")
+			". Para usar o Claude sem máscara enquanto conserta: rode, no seu terminal, sudo llm-dlp emergency")
 	}
 	// avisos só para você (systemMessage não vai para a API: zero tokens)
 	aviso := ""
@@ -192,7 +192,7 @@ func verificar() error {
 		if t, err := time.Parse(time.RFC3339, info.Ate); err == nil {
 			ate = t.Local().Format("15:04")
 		}
-		aviso = "⚠️ llm-dlp em MODO EMERGÊNCIA: mensagens SEM máscara até " + ate + " (sudo llm-dlp emergencia sair)"
+		aviso = "⚠️ llm-dlp em MODO EMERGÊNCIA: mensagens SEM máscara até " + ate + " (sudo llm-dlp emergency off)"
 	} else if fracos := protecaoReduzida(cfg); len(fracos) > 0 {
 		aviso = "⚠️ llm-dlp com a proteção reduzida pela configuração: " + strings.Join(fracos, "; ") +
 			". Se não foi você, confira " + config.Caminho("config.json")
@@ -224,13 +224,13 @@ func protecaoReduzida(cfg config.Config) []string {
 		}
 	}
 	if !cfg.FalharFechado {
-		out = append(out, "uma falha ao mascarar manda a mensagem sem máscara (falhar_fechado = false)")
+		out = append(out, "uma falha ao mascarar manda a mensagem sem máscara (fail_closed = false)")
 	}
-	if cfg.OCR.Modo == "permitir" {
-		out = append(out, "imagens e PDFs saem sem verificação (ocr.modo = permitir)")
+	if cfg.OCR.Modo == "allow" {
+		out = append(out, "imagens e PDFs saem sem verificação (ocr.mode = allow)")
 	}
 	if !cfg.Objetos.Ligado {
-		out = append(out, "nomes de recursos internos não são mascarados (objetos.ligado = false)")
+		out = append(out, "nomes de recursos internos não são mascarados (objects.enabled = false)")
 	}
 	if len(cfg.DetectoresDesligados) > 0 {
 		out = append(out, "detectores desligados: "+proxy.Limpo(strings.Join(cfg.DetectoresDesligados, ", ")))
@@ -267,7 +267,7 @@ func status() error {
 	}
 	json.Unmarshal(b, &info)
 	if aviso := binarioNovo(info.Commit, info.PID); aviso != "" {
-		fmt.Println("⚠️  " + aviso + ": rode llm-dlp atualizar para trocar o que está no ar (sem fechar o Claude Code)")
+		fmt.Println("⚠️  " + aviso + ": rode llm-dlp update para trocar o que está no ar (sem fechar o Claude Code)")
 	}
 	if _, ok := saude(cfg); !ok {
 		fmt.Println("⚠️  " + errSemProva.Error())
@@ -275,7 +275,7 @@ func status() error {
 	for _, f := range protecaoReduzida(cfg) {
 		fmt.Println("⚠️  proteção reduzida pela configuração: " + f)
 	}
-	if falta := faltaOCR(cfg); falta != "" && cfg.OCR.Modo == "mascarar" {
+	if falta := faltaOCR(cfg); falta != "" && cfg.OCR.Modo == "mask" {
 		fmt.Printf("⚠️  sem OCR (falta %s): imagens e PDFs não são enviados. Para instalar: %s\n", falta, ocr.DicaInstalacao())
 	}
 	return nil

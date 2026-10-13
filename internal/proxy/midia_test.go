@@ -167,15 +167,15 @@ func TestImagemIlegivelERetirada(t *testing.T) {
 	}
 }
 
-// ocr.modo = bloquear: imagem e PDF não saem, e a conversa continua.
+// ocr.mode = block: imagem e PDF não saem, e a conversa continua.
 func TestMidiaBloqueadaPelaConfiguracao(t *testing.T) {
-	px, corpos, _ := montarMidia(t, func(c *config.Config) { c.OCR.Modo = "bloquear" })
+	px, corpos, _ := montarMidia(t, func(c *config.Config) { c.OCR.Modo = "block" })
 	pdf := map[string]any{"type": "document", "source": map[string]any{"type": "base64", "media_type": "application/pdf", "data": pngMinimo}}
 	if st := postar(t, px, conversaComArquivo(pdf)); st != 200 {
 		t.Fatalf("recusada: status %d", st)
 	}
 	aviso, _ := oQueSaiu(t, (*corpos)[0])[0]["text"].(string)
-	if !strings.Contains(aviso, "[llm-dlp] Um PDF foi retirado") || !strings.Contains(aviso, "ocr.modo = bloquear") {
+	if !strings.Contains(aviso, "[llm-dlp] Um PDF foi retirado") || !strings.Contains(aviso, "ocr.mode = block") {
 		t.Errorf("aviso: %s", aviso)
 	}
 	if bytes.Contains((*corpos)[0], []byte(pngMinimo)) {

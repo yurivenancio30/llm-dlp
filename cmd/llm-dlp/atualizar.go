@@ -30,24 +30,27 @@ import (
 
 const urlReleases = "https://github.com/yurivenancio30/llm-dlp/releases"
 
+// primeiraEmIngles: a primeira versão com os comandos e os campos do config.json em inglês.
+const primeiraEmIngles = "0.9.0"
+
 var reVersaoExata = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
 
 func atualizar(args []string) error {
 	var pedida, arquivo string
 	for i := 0; i < len(args); i++ {
 		switch a := args[i]; a {
-		case "--versao", "--version", "--arquivo":
+		case "--version", "--file", "--versao", "--arquivo": // (--versao e --arquivo: nomes antigos)
 			if i+1 >= len(args) {
 				return fmt.Errorf("%s precisa de um valor", a)
 			}
 			i++
-			if a == "--arquivo" {
+			if a == "--file" || a == "--arquivo" {
 				arquivo = args[i]
 			} else {
 				pedida = strings.TrimPrefix(args[i], "v")
 			}
 		default:
-			return fmt.Errorf("opção desconhecida: %q (uso: llm-dlp atualizar [--versao X.Y.Z] [--arquivo ARQ.tar.gz])", a)
+			return fmt.Errorf("opção desconhecida: %q (uso: llm-dlp update [--version X.Y.Z] [--file ARQ.tar.gz])", a)
 		}
 	}
 	if os.Geteuid() == 0 {
@@ -96,6 +99,18 @@ func atualizar(args []string) error {
 		fmt.Printf("✓ já está na %s (%s)\n", vNovo, cNovo)
 		return nil
 	}
+	// uma versão anterior aos nomes em inglês ignoraria os campos do config.json com nome novo
+	// (e deixaria de mascarar o que eles pedem): o arquivo volta aos nomes antigos antes de ela
+	// subir. Indo para frente, os nomes novos entram só depois da troca (até lá, a versão no ar
+	// pode precisar reler o arquivo).
+	anterior := versaoMenor(vNovo, primeiraEmIngles)
+	if anterior {
+		if c, err := config.MigrarArquivo(true); err != nil {
+			return fmt.Errorf("não consegui passar o config.json para os nomes da %s: %w", vNovo, err)
+		} else if c != "" {
+			fmt.Printf("✓ config.json com os nomes de campo da %s (o anterior em %s)\n", vNovo, c)
+		}
+	}
 	bak := ""
 	if !mesmo {
 		if bak, err = trocarBinario(novo, destino); err != nil {
@@ -107,14 +122,33 @@ func atualizar(args []string) error {
 		if bak != "" {
 			os.Rename(bak, destino)
 		}
+		if anterior {
+			config.MigrarArquivo(false)
+		}
 	}
 	log := config.Caminho("llm-dlp.log")
+	home, _ := os.UserHomeDir()
+	// os hooks do Claude Code e o config.json passam a usar os nomes que a versão nova conhece
+	ajustarHooks := func() {
+		if mudou, err := hooksParaVersao(home, destino, vNovo); err != nil {
+			fmt.Printf("! não consegui ajustar os hooks do Claude Code (%v); rode: llm-dlp install\n", err)
+		} else if mudou {
+			fmt.Println("✓ hooks do Claude Code com os nomes desta versão (valem nas sessões novas;" +
+				" as já abertas seguem com os de antes, que também funcionam)")
+		}
+		if !anterior {
+			if c, err := config.MigrarArquivo(false); err != nil {
+				fmt.Printf("! o config.json continua com os nomes antigos (%v); eles seguem valendo\n", err)
+			} else if c != "" {
+				fmt.Printf("✓ config.json com os nomes de campo em inglês (o anterior em %s)\n", c)
+			}
+		}
+	}
 	if !noAr {
-		home, _ := os.UserHomeDir()
 		if !claudeLigado(home, cfg) {
 			limparCopias(destino, bak)
 			fmt.Println("– o llm-dlp não estava no ar: ele sobe já na versão nova quando for usado")
-			fmt.Println("  (o Claude Code não passa pelo llm-dlp; para ligar: llm-dlp instalar)")
+			fmt.Println("  (o Claude Code não passa pelo llm-dlp; para ligar: llm-dlp install)")
 			return nil
 		}
 		if err := garantir(); err != nil {
@@ -122,6 +156,7 @@ func atualizar(args []string) error {
 			return fmt.Errorf("a versão nova não subiu (%v); voltei para a %s. Veja %s", err, vAtual, log)
 		}
 		limparCopias(destino, bak)
+		ajustarHooks()
 		fmt.Printf("✓ llm-dlp %s no ar\n", vNovo)
 		return nil
 	}
@@ -134,6 +169,7 @@ func atualizar(args []string) error {
 		return fmt.Errorf("%v; voltei para a %s. Veja %s", err, vAtual, log)
 	}
 	limparCopias(destino, bak)
+	ajustarHooks()
 	fmt.Printf("✓ llm-dlp %s no ar. Não precisa fechar o Claude Code.\n", vNovo)
 	if !info.Troca {
 		fmt.Println("  A versão anterior não sabia passar a vez: uma resposta que estivesse no meio foi cortada" +
@@ -156,7 +192,7 @@ func recarregar() error {
 	if !ok {
 		if supervisorNoAr() > 0 {
 			return errors.New("o llm-dlp no ar não responde na porta da configuração (a porta mudou?): " +
-				"feche o Claude Code, rode llm-dlp parar e depois llm-dlp instalar")
+				"feche o Claude Code, rode llm-dlp stop e depois llm-dlp install")
 		}
 		fmt.Println("– o llm-dlp não está no ar: ele sobe com a configuração nova quando for usado")
 		return nil

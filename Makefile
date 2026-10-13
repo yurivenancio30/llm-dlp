@@ -3,7 +3,7 @@ BIN := bin/llm-dlp
 PACOTE := github.com/yurivenancio30/llm-dlp
 # a versão é a de internal/versao/versao.go (ver docs/pt-BR/versoes.md)
 VERSAO := $(shell sed -n 's/^const Versao = "\(.*\)"$$/\1/p' internal/versao/versao.go)
-# o commit vai dentro do binário ("llm-dlp versao"); "-mod": havia mudança não commitada
+# o commit vai dentro do binário ("llm-dlp version"); "-mod": havia mudança não commitada
 COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo desconhecido)$(shell git diff --quiet HEAD 2>/dev/null || echo -mod)
 LDFLAGS := -s -w -X $(PACOTE)/internal/versao.Commit=$(COMMIT)
 
@@ -18,11 +18,11 @@ test:
 	$(GO) test -count=1 ./...
 
 # instala o binário em ~/.local/bin e, se o llm-dlp estiver no ar, põe o novo no lugar sem
-# tirá-lo do ar (não mexe no Claude Code; para isso: llm-dlp instalar)
+# tirá-lo do ar (não mexe no Claude Code; para isso: llm-dlp install)
 instalar: build
 	install -D -m 0755 $(BIN) $(HOME)/.local/bin/llm-dlp
 	@echo "instalado em ~/.local/bin/llm-dlp"
-	@$(HOME)/.local/bin/llm-dlp recarregar
+	@$(HOME)/.local/bin/llm-dlp reload
 
 versao:
 	@echo $(VERSAO) "($(COMMIT))"

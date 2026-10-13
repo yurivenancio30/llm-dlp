@@ -19,7 +19,7 @@ builds:
       - arm64
     flags:
       - -trimpath
-    # o commit vai dentro do binário ("llm-dlp versao"); a versão é a de internal/versao/versao.go
+    # o commit vai dentro do binário ("llm-dlp version"); a versão é a de internal/versao/versao.go
     ldflags:
       - -s -w -X github.com/yurivenancio30/llm-dlp/internal/versao.Commit={{ .ShortCommit }}
     mod_timestamp: "{{ .CommitTimestamp }}"

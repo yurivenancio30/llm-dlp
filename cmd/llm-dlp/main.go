@@ -18,47 +18,59 @@ const ajuda = `llm-dlp %s — mascara dado sensível entre você e a LLM (Claude
 Uso: llm-dlp COMANDO [argumentos]
 
 Instalar e atualizar
-  llm-dlp instalar              instala e configura tudo, explicando cada passo (pode rodar de novo)
-  sudo llm-dlp instalar-trava   (recomendado) o Claude Code só funciona passando pelo llm-dlp
-  llm-dlp desinstalar           desfaz a configuração do Claude Code
-  sudo llm-dlp desinstalar-trava
-                                tira a trava
-  llm-dlp atualizar [--versao X.Y.Z] [--arquivo ARQ.tar.gz]
+  llm-dlp install               instala e configura tudo, explicando cada passo (pode rodar de novo)
+  sudo llm-dlp install-lock     (recomendado) o Claude Code só funciona passando pelo llm-dlp
+  llm-dlp uninstall             desfaz a configuração do Claude Code
+  sudo llm-dlp uninstall-lock   tira a trava
+  llm-dlp update [--version X.Y.Z] [--file ARQ.tar.gz]
                                 baixa a versão nova (ou a pedida), confere e troca a que está no ar
                                 sem tirá-lo do ar: não precisa fechar o Claude Code
 
 Dia a dia (normalmente você não precisa de nada disto)
   llm-dlp status                mostra se está no ar, em qual versão, e o que falta (OCR, binário novo)
-  llm-dlp recarregar            aplica uma mudança na configuração, sem tirar o llm-dlp do ar
-  llm-dlp parar                 para o llm-dlp, com o Claude Code fechado; ele volta sozinho na próxima
+  llm-dlp reload                aplica uma mudança na configuração, sem tirar o llm-dlp do ar
+  llm-dlp stop                  para o llm-dlp, com o Claude Code fechado; ele volta sozinho na próxima
                                 mensagem
-  llm-dlp importar-pessoas ARQ.csv --grupo COD:NOME:EMAIL [--separador-nome /]
+  llm-dlp import-people ARQ.csv --group COD:NOME:EMAIL [--name-separator /]
                                 ensina nomes e e-mails de pessoas (guardados só como hash)
-  sudo llm-dlp emergencia [30m|sair]
+  sudo llm-dlp emergency [30m|off]
                                 se o llm-dlp quebrar: libera o Claude SEM máscara por tempo limitado
 
 Conferir o que é mascarado
-  llm-dlp ultima [N]            mostra as últimas N mensagens como a API recebeu (já mascaradas)
-  llm-dlp testar < ARQ          mostra a versão mascarada de um texto
-  llm-dlp testar-midia ARQ DIR  processa uma imagem ou PDF como o proxy e grava o resultado em DIR
-  llm-dlp colunas ARQ           mostra como os campos de um arquivo são entendidos
-  llm-dlp simular SESSAO.jsonl  repete uma sessão antiga do Claude Code, sem falar com a API, e confere
-  llm-dlp medir ARQ.jsonl...    tempo e cobertura sobre sessões antigas (só contagens)
+  llm-dlp last [N]              mostra as últimas N mensagens como a API recebeu (já mascaradas)
+  llm-dlp test < ARQ            mostra a versão mascarada de um texto
+  llm-dlp test-media ARQ DIR    processa uma imagem ou PDF como o proxy e grava o resultado em DIR
+  llm-dlp columns ARQ           mostra como os campos de um arquivo são entendidos
+  llm-dlp simulate SESSAO.jsonl repete uma sessão antiga do Claude Code, sem falar com a API, e confere
+  llm-dlp measure ARQ.jsonl...  tempo e cobertura sobre sessões antigas (só contagens)
 
 Outros
-  llm-dlp versao                mostra a versão e o commit (também: --version)
-  llm-dlp ajuda                 mostra esta ajuda (também: --help, -h)
+  llm-dlp version               mostra a versão e o commit (também: --version)
+  llm-dlp help                  mostra esta ajuda (também: --help, -h)
 
-Configuração: %s (depois de mudar: llm-dlp recarregar)
+Configuração: %s (depois de mudar: llm-dlp reload)
 Log:          %s
 Documentação: https://github.com/yurivenancio30/llm-dlp
 
 Internos (quem chama são os ganchos do Claude Code e o supervisor):
-  garantir, verificar, servir, supervisionar
+  ensure, check, serve, supervise
 `
 
 func textoAjuda() string {
 	return fmt.Sprintf(ajuda, versao.Versao, config.Caminho("config.json"), config.Caminho("llm-dlp.log"))
+}
+
+// nomesAntigos: os nomes em português de antes da 0.9.0. Continuam aceitos (os hooks já
+// instalados no Claude Code chamam "garantir" e "verificar", e o supervisor sobe "servir" e
+// "supervisionar", que toda versão entende: ver iniciarProxy), mas não aparecem na ajuda nem
+// nas docs.
+var nomesAntigos = map[string]string{
+	"ajuda": "help", "servir": "serve", "supervisionar": "supervise", "garantir": "ensure",
+	"verificar": "check", "atualizar": "update", "recarregar": "reload", "emergencia": "emergency",
+	"parar": "stop", "importar-pessoas": "import-people", "testar": "test", "testar-midia": "test-media",
+	"medir": "measure", "colunas": "columns", "ultima": "last", "simular": "simulate",
+	"instalar": "install", "desinstalar": "uninstall", "instalar-trava": "install-lock",
+	"desinstalar-trava": "uninstall-lock", "versao": "version",
 }
 
 func main() {
@@ -67,51 +79,54 @@ func main() {
 		os.Exit(2)
 	}
 	cmd, args := os.Args[1], os.Args[2:]
+	if novo, ok := nomesAntigos[cmd]; ok {
+		cmd = novo
+	}
 	var err error
 	switch cmd {
-	case "ajuda", "help", "--help", "-h":
+	case "help", "--help", "-h":
 		fmt.Print(textoAjuda())
-	case "servir":
+	case "serve":
 		err = servir(args)
-	case "supervisionar":
+	case "supervise":
 		err = supervisionar(args)
-	case "atualizar":
+	case "update":
 		err = atualizar(args)
-	case "recarregar":
+	case "reload":
 		err = recarregar()
-	case "garantir":
+	case "ensure":
 		err = garantir()
 	case "status":
 		err = status()
-	case "verificar":
+	case "check":
 		err = verificar()
-	case "emergencia":
+	case "emergency":
 		err = emergencia(args)
-	case "parar":
+	case "stop":
 		err = parar()
-	case "importar-pessoas":
+	case "import-people":
 		err = importarPessoas(args)
-	case "testar":
+	case "test":
 		err = testar()
-	case "testar-midia":
+	case "test-media":
 		err = testarMidia(args)
-	case "medir":
+	case "measure":
 		err = medir(args)
-	case "colunas":
+	case "columns":
 		err = colunas(args)
-	case "ultima":
+	case "last":
 		err = ultima(args)
-	case "simular":
+	case "simulate":
 		err = simular(args)
-	case "instalar":
+	case "install":
 		err = instalar(args)
-	case "desinstalar":
+	case "uninstall":
 		err = desinstalar(args)
-	case "instalar-trava":
+	case "install-lock":
 		err = instalarTrava(false)
-	case "desinstalar-trava":
+	case "uninstall-lock":
 		err = instalarTrava(true)
-	case "versao", "--version", "-v":
+	case "version", "--version", "-v":
 		fmt.Println("llm-dlp", versao.Completa())
 	default:
 		fmt.Fprintf(os.Stderr, "llm-dlp: comando desconhecido: %q\n\n", cmd)

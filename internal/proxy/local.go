@@ -79,7 +79,7 @@ func ProvaConfere(chave []byte, uso, prova string) bool {
 	return len(chave) > 0 && hmac.Equal([]byte(prova), []byte(Prova(chave, uso)))
 }
 
-// CabecalhoProva: o cabeçalho com que "llm-dlp ultima" se apresenta.
+// CabecalhoProva: o cabeçalho com que "llm-dlp last" se apresenta.
 const CabecalhoProva = "X-Llm-Dlp-Prova"
 
 // desafioValido: 16 a 64 dígitos hexadecimais (o llm-dlp não assina texto livre).

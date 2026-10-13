@@ -77,7 +77,7 @@ func ultima(args []string) error {
 	return nil
 }
 
-// mensagemVista: uma mensagem da última requisição, com os textos que "llm-dlp ultima" mostra.
+// mensagemVista: uma mensagem da última requisição, com os textos que "llm-dlp last" mostra.
 type mensagemVista struct {
 	papel  string
 	textos []string
@@ -266,14 +266,15 @@ func textosDoConteudo(c any) []string {
 // a resposta voltou igual ao texto original; e as mensagens antigas saíram idênticas às da
 // requisição anterior (o cache da API depende disso). Só imprime contagens.
 func simular(args []string) error {
-	fs := flag.NewFlagSet("simular", flag.ContinueOnError)
+	fs := flag.NewFlagSet("simulate", flag.ContinueOnError)
 	max := fs.Int("max", 400, "número máximo de requisições por sessão")
-	janela := fs.Int("janela", 600, "tamanho máximo da conversa, em KB (como o limite de contexto)")
+	janela := fs.Int("window", 600, "tamanho máximo da conversa, em KB (como o limite de contexto)")
+	fs.IntVar(janela, "janela", 600, "nome antigo de --window")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	if fs.NArg() == 0 {
-		return fmt.Errorf("uso: llm-dlp simular [--max N] SESSAO.jsonl...")
+		return fmt.Errorf("uso: llm-dlp simulate [--max N] [--window KB] SESSAO.jsonl...")
 	}
 	cfg, chave, _, _, _, err := carregarTudo()
 	if err != nil {

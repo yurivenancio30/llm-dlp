@@ -363,7 +363,7 @@ func TestGeminiErroNoLogSemAChave(t *testing.T) {
 	}
 }
 
-// "llm-dlp ultima" também mostra a conversa do Gemini: a última requisição mascarada fica
+// "llm-dlp last" também mostra a conversa do Gemini: a última requisição mascarada fica
 // guardada (só para quem tem a chave), e a contagem de tokens não toma o lugar dela.
 func TestGeminiUltima(t *testing.T) {
 	cfg := config.Padrao()

@@ -19,7 +19,7 @@ import (
 // as ferramentas de classificação de dados usam (piicatcher, OpenMetadata, datahub-classify,
 // em inglês) com os termos e prefixos usados no Brasil (NM_, NO_, NU_, CO_, CD_...). Como
 // cada empresa abrevia do seu jeito, dá para acrescentar palavras no config.json
-// (campos_extras) e ver o que foi reconhecido com "llm-dlp colunas arquivo".
+// (extra_fields) e ver o que foi reconhecido com "llm-dlp columns arquivo".
 type vocabulario struct {
 	classe map[string]string // palavra -> tipo de dado do campo
 	pessoa map[string]bool   // de quem é o campo: "cliente", "titular", "owner"...

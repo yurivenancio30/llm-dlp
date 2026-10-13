@@ -29,13 +29,33 @@ var denyLLMDLP = []string{
 	"Read(~/.config/llm-dlp/**)",    // a chave e os hashes nunca são lidos pelo agente
 	"Edit(~/.config/llm-dlp/**)",    // nem alterados
 	"Bash(*.config/llm-dlp*)",       // nem por um comando (a configuração decide o que é mascarado e para onde vai)
-	"Bash(*llm-dlp emergencia*)",    // o agente não tenta ligar a emergência (a barreira real é o sudo)
+	"Bash(*llm-dlp emergency*)",     // o agente não tenta ligar a emergência (a barreira real é o sudo)
+	"Bash(*llm-dlp emergencia*)",    // (o nome antigo do comando continua aceito)
 	"Bash(*managed-settings.json*)", // nem mexer na trava
+}
+
+// hooksLLMDLP: o comando de cada hook do Claude Code. hooksAntigos: os nomes de antes da 0.9.0,
+// que o install troca pelos novos e o uninstall também reconhece.
+var (
+	hooksLLMDLP  = map[string]string{"SessionStart": "ensure", "UserPromptSubmit": "check"}
+	hooksAntigos = map[string]string{"SessionStart": "garantir", "UserPromptSubmit": "verificar"}
+)
+
+// ehHookLLMDLP: o grupo de hooks (em JSON) chama o llm-dlp, com o nome novo ou o antigo?
+func ehHookLLMDLP(grupo []byte) bool {
+	for _, m := range []map[string]string{hooksLLMDLP, hooksAntigos} {
+		for _, acao := range m {
+			if strings.Contains(string(grupo), "llm-dlp "+acao) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 type entrada struct {
 	r       *bufio.Reader
-	semPerg bool // --sim: responde "sim" a tudo (para scripts)
+	semPerg bool // --yes: responde "sim" a tudo (para scripts)
 }
 
 func (e entrada) perguntar(msg string) string {
@@ -70,7 +90,7 @@ func comSudo(args ...string) error {
 func instalar(args []string) error {
 	in := entrada{r: bufio.NewReader(os.Stdin)}
 	for _, a := range args {
-		if a == "--sim" {
+		if a == "--yes" || a == "--sim" {
 			in.semPerg = true
 		}
 	}
@@ -149,7 +169,7 @@ Em dois passos (OCR e trava) ele usa sudo: a sua senha será pedida nessa hora.`
 		fmt.Printf("      falta %s. Comando:  sudo sh -c '%s'\n", falta, cmd)
 		if cmd != "" && !in.semPerg && in.confirmar("      Instalar agora? (pede a senha do sudo)") {
 			if err := comSudo("sh", "-c", cmd); err != nil {
-				fmt.Println("      ! a instalação falhou; rode o comando acima à mão e depois rode o llm-dlp instalar de novo")
+				fmt.Println("      ! a instalação falhou; rode o comando acima à mão e depois rode o llm-dlp install de novo")
 			}
 		}
 		if falta := faltaOCR(cfg); falta != "" {
@@ -164,8 +184,8 @@ Em dois passos (OCR e trava) ele usa sudo: a sua senha será pedida nessa hora.`
 	// 4. Claude Code
 	passo(4, "Claude Code", "só para quem usa o Claude Code (com o Gemini CLI, o Codex, o opencode ou o Copilot, responda n:\n      eles são apontados à mão, ver o README). Faz o Claude Code passar pelo llm-dlp. Muda o\n      ~/.claude/settings.json (com backup):")
 	fmt.Printf(`        • ANTHROPIC_BASE_URL=http://%s  → as mensagens passam pelo llm-dlp
-        • ao abrir uma sessão: "llm-dlp garantir"   → sobe o llm-dlp se não estiver no ar
-        • a cada mensagem:     "llm-dlp verificar"  → barra a mensagem se algo estiver errado
+        • ao abrir uma sessão: "llm-dlp ensure"   → sobe o llm-dlp se não estiver no ar
+        • a cada mensagem:     "llm-dlp check"  → barra a mensagem se algo estiver errado
         • proíbe o agente de ler/editar ~/.config/llm-dlp e de mexer na emergência e na trava
 `, endereco(cfg))
 	if in.confirmar("      Aplicar?") {
@@ -179,13 +199,13 @@ Em dois passos (OCR e trava) ele usa sudo: a sua senha será pedida nessa hora.`
 			fmt.Println("      ✓ aplicado")
 		}
 		if err := garantir(); errors.Is(err, errSemProva) {
-			fmt.Println("      ! há outro llm-dlp no ar (de antes desta instalação): feche o Claude Code e rode \"llm-dlp parar\" para este assumir")
+			fmt.Println("      ! há outro llm-dlp no ar (de antes desta instalação): feche o Claude Code e rode \"llm-dlp stop\" para este assumir")
 		} else if err != nil {
 			return err
 		} else if info, _ := saude(cfg); info.Commit != versao.Commit || info.Versao != versao.Versao {
 			// uma versão anterior no ar: troca por esta sem tirar o llm-dlp do ar
 			if err := trocarServico(cfg, info, versao.Commit); err != nil {
-				fmt.Printf("      ! a versão anterior (%s) continua no ar: %v. Tente: llm-dlp atualizar\n", info.Versao, err)
+				fmt.Printf("      ! a versão anterior (%s) continua no ar: %v. Tente: llm-dlp update\n", info.Versao, err)
 			} else {
 				fmt.Printf("      ✓ llm-dlp no ar (a %s no lugar da %s, sem sair do ar)\n", versao.Versao, info.Versao)
 			}
@@ -206,7 +226,7 @@ Em dois passos (OCR e trava) ele usa sudo: a sua senha será pedida nessa hora.`
 		fmt.Println("      – pulado: a trava é do Claude Code, que não foi ligado no passo 4")
 	} else {
 		if v := versaoClaudeCode(); v != "" && versaoMenor(v, "2.1.285") {
-			fmt.Printf("      ! seu Claude Code está na %s; a trava exige a 2.1.285 ou mais nova. Atualize e rode o llm-dlp instalar de novo.\n", v)
+			fmt.Printf("      ! seu Claude Code está na %s; a trava exige a 2.1.285 ou mais nova. Atualize e rode o llm-dlp install de novo.\n", v)
 		} else if !in.semPerg && in.confirmar("      Instalar a trava agora? (pede a senha do sudo)") {
 			if err := comSudo(destino, "instalar-trava"); err != nil {
 				fmt.Println("      ! falhou; rode à mão:  sudo", destino, "instalar-trava")
@@ -231,26 +251,26 @@ Em dois passos (OCR e trava) ele usa sudo: a sua senha será pedida nessa hora.`
 	case comClaude:
 		ok(false, "", "llm-dlp fora do ar: veja "+config.Caminho("llm-dlp.log"))
 	default:
-		nada("llm-dlp ainda não está no ar: com outro cliente, ele sobe com llm-dlp garantir (o README mostra como deixar isso automático)")
+		nada("llm-dlp ainda não está no ar: com outro cliente, ele sobe com llm-dlp ensure (o README mostra como deixar isso automático)")
 	}
 	if comClaude {
 		ok(true, "Claude Code passa pelo llm-dlp", "")
 	} else {
-		nada("Claude Code não ligado (passo 4 pulado). Se você usa o Claude Code, rode o llm-dlp instalar de novo e aceite o passo 4")
+		nada("Claude Code não ligado (passo 4 pulado). Se você usa o Claude Code, rode o llm-dlp install de novo e aceite o passo 4")
 	}
 	ok(faltaOCR(cfg) == "", "OCR de imagens e PDFs", "sem OCR: imagens e PDFs não são enviados (para instalar: "+ocr.DicaInstalacao()+")")
 	switch {
 	case travaInstalada(endereco(cfg)):
 		fmt.Println("  ✓ trava instalada")
 	case comClaude:
-		ok(false, "", "sem trava: rode o llm-dlp instalar de novo e aceite o passo 5")
+		ok(false, "", "sem trava: rode o llm-dlp install de novo e aceite o passo 5")
 	default:
 		nada("sem trava (ela é só do Claude Code)")
 	}
 	if len(cfg.DominiosInternos) > 0 || contarTermos(cfg) > 0 {
 		fmt.Println("  ✓ domínios internos e nomes protegidos configurados")
 	} else {
-		fmt.Println("  – sem domínio interno nem nomes protegidos (opcional: rode o llm-dlp instalar de novo para informar)")
+		fmt.Println("  – sem domínio interno nem nomes protegidos (opcional: rode o llm-dlp install de novo para informar)")
 	}
 	if comClaude {
 		fmt.Println("\nPara valer: feche e abra o Claude Code (no VS Code, recarregue a janela).")
@@ -293,23 +313,7 @@ func desinstalar(args []string) error {
 			delete(env, "ANTHROPIC_BASE_URL")
 		}
 	}
-	if hooks, ok := s["hooks"].(map[string]any); ok {
-		for ev, v := range hooks {
-			lista, _ := v.([]any)
-			var fica []any
-			for _, g := range lista {
-				b, _ := json.Marshal(g)
-				if !strings.Contains(string(b), "llm-dlp garantir") && !strings.Contains(string(b), "llm-dlp verificar") {
-					fica = append(fica, g)
-				}
-			}
-			if len(fica) == 0 {
-				delete(hooks, ev)
-			} else {
-				hooks[ev] = fica
-			}
-		}
-	}
+	tirarHooks(s)
 	if perms, ok := s["permissions"].(map[string]any); ok {
 		deny, _ := perms["deny"].([]any)
 		var fica []any
@@ -345,11 +349,11 @@ func desinstalar(args []string) error {
 	// deixaria essas sessões sem resposta (falha fechada).
 	fmt.Println("✓ removido do Claude Code (backup em " + bak + ").")
 	fmt.Println("  O llm-dlp continua no ar para as sessões que já estão abertas. Feche e abra o Claude Code")
-	fmt.Println("  (ou o VS Code) e depois rode: llm-dlp parar")
+	fmt.Println("  (ou o VS Code) e depois rode: llm-dlp stop")
 	cfg, _ := config.Carregar()
 	if travaInstalada(endereco(cfg)) {
 		fmt.Println("! A trava continua instalada: sem o llm-dlp, o Claude Code vai se recusar a funcionar. Remova com:")
-		fmt.Println("      sudo llm-dlp desinstalar-trava")
+		fmt.Println("      sudo llm-dlp uninstall-lock")
 	}
 	fmt.Println("A pasta", config.Dir(), "(config e chave) foi mantida; apague à mão se quiser.")
 	return nil
@@ -364,10 +368,8 @@ func instalarTrava(remover bool) error {
 	if u := os.Getenv("SUDO_USER"); u != "" { // usa a porta configurada pelo usuário
 		if uu, err := user.Lookup(u); err == nil {
 			if b, err := os.ReadFile(filepath.Join(uu.HomeDir, ".config", "llm-dlp", "config.json")); err == nil {
-				var c struct {
-					Porta int `json:"porta"`
-				}
-				if json.Unmarshal(b, &c) == nil && c.Porta > 0 {
+				var c config.Config // (com os nomes novos ou os antigos)
+				if config.Ler(b, &c) == nil && c.Porta > 0 {
 					porta = c.Porta
 				}
 			}
@@ -466,21 +468,10 @@ func aplicarClaude(home, bin string, cfg config.Config) (string, error) {
 		return v
 	}
 	sub("env")["ANTHROPIC_BASE_URL"] = "http://" + endereco(cfg)
-	hooks := sub("hooks")
-	for evento, acao := range map[string]string{"SessionStart": "garantir", "UserPromptSubmit": "verificar"} {
-		cmd := bin + " " + acao
-		lista, _ := hooks[evento].([]any)
-		tem := false
-		for _, g := range lista {
-			b, _ := json.Marshal(g)
-			tem = tem || strings.Contains(string(b), cmd)
-		}
-		if !tem {
-			// timeout explícito: hook que estoura o tempo é ignorado pelo Claude Code (falharia aberto)
-			hooks[evento] = append(lista, map[string]any{"hooks": []any{
-				map[string]any{"type": "command", "command": cmd, "timeout": timeoutHook}}})
-		}
-	}
+	// os hooks do llm-dlp que já estiverem lá (com o nome novo ou o antigo) saem e entram de
+	// novo: nunca ficam dois
+	tirarHooks(s)
+	porHooks(s, bin, hooksLLMDLP)
 	perms := sub("permissions")
 	deny, _ := perms["deny"].([]any)
 	for _, r := range denyLLMDLP {
@@ -494,6 +485,68 @@ func aplicarClaude(home, bin string, cfg config.Config) (string, error) {
 	}
 	perms["deny"] = deny
 	return gravarSettings(alvo, s, orig)
+}
+
+// tirarHooks tira do settings.json os hooks do llm-dlp (com o nome novo ou o antigo).
+func tirarHooks(s map[string]any) {
+	hooks, ok := s["hooks"].(map[string]any)
+	if !ok {
+		return
+	}
+	for ev, v := range hooks {
+		lista, _ := v.([]any)
+		var fica []any
+		for _, g := range lista {
+			if b, _ := json.Marshal(g); !ehHookLLMDLP(b) {
+				fica = append(fica, g)
+			}
+		}
+		if len(fica) == 0 {
+			delete(hooks, ev)
+		} else {
+			hooks[ev] = fica
+		}
+	}
+}
+
+// porHooks acrescenta os hooks do llm-dlp, com os nomes de comando dados.
+func porHooks(s map[string]any, bin string, nomes map[string]string) {
+	hooks, ok := s["hooks"].(map[string]any)
+	if !ok {
+		hooks = map[string]any{}
+		s["hooks"] = hooks
+	}
+	for _, evento := range []string{"SessionStart", "UserPromptSubmit"} {
+		lista, _ := hooks[evento].([]any)
+		// timeout explícito: hook que estoura o tempo é ignorado pelo Claude Code (falharia aberto)
+		hooks[evento] = append(lista, map[string]any{"hooks": []any{
+			map[string]any{"type": "command", "command": bin + " " + nomes[evento], "timeout": timeoutHook}}})
+	}
+}
+
+// hooksParaVersao: depois de trocar o binário pela versão v, os hooks do Claude Code passam a
+// chamar os nomes de comando que ela conhece: os em inglês desde a 0.9.0, os antigos antes
+// (voltar para uma versão anterior com os nomes novos barraria cada mensagem com "comando
+// desconhecido"). Só mexe no settings.json se ele já chama o llm-dlp e os nomes mudam.
+// Devolve se mudou.
+func hooksParaVersao(home, bin, v string) (bool, error) {
+	alvo := filepath.Join(home, ".claude", "settings.json")
+	s, orig, err := lerSettings(alvo)
+	if err != nil {
+		return false, err
+	}
+	nomes := hooksLLMDLP
+	if versaoMenor(v, primeiraEmIngles) {
+		nomes = hooksAntigos
+	}
+	b, _ := json.Marshal(s["hooks"])
+	if !ehHookLLMDLP(b) || strings.Contains(string(b), bin+" "+nomes["UserPromptSubmit"]+`"`) {
+		return false, nil
+	}
+	tirarHooks(s)
+	porHooks(s, bin, nomes)
+	_, err = gravarSettings(alvo, s, orig)
+	return err == nil, err
 }
 
 func lerSettings(alvo string) (map[string]any, []byte, error) {

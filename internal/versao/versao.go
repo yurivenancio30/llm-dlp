@@ -1,5 +1,5 @@
 // Package versao diz qual código está rodando: a versão (escrita aqui) e o commit (gravado na
-// compilação pelo Makefile). "llm-dlp versao" e /__llm-dlp/saude mostram os dois.
+// compilação pelo Makefile). "llm-dlp version" e /__llm-dlp/saude mostram os dois.
 package versao
 
 // Versao: a versão do llm-dlp, no formato MAIOR.MENOR.CORREÇÃO (ver docs/pt-BR/versoes.md). É a única

@@ -546,7 +546,7 @@ func (m *Masker) acharXML(s string, add func(ini, fim int, tipo string)) {
 	}
 }
 
-// Coluna descreve como um nome de campo foi entendido (para o comando "llm-dlp colunas").
+// Coluna descreve como um nome de campo foi entendido (para o comando "llm-dlp columns").
 type Coluna struct {
 	Nome, Classe string
 }

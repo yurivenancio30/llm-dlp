@@ -11,14 +11,14 @@ import (
 
 // PadraoExtra é uma regex própria do usuário, com um rótulo para o pseudônimo.
 type PadraoExtra struct {
-	Rotulo string `json:"rotulo"`
+	Rotulo string `json:"label"`
 	Regex  string `json:"regex"`
 }
 
 // Termo é uma lista de valores exatos (sem diferenciar maiúsculas) que devem ser mascarados.
 type Termo struct {
-	Rotulo  string   `json:"rotulo"`
-	Valores []string `json:"valores"`
+	Rotulo  string   `json:"label"`
+	Valores []string `json:"values"`
 }
 
 // Provedor: outra API de LLM atendida na mesma porta, pelo caminho "/<nome>/..." (o cliente
@@ -31,67 +31,67 @@ type Provedor struct {
 	// modo genérico (todo texto da requisição é mascarado, e a resposta em streaming não é
 	// desmascarada). Um caminho terminado em /chat/completions é sempre lido como "openai", e um
 	// terminado em /responses, como "responses".
-	Formato string `json:"formato"`
+	Formato string `json:"format"`
 }
 
 type Config struct {
-	Porta    int    `json:"porta"`
+	Porta    int    `json:"port"`
 	Upstream string `json:"upstream"`
 	// Outras APIs, pelo nome que vai no caminho. O que não começa com um nome daqui vai para
 	// Upstream (a API da Anthropic).
-	Provedores map[string]Provedor `json:"provedores"`
+	Provedores map[string]Provedor `json:"providers"`
 
 	// Hostnames e e-mails que contêm um destes trechos são tratados como internos.
-	DominiosInternos []string `json:"dominios_internos"`
+	DominiosInternos []string `json:"internal_domains"`
 	// E-mails e domínios que passam sem máscara.
-	EmailsLiberados        []string `json:"emails_liberados"`
-	DominiosEmailLiberados []string `json:"dominios_email_liberados"`
+	EmailsLiberados        []string `json:"allowed_emails"`
+	DominiosEmailLiberados []string `json:"allowed_email_domains"`
 	// Primeiro rótulo de hostname que pode ficar visível (ex.: "mysql" em mysql.empresa.intra).
-	PapeisHost []string `json:"papeis_host"`
+	PapeisHost []string `json:"host_roles"`
 
-	PadroesExtras []PadraoExtra `json:"padroes_extras"`
-	Termos        []Termo       `json:"termos"`
+	PadroesExtras []PadraoExtra `json:"extra_patterns"`
+	Termos        []Termo       `json:"terms"`
 
 	// Detectores que o usuário quer desligar (ex.: "endereco").
-	DetectoresDesligados []string `json:"detectores_desligados"`
+	DetectoresDesligados []string `json:"disabled_detectors"`
 	// Detectores opcionais que o usuário quer ligar. Hoje: "quase" (quase identificadores:
 	// sexo, idade, estado civil, profissão, nacionalidade, renda, latitude/longitude).
-	DetectoresOpcionais []string `json:"detectores_opcionais,omitempty"`
+	DetectoresOpcionais []string `json:"optional_detectors,omitempty"`
 
 	// Palavras a mais para reconhecer nomes de campo (cabeçalho de CSV, chave de JSON...).
 	// Tipos: cpf, cnpj, rg, cnh, pis, doc, nascimento, telefone, cep, endereco, usuario,
 	// conta, cartao, sensivel, nome, quase; "pessoa" (de quem é o campo: "segurado") e
 	// "neutra" (palavra que não muda o que o campo guarda: "bco", "sis").
-	CamposExtras []CampoExtra `json:"campos_extras,omitempty"`
+	CamposExtras []CampoExtra `json:"extra_fields,omitempty"`
 
 	// CPF e CNPJ só com dígitos (sem pontuação) são mascarados mesmo sem a palavra "cpf"/"cnpj"
 	// por perto, desde que o dígito verificador confira. Cerca de 1 em cada 100 números
 	// aleatórios desse tamanho também confere: esses são mascarados a mais (na dúvida, mascara).
-	DocumentosSemContexto bool `json:"documentos_sem_contexto"`
+	DocumentosSemContexto bool `json:"documents_without_context"`
 
 	// Bloqueia (502) requisições que o llm-dlp não sabe mascarar, em vez de deixá-las passar.
-	FalharFechado bool `json:"falhar_fechado"`
+	FalharFechado bool `json:"fail_closed"`
 
 	OCR OCR `json:"ocr"`
 
 	// Ferramentas cuja entrada NUNCA é desmascarada: vão para a internet, então devem
 	// levar só pseudônimos (evita que uma página maliciosa induza o modelo a mandar o
 	// dado real numa URL).
-	FerramentasSemDesmascarar []string `json:"ferramentas_sem_desmascarar"`
+	FerramentasSemDesmascarar []string `json:"tools_never_unmasked"`
 
 	// Nomes de recursos internos (servidor, banco, schema, tabela, coluna...), reconhecidos
 	// pela estrutura do conteúdo. Ver docs/pt-BR/configuracao.md.
-	Objetos Objetos `json:"objetos"`
+	Objetos Objetos `json:"objects"`
 }
 
 // Objetos liga e desliga, por tipo de entidade, o mascaramento e a propagação. Tipo que não
 // estiver nos mapas fica no padrão: mascarar todos; propagar todos menos coluna e índice.
 type Objetos struct {
-	Ligado   bool            `json:"ligado"`
-	Mascarar map[string]bool `json:"mascarar,omitempty"`
-	Propagar map[string]bool `json:"propagar,omitempty"`
+	Ligado   bool            `json:"enabled"`
+	Mascarar map[string]bool `json:"mask,omitempty"`
+	Propagar map[string]bool `json:"propagate,omitempty"`
 	// IPv4 público e IPv6 viram nome de servidor (desligado: só o IP privado é mascarado).
-	IPPublico bool `json:"ip_publico"`
+	IPPublico bool `json:"public_ip"`
 }
 
 // PrefixoConectores: ferramentas dos conectores do claude.ai (Gmail, Drive...). Rodam fora
@@ -113,16 +113,17 @@ func (c Config) SemDesmascarar(ferramenta string) bool {
 
 // OCR controla imagens e PDFs enviados à LLM.
 type OCR struct {
-	// "mascarar" (OCR e cobre o que é sensível), "bloquear" (não deixa sair) ou "permitir".
-	Modo       string            `json:"modo"`
+	// "mask" (OCR e cobre o que é sensível), "block" (não deixa sair) ou "allow" (até a 0.8.0:
+	// "mascarar", "bloquear", "permitir"; ainda aceitos, ver Ler).
+	Modo       string            `json:"mode"`
 	Tesseract  string            `json:"tesseract"`
 	PDFToText  string            `json:"pdftotext"`
 	PDFToPPM   string            `json:"pdftoppm"`
-	Idioma     string            `json:"idioma"`
+	Idioma     string            `json:"language"`
 	Env        map[string]string `json:"env"` // ex.: LD_LIBRARY_PATH, TESSDATA_PREFIX
-	MaxPaginas int               `json:"max_paginas"`
+	MaxPaginas int               `json:"max_pages"`
 	// PDF com texto e sem nada sensível sai original; com true, sai sempre como texto extraído.
-	PDFEstrito bool `json:"pdf_estrito"`
+	PDFEstrito bool `json:"strict_pdf"`
 }
 
 // ProvedoresPadrao: as APIs que já vêm configuradas.
@@ -150,7 +151,7 @@ func Padrao() Config {
 			"nginx", "gms", "frontend", "dh-gms", "dh-frontend", "schema-registry", "actions", "mae", "mce", "api", "db", "web"},
 		FalharFechado:         true,
 		DocumentosSemContexto: true,
-		OCR: OCR{Modo: "mascarar", Tesseract: "tesseract", PDFToText: "pdftotext", PDFToPPM: "pdftoppm",
+		OCR: OCR{Modo: "mask", Tesseract: "tesseract", PDFToText: "pdftotext", PDFToPPM: "pdftoppm",
 			Idioma: "por", Env: map[string]string{}, MaxPaginas: 30},
 		FerramentasSemDesmascarar: []string{"WebFetch", "WebSearch"},
 	}
@@ -181,15 +182,15 @@ func Carregar() (Config, error) {
 	if err != nil {
 		return c, err
 	}
-	if err := json.Unmarshal(b, &c); err != nil {
+	if err := Ler(b, &c); err != nil {
 		return c, err
 	}
 	return c, nil
 }
 
 type CampoExtra struct {
-	Tipo     string   `json:"tipo"`
-	Palavras []string `json:"palavras"`
+	Tipo     string   `json:"type"`
+	Palavras []string `json:"words"`
 }
 
 func (c Config) Opcional(detector string) bool {

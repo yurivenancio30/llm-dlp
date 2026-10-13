@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// "llm-dlp ultima" lê a última requisição nos dois formatos: o da Anthropic (messages) e o do
+// "llm-dlp last" lê a última requisição nos dois formatos: o da Anthropic (messages) e o do
 // Gemini (contents, com chamada e resultado de ferramenta).
 func TestMensagensDaUltima(t *testing.T) {
 	casos := []struct {
@@ -37,7 +37,7 @@ func TestMensagensDaUltima(t *testing.T) {
 	}
 }
 
-// O "llm-dlp ultima" também lê o Gemini CLI com a conta Google (a conversa dentro de "request") e
+// O "llm-dlp last" também lê o Gemini CLI com a conta Google (a conversa dentro de "request") e
 // o Responses do Codex (instruções e itens).
 func TestMensagensDaUltimaAssinaturas(t *testing.T) {
 	codeAssist := `{"model":"m","project":"p","request":{"contents":[{"role":"user","parts":[{"text":"oi"}]}]}}`

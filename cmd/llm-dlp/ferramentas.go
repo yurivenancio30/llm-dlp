@@ -24,17 +24,19 @@ import (
 // Comandos de apoio: importar-pessoas, testar, testar-midia, medir, colunas.
 
 func importarPessoas(args []string) error {
-	fs := flag.NewFlagSet("importar-pessoas", flag.ExitOnError)
+	fs := flag.NewFlagSet("import-people", flag.ExitOnError)
 	var grupos multi
-	fs.Var(&grupos, "grupo", "COD:NOME:EMAIL (colunas da mesma pessoa; qualquer uma pode ficar vazia)")
-	sep := fs.String("separador-nome", "", `o nome vem como "PESSOA/ÁREA": só a parte antes deste separador é o nome`)
+	fs.Var(&grupos, "group", "COD:NOME:EMAIL (colunas da mesma pessoa; qualquer uma pode ficar vazia)")
+	fs.Var(&grupos, "grupo", "nome antigo de --group")
+	sep := fs.String("name-separator", "", `o nome vem como "PESSOA/ÁREA": só a parte antes deste separador é o nome`)
+	fs.StringVar(sep, "separador-nome", "", "nome antigo de --name-separator")
 	if len(args) == 0 {
 		return errors.New("informe o arquivo CSV")
 	}
 	arq := args[0]
 	fs.Parse(args[1:])
 	if len(grupos) == 0 {
-		return errors.New("informe ao menos um --grupo")
+		return errors.New("informe ao menos um --group")
 	}
 	_, chave, pessoas, _, _, err := carregarTudo()
 	if err != nil {
@@ -130,7 +132,7 @@ func testar() error {
 // testarMidia processa uma imagem/PDF como o proxy faria e grava o que sairia em DIR.
 func testarMidia(args []string) error {
 	if len(args) < 2 {
-		return errors.New("uso: llm-dlp testar-midia ARQUIVO DIR_SAIDA")
+		return errors.New("uso: llm-dlp test-media ARQUIVO DIR_SAIDA")
 	}
 	cfg, _, _, _, m, err := carregarTudo()
 	if err != nil {
@@ -263,10 +265,10 @@ func textos(c any) []string {
 
 // colunas mostra como o llm-dlp entende os nomes de campo de um arquivo (o cabeçalho de um
 // CSV, as chaves de um JSON): o que será mascarado e o que ele não reconhece. Serve para
-// descobrir o que acrescentar em campos_extras no config.json.
+// descobrir o que acrescentar em extra_fields no config.json.
 func colunas(args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("uso: llm-dlp colunas ARQUIVO...")
+		return fmt.Errorf("uso: llm-dlp columns ARQUIVO...")
 	}
 	_, _, _, _, m, err := carregarTudo()
 	if err != nil {
@@ -300,8 +302,8 @@ func colunas(args []string) error {
 			}
 		}
 		if nao > 0 {
-			fmt.Println("\nSe algum campo não reconhecido guarda dado pessoal, acrescente a palavra dele em campos_extras no config.json, por exemplo:")
-			fmt.Println(`  "campos_extras": [{"tipo": "usuario", "palavras": ["chapa"]}, {"tipo": "pessoa", "palavras": ["segurado"]}]`)
+			fmt.Println("\nSe algum campo não reconhecido guarda dado pessoal, acrescente a palavra dele em extra_fields no config.json, por exemplo:")
+			fmt.Println(`  "extra_fields": [{"type": "usuario", "words": ["chapa"]}, {"type": "pessoa", "words": ["segurado"]}]`)
 			fmt.Println("Valores com formato próprio (e-mail, CPF com pontos, telefone, IP) são mascarados em qualquer campo.")
 		}
 	}

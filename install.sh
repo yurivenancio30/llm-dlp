@@ -2,9 +2,9 @@
 # llm-dlp installer.
 #
 # Downloads the release binary for this machine, checks its SHA-256 against the checksums
-# published with the release and runs "llm-dlp instalar" (the 5-step setup, which asks before
+# published with the release and runs "llm-dlp install" (the 5-step setup, which asks before
 # changing anything). If llm-dlp is already installed in ~/.local/bin, it runs
-# "llm-dlp atualizar" instead: it swaps the binary and the proxy that is running without taking
+# "llm-dlp update" instead: it swaps the binary and the proxy that is running without taking
 # llm-dlp offline (no setup questions, no need to close Claude Code).
 #
 #   curl -fsSL https://raw.githubusercontent.com/yurivenancio30/llm-dlp/main/install.sh | sh
@@ -110,12 +110,39 @@ echo "Checksum OK."
 tar -xzf "$TMP/$ARCHIVE" -C "$TMP" llm-dlp
 chmod 0755 "$TMP/llm-dlp"
 
+# Commands are in English since 0.9.0. Releases before it only know the Portuguese names
+# ("ajuda", "instalar", "atualizar"...), which 0.9.0 and later still accept.
+english() { "$1" ajuda 2>/dev/null | grep -q "llm-dlp update"; }
+# newer A B: version A is newer than version B
+newer() {
+	awk -v a="$1" -v b="$2" 'BEGIN { split(a, x, "."); split(b, y, ".")
+		for (i = 1; i <= 3; i++) { if (x[i] + 0 > y[i] + 0) exit 0; if (x[i] + 0 < y[i] + 0) exit 1 }
+		exit 1 }'
+}
+
 # Already installed: update in place (versions without "atualizar" fall back to the setup).
-if [ -z "$NO_SETUP" ] && [ -x "$HOME/.local/bin/llm-dlp" ] &&
-	"$TMP/llm-dlp" ajuda 2>/dev/null | grep -q "llm-dlp atualizar"; then
-	echo
-	"$TMP/llm-dlp" atualizar --arquivo "$TMP/$ARCHIVE"
-	exit $?
+# Going back to an older version, the installed one runs the update when it knows how: it
+# also converts the configuration to the field names the older version reads.
+INSTALLED="$HOME/.local/bin/llm-dlp"
+if [ -z "$NO_SETUP" ] && [ -x "$INSTALLED" ]; then
+	current=$("$INSTALLED" versao 2>/dev/null | awk '{ print $2 }') || current=""
+	if [ -n "$current" ] && newer "$current" "$VERSION" && english "$INSTALLED"; then
+		echo
+		"$INSTALLED" update --file "$TMP/$ARCHIVE"
+		exit $?
+	elif english "$TMP/llm-dlp"; then
+		echo
+		"$TMP/llm-dlp" update --file "$TMP/$ARCHIVE"
+		exit $?
+	elif "$TMP/llm-dlp" ajuda 2>/dev/null | grep -q "llm-dlp atualizar"; then
+		echo
+		"$TMP/llm-dlp" atualizar --arquivo "$TMP/$ARCHIVE"
+		exit $?
+	fi
+fi
+SETUP=instalar
+if english "$TMP/llm-dlp"; then
+	SETUP=install
 fi
 
 # The setup asks questions, and with "curl | sh" the standard input is the script itself:
@@ -123,7 +150,7 @@ fi
 # binary.
 if [ -z "$NO_SETUP" ] && (exec </dev/tty) 2>/dev/null; then
 	echo
-	"$TMP/llm-dlp" instalar </dev/tty
+	"$TMP/llm-dlp" "$SETUP" </dev/tty
 	exit $?
 fi
 
@@ -136,4 +163,4 @@ case ":$PATH:" in
 *":$BIN_DIR:"*) ;;
 *) echo "Note: $BIN_DIR is not in your PATH." ;;
 esac
-echo "To finish (configuration, OCR, Claude Code and the lock), run:  $BIN_DIR/llm-dlp instalar"
+echo "To finish (configuration, OCR, Claude Code and the lock), run:  $BIN_DIR/llm-dlp $SETUP"

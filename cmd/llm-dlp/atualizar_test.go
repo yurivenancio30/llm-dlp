@@ -38,8 +38,30 @@ var binarios struct {
 	err  error
 }
 
+// TestMain põe a pasta pessoal num diretório temporário: install, uninstall e update mexem no
+// ~/.claude e no ~/.local/bin, e um teste não pode tocar nos de verdade. Os caches do Go ficam
+// nos de sempre (o go build dos testes de troca não recompila nem baixa tudo de novo).
 func TestMain(m *testing.M) {
+	if os.Getenv("GOPATH") == "" {
+		if h, err := os.UserHomeDir(); err == nil {
+			os.Setenv("GOPATH", filepath.Join(h, "go"))
+		}
+	}
+	if cache, err := os.UserCacheDir(); err == nil && os.Getenv("GOCACHE") == "" {
+		os.Setenv("GOCACHE", filepath.Join(cache, "go-build"))
+	}
+	if cfg, err := os.UserConfigDir(); err == nil && os.Getenv("GOENV") == "" {
+		os.Setenv("GOENV", filepath.Join(cfg, "go", "env"))
+	}
+	home, err := os.MkdirTemp("", "llm-dlp-home-")
+	if err != nil {
+		panic(err)
+	}
+	os.Setenv("HOME", home)
+	os.Unsetenv("XDG_CONFIG_HOME")
+	os.Unsetenv("XDG_CACHE_HOME")
 	c := m.Run()
+	os.RemoveAll(home)
 	if binarios.dir != "" {
 		os.RemoveAll(binarios.dir)
 	}
@@ -174,7 +196,7 @@ func (e *ambiente) supervisor() int {
 
 // encerrar para o supervisor (e o proxy) que o teste deixou no ar.
 func (e *ambiente) encerrar() {
-	e.rodar(e.destino, "parar")
+	e.rodar(e.destino, "stop")
 	if pid := e.supervisor(); pid > 0 {
 		syscall.Kill(pid, syscall.SIGKILL)
 	}
@@ -315,7 +337,7 @@ func TestAtualizarSemPausa(t *testing.T) {
 	a, b := compilados(t)
 	e := novoAmbiente(t)
 	e.instalar(a)
-	if out, err := e.rodar(e.destino, "garantir"); err != nil {
+	if out, err := e.rodar(e.destino, "ensure"); err != nil {
 		t.Fatalf("garantir: %v\n%s", err, out)
 	}
 	antigo := e.esperarCommit("aaaaaaa")
@@ -325,7 +347,7 @@ func TestAtualizarSemPausa(t *testing.T) {
 	go func() { longa <- e.pedir(&http.Client{Timeout: time.Minute}, "LONGA") }()
 	time.Sleep(500 * time.Millisecond)
 	// como o install.sh: o binário novo, de fora, atualiza o instalado
-	out, err := e.rodar(b, "atualizar", "--arquivo", pacote(t, b))
+	out, err := e.rodar(b, "update", "--file", pacote(t, b))
 	if err != nil {
 		t.Fatalf("atualizar: %v\n%s\nlog:\n%s", err, out, e.log())
 	}
@@ -355,7 +377,7 @@ func TestAtualizarSemPausa(t *testing.T) {
 	// recarregar: o mesmo binário num processo novo, também sem nenhuma falha
 	c = e.carga(4)
 	time.Sleep(200 * time.Millisecond)
-	if out, err := e.rodar(e.destino, "recarregar"); err != nil {
+	if out, err := e.rodar(e.destino, "reload"); err != nil {
 		t.Fatalf("recarregar: %v\n%s", err, out)
 	}
 	time.Sleep(300 * time.Millisecond)
@@ -365,7 +387,7 @@ func TestAtualizarSemPausa(t *testing.T) {
 	}
 
 	// a trava e o supervisor.pid passaram para o supervisor novo: o parar funciona
-	if out, err := e.rodar(e.destino, "parar"); err != nil {
+	if out, err := e.rodar(e.destino, "stop"); err != nil {
 		t.Fatalf("parar depois da troca: %v\n%s", err, out)
 	}
 	if s, ok := e.saude(); ok {
@@ -380,7 +402,7 @@ func TestProxyCaiSemRecusar(t *testing.T) {
 	a, _ := compilados(t)
 	e := novoAmbiente(t)
 	e.instalar(a)
-	if out, err := e.rodar(e.destino, "garantir"); err != nil {
+	if out, err := e.rodar(e.destino, "ensure"); err != nil {
 		t.Fatalf("garantir: %v\n%s", err, out)
 	}
 	antigo := e.esperarCommit("aaaaaaa")
@@ -415,7 +437,7 @@ func TestAtualizarVoltaSeNaoSobe(t *testing.T) {
 	a, _ := compilados(t)
 	e := novoAmbiente(t)
 	e.instalar(a)
-	if out, err := e.rodar(e.destino, "garantir"); err != nil {
+	if out, err := e.rodar(e.destino, "ensure"); err != nil {
 		t.Fatalf("garantir: %v\n%s", err, out)
 	}
 	antigo := e.esperarCommit("aaaaaaa")
@@ -423,6 +445,7 @@ func TestAtualizarVoltaSeNaoSobe(t *testing.T) {
 	os.WriteFile(quebrado, []byte("#!/bin/sh\n[ \"$1\" = versao ] && echo 'llm-dlp 9.9.9 (quebrado)' && exit 0\nexit 1\n"), 0o755)
 
 	c := e.carga(2)
+	// (com os nomes de antes da 0.9.0, que continuam aceitos)
 	out, err := e.rodar(e.destino, "atualizar", "--arquivo", pacote(t, quebrado))
 	saidaAtualizar := out
 	time.Sleep(time.Second)
@@ -436,7 +459,7 @@ func TestAtualizarVoltaSeNaoSobe(t *testing.T) {
 	if _, commit, _ := versaoDe(e.destino); commit != "aaaaaaa" {
 		t.Errorf("o instalado ficou com o commit %q; esperado o anterior de volta", commit)
 	}
-	if out, err := e.rodar(e.destino, "parar"); err != nil {
+	if out, err := e.rodar(e.destino, "stop"); err != nil {
 		t.Errorf("parar: %v\n%s\nsaída do atualizar:\n%s\nlog:\n%s", err, out, saidaAtualizar, e.log())
 	}
 }

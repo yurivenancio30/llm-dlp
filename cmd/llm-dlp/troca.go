@@ -51,7 +51,7 @@ const (
 	prazoPronto = 20 * time.Second
 )
 
-// portaDoServico: a porta emprestada pelo supervisor ou, sem ele (llm-dlp servir à mão), uma
+// portaDoServico: a porta emprestada pelo supervisor ou, sem ele (llm-dlp serve à mão), uma
 // aberta aqui. emprestada diz qual.
 func portaDoServico(endereco string) (ln net.Listener, emprestada bool, err error) {
 	if os.Getenv(envPorta) == "" {
@@ -129,7 +129,9 @@ type proxyFilho struct {
 }
 
 // iniciarProxy sobe "servir" com a porta emprestada e devolve o lado de leitura do aviso de
-// pronto. A porta vai como número cru (syscall.ForkExec), nunca por um *os.File: passar um
+// pronto. O nome antigo ("servir", não "serve"; "supervisionar" na reexecução e no garantir) é
+// de propósito: o binário instalado pode ser de uma versão anterior aos nomes em inglês (quem
+// voltou de versão), e toda versão entende o antigo. A porta vai como número cru (syscall.ForkExec), nunca por um *os.File: passar um
 // *os.File a um processo (exec.Cmd.ExtraFiles) chama Fd(), que põe o socket em modo
 // bloqueante, e o modo vale para todos os processos que o dividem. O proxy no ar ficaria
 // preso no accept e não conseguiria mais sair.
@@ -497,7 +499,8 @@ func supervisorNoAr() int {
 		return 0
 	}
 	cmdline := linhaDeComando(pid)
-	if !strings.Contains(cmdline, "supervisionar") || !strings.Contains(cmdline, "llm-dlp") {
+	// "supervisionar" (o que o llm-dlp sobe: ver iniciarProxy) ou "supervise"
+	if !strings.Contains(cmdline, "supervis") || !strings.Contains(cmdline, "llm-dlp") {
 		return 0
 	}
 	return pid

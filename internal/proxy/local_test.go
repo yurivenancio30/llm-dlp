@@ -121,7 +121,7 @@ func TestSoAtendeProgramaLocal(t *testing.T) {
 	}
 }
 
-// A última conversa (mascarada) só sai para quem lê a chave: o comando "llm-dlp ultima". Outro
+// A última conversa (mascarada) só sai para quem lê a chave: o comando "llm-dlp last". Outro
 // usuário da máquina, sem a chave, não lê nem usa o proxy para conferir palpites.
 func TestUltimaSoComAProva(t *testing.T) {
 	px, _, _ := montarLocal(t, true)

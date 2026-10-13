@@ -60,9 +60,9 @@ func emergenciaAtiva() (time.Time, bool) {
 
 func emergencia(args []string) error {
 	if os.Geteuid() != 0 {
-		return errors.New("o modo emergência desliga a máscara, então só o administrador liga. Rode: sudo llm-dlp emergencia [30m|sair]")
+		return errors.New("o modo emergência desliga a máscara, então só o administrador liga. Rode: sudo llm-dlp emergency [30m|off]")
 	}
-	if len(args) > 0 && args[0] == "sair" {
+	if len(args) > 0 && (args[0] == "off" || args[0] == "sair") {
 		if err := os.Remove(arquivoEmergencia()); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
@@ -83,7 +83,7 @@ func emergencia(args []string) error {
 	fmt.Printf(`
 ⚠️  MODO EMERGÊNCIA: por %s, as mensagens irão para a API SEM MÁSCARA.
     Use uma sessão NOVA do Claude Code, sem dados de cliente, só para consertar o llm-dlp.
-    Para sair antes: sudo llm-dlp emergencia sair
+    Para sair antes: sudo llm-dlp emergency off
 
 Digite LIBERAR para continuar: `, dur)
 	linha, _ := bufio.NewReader(os.Stdin).ReadString('\n')
