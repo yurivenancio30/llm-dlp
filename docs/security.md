@@ -7,8 +7,10 @@ To report a vulnerability, see [SECURITY.md](../.github/SECURITY.md).
 **What it protects:**
 
 - The LLM API does not receive the detected values, only pseudonyms.
-- The pseudonyms cannot be reversed without the key.
-- Nothing sensitive is written to disk by llm-dlp (only hashes).
+- The pseudonyms cannot be reversed without the key: every one comes from an HMAC-SHA256 with
+  the key (the ID and, in a mixed-case object name, the case of its letters). Of a fake IP, the
+  /24 network comes from the key and the last number stays (see [How it works](how-it-works.md)).
+- Nothing sensitive is written to disk by llm-dlp (only hashes, also with the key).
 - If something fails, the message does not go out.
 
 **Why the lock and the emergency mode require `sudo`:** this way, nothing running as your

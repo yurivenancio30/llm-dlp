@@ -23,12 +23,14 @@ var (
 	reLogReq   = regexp.MustCompile(` -> (\d{3}) \| (\d+) substituições \| (\d+) colisões`)
 	reLogTipos = regexp.MustCompile(` \| tipos: ([^|]+)`)
 	reLogND    = regexp.MustCompile(` \| NÃO DESFEITOS \d+: ([^|]+)`)
+	reLogCol   = regexp.MustCompile(` \| colididos: ([^|]+)`)
 	reLogAPI   = regexp.MustCompile(` \| API: ([\w.-]+)`)
 )
 
 type resumoLog struct {
 	desde                    time.Time
 	req, subst, colisoes     int
+	colididos                []string
 	status                   map[string]int // status HTTP diferente de 2xx
 	errosAPI                 map[string]int
 	tipos                    map[string]int
@@ -99,13 +101,22 @@ func (r *resumoLog) ler(in io.Reader) {
 		}
 		if nd := reLogND.FindStringSubmatch(msg); nd != nil {
 			r.respostasND++
-			for _, p := range strings.Split(nd[1], ",") {
-				if p = strings.TrimSpace(p); p != "" && len(r.pseudosND) < 40 && !contem(r.pseudosND, p) {
-					r.pseudosND = append(r.pseudosND, p)
-				}
-			}
+			r.pseudosND = juntarLista(r.pseudosND, nd[1])
+		}
+		if c := reLogCol.FindStringSubmatch(msg); c != nil {
+			r.colididos = juntarLista(r.colididos, c[1])
 		}
 	}
+}
+
+// juntarLista acrescenta os itens de "a, b, c" que ainda não estão em xs (até 40).
+func juntarLista(xs []string, lista string) []string {
+	for _, p := range strings.Split(lista, ",") {
+		if p = strings.TrimSpace(p); p != "" && len(xs) < 40 && !contem(xs, p) {
+			xs = append(xs, p)
+		}
+	}
+	return xs
 }
 
 func contem(xs []string, x string) bool {
@@ -143,6 +154,9 @@ func (r *resumoLog) texto(periodo string) string {
 		fmt.Fprintf(&b, "  erros da API: %s\n", contagens(r.errosAPI))
 	}
 	fmt.Fprintf(&b, "  substituições: %d; colisões (pseudônimo que ficou sem desmascarar): %d\n", r.subst, r.colisoes)
+	if len(r.colididos) > 0 {
+		fmt.Fprintf(&b, "    pseudônimos colididos: %s\n", strings.Join(r.colididos, ", "))
+	}
 	if len(r.tipos) > 0 {
 		fmt.Fprintf(&b, "  mascarados por tipo (valores distintos de cada requisição, somados): %s\n", contagens(r.tipos))
 	}

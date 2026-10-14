@@ -30,6 +30,7 @@ type Tabela struct {
 	ipPref map[string]string // "240.a.b" -> "10.42.7"
 	// Conflitos: pseudônimos que colidiram e por isso não serão desmascarados (para log).
 	Conflitos int
+	colididos []string // os pseudônimos (ou prefixos de IP falso) que colidiram, até 20
 
 	muND sync.Mutex
 	nd   []string // pseudônimos nossos que sobraram na volta (ver NaoDesfeitos)
@@ -75,6 +76,11 @@ func (t *Tabela) NaoDesfeitos() []string {
 	return slices.Clone(t.nd)
 }
 
+// Colididos: os pseudônimos que dois valores reais diferentes receberam nesta tabela (até 20; um
+// IP falso aparece como "240.a.b.x", a rede /24 inteira). Pseudônimo não é dado real: pode ir
+// para o log, e a forma dele diz o tipo.
+func (t *Tabela) Colididos() []string { return t.colididos }
+
 var reIPFalso = regexp.MustCompile(`\b(2(?:4\d|5[0-5])\.\d{1,3}\.\d{1,3})\.(\d{1,3})\b`)
 
 func NovaTabela(entradas []Entrada) *Tabela {
@@ -104,8 +110,11 @@ func NovaTabela(entradas []Entrada) *Tabela {
 		}
 		if r, ok := t.m[e.Pseudo]; ok {
 			// o mesmo número com outra pontuação ("12.345.678-9" e "123456789") não é
-			// colisão: é o mesmo valor. Fica a primeira grafia vista.
-			if r != e.Real && !mesmoValor(e.Tipo, r, e.Real) {
+			// colisão: é o mesmo valor. Fica a primeira grafia vista. Também não é colisão o mesmo
+			// pseudônimo de pessoa para dois nomes: o registro de pessoas dá o id da pessoa ao nome
+			// completo e ao primeiro + último ("Maria Fernanda Silva" e "Maria Silva"), e as duas
+			// grafias são a mesma pessoa.
+			if r != e.Real && e.Tipo != "nome" && !mesmoValor(e.Tipo, r, e.Real) {
 				conflito[e.Pseudo] = true
 			}
 			continue
@@ -154,6 +163,16 @@ func NovaTabela(entradas []Entrada) *Tabela {
 		}
 	}
 	t.Conflitos = len(conflito) + len(conflitoIP)
+	for p := range conflito {
+		t.colididos = append(t.colididos, p)
+	}
+	for f := range conflitoIP {
+		t.colididos = append(t.colididos, f+".x")
+	}
+	sort.Strings(t.colididos)
+	if len(t.colididos) > maxNaoDesfeitos {
+		t.colididos = t.colididos[:maxNaoDesfeitos]
+	}
 	for k := range t.m {
 		if len(k) > t.maxLen {
 			t.maxLen = len(k)

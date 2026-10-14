@@ -250,9 +250,9 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		p.vistos.SalvarSeSujo()
 	}
 	p.m.Persistir()
-	p.log.Printf("%s %s -> %d | %d substituições | %d colisões | mascarar %s | total %s%s%s%s%s", r.Method, limpo(r.URL.Path), resp.StatusCode,
+	p.log.Printf("%s %s -> %d | %d substituições | %d colisões | mascarar %s | total %s%s%s%s%s%s", r.Method, limpo(r.URL.Path), resp.StatusCode,
 		len(entradas), tab.Conflitos, tMascara.Round(time.Millisecond), time.Since(t0).Round(time.Millisecond), porTipo(entradas),
-		naoDesfeitos(tab), erroAPI, errSufixo(err))
+		colididos(tab), naoDesfeitos(tab), erroAPI, errSufixo(err))
 }
 
 // porTipo: quantos valores distintos de cada tipo foram mascarados (" | tipos: cpf 2, ip 1,
@@ -294,6 +294,16 @@ func naoDesfeitos(tab *mask.Tabela) string {
 		return ""
 	}
 	return fmt.Sprintf(" | NÃO DESFEITOS %d: %s", len(nd), strings.Join(nd, ", "))
+}
+
+// colididos: os pseudônimos que colidiram (" | colididos: CPF-x, 240.1.2.x"): a forma de cada um
+// diz o tipo do dado que ficou sem desmascarar.
+func colididos(tab *mask.Tabela) string {
+	c := tab.Colididos()
+	if len(c) == 0 {
+		return ""
+	}
+	return " | colididos: " + strings.Join(c, ", ")
 }
 
 // resumoDoErro: o tipo e o começo da mensagem de um erro da API, como ela mandou, para o log

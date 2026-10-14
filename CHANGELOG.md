@@ -57,12 +57,20 @@ was leaking is listed below.
 - RG of any state after `RG`, `registro geral` or `carteira de identidade` (`MG-12.345.678`,
   `1234567 SSP/DF`, 10 digits in RS): each state defines its number (Law 7.116/1983) and none
   publishes a check-digit rule, so it counts by the label. Before, only the São Paulo format.
+- The upper and lower case of the ID in the pseudonym of a mixed-case object name
+  (`Pedido_Item` → `T_aBcd…`) now also comes from the key. Before, it came from a hash without
+  the key, which let anyone who guessed the name confirm it by the case of each letter. A test
+  now checks that every pseudonym changes with the key and none contains the real value.
+- Two spellings of the same imported person (full name and first + last name) share the
+  pseudonym and are no longer counted as a collision: the pseudonym goes back to the first
+  spelling seen. Before, neither went back and the client saw the pseudonym.
 
 ### Program
 
 - The log line of each request also says how many values of each type were masked
   (`tipos: cpf 2, tabela 5`) and, when it happens, the pseudonyms that reached the client
-  without becoming the real value again (`NÃO DESFEITOS`). Counts and pseudonyms only.
+  without becoming the real value again (`NÃO DESFEITOS`) and those that collided
+  (`colididos`). Counts and pseudonyms only.
 - New command `llm-dlp audit [24h|7d]`: sums up the log of a period (what was masked by type,
   pseudonyms that came back, requests sent without masking, refused ones, API errors).
 - The log rotates at 10 MB also while llm-dlp is running (before, only when it started): at most

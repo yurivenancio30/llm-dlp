@@ -16,7 +16,7 @@ func TestResumoDoLog(t *testing.T) {
 	linhas := []string{
 		h(48*time.Hour) + "POST /v1/messages -> 200 | 9 substituições | 0 colisões | mascarar 1ms | total 2s | tipos: cpf 9",
 		h(2*time.Hour) + "POST /v1/messages -> 200 | 5 substituições | 0 colisões | mascarar 1ms | total 2s | tipos: tabela 3, cpf 1, ip 1",
-		h(time.Hour) + "POST /v1/messages -> 200 | 2 substituições | 1 colisões | mascarar 1ms | total 2s | tipos: cpf 2 | NÃO DESFEITOS 2: CPF-abcdefgh, t_xyzwvuts",
+		h(time.Hour) + "POST /v1/messages -> 200 | 2 substituições | 1 colisões | mascarar 1ms | total 2s | tipos: cpf 2 | colididos: 241.7.9.x | NÃO DESFEITOS 2: CPF-abcdefgh, t_xyzwvuts",
 		h(time.Hour) + "POST /v1/messages -> 529 | 0 substituições | 0 colisões | mascarar 1ms | total 2s | API: overloaded_error: Overloaded",
 		h(30*time.Minute) + "AVISO POST /v1/messages: enviado sem máscara (falhou)",
 		h(20*time.Minute) + `RECUSADO POST /v1/messages: não veio de um programa local (Host "x", Origin "")`,
@@ -26,11 +26,11 @@ func TestResumoDoLog(t *testing.T) {
 	r := novoResumo(agora.Add(-24 * time.Hour))
 	r.ler(strings.NewReader(strings.Join(linhas, "\n")))
 	if r.req != 3 || r.subst != 7 || r.colisoes != 1 || r.tipos["cpf"] != 3 || r.tipos["tabela"] != 3 || r.respostasND != 1 ||
-		len(r.pseudosND) != 2 || r.semMascara != 1 || r.recus != 1 || r.erros != 1 || r.status["529"] != 1 || r.errosAPI["overloaded_error"] != 1 {
+		len(r.pseudosND) != 2 || len(r.colididos) != 1 || r.semMascara != 1 || r.recus != 1 || r.erros != 1 || r.status["529"] != 1 || r.errosAPI["overloaded_error"] != 1 {
 		t.Fatalf("resumo: %+v", r)
 	}
 	txt := r.texto("24h")
-	for _, quer := range []string{"requisições: 3", "cpf 3", "CPF-abcdefgh, t_xyzwvuts", "SEM máscara", "recusadas: 1"} {
+	for _, quer := range []string{"requisições: 3", "cpf 3", "CPF-abcdefgh, t_xyzwvuts", "colididos: 241.7.9.x", "SEM máscara", "recusadas: 1"} {
 		if !strings.Contains(txt, quer) {
 			t.Errorf("falta %q em:\n%s", quer, txt)
 		}

@@ -130,8 +130,20 @@ func TestColisaoNaoDesmascara(t *testing.T) {
 	if got != want {
 		t.Fatalf("\n got %q\nwant %q", got, want)
 	}
-	if tab.Conflitos != 2 {
-		t.Errorf("conflitos = %d, esperado 2", tab.Conflitos)
+	if tab.Conflitos != 2 || strings.Join(tab.Colididos(), " ") != "250.1.2.x pessoa.aaaa@dom-x.invalid" {
+		t.Errorf("conflitos = %d %v, esperado 2", tab.Conflitos, tab.Colididos())
+	}
+}
+
+// O registro de pessoas dá o mesmo id ao nome completo e ao primeiro + último nome: é a mesma
+// pessoa, não colisão. A volta fica com a primeira grafia vista.
+func TestNomesDaMesmaPessoaNaoColidem(t *testing.T) {
+	tab := NovaTabela([]Entrada{
+		{"Pessoa abcdefgh", "Maria Fernanda Silva", "nome"},
+		{"Pessoa abcdefgh", "Maria Silva", "nome"},
+	})
+	if got := tab.Desmascarar("fale com Pessoa abcdefgh", false); got != "fale com Maria Fernanda Silva" || tab.Conflitos != 0 {
+		t.Errorf("%q, conflitos %d", got, tab.Conflitos)
 	}
 }
 

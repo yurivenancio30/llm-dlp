@@ -203,6 +203,7 @@ POST /v1/messages -> 200 | 245 substituições | 0 colisões | mascarar 9ms | to
 | `mascarar` | Tempo gasto pelo llm-dlp |
 | `total` | Tempo total, dominado pela resposta do modelo |
 | `tipos` | Quantos valores diferentes de cada tipo foram mascarados nessa requisição (`cpf 2`: dois CPFs diferentes). Só contagens |
+| `colididos: …` | Só quando acontece: os pseudônimos que colidiram (`240.1.2.x` é uma rede /24 falsa inteira). A forma de cada um diz o tipo do dado. Duas grafias da mesma pessoa importada (nome completo e primeiro + último nome) dividem o pseudônimo e não são colisão |
 | `NÃO DESFEITOS n: …` | Só quando acontece: pseudônimos gerados pelo llm-dlp que chegaram ao cliente na resposta sem voltar a ser o valor real (o modelo mudou ou cortou um, ou citou um de outra conversa; também um endereço da faixa falsa de IP). O que o cliente gravou em arquivo nessa resposta ficou com o pseudônimo. Os pseudônimos vão listados, para dar para procurá-los |
 | `API: tipo: mensagem` | Só quando a API responde com erro: o tipo e o começo da mensagem dela, como ela mandou (ela só recebeu pseudônimos). É o que distingue, por exemplo, um 429 de limite da conta de um 429 de requisição recusada |
 

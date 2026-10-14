@@ -7,8 +7,10 @@ Para relatar uma vulnerabilidade, veja [SECURITY.md](SECURITY.md).
 **O que protege:**
 
 - A API da LLM não recebe os valores detectados, só pseudônimos.
-- Os pseudônimos não podem ser revertidos sem a chave.
-- Nada sensível é gravado em disco pelo llm-dlp (só hashes).
+- Os pseudônimos não podem ser revertidos sem a chave: todos vêm de um HMAC-SHA256 com a chave
+  (o ID e, num nome de objeto de caixa mista, a caixa das letras dele). Num IP falso, a rede /24
+  vem da chave e o último número fica (ver [Como funciona](como-funciona.md)).
+- Nada sensível é gravado em disco pelo llm-dlp (só hashes, também com a chave).
 - Se algo falhar, a mensagem não sai.
 
 **Por que a trava e a emergência exigem `sudo`:** assim, nada que rode com o seu usuário,

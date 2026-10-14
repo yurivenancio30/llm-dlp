@@ -1,7 +1,6 @@
 package mask
 
 import (
-	"crypto/sha256"
 	"regexp"
 	"runtime"
 	"sort"
@@ -110,8 +109,9 @@ func canonObj(ent, v string) string {
 // Estável entre conversas e reinícios. Nome em minúsculas recebe o prefixo em minúsculas
 // ("t_..."), para combinar com o estilo do texto; em maiúsculas, o prefixo em maiúsculas. Nome
 // de caixa mista (Pedido_Item) recebe o prefixo com só a primeira letra maiúscula e as letras
-// do ID na caixa que um hash da própria grafia diz: o mesmo nome de SQL em duas grafias no
-// mesmo texto ("ContAB" e "ContAb", que são o mesmo objeto) sai com dois pseudônimos, e a volta
+// do ID na caixa que o HMAC da própria grafia diz (com a chave, como o resto do pseudônimo: um
+// hash sem chave deixaria conferir pela caixa um nome adivinhado): o mesmo nome de SQL em duas
+// grafias no mesmo texto ("ContAB" e "ContAb", que são o mesmo objeto) sai com dois pseudônimos, e a volta
 // devolve cada grafia como estava.
 func (m *Masker) pseudoObjeto(ent, real string) string {
 	pref := EntObjeto[ent]
@@ -125,7 +125,7 @@ func (m *Masker) pseudoObjeto(ent, real string) string {
 	case strings.ToUpper(real) == real:
 	default:
 		pref = pref[:1] + strings.ToLower(pref[1:])
-		h := sha256.Sum256([]byte(real))
+		h := m.p.Bits("caixa", real, 8)
 		b := []byte(id)
 		maius := false
 		for i := range b {

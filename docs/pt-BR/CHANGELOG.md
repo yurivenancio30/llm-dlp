@@ -59,12 +59,20 @@ inventados: o que vazava está listado abaixo.
   (`MG-12.345.678`, `1234567 SSP/DF`, 10 dígitos no RS): cada estado define o seu número (Lei
   7.116/1983) e nenhum publica regra de dígito verificador, então conta pelo rótulo. Antes, só o
   formato de São Paulo.
+- As maiúsculas e minúsculas do ID no pseudônimo de um nome de objeto de caixa mista
+  (`Pedido_Item` → `T_aBcd…`) passam a vir também da chave. Antes vinham de um hash sem a chave,
+  o que deixava quem adivinhasse o nome confirmá-lo pela caixa de cada letra. Um teste agora
+  confere que todo pseudônimo muda com a chave e que nenhum contém o valor real.
+- Duas grafias da mesma pessoa importada (nome completo e primeiro + último nome) dividem o
+  pseudônimo e deixam de contar como colisão: o pseudônimo volta à primeira grafia vista. Antes,
+  nenhuma voltava e o cliente via o pseudônimo.
 
 ### Programa
 
 - A linha de cada requisição no log diz também quantos valores de cada tipo foram mascarados
   (`tipos: cpf 2, tabela 5`) e, quando acontece, os pseudônimos que chegaram ao cliente sem
-  voltar a ser o valor real (`NÃO DESFEITOS`). Só contagens e pseudônimos.
+  voltar a ser o valor real (`NÃO DESFEITOS`) e os que colidiram (`colididos`). Só contagens e
+  pseudônimos.
 - Comando novo `llm-dlp audit [24h|7d]`: resume o log de um período (o que foi mascarado por
   tipo, pseudônimos que voltaram, envios sem máscara, recusas, erros da API).
 - O log troca de arquivo aos 10 MB também com o llm-dlp no ar (antes, só quando ele subia): no
