@@ -58,6 +58,7 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 	os.Setenv("HOME", home)
+	lockFile = filepath.Join(home, "managed-settings.json") // never the machine's real lock
 	os.Unsetenv("XDG_CONFIG_HOME")
 	os.Unsetenv("XDG_CACHE_HOME")
 	c := m.Run()
@@ -72,7 +73,7 @@ func TestMain(m *testing.M) {
 func compiled(t *testing.T) (a, b string) {
 	t.Helper()
 	if testing.Short() {
-		t.Skip("compila o llm-dlp duas vezes")
+		t.Skip("builds llm-dlp twice")
 	}
 	if runtime.GOOS != "linux" {
 		t.Skip("the swap without a pause is Linux's")
@@ -230,7 +231,7 @@ func (e *environment) waitCommit(commit string) testHealth {
 			return s
 		}
 	}
-	e.t.Fatalf("o proxy com o commit %s não respondeu em 20s", commit)
+	e.t.Fatalf("the proxy with commit %s did not answer within 20s", commit)
 	return testHealth{}
 }
 
@@ -247,7 +248,7 @@ func (e *environment) ask(cli *http.Client, text string) error {
 		return fmt.Errorf("response cut: %w", err)
 	}
 	if r.StatusCode != 200 || !bytes.Contains(b, []byte("message_stop")) {
-		return fmt.Errorf("status %d, resposta incompleta: %.120s", r.StatusCode, b)
+		return fmt.Errorf("status %d, incomplete response: %.120s", r.StatusCode, b)
 	}
 	return nil
 }
@@ -378,7 +379,7 @@ func TestUpdateWithoutPause(t *testing.T) {
 	c = e.load(4)
 	time.Sleep(200 * time.Millisecond)
 	if out, err := e.runIt(e.destination, "reload"); err != nil {
-		t.Fatalf("recarregar: %v\n%s", err, out)
+		t.Fatalf("reload: %v\n%s", err, out)
 	}
 	time.Sleep(300 * time.Millisecond)
 	c.stop(t, "durante o recarregar")

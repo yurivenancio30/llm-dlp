@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/yurivenancio30/llm-dlp/internal/config"
+	"github.com/yurivenancio30/llm-dlp/internal/version"
 )
 
 // The update and reload commands: put another binary online (or the same one, with the new
@@ -186,6 +187,16 @@ func adjustNames(home, bin, v string) {
 		} else if c != "" {
 			fmt.Printf("✓ config.json with the English names (the previous one at %s)\n", c)
 		}
+	}
+	// the rules that keep the agent away from llm-dlp, added by versions after the installation: only
+	// install wrote them, so an old installation never got the new ones
+	if !minorVersion(v, version.Version) {
+		if added, err := completeDenyRules(home); err != nil {
+			fmt.Printf("! could not add the missing Claude Code rules (%v); run: llm-dlp install\n", err)
+		} else if len(added) > 0 {
+			fmt.Printf("✓ Claude Code rules added to settings.json: %s\n", strings.Join(added, ", "))
+		}
+		offerLockUpdate(bin)
 	}
 }
 
@@ -481,7 +492,7 @@ func versionOf(bin string) (string, string, error) {
 	}
 	m := reVersionOutput.FindStringSubmatch(strings.TrimSpace(string(out)))
 	if m == nil {
-		return "", "", fmt.Errorf("%s versao respondeu %q", bin, strings.TrimSpace(string(out)))
+		return "", "", fmt.Errorf("%s versao answered %q", bin, strings.TrimSpace(string(out)))
 	}
 	return m[1], m[2], nil
 }

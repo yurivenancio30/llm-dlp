@@ -284,6 +284,13 @@ func status() error {
 	for _, f := range reducedProtection(cfg) {
 		fmt.Println("⚠️  protection reduced by the configuration: " + f)
 	}
+	home, _ := os.UserHomeDir()
+	if missing, _, _, _, err := settingsMissingRules(home); err == nil && len(missing) > 0 {
+		fmt.Printf("⚠️  Claude Code's settings.json lacks rules of this version (%s): run llm-dlp reload\n", strings.Join(missing, ", "))
+	}
+	if missing := lockMissingRules(); len(missing) > 0 {
+		fmt.Printf("⚠️  the lock lacks rules of this version (%s): run sudo llm-dlp install-lock\n", strings.Join(missing, ", "))
+	}
 	if missingOne := missingOCR(cfg); missingOne != "" && cfg.OCR.Mode == "mask" {
 		fmt.Printf("⚠️  no OCR (%s missing): images and PDFs are not sent. To install: %s\n", missingOne, ocr.InstallHint())
 	}

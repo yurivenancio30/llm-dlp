@@ -20,14 +20,15 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/version"
 )
 
-// Commands instalar, desinstalar e a trava (managed-settings).
+// Commands install, uninstall and the lock (managed-settings).
 
-const lockFile = "/etc/claude-code/managed-settings.json"
+// lockFile: Claude Code managed settings (a variable only so the tests use a temporary file).
+var lockFile = "/etc/claude-code/managed-settings.json"
 
 // rules llm-dlp adds to Claude Code's permissions
 var denyLLMDLP = []string{
 	"Read(~/.config/llm-dlp/**)",    // the key and the hashes are never read by the agent
-	"Edit(~/.config/llm-dlp/**)",    // nem alterados
+	"Edit(~/.config/llm-dlp/**)",    // nor changed
 	"Bash(*.config/llm-dlp*)",       // nor by a command (the configuration decides what is masked and where it goes)
 	"Bash(*llm-dlp emergency*)",     // the agent does not try to turn on emergency (the real barrier is sudo)
 	"Bash(*llm-dlp emergencia*)",    // (the old command name is still accepted)
@@ -101,8 +102,8 @@ func install(args []string) error {
 	fmt.Println(`llm-dlp installation. There are 5 steps; it asks what it needs and shows what will change.
 In two steps (OCR and lock) it uses sudo: your password will be asked at that time.`)
 
-	// 1. programa
-	step(1, "Programa", "copies llm-dlp to ~/.local/bin, so you and Claude Code can call it from any folder.")
+	// 1. program
+	step(1, "Program", "copies llm-dlp to ~/.local/bin, so you and Claude Code can call it from any folder.")
 	destination := filepath.Join(home, ".local", "bin", "llm-dlp")
 	me, _ := os.Executable()
 	if me, _ = filepath.EvalSymlinks(me); me != destination {
@@ -118,12 +119,12 @@ In two steps (OCR and lock) it uses sudo: your password will be asked at that ti
 	}
 
 	// 2. configuration and key
-	step(2, "Configuration and key", "cria "+config.Dir()+" with the configuration and the secret key that generates the pseudonyms.")
+	step(2, "Configuration and key", "creates "+config.Dir()+" with the configuration and the secret key that generates the pseudonyms.")
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("config: %w", err)
 	}
-	changed := false
+	changed := map[string]any{}
 	if len(cfg.InternalDomains) == 0 {
 		fmt.Println("\n      a) Internal domain: the piece that appears in the names of the company's servers.")
 		fmt.Println("         With \"empresa\", mysql-prd.empresa.intra becomes mysql-x7k2.invalid. Without it, server")
@@ -132,7 +133,7 @@ In two steps (OCR and lock) it uses sudo: your password will be asked at that ti
 		for _, d := range strings.Split(r, ",") {
 			if d = strings.TrimSpace(strings.ToLower(d)); d != "" {
 				cfg.InternalDomains = append(cfg.InternalDomains, d)
-				changed = true
+				changed["internal_domains"] = cfg.InternalDomains
 			}
 		}
 	}
@@ -148,13 +149,21 @@ In two steps (OCR and lock) it uses sudo: your password will be asked at that ti
 		}
 		if len(vs) > 0 {
 			cfg.Terms = append(cfg.Terms, config.Term{Label: "name", Values: vs})
-			changed = true
+			changed["terms"] = cfg.Terms
 		}
 	}
-	if changed {
+	if _, err := os.Stat(config.Path("config.json")); errors.Is(err, os.ErrNotExist) {
+		// first installation: the whole file, with the defaults visible
 		if err := saveConfig(cfg); err != nil {
 			return err
 		}
+	} else if len(changed) > 0 {
+		// an existing file: only what was answered goes in; the rest stays as it was
+		bak, err := config.SetFields(changed)
+		if err != nil {
+			return err
+		}
+		fmt.Println("      ✓ config.json updated (the previous one at " + bak + ")")
 	}
 	kp, err := config.DataPath(config.KeyFile)
 	if err != nil {
@@ -192,7 +201,7 @@ In two steps (OCR and lock) it uses sudo: your password will be asked at that ti
         • on every message:     "llm-dlp check"    → blocks the message if something is wrong
         • forbids the agent from reading/editing ~/.config/llm-dlp and from touching emergency and the lock
 `, address(cfg))
-	if in.confirm("      Aplicar?") {
+	if in.confirm("      Apply?") {
 		bak, err := applyClaude(home, destination, cfg)
 		if err != nil {
 			return err
@@ -221,11 +230,20 @@ In two steps (OCR and lock) it uses sudo: your password will be asked at that ti
 	}
 	withClaude := claudeEnabled(home, cfg)
 
-	// 5. trava
+	// 5. lock
 	step(5, "Lock against silent leaks (recommended)",
 		"if the configuration of step 4 is erased, Claude Code would go straight to the API unmasked.\n      The lock makes Claude Code refuse to work outside llm-dlp. It lives in a system folder,\n      which the agent cannot change — that is why it needs sudo:")
 	if lockInstalled(address(cfg)) {
-		fmt.Println("      ✓ lock already installed")
+		if missing := lockMissingRules(); len(missing) == 0 {
+			fmt.Println("      ✓ lock already installed")
+		} else {
+			fmt.Printf("      ! the lock lacks rules of this version: %s\n", strings.Join(missing, ", "))
+			if !in.noQuestion && in.confirm("      Add them now? (asks for the sudo password)") {
+				if err := withSudo(destination, "install-lock"); err != nil {
+					fmt.Println("      ! failed; run by hand:  sudo", destination, "install-lock")
+				}
+			}
+		}
 	} else if !withClaude {
 		fmt.Println("      – skipped: the lock is Claude Code's, which was not turned on in step 4")
 	} else {
@@ -238,9 +256,9 @@ In two steps (OCR and lock) it uses sudo: your password will be asked at that ti
 		}
 	}
 
-	// resumo
+	// summary
 	cfg, _ = config.Load()
-	fmt.Println("\nResumo")
+	fmt.Println("\nSummary")
 	ok := func(b bool, yes, negated string) {
 		if b {
 			fmt.Println("  ✓", yes)
@@ -264,6 +282,8 @@ In two steps (OCR and lock) it uses sudo: your password will be asked at that ti
 	}
 	ok(missingOCR(cfg) == "", "OCR of images and PDFs", "no OCR: images and PDFs are not sent (to install: "+ocr.InstallHint()+")")
 	switch {
+	case lockInstalled(address(cfg)) && len(lockMissingRules()) > 0:
+		ok(false, "", "lock without all the rules of this version: run sudo llm-dlp install-lock")
 	case lockInstalled(address(cfg)):
 		fmt.Println("  ✓ lock installed")
 	case withClaude:
@@ -643,6 +663,94 @@ func missingOCR(cfg config.Config) string {
 		missingOne = append(missingOne, "poppler (pdftotext)")
 	}
 	return strings.Join(missingOne, ", ")
+}
+
+// missingDeny: the llm-dlp rules a deny list does not have.
+func missingDeny(deny []any) []string {
+	var missing []string
+	for _, r := range denyLLMDLP {
+		has := false
+		for _, d := range deny {
+			has = has || d == r
+		}
+		if !has {
+			missing = append(missing, r)
+		}
+	}
+	return missing
+}
+
+// denyOf: the deny list of a settings file (nil if the file or the list does not exist).
+func denyOf(s map[string]any) []any {
+	perms, _ := s["permissions"].(map[string]any)
+	deny, _ := perms["deny"].([]any)
+	return deny
+}
+
+// completeDenyRules adds to ~/.claude/settings.json the llm-dlp rules it does not have yet, when
+// Claude Code goes through llm-dlp (it has the hooks). It keeps everything else, with a backup.
+func completeDenyRules(home string) ([]string, error) {
+	missing, target, s, orig, err := settingsMissingRules(home)
+	if err != nil || len(missing) == 0 {
+		return nil, err
+	}
+	perms, _ := s["permissions"].(map[string]any)
+	if perms == nil {
+		perms = map[string]any{}
+		s["permissions"] = perms
+	}
+	deny := denyOf(s)
+	for _, r := range missing {
+		deny = append(deny, r)
+	}
+	perms["deny"] = deny
+	if _, err := writeSettings(target, s, orig); err != nil {
+		return nil, err
+	}
+	return missing, nil
+}
+
+// settingsMissingRules: the llm-dlp rules missing in ~/.claude/settings.json, if it calls llm-dlp.
+func settingsMissingRules(home string) ([]string, string, map[string]any, []byte, error) {
+	target := filepath.Join(home, ".claude", "settings.json")
+	s, orig, err := readSettings(target)
+	if err != nil {
+		return nil, target, nil, nil, err
+	}
+	if b, _ := json.Marshal(s["hooks"]); !isLLMDLPHook(b) {
+		return nil, target, s, orig, nil
+	}
+	return missingDeny(denyOf(s)), target, s, orig, nil
+}
+
+// lockMissingRules: the llm-dlp rules missing in the lock, when there is a lock (one installed by
+// a version before them). Only reads: writing there needs sudo (llm-dlp install-lock).
+func lockMissingRules() []string {
+	if _, err := os.Stat(lockFile); err != nil {
+		return nil
+	}
+	s, _, err := readSettings(lockFile)
+	if err != nil {
+		return nil
+	}
+	return missingDeny(denyOf(s))
+}
+
+// offerLockUpdate: if the lock lacks rules of this version, says which and, at a terminal, offers to
+// add them now with sudo (bin install-lock keeps everything else in the file).
+func offerLockUpdate(bin string) {
+	missing := lockMissingRules()
+	if len(missing) == 0 {
+		return
+	}
+	fmt.Printf("! the lock (%s) lacks rules of this version: %s\n", lockFile, strings.Join(missing, ", "))
+	if st, err := os.Stdin.Stat(); err == nil && st.Mode()&os.ModeCharDevice != 0 &&
+		(entry{r: bufio.NewReader(os.Stdin)}).confirm("  Add them now? (asks for the sudo password)") {
+		if err := withSudo(bin, "install-lock"); err == nil {
+			return
+		}
+	}
+	fmt.Println("  To add them: sudo llm-dlp install-lock")
 }
 
 func lockInstalled(address string) bool {
