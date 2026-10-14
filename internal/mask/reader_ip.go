@@ -61,21 +61,21 @@ func findInternalIP(s string, add func(ObjFinding)) {
 	if strings.Count(s, ":") >= 2 {
 		scanIPv6(s, func(i, k int, a netip.Addr) {
 			if ok(a, s[i:k]) {
-				add(ObjFinding{i, k, "server", "ip-interno", true})
+				add(ObjFinding{i, k, "server", "internal-ip", true})
 			}
 		})
 	}
 	if strings.Contains(s, "ip6.arpa") || strings.Contains(s, "IP6.ARPA") {
 		findReverseV6(s, func(i, k int, a netip.Addr) {
 			if internalIPv6(a) {
-				add(ObjFinding{i, k, "server", "ip-interno", true})
+				add(ObjFinding{i, k, "server", "internal-ip", true})
 			}
 		})
 	}
 }
 
 func findPublicIP(s string, add func(ObjFinding)) {
-	pub := func(i, k int) { add(ObjFinding{i, k, "server", "ip-público", true}) }
+	pub := func(i, k int) { add(ObjFinding{i, k, "server", "public-ip", true}) }
 	if strings.Count(s, ".") >= 3 {
 		for _, ix := range reIPv4.FindAllStringIndex(s, -1) {
 			if !numberEdge(s, ix[0], ix[1]) || ix[0] > 0 && (letterD(s[ix[0]-1]) || s[ix[0]-1] == '.') {

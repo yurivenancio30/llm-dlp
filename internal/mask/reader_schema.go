@@ -115,7 +115,7 @@ func addColumn(s string, a, b int, add func(ObjFinding)) {
 	if v == "" || isDataType(v) || publicSQL(v) || outputLabels[strings.ToLower(v)] || keyAttribute[strings.ToLower(v)] || !reSimpleIdent.MatchString(strings.ReplaceAll(v, ".", "_")) {
 		return
 	}
-	add(ObjFinding{a, b, "column", "esquema", true})
+	add(ObjFinding{a, b, "column", "schema", true})
 }
 
 // --------------------------------------------------------------------------------------- "name" by
@@ -197,7 +197,7 @@ func findNameByContext(s string, add func(ObjFinding)) {
 		} else if strings.Count(v, ".") > 0 && strings.Count(v, ".") <= 3 && reIdentCell.MatchString(v) {
 			addCellParts(s, e.vi, e.vf, ent, add) // "db.schema.tabela": nome qualificado
 		} else {
-			addName(s, e.vi, e.vf, ent, "nome-contexto", true, add)
+			addName(s, e.vi, e.vf, ent, "name-context", true, add)
 		}
 	}
 }

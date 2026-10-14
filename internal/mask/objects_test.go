@@ -17,7 +17,7 @@ func testReader() []Reader {
 	return []Reader{{Name: "teste", Public: func(v string) bool { return strings.EqualFold(v, "dual_x1") },
 		Find: func(s string, add func(ObjFinding)) {
 			for _, ix := range reStrongTest.FindAllStringSubmatchIndex(s, -1) {
-				add(ObjFinding{ix[4], ix[5], ent[s[ix[2]:ix[3]]], "forte", true})
+				add(ObjFinding{ix[4], ix[5], ent[s[ix[2]:ix[3]]], "strong", true})
 			}
 			for _, ix := range reWeakTest.FindAllStringSubmatchIndex(s, -1) {
 				add(ObjFinding{ix[4], ix[5], ent[s[ix[2]:ix[3]]], s[ix[2]:ix[3]], false})

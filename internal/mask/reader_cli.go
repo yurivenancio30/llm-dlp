@@ -176,7 +176,7 @@ func cliCommand(s string, toks []cliToken, add func(ObjFinding)) {
 				ent = "service"
 			}
 			if name := v[m[4]:m[5]]; !publicDev(name) && !publicDevops(name) {
-				add(ObjFinding{t.a + m[4], t.a + m[5], ent, "linha-de-comando", true})
+				add(ObjFinding{t.a + m[4], t.a + m[5], ent, "command-line", true})
 			}
 			continue
 		}
@@ -206,9 +206,9 @@ func cliCommand(s string, toks []cliToken, add func(ObjFinding)) {
 			continue
 		}
 		if p.ent == "server" {
-			addHost(s, p.a, p.b, "linha-de-comando", true, add)
+			addHost(s, p.a, p.b, "command-line", true, add)
 		} else {
-			add(ObjFinding{p.a, p.b, p.ent, "linha-de-comando", true})
+			add(ObjFinding{p.a, p.b, p.ent, "command-line", true})
 		}
 	}
 	// remote copy: scp/rsync [user@]host:/path
@@ -222,10 +222,10 @@ func cliCommand(s string, toks []cliToken, add func(ObjFinding)) {
 					continue
 				}
 				if m[2] >= 0 && !publicDev(v[m[2]:m[3]]) {
-					add(ObjFinding{t.a + m[2], t.a + m[3], "user", "linha-de-comando", true})
+					add(ObjFinding{t.a + m[2], t.a + m[3], "user", "command-line", true})
 				}
 				if h := v[m[4]:m[5]]; !publicDev(h) && !publicDomain(strings.ToLower(h)) {
-					add(ObjFinding{t.a + m[4], t.a + m[5], "server", "linha-de-comando", true})
+					add(ObjFinding{t.a + m[4], t.a + m[5], "server", "command-line", true})
 				}
 			}
 		}

@@ -229,7 +229,7 @@ func (m *Masker) findLists(s string, learn bool, add func(ini, end int, typ stri
 	// only what was already LEARNED (with the brakes: strong evidence or two rules), and not any
 	// finding of this text: a wrong weak finding would pull the whole list along
 	knownOne := m.knownType
-	m.runReader(Reader{Name: "lista", Public: publicList, Find: func(s string, add func(ObjFinding)) {
+	m.runReader(Reader{Name: "list", Public: publicList, Find: func(s string, add func(ObjFinding)) {
 		homogeneousLists(s, knownOne, add)
 		knownQualified(s, knownOne, add)
 	}}, s, learn, add)
@@ -275,7 +275,7 @@ func homogeneousLists(s string, knownOne func(string) (string, bool), add func(O
 			a := c.a
 			for k, p := range ps {
 				if _, ok := knownOne(p); !ok && reSimpleIdent.MatchString(p) {
-					add(ObjFinding{a, a + len(p), ents[k], "lista", ents[k] != "column" && identifierShape(p)})
+					add(ObjFinding{a, a + len(p), ents[k], "list", ents[k] != "column" && identifierShape(p)})
 				}
 				a += len(p) + 1
 			}

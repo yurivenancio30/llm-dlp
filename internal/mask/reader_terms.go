@@ -51,7 +51,7 @@ func findTerms(s string, ts []string, add func(ObjFinding)) {
 			if len(id) <= len(t) || !identifierShape(id) || !hasPiece(id, t) || isPseudoObj(id) {
 				continue
 			}
-			add(ObjFinding{a, b, entPosition(s, a), "termo-embutido", true})
+			add(ObjFinding{a, b, entPosition(s, a), "embedded-term", true})
 		}
 	}
 }

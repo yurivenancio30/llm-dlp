@@ -50,7 +50,7 @@ func findAWSIDs(s string, add func(ObjFinding)) {
 				a, pfx = a-4, "tgw-attach"
 			}
 			if awsPrefixes[pfx] && (a == 0 || looseOne(s[a-1])) {
-				add(ObjFinding{a, j, "service", "id-aws", true})
+				add(ObjFinding{a, j, "service", "aws-id", true})
 			}
 		}
 		k := strings.IndexByte(s[i+1:], '-')

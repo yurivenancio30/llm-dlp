@@ -108,7 +108,7 @@ func (m *Masker) runDeciders(s string, findings []Finding, learn bool, ext strin
 	return c.out, c.dec
 }
 
-// findingDecisions: the object names found by the readers, as decisions (rule "leitor"). Together
+// findingDecisions: the object names found by the readers, as decisions (rule "reader"). Together
 // with those of the deciders, they make up the decided names of the text.
 func findingDecisions(as []Finding) []Decision {
 	var out []Decision
@@ -117,7 +117,7 @@ func findingDecisions(as []Finding) []Decision {
 		if !isObject(a.Type) {
 			continue
 		}
-		d := Decision{Name: unquoted(a.Real), Ent: strings.TrimPrefix(a.Type, objTypePrefix), Rule: "leitor", Generic: isGeneric(a.Real)}
+		d := Decision{Name: unquoted(a.Real), Ent: strings.TrimPrefix(a.Type, objTypePrefix), Rule: "reader", Generic: isGeneric(a.Real)}
 		if k := d.Key(); !seen[k] {
 			seen[k] = true
 			out = append(out, d)

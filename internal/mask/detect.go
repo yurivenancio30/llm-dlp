@@ -205,7 +205,7 @@ func (m *Masker) findStructure(s string, learn bool, base []Finding, d *outputHi
 		add := func(ini, end int, typ string) { out = append(out, Finding{ini, end, typ, s[ini:end]}) }
 		m.findObjects(s, learn, add)
 		if d != nil && m.cfg.Objects.Enabled {
-			m.runReader(Reader{Name: "comando", Public: publicHint,
+			m.runReader(Reader{Name: "command", Public: publicHint,
 				Find: func(s string, add func(ObjFinding)) { findWithHint(s, d, add) }}, s, learn, add)
 		}
 		m.findLists(s, learn, add)

@@ -50,41 +50,41 @@ var varCases = []varCase{
 	{reader: "sql", model: "MERGE INTO «1» USING «2» ON «1».id = «2».id", spc: varSQLSpace, quoted: varQuotedSQL, chars: varSQLNames},
 	{reader: "sql", model: "EXEC «Q» @a = 1", spc: varLineSpace, quoted: []string{"[]"}, parts: true, chars: varSQLNames, several: "; "},
 	// error messages
-	{reader: "erro", model: `ERROR: relation "«Q»" does not exist`, punct: true, parts: true, chars: varSQLNames},
-	{reader: "erro", model: `Invalid object name '«Q»'`, punct: true, parts: true, chars: varSQLNames},
-	{reader: "erro", model: `Table '«Q»' doesn't exist`, punct: true, parts: true, chars: varSQLNames},
+	{reader: "error", model: `ERROR: relation "«Q»" does not exist`, punct: true, parts: true, chars: varSQLNames},
+	{reader: "error", model: `Invalid object name '«Q»'`, punct: true, parts: true, chars: varSQLNames},
+	{reader: "error", model: `Table '«Q»' doesn't exist`, punct: true, parts: true, chars: varSQLNames},
 	// connection strings and URIs
-	{reader: "conexão", model: "Server=«1»;Database=«2»;User Id=«3»;", spc: []string{" "}, chars: []string{"srv-ped-01", "srv_ped01"}, several: " "},
-	{reader: "conexão", model: `String url = "jdbc:sqlserver://«1»:1433;databaseName=«2»;encrypt=true";`, spc: varLineSpace, punct: true, chars: []string{"srv-ped-01"}},
-	{reader: "conexão", model: `props.put("url", "jdbc:sqlserver://«1»;databaseName=«2»");`, spc: varLineSpace, chars: []string{"srv-ped-01"}},
-	{reader: "conexão", model: "postgresql://«3»@«1»:5432/«2»", punct: true, chars: []string{"srv-ped-01"}, several: " "},
-	{reader: "conexão", model: "urn:li:dataset:(urn:li:dataPlatform:mssql,«Q»,PROD)", parts: true, caseless: true, punct: true, several: " "},
+	{reader: "connection", model: "Server=«1»;Database=«2»;User Id=«3»;", spc: []string{" "}, chars: []string{"srv-ped-01", "srv_ped01"}, several: " "},
+	{reader: "connection", model: `String url = "jdbc:sqlserver://«1»:1433;databaseName=«2»;encrypt=true";`, spc: varLineSpace, punct: true, chars: []string{"srv-ped-01"}},
+	{reader: "connection", model: `props.put("url", "jdbc:sqlserver://«1»;databaseName=«2»");`, spc: varLineSpace, chars: []string{"srv-ped-01"}},
+	{reader: "connection", model: "postgresql://«3»@«1»:5432/«2»", punct: true, chars: []string{"srv-ped-01"}, several: " "},
+	{reader: "connection", model: "urn:li:dataset:(urn:li:dataPlatform:mssql,«Q»,PROD)", parts: true, caseless: true, punct: true, several: " "},
 	// table (query result)
 	{reader: "table", model: "table_schema,table_name\n«1»,«2»\n«1»,«3»\n", spc: []string{"\t", ";", "|", " , "}, quoted: []string{`"`}, chars: varSQLNames},
 	// chave-valor
-	{reader: "chave-valor", model: "database: «1»«c»\nschema: «2»\ntable: «3»\n", spc: varLineSpace, quoted: []string{`"`, "'"}, with: []string{"  # obs", " # obs: x"}, chars: varNames},
-	{reader: "chave-valor", model: "[banco]\nhost = «1»«c»\ndatabase = «2»\n", spc: varLineSpace, with: []string{" ; obs", " # obs"}, chars: []string{"srv-ped-01"}},
-	{reader: "chave-valor", model: "database=«1» schema=«2» table=«3»", quoted: []string{`"`, "'"}, chars: varNames},
-	{reader: "chave-valor", model: `{"database": "«1»", "schema": "«2»", "table": "«3»"}`, spc: varLineSpace, chars: varNames},
+	{reader: "key-value", model: "database: «1»«c»\nschema: «2»\ntable: «3»\n", spc: varLineSpace, quoted: []string{`"`, "'"}, with: []string{"  # obs", " # obs: x"}, chars: varNames},
+	{reader: "key-value", model: "[banco]\nhost = «1»«c»\ndatabase = «2»\n", spc: varLineSpace, with: []string{" ; obs", " # obs"}, chars: []string{"srv-ped-01"}},
+	{reader: "key-value", model: "database=«1» schema=«2» table=«3»", quoted: []string{`"`, "'"}, chars: varNames},
+	{reader: "key-value", model: `{"database": "«1»", "schema": "«2»", "table": "«3»"}`, spc: varLineSpace, chars: varNames},
 	// addresses and paths
-	{reader: "endereço", model: "veja http://«1»:8080/api/v1", punct: true, chars: []string{"srv-ped-01"}, several: " e "},
-	{reader: "caminho", model: "lendo /srv/«1»/«2»/saida.csv", caseless: true, punct: true, chars: []string{"ped-hist-01", "ped$hist01"}, several: " e "},
+	{reader: "address", model: "veja http://«1»:8080/api/v1", punct: true, chars: []string{"srv-ped-01"}, several: " e "},
+	{reader: "path", model: "lendo /srv/«1»/«2»/saida.csv", caseless: true, punct: true, chars: []string{"ped-hist-01", "ped$hist01"}, several: " e "},
 	// code
-	{reader: "código-chamada", model: `df = spark.table("«Q»")«c»`, with: []string{"  # obs", " // obs", " /* obs */"}, caseless: true, spc: varLineSpace, quoted: []string{"'"}, parts: true, chars: varSQLNames, several: "; "},
-	{reader: "código-chamada", model: `df = pd.read_sql_table("«1»", con, schema="«2»")`, caseless: true, spc: varLineSpace, chars: varSQLNames},
+	{reader: "code-call", model: `df = spark.table("«Q»")«c»`, with: []string{"  # obs", " // obs", " /* obs */"}, caseless: true, spc: varLineSpace, quoted: []string{"'"}, parts: true, chars: varSQLNames, several: "; "},
+	{reader: "code-call", model: `df = pd.read_sql_table("«1»", con, schema="«2»")`, caseless: true, spc: varLineSpace, chars: varSQLNames},
 	// schema (name + data type)
-	{reader: "esquema", model: "root\n |-- «1»: string (nullable = true)\n |-- «2»: integer (nullable = true)\n", caseless: true, chars: varSQLNames},
-	{reader: "esquema", model: "«1»    object\n«2»     int64\n«3»    float64\ndtype: object\n", caseless: true, chars: varSQLNames},
+	{reader: "schema", model: "root\n |-- «1»: string (nullable = true)\n |-- «2»: integer (nullable = true)\n", caseless: true, chars: varSQLNames},
+	{reader: "schema", model: "«1»    object\n«2»     int64\n«3»    float64\ndtype: object\n", caseless: true, chars: varSQLNames},
 	// devops: manifest, terraform, cloud, DSN, Kubernetes DNS, git
 	{reader: "devops-yaml", model: "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: «1»\n  namespace: «2»\n", spc: []string{"   "}, caseless: true, quoted: []string{`"`, "'"}, chars: []string{"svc-ped-01"}},
 	{reader: "terraform", model: "resource \"aws_s3_bucket\" \"dados\" {\n  bucket = \"«1»\"\n}\n", spc: []string{"\t"}, caseless: true, chars: []string{"bkt-ped-01"}},
-	{reader: "url-nuvem", model: "copiando para s3://«1»/«2»/arquivo.parquet", caseless: true, punct: true, chars: []string{"bkt-ped-01"}, several: " e "},
+	{reader: "cloud-url", model: "copiando para s3://«1»/«2»/arquivo.parquet", caseless: true, punct: true, chars: []string{"bkt-ped-01"}, several: " e "},
 	{reader: "dsn", model: `dsn := "«3»:senha@tcp(«1»:3306)/«2»"`, caseless: true, spc: varLineSpace, chars: []string{"srv-ped-01"}},
 	{reader: "k8s-dns", model: "curl http://«1».«2».svc.cluster.local:8080/saude", caseless: true, punct: true, chars: []string{"svc-ped-01"}, several: " && ", base: []string{"xq-pedidos01", "xq-clientes02"}},
 	{reader: "git", model: "git clone git@«1»:«2»/«3».git", caseless: true, punct: true, chars: []string{"srv-ped-01"}, several: " && ", base: []string{"xq-git01", "xq-org02", "xq-repo03"}},
 	// command line
-	{reader: "linha-de-comando", model: "psql -h «1» -d «2» -U «3»", caseless: true, spc: varLineSpace, quoted: []string{`"`, "'"}, chars: []string{"srv-ped-01"}, several: " && "},
-	{reader: "linha-de-comando", model: "kubectl -n «1» get pods", spc: varLineSpace, caseless: true, chars: []string{"ns-ped-01"}, several: " && "},
+	{reader: "command-line", model: "psql -h «1» -d «2» -U «3»", caseless: true, spc: varLineSpace, quoted: []string{`"`, "'"}, chars: []string{"srv-ped-01"}, several: " && "},
+	{reader: "command-line", model: "kubectl -n «1» get pods", spc: varLineSpace, caseless: true, chars: []string{"ns-ped-01"}, several: " && "},
 }
 
 // base names for each slot (made up)
@@ -236,7 +236,7 @@ func variations(c varCase) []varText {
 	add("base", build(c, 0, " ", "", "", 1, "", false))
 	if !c.caseless {
 		for k, name := range []string{"MAIÚSCULAS", "minúsculas", "aLtErNaDa", "Inicial"} {
-			if k == 2 && c.reader != "sql" && c.reader != "erro" {
+			if k == 2 && c.reader != "sql" && c.reader != "error" {
 				continue // alternating case only where the language is case-insensitive
 			}
 			add("caixa "+name, build(c, k+1, " ", "", "", 1, "", false))

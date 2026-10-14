@@ -673,7 +673,7 @@ func hintCell(s string, c cell, e string, strong bool, add func(ObjFinding)) {
 	ents := entQual(len(ps), e)
 	for k, p := range ps {
 		if p != "" && !publicHint(p) && reSimpleIdent.MatchString(p) {
-			add(ObjFinding{a, a + len(p), ents[k], "comando", strong && ents[k] != "column" && len(p) >= 5})
+			add(ObjFinding{a, a + len(p), ents[k], "command", strong && ents[k] != "column" && len(p) >= 5})
 		}
 		a += len(p) + 1
 	}

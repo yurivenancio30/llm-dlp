@@ -21,36 +21,36 @@ func DefaultReaders() []Reader { return defaultReaders() }
 func defaultReaders() []Reader {
 	return []Reader{
 		{Name: "sql", Find: findSQL, Public: publicSQL},
-		{Name: "erro", Find: findObjectError, Public: publicSQL},
-		{Name: "conexão", Find: findConnections, Public: publicConnection},
+		{Name: "error", Find: findObjectError, Public: publicSQL},
+		{Name: "connection", Find: findConnections, Public: publicConnection},
 		{Name: "table", Find: findTablesObj, Public: publicSQL},
-		{Name: "esquema", Find: findSchema, Public: publicSQL},
-		{Name: "nome-contexto", Find: findNameByContext, Public: publicDev},
+		{Name: "schema", Find: findSchema, Public: publicSQL},
+		{Name: "name-context", Find: findNameByContext, Public: publicDev},
 		{Name: "devops-yaml", Find: findStructuredDevops, Public: publicDevops},
 		{Name: "terraform", Find: findTerraform, Public: publicDevops},
 		{Name: "ansible-ini", Find: findAnsibleINI, Public: publicDevops},
 		{Name: "bicep", Find: findBicep, Public: publicDevops},
 		{Name: "jenkins", Find: findJenkins, Public: publicDevops},
 		{Name: "k8s-dns", Find: findK8sDNS, Public: publicDevops},
-		{Name: "imagem", Find: findImages, Public: publicDevops},
-		{Name: "saída-cli", Find: findCLITable, Public: publicDevops},
-		{Name: "ip-infra", Find: findInfraIP},
-		{Name: "chave-valor", Find: findKeyValue, Public: publicDev},
-		{Name: "endereço", Find: findAddresses, Public: publicDev},
+		{Name: "image", Find: findImages, Public: publicDevops},
+		{Name: "cli-output", Find: findCLITable, Public: publicDevops},
+		{Name: "infra-ip", Find: findInfraIP},
+		{Name: "key-value", Find: findKeyValue, Public: publicDev},
+		{Name: "address", Find: findAddresses, Public: publicDev},
 		{Name: "git", Find: findGitSCP, Public: publicDev},
 		{Name: "package", Find: findPackages, Public: publicDev},
-		{Name: "caminho", Find: findPaths, Public: publicDev},
+		{Name: "path", Find: findPaths, Public: publicDev},
 		{Name: "usuário de rede", Find: findNetworkUsers, Public: publicDev},
-		{Name: "nuvem", Find: findCloud, Public: publicDev},
-		{Name: "código-nome", Find: findCodeName, Public: publicDev},
-		{Name: "código-chamada", Find: findCodeCall, Public: publicDev},
-		{Name: "linha-de-comando", Find: findCLI, Public: publicDev},
-		{Name: "caminho-sistema", Find: findPathsOutside, Public: publicDev},
-		{Name: "url-nuvem", Find: findCloudURLs, Public: publicDev},
+		{Name: "cloud", Find: findCloud, Public: publicDev},
+		{Name: "code-name", Find: findCodeName, Public: publicDev},
+		{Name: "code-call", Find: findCodeCall, Public: publicDev},
+		{Name: "command-line", Find: findCLI, Public: publicDev},
+		{Name: "system-path", Find: findPathsOutside, Public: publicDev},
+		{Name: "cloud-url", Find: findCloudURLs, Public: publicDev},
 		{Name: "dsn", Find: findDSN, Public: publicConnection},
-		{Name: "env-lista", Find: findEnvList, Public: publicDev},
+		{Name: "env-list", Find: findEnvList, Public: publicDev},
 		{Name: "placeholder", Find: findPlaceholder, Public: publicDev},
-		{Name: "ip-interno", Find: findInternalIP},
+		{Name: "internal-ip", Find: findInternalIP},
 	}
 }
 
@@ -58,7 +58,7 @@ func defaultReaders() []Reader {
 func configReaders(cfg config.Config) []Reader {
 	var ls []Reader
 	if cfg.Objects.PublicIP {
-		ls = append(ls, Reader{Name: "ip-público", Find: findPublicIP})
+		ls = append(ls, Reader{Name: "public-ip", Find: findPublicIP})
 	}
 	var ts []string
 	for _, t := range cfg.Terms {
@@ -70,7 +70,7 @@ func configReaders(cfg config.Config) []Reader {
 		}
 	}
 	if len(ts) > 0 {
-		ls = append(ls, Reader{Name: "termo-embutido", Find: func(s string, add func(ObjFinding)) { findTerms(s, ts, add) }})
+		ls = append(ls, Reader{Name: "embedded-term", Find: func(s string, add func(ObjFinding)) { findTerms(s, ts, add) }})
 	}
 	return ls
 }

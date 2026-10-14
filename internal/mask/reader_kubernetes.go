@@ -158,7 +158,7 @@ func findImages(s string, add func(ObjFinding)) {
 	}
 	for _, re := range res {
 		for _, m := range re.FindAllStringSubmatchIndex(s, -1) {
-			addImage(s, m[2], m[3], "imagem", add)
+			addImage(s, m[2], m[3], "image", add)
 		}
 	}
 	if !strings.Contains(s, "docker") && !strings.Contains(s, "podman") && !strings.Contains(s, "nerdctl") {
@@ -174,7 +174,7 @@ func findImages(s string, add func(ObjFinding)) {
 				q++
 			}
 			if q > p && s[p] != '-' && reImageTok.MatchString(s[p:q]) {
-				addImage(s, p, q, "imagem", add)
+				addImage(s, p, q, "image", add)
 			}
 			p = q
 		}
@@ -273,7 +273,7 @@ func k8sRule(s string, e *yEnt, rel []string, kind, v string, add func(ObjFindin
 		}
 		addName(s, a, b, "server", "k8s", true, add)
 	case k == "image":
-		addImage(s, a, b, "imagem", add)
+		addImage(s, a, b, "image", add)
 	case k8sLabels[k] && (prev == "labels" || prev == "matchLabels" || prev == "selector"):
 		addName(s, a, b, "service", "k8s-label", false, add)
 	}
@@ -346,6 +346,6 @@ func findEnvList(s string, add func(ObjFinding)) {
 		if m[0] > 0 && strings.LastIndexByte(s[m[0]-1:m[8]], '\n') < 0 {
 			continue
 		}
-		markValue(s, m[8], m[9], ent, "env-lista", strong, add)
+		markValue(s, m[8], m[9], ent, "env-list", strong, add)
 	}
 }

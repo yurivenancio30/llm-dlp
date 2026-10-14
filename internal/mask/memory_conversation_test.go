@@ -128,7 +128,7 @@ func TestMemoryWhoWrote(t *testing.T) {
 	des := m.RecordResponse(orig, tab)
 	l := m.NewBatch()
 	d, ok := l.Written(des)
-	if !ok || len(d) != 1 || d[0].Name != nsCommon || d[0].Ent != "namespace" || d[0].Rule != "traduzida" {
+	if !ok || len(d) != 1 || d[0].Name != nsCommon || d[0].Ent != "namespace" || d[0].Rule != "translated" {
 		t.Fatalf("decisões traduzidas: %+v %v", d, ok)
 	}
 	output := "logs de " + nsCommon + " ok"

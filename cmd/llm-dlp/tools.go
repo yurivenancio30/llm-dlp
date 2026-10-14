@@ -276,7 +276,7 @@ func columns(args []string) error {
 	}
 	names := map[string]string{"name": "nome de pessoa", "name_full": "nome de pessoa (só valor com nome e sobrenome)",
 		"name_loose": "nome de pessoa (se a tabela tiver outra coluna de pessoa)", "user": "código/login de usuário",
-		"doc": "documento", "sensitive": "dado pessoal sensível", "quasi": "quase identificador", "address": "endereço",
+		"doc": "documento", "sensitive": "dado pessoal sensível", "quasi": "quase identificador", "address": "address",
 		"birthdate": "data de nascimento", "phone": "phone", "account": "conta bancária", "card": "cartão",
 		"email": "e-mail (pelo formato do valor)"}
 	for _, file := range args {

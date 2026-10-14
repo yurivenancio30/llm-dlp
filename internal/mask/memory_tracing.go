@@ -77,7 +77,7 @@ func (l *Batch) learnAnchor(s string, before, ts2 []snippet) []Decision {
 		if l.fromModel(v) {
 			continue
 		}
-		d := Decision{Name: v, Ent: t.Type[len(objTypePrefix):], Rule: "âncora", Generic: isGeneric(v)}
+		d := Decision{Name: v, Ent: t.Type[len(objTypePrefix):], Rule: "anchor", Generic: isGeneric(v)}
 		l.markDeduced(v)
 		if l.mem.addEntry(l.m, d) {
 			out = append(out, d)
@@ -248,7 +248,7 @@ func (l *Batch) recordSources(items []BatchItem, sources []string) {
 		}
 		ds, _ := l.m.decidedMemo(it.S, it.Hint)
 		for _, d := range ds {
-			if d.Rule == "âncora" {
+			if d.Rule == "anchor" {
 				continue
 			}
 			k := strings.ToLower(d.Name)

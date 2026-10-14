@@ -141,9 +141,9 @@ func findConnections(s string, add func(ObjFinding)) {
 				a, b = a+1, b-1
 			}
 			if ent == "server" {
-				addServer(s, a, b, "conexão", add)
+				addServer(s, a, b, "connection", add)
 			} else if !publicConnection(s[a:b]) && reSimpleIdent.MatchString(strings.ReplaceAll(s[a:b], ".", "_")) {
-				addParts(s, a, b, ent, "conexão", add)
+				addParts(s, a, b, ent, "connection", add)
 			}
 		}
 	}
@@ -406,13 +406,13 @@ func findDatabaseAddress(s string, add func(ObjFinding)) {
 		if db := s[m[6]:m[7]]; m[8] < 0 && publicConnection(s[m[2]:m[3]]) && !identifierShape(db) {
 			continue
 		}
-		addServer(s, m[2], m[3], "conexão", add)
+		addServer(s, m[2], m[3], "connection", add)
 		if db := s[m[6]:m[7]]; !publicConnection(db) {
-			add(ObjFinding{m[6], m[7], "database", "conexão", true})
+			add(ObjFinding{m[6], m[7], "database", "connection", true})
 		}
 		if m[8] >= 0 {
 			if u := s[m[8]:m[9]]; resourceValue(u, "user") && !publicConnection(u) {
-				add(ObjFinding{m[8], m[9], "user", "conexão", true})
+				add(ObjFinding{m[8], m[9], "user", "connection", true})
 			}
 		}
 	}

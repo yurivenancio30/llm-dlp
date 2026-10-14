@@ -17,7 +17,7 @@ import "strings"
 //   - INI section: "key = value" with spaces around the "=" is a code assignment in Python,
 //     Ruby, shell..., except when the line is in a block that starts with a section header
 //     "[name]" (iniSection, used by the key-value reader).
-//   - anchor (decider "léxica-âncora"): in a list of literals ([..], {..} of Go/C#, YAML list
+//   - anchor (decider "lexical-anchor"): in a list of literals ([..], {..} of Go/C#, YAML list
 //     "- x" under "key:"), all of them candidates, in which one item is already a learned name
 //     (in this text, by the readers, or before), the other items are names of the same type.
 //     The list is homogeneous; the tuple and the arguments of a call ("(...)") do not count,
@@ -87,7 +87,7 @@ func keyEqualsLine(lineV string) bool {
 // --------------------------------------------------------------------------------------- Anchor
 
 func init() {
-	registerDecider(Decider{Name: "léxica-âncora", Decide: decideAnchor})
+	registerDecider(Decider{Name: "lexical-anchor", Decide: decideAnchor})
 }
 
 func decideAnchor(c *TextCtx) {
@@ -120,9 +120,9 @@ func decideAnchor(c *TextCtx) {
 			if _, ok := knownOne(v); ok || !resourceValue(v, ent) {
 				continue
 			}
-			c.Decide(e[0], e[1], ent, "léxica-âncora")
+			c.Decide(e[0], e[1], ent, "lexical-anchor")
 			if hookFound != nil {
-				hookFound("léxica", ObjFinding{e[0], e[1], ent, "âncora", false}, v)
+				hookFound("lexical", ObjFinding{e[0], e[1], ent, "anchor", false}, v)
 			}
 		}
 	}

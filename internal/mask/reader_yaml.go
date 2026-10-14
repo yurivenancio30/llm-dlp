@@ -792,7 +792,7 @@ func structureRules(s string, ents []yEnt, add func(ObjFinding)) {
 				case "hostname":
 					addName(s, e.vi, e.vf, "server", "compose", true, add)
 				case "image":
-					addImage(s, e.vi, e.vf, "imagem", add)
+					addImage(s, e.vi, e.vf, "image", add)
 				}
 			case (e.path[0] == "networks" || e.path[0] == "volumes") && len(e.path) == 2 && e.ki >= 0:
 				addName(s, e.ki, e.kf, "service", "compose", false, add)

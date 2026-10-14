@@ -18,7 +18,7 @@ import (
 // Who wrote it: an assistant text the proxy unmasked (recorded in RecordResponse) comes back as the
 // API sent it: exactly the pieces the proxy translated become pseudonyms again, and the memory does
 // not apply to the rest (the model never saw the real name; if it wrote the word, it is a common
-// word). The translated words enter the memory (rule "traduzida", with the type of the pseudonym).
+// word). The translated words enter the memory (rule "translated", with the type of the pseudonym).
 
 // memName: a name of the memory, indexed by its first word.
 type memName struct {
@@ -273,7 +273,7 @@ func (l *Batch) withMemory(s string, r result, hint string) result {
 	ts := l.joinSnippets(r.snippets, extra)
 	l.currentProv = map[string]bool{}
 	for _, d := range r.decidedSet {
-		if d.Rule != "âncora" {
+		if d.Rule != "anchor" {
 			l.currentProv[strings.ToLower(d.Name)] = true
 		}
 	}
@@ -547,7 +547,7 @@ func (l *Batch) buildMemory(decs [][]Decision, extras []Decision) {
 		}
 		l.mem = m.newMemory(allOf)
 		for _, d := range allOf {
-			if d.Rule == "âncora" {
+			if d.Rule == "anchor" {
 				l.markDeduced(d.Name)
 			}
 		}
@@ -592,7 +592,7 @@ func (m *Masker) inMemo(s, hint string) (result, bool) {
 }
 
 // Written: is des an assistant text unmasked here (is there a record)? Returns the decisions of the
-// translated pieces (rule "traduzida", with the type of the pseudonym), for the memory.
+// translated pieces (rule "translated", with the type of the pseudonym), for the memory.
 func (l *Batch) Written(des string) ([]Decision, bool) {
 	if len(des) < 4 {
 		return nil, false
@@ -611,7 +611,7 @@ func translatedDecisions(des string, ts []snippet) []Decision {
 			continue
 		}
 		v := des[t.Start:t.End]
-		out = append(out, Decision{Name: v, Ent: strings.TrimPrefix(t.Type, objTypePrefix), Rule: "traduzida", Generic: isGeneric(v)})
+		out = append(out, Decision{Name: v, Ent: strings.TrimPrefix(t.Type, objTypePrefix), Rule: "translated", Generic: isGeneric(v)})
 	}
 	return out
 }

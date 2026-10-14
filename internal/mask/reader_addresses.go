@@ -155,25 +155,25 @@ func urlIn(s string, i int, add func(ObjFinding)) {
 	switch left {
 	case "s3", "s3a", "s3n", "gs", "gcs", "az", "oss":
 		if simpleName(host) && !publicDev(host) && !strings.HasPrefix(host, "$") {
-			add(ObjFinding{ha, hb, "bucket", "armazenamento", true})
+			add(ObjFinding{ha, hb, "bucket", "storage", true})
 		}
-		addFolders(s, pa, pb, "armazenamento", add)
+		addFolders(s, pa, pb, "storage", add)
 	case "abfs", "abfss", "wasb", "wasbs":
 		if ua >= 0 && simpleName(s[ua:h+strings.LastIndexByte(s[h:e], '@')]) {
 			c := s[ua : h+strings.LastIndexByte(s[h:e], '@')]
 			if !publicDev(c) {
-				add(ObjFinding{ua, ua + len(c), "bucket", "armazenamento", true})
+				add(ObjFinding{ua, ua + len(c), "bucket", "storage", true})
 			}
 		}
 		if d := strings.IndexByte(host, '.'); d > 0 && !publicDev(host[:d]) {
-			add(ObjFinding{ha, ha + d, "cloud_account", "armazenamento", true})
+			add(ObjFinding{ha, ha + d, "cloud_account", "storage", true})
 		}
-		addFolders(s, pa, pb, "armazenamento", add)
+		addFolders(s, pa, pb, "storage", add)
 	case "hdfs", "webhdfs", "viewfs":
 		if simpleName(host) && !publicDomain(host) {
-			addHost(s, ha, hb, "armazenamento", true, add)
+			addHost(s, ha, hb, "storage", true, add)
 		}
-		addFolders(s, pa, pb, "armazenamento", add)
+		addFolders(s, pa, pb, "storage", add)
 	case "amqp", "amqps", "kafka", "nats", "tls+nats", "mqtt", "mqtts", "pulsar", "pulsar+ssl", "stomp":
 		user("queue")
 		for x := ha; x < e; { // host list
@@ -413,7 +413,7 @@ func internalHostIn(s string, i, end int, add func(ObjFinding)) {
 	if publicDev(s[a:i]) {
 		return
 	}
-	add(ObjFinding{a, end, "server", "host-interno", true})
+	add(ObjFinding{a, end, "server", "internal-host", true})
 }
 
 // ---- user paths ----------------------------------------------------------------------------
@@ -478,7 +478,7 @@ func pathIn(s string, u int, add func(ObjFinding)) {
 	// a public user (/home/ubuntu, /home/ec2-user) stays, but the project folders below it are
 	// still read
 	if !publicDev(name) && len(name) >= 2 {
-		add(ObjFinding{u, e, "user", "caminho", true})
+		add(ObjFinding{u, e, "user", "path", true})
 	}
 	prev := ""
 	for n, a := 0, e; n < 8 && a < len(s) && pathSep(s[a]); n++ {
@@ -502,7 +502,7 @@ func pathIn(s string, u int, add func(ObjFinding)) {
 			return // arquivo
 		}
 		if v[0] != '.' && identifierShape(v) && !publicFolder(v) && !publicDev(v) {
-			add(ObjFinding{a, b, "folder", "caminho", false})
+			add(ObjFinding{a, b, "folder", "path", false})
 		}
 		if !dir {
 			return
@@ -567,7 +567,7 @@ func findDomainUser(s string, add func(ObjFinding)) {
 				// user
 				escape = escape || strings.IndexByte("ntr", v[0]) >= 0 && len(v) > 1 && v[1] >= 'A' && v[1] <= 'Z'
 				if len(v) >= 2 && !escape && (b == len(s) || s[b] != '\\' && s[b] != '/') && !publicDev(v) {
-					add(ObjFinding{u, b, "user", "usuario-rede", true})
+					add(ObjFinding{u, b, "user", "network-user", true})
 				}
 			}
 		}

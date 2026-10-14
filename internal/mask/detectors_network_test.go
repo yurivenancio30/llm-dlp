@@ -81,7 +81,7 @@ func TestFakeIPSameSpelling(t *testing.T) {
 }
 
 func TestReaderInternalIP(t *testing.T) {
-	checkReader(t, "ip-interno", findInternalIP, nil, []readerCase{
+	checkReader(t, "internal-ip", findInternalIP, nil, []readerCase{
 		{"inet6 fd12:3456:789a:1::15/64 e fe80::2a0:c9ff:fe12:3456%eth0", []string{"server:fd12:3456:789a:1::15!", "server:fe80::2a0:c9ff:fe12:3456!"}},
 		{"::ffff:a2a:70f ::ffff:342e:5815 ::ffff:10.42.7.15", []string{"server:::ffff:a2a:70f!"}},
 		{"fd00::1 fe80::1 ::1 2001:db8::1 2600:1f18:abcd::12 fd00:ec2::254", nil},
@@ -115,7 +115,7 @@ func TestPublicIPInName(t *testing.T) {
 
 // A loose AWS resource ID: the same pseudonym it has inside the ARN.
 func TestIDsAWS(t *testing.T) {
-	checkReader(t, "nuvem", findCloud, nil, []readerCase{
+	checkReader(t, "cloud", findCloud, nil, []readerCase{
 		{"vpc-0a1b2c3d4e5f67890 subnet-0f1e2d3c i-0abc1234def567890 tgw-attach-0123456789abcdef0",
 			[]string{"service:i-0abc1234def567890!", "service:subnet-0f1e2d3c!", "service:tgw-attach-0123456789abcdef0!", "service:vpc-0a1b2c3d4e5f67890!"}},
 		// prefix outside the list, wrong length, no digit, glued, AWS public image

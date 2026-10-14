@@ -33,9 +33,9 @@ func ciRule(s string, ents []yEnt, e *yEnt, v string, child func(int, string) *y
 	}
 	switch {
 	case k == "image" || k == "container" && n >= 2 || k == "name" && prev == "image" || k == "image" && prev == "container":
-		addImage(s, e.vi, e.vf, "imagem", add)
+		addImage(s, e.vi, e.vf, "image", add)
 	case k == "-" && prev == "services" || k == "name" && prev == "-" && prev2 == "services":
-		addImage(s, e.vi, e.vf, "imagem", add)
+		addImage(s, e.vi, e.vf, "image", add)
 	case k == "runs-on" || k == "-" && prev == "runs-on" || prev == "runs-on" && (k == "group" || k == "labels") || k == "-" && prev == "labels" && prev2 == "runs-on":
 		runner()
 	case k == "-" && prev == "tags" && n == 3 && e.path[0] != "-" && job(e.ids[0]):
@@ -78,9 +78,9 @@ func findJenkins(s string, add func(ObjFinding)) {
 	}
 	for _, m := range reJkImage.FindAllStringSubmatchIndex(s, -1) {
 		if m[2] >= 0 {
-			addImage(s, m[2], m[3], "imagem", add)
+			addImage(s, m[2], m[3], "image", add)
 		} else {
-			addImage(s, m[4], m[5], "imagem", add)
+			addImage(s, m[4], m[5], "image", add)
 		}
 	}
 }

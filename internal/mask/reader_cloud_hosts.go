@@ -51,7 +51,7 @@ func findCloudHosts(s string, add func(ObjFinding)) {
 	for _, h := range cloudHosts {
 		for i := strings.Index(s, h.suf); i >= 0; {
 			if a, b, ok := clientLabel(s, i); ok && (h.suf != ".execute-api." || strings.Contains(s[i:min(len(s), i+80)], ".amazonaws.com")) {
-				add(ObjFinding{a, b, h.ent, "nuvem-host", true})
+				add(ObjFinding{a, b, h.ent, "cloud-host", true})
 			}
 			j := strings.Index(s[i+1:], h.suf)
 			if j < 0 {
@@ -98,7 +98,7 @@ func findS3Virtual(s string, add func(ObjFinding)) {
 					a--
 				}
 				if v := s[a:i]; len(v) >= 3 && !publicDev(v) {
-					add(ObjFinding{a, i, "bucket", "nuvem-host", true})
+					add(ObjFinding{a, i, "bucket", "cloud-host", true})
 				}
 			}
 		}
@@ -114,7 +114,7 @@ func findS3Virtual(s string, add func(ObjFinding)) {
 func findECRHost(s string, add func(ObjFinding)) {
 	for i := strings.Index(s, ".dkr.ecr."); i >= 0; {
 		if i >= 12 && allDigits(s[i-12:i]) && (i == 12 || !isAlnum(s[i-13])) {
-			add(ObjFinding{i - 12, i, "cloud_account", "nuvem-host", true})
+			add(ObjFinding{i - 12, i, "cloud_account", "cloud-host", true})
 		}
 		j := strings.Index(s[i+1:], ".dkr.ecr.")
 		if j < 0 {

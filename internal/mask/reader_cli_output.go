@@ -14,7 +14,7 @@ import (
 var reCLIHeader = regexp.MustCompile(`^[A-Z][A-Z0-9()/_.-]*(?: [A-Z][A-Z0-9()/_.-]*)?$`)
 
 // columns of interest -> type
-var cliColumns = map[string]string{"NAME": "service", "NAMES": "service", "NAMESPACE": "namespace", "IMAGE": "imagem",
+var cliColumns = map[string]string{"NAME": "service", "NAMES": "service", "NAMESPACE": "namespace", "IMAGE": "image",
 	"EXTERNAL-IP": "ip", "EXTERNAL IP": "ip", "PUBLIC-IP": "ip", "PUBLIC IP": "ip", "CONTAINER": "service"}
 
 type cliColumn struct {
@@ -151,12 +151,12 @@ func cliLine2(s string, base int, l string, cols []cliColumn, tab bool, add func
 		}
 		a, b := base+i, base+j
 		switch c.ent {
-		case "imagem":
-			addImage(s, a, b, "saída-cli", add)
+		case "image":
+			addImage(s, a, b, "cli-output", add)
 		case "ip":
 			for _, p := range strings.Split(v, ",") {
 				if isIPv4(p) {
-					add(ObjFinding{a, a + len(p), "server", "saída-cli", true})
+					add(ObjFinding{a, a + len(p), "server", "cli-output", true})
 				}
 				a += len(p) + 1
 			}
@@ -167,7 +167,7 @@ func cliLine2(s string, base int, l string, cols []cliColumn, tab bool, add func
 				if k := strings.LastIndexByte(p0, '/'); k >= 0 {
 					x, p = a+k+1, p0[k+1:]
 				}
-				addName(s, x, x+len(p), c.ent, "saída-cli", true, add)
+				addName(s, x, x+len(p), c.ent, "cli-output", true, add)
 				a += len(p0) + 1
 			}
 		}
@@ -188,14 +188,14 @@ func findInfraIP(s string, add func(ObjFinding)) {
 	if strings.Contains(s, "loadBalancer") {
 		for _, m := range reIPIngress.FindAllStringSubmatchIndex(s, -1) {
 			for _, n := range reIPItem.FindAllStringSubmatchIndex(s[m[2]:m[3]], -1) {
-				add(ObjFinding{m[2] + n[2], m[2] + n[3], "server", "ip-infra", true})
+				add(ObjFinding{m[2] + n[2], m[2] + n[3], "server", "infra-ip", true})
 			}
 		}
 	}
 	if strings.Contains(s, "ExternalIP") || strings.Contains(s, "InternalIP") {
 		for _, re := range []*regexp.Regexp{reIPInType, reIPInTypeAo} {
 			for _, m := range re.FindAllStringSubmatchIndex(s, -1) {
-				add(ObjFinding{m[2], m[3], "server", "ip-infra", true})
+				add(ObjFinding{m[2], m[3], "server", "infra-ip", true})
 			}
 		}
 	}

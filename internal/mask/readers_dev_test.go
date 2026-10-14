@@ -55,7 +55,7 @@ func checkReader(t *testing.T, name string, find func(string, func(ObjFinding)),
 }
 
 func TestReaderKeyValue(t *testing.T) {
-	checkReader(t, "chave-valor", findKeyValue, publicDev, []readerCase{
+	checkReader(t, "key-value", findKeyValue, publicDev, []readerCase{
 		// YAML, JSON, TOML, INI, .env, .properties
 		{"host: db-exemplo-01.interno\nport: 5432\n", []string{"server:db-exemplo-01.interno!"}},
 		{"database: vendas_x\nschema: financeiro\n", []string{"database:vendas_x!", "schema:financeiro!"}},
@@ -104,7 +104,7 @@ func TestReaderKeyValue(t *testing.T) {
 }
 
 func TestReaderAddresses(t *testing.T) {
-	checkReader(t, "endereço", findAddresses, publicDev, []readerCase{
+	checkReader(t, "address", findAddresses, publicDev, []readerCase{
 		// internal host in a URL
 		{"veja http://wiki-interna/pagina e https://grafana.vendas.svc.cluster.local:3000/d/x", []string{"server:wiki-interna!"}}, // the Kubernetes DNS is left to the Kubernetes reader
 		{"grpc://svc-pedidos.internal:50051", []string{"server:svc-pedidos.internal!"}},
@@ -158,7 +158,7 @@ func TestReaderPackages(t *testing.T) {
 }
 
 func TestReaderPaths(t *testing.T) {
-	checkReader(t, "caminho", findPaths, publicDev, []readerCase{
+	checkReader(t, "path", findPaths, publicDev, []readerCase{
 		{"/home/joao_x/projetos/cliente_x9/main.go", []string{"folder:cliente_x9", "user:joao_x!"}},
 		{"/Users/maria.s/Documents/rel_2026/", []string{"folder:rel_2026", "user:maria.s!"}},
 		{`C:\Users\jsilva01\AppData\Local\proj_x\`, []string{"folder:proj_x", "user:jsilva01!"}},
@@ -183,7 +183,7 @@ func TestReaderNetworkUsers(t *testing.T) {
 }
 
 func TestReaderCloud(t *testing.T) {
-	checkReader(t, "nuvem", findCloud, publicDev, []readerCase{
+	checkReader(t, "cloud", findCloud, publicDev, []readerCase{
 		{"arn:aws:s3:::bkt-relatorios-demo/*", []string{"bucket:bkt-relatorios-demo!"}},
 		{"arn:aws:sqs:us-east-1:210987654321:fila-pedidos-x9", []string{"cloud_account:210987654321!", "queue:fila-pedidos-x9!"}},
 		{"arn:aws:dynamodb:sa-east-1:210987654321:table/tb_pedido_x9/stream/2026", []string{"cloud_account:210987654321!", "table:tb_pedido_x9!"}},
@@ -200,7 +200,7 @@ func TestReaderCloud(t *testing.T) {
 }
 
 func TestReaderPublicIP(t *testing.T) {
-	checkReader(t, "ip-público", findPublicIP, nil, []readerCase{
+	checkReader(t, "public-ip", findPublicIP, nil, []readerCase{
 		{"servidor em 34.120.10.5 e 2600:1f18:abcd::12", []string{"server:2600:1f18:abcd::12!", "server:34.120.10.5!"}},
 		{"10.0.0.1 192.168.1.1 127.0.0.1 8.8.8.8 1.1.1.1 192.0.2.10 ::1 fe80::1 2001:db8::1", nil},
 		{"versão 1.2.3.4.5, hora 12:30:45, mac aa:bb:cc:dd:ee:ff, slice x[1::2], std::vector", nil},
@@ -225,7 +225,7 @@ func TestReaderPublicIP(t *testing.T) {
 func TestReaderEmbeddedTerms(t *testing.T) {
 	ts := []string{"acmex"}
 	find := func(s string, add func(ObjFinding)) { findTerms(s, ts, add) }
-	checkReader(t, "termo-embutido", find, nil, []readerCase{
+	checkReader(t, "embedded-term", find, nil, []readerCase{
 		{"SELECT * FROM acmex_pedidos", []string{"table:acmex_pedidos!"}},
 		{"host: dbAcmexVendas01", []string{"server:dbAcmexVendas01!"}},
 		{"o job svc-acmex-carga falhou", []string{"service:svc-acmex-carga!"}},

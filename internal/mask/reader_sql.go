@@ -819,7 +819,7 @@ func errorIn(s string, a, b int, e string, add func(ObjFinding)) {
 	ents := entQual(len(ps), e)
 	for k, p := range ps {
 		if p != "" && reSimpleIdent.MatchString(p) {
-			add(ObjFinding{a, a + len(p), ents[k], "erro", strong})
+			add(ObjFinding{a, a + len(p), ents[k], "error", strong})
 		}
 		a += len(p) + 1
 	}
@@ -827,12 +827,12 @@ func errorIn(s string, a, b int, e string, add func(ObjFinding)) {
 
 func findBQError(s string, add func(ObjFinding)) {
 	for _, m := range reBQError.FindAllStringSubmatchIndex(s, -1) {
-		add(ObjFinding{m[4], m[5], "database", "erro", true})
+		add(ObjFinding{m[4], m[5], "database", "error", true})
 		a := m[6]
 		ps := strings.Split(s[m[6]:m[7]], ".")
 		ents := []string{"schema", "table"}
 		for k, p := range ps {
-			add(ObjFinding{a, a + len(p), ents[k], "erro", true})
+			add(ObjFinding{a, a + len(p), ents[k], "error", true})
 			a += len(p) + 1
 		}
 	}

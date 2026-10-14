@@ -419,7 +419,7 @@ func kvIn(s string, p int, add func(ObjFinding)) {
 			}
 		}
 	}
-	markValue(s, va, vb, ent, "chave-valor", exact, add)
+	markValue(s, va, vb, ent, "key-value", exact, add)
 }
 
 // yamlList: the "- x" items right under "key:" (indented) are of the key's type.
@@ -452,7 +452,7 @@ func yamlList(s string, v int, ent string, add func(ObjFinding)) {
 		if v := s[a:b]; strings.ContainsAny(v, ":{}[] ") {
 			return // item that is a map or a sentence: not a list of names
 		}
-		markValue(s, a, b, ent, "chave-valor", true, add)
+		markValue(s, a, b, ent, "key-value", true, add)
 	}
 }
 
@@ -485,7 +485,7 @@ func inlineList(s string, v int, ent string, add func(ObjFinding)) {
 			}
 		}
 		if b > a {
-			markValue(s, a, b, ent, "chave-valor", true, add)
+			markValue(s, a, b, ent, "key-value", true, add)
 		}
 	}
 }
@@ -733,7 +733,7 @@ func findXMLValue(s string, add func(ObjFinding)) {
 							vb--
 						}
 						if vb > va && !strings.EqualFold(s[va:vb], local) {
-							markValue(s, va, vb, ent, "chave-valor", exact, add)
+							markValue(s, va, vb, ent, "key-value", exact, add)
 						}
 					}
 				}
@@ -772,7 +772,7 @@ func findLongOptions(s string, add func(ObjFinding)) {
 					if vb > va {
 						v := s[va:vb]
 						if (quotes || dashOrDigit(v) || identifierShape(v)) && !uppercaseOnly(v) && !typeWords[strings.ToLower(v)] {
-							markValue(s, va, vb, ent, "chave-valor", exact, add)
+							markValue(s, va, vb, ent, "key-value", exact, add)
 						}
 					}
 				}

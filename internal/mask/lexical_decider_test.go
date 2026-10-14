@@ -79,7 +79,7 @@ func TestLexicalAnchor(t *testing.T) {
 	// the anchor found in the same text
 	s := "db_host = \"pgsrv-01\"\nalvos = [\"pgsrv-01\", \"billing\", \"checkout\"]\n"
 	check(t, m, s, []string{"billing", "checkout"}, []string{"alvos"})
-	if !decided(m, s, "billing", "server", "léxica-âncora") {
+	if !decided(m, s, "billing", "server", "lexical-anchor") {
 		t.Errorf("billing: %+v", m.Decided(s, ""))
 	}
 	// the anchor learned before (another text), in a Go list and in a YAML list

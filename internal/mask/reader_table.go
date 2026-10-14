@@ -485,11 +485,11 @@ func classifyTableD(s string, cs []cell, rows [][]cell, title string, noHdr, str
 		}
 		if m := reTablesIn.FindStringSubmatchIndex(h); m != nil { // MySQL: Tables_in_<banco>
 			ent[k] = "table"
-			add(ObjFinding{c.a + m[2], c.a + m[3], "database", "tabela-catálogo", true})
+			add(ObjFinding{c.a + m[2], c.a + m[3], "database", "catalog-table", true})
 			continue
 		}
 		if !noHdr && !outputLabels[v] && !publicSQL(v) && !strings.ContainsAny(h, " ().") && identifierShape(h) && (!strict || strings.ContainsAny(h, "_0123456789")) {
-			add(ObjFinding{c.a, c.b, "column", "cabeçalho", false})
+			add(ObjFinding{c.a, c.b, "column", "header", false})
 		}
 	}
 	if name >= 0 {
@@ -612,7 +612,7 @@ func labelAndValues(s string, l cell, add func(ObjFinding)) bool {
 	}
 	for _, c := range objCells(s, l.a+t+1, l.b, '\t', nil) {
 		if v := s[c.a:c.b]; v != "" && reSimpleIdent.MatchString(v) && resourceValue(v, e) && !isDataType(v) {
-			add(ObjFinding{c.a, c.b, e, "tabela-rótulo", false})
+			add(ObjFinding{c.a, c.b, e, "label-table", false})
 		}
 	}
 	return true
@@ -651,7 +651,7 @@ func addCellParts(s string, a, b int, lastPos string, add func(ObjFinding)) {
 		if p != "" && !publicSQL(p) && reSimpleIdent.MatchString(p) {
 			// a short value (up to 4 characters: codes, acronyms) masks in place, but does not
 			// teach alone
-			add(ObjFinding{a, a + len(p), ents[k], "tabela-catálogo", ents[k] != "column" && len(p) >= 5})
+			add(ObjFinding{a, a + len(p), ents[k], "catalog-table", ents[k] != "column" && len(p) >= 5})
 		}
 		a += len(p) + 1
 	}

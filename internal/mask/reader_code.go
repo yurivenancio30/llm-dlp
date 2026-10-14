@@ -251,7 +251,7 @@ func findCodeName(s string, add func(ObjFinding)) {
 		if ent == "" {
 			continue
 		}
-		markValue(s, a, b, ent, "código-nome", strong && markedValue(s[a:b]), add)
+		markValue(s, a, b, ent, "code-name", strong && markedValue(s[a:b]), add)
 	}
 }
 
@@ -518,9 +518,9 @@ func findCodeCall(s string, add func(ObjFinding)) {
 					}
 					switch {
 					case conn && len(levels) == 0 && followedByPort(s, e+1):
-						markValue(s, j+1, e, "server", "código-chamada", markedValue(s[j+1:e]), add)
+						markValue(s, j+1, e, "server", "code-call", markedValue(s[j+1:e]), add)
 					case ent != "":
-						markValue(s, j+1, e, ent, "código-chamada", markedValue(s[j+1:e]), add)
+						markValue(s, j+1, e, ent, "code-call", markedValue(s[j+1:e]), add)
 					}
 				}
 				j = e

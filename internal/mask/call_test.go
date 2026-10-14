@@ -262,7 +262,7 @@ func TestCallNegatives(t *testing.T) {
 			t.Errorf("%s: as regras de chamada mascararam a mais:\n%s", p.cmd, r.text)
 		}
 		for _, d := range r.dec {
-			if d.Rule != "leitor" {
+			if d.Rule != "reader" {
 				t.Errorf("%s: decisão %+v", p.cmd, d)
 			}
 		}
@@ -344,7 +344,7 @@ func TestEchoAndTranslated(t *testing.T) {
 	}
 	foundIt := false
 	for _, d := range rs[1].decUsage {
-		foundIt = foundIt || d.Name == "vitrine" && d.Rule == "eco"
+		foundIt = foundIt || d.Name == "vitrine" && d.Rule == "echo"
 	}
 	if !foundIt {
 		t.Errorf("eco não decidido: %+v", rs[1].decUsage)

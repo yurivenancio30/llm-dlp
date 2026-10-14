@@ -26,7 +26,7 @@ import (
 // letters. Everything in one pass per line and lookups in a hash table.
 
 func init() {
-	registerDecider(Decider{Name: "chamada", Decide: decideCall})
+	registerDecider(Decider{Name: "call", Decide: decideCall})
 }
 
 // callExt: the extension of the hint read (call.go).
@@ -88,7 +88,7 @@ func decideCall(c *TextCtx) {
 	if len(e.names) > 0 {
 		scanWords(s, func(a, b int) {
 			if ent, ok := e.names[hpal(s[a:b])]; ok && !cov.covers(a, b) {
-				c.Decide(a, b, knownEnt(c, s[a:b], ent), "eco")
+				c.Decide(a, b, knownEnt(c, s[a:b], ent), "echo")
 			}
 		})
 	}
