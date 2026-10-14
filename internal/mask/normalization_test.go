@@ -62,7 +62,7 @@ func checkMasked(t *testing.T, m *Masker, label, text string, names []string) (o
 		ok += a - b
 	}
 	if back := NewTable(ents).Unmask(out, false); back != text {
-		t.Errorf("%s: a volta não reproduz o original", label)
+		t.Errorf("%s: the way back does not reproduce the original", label)
 	}
 	return ok, tot
 }
@@ -75,7 +75,7 @@ func TestTransportSameCSV(t *testing.T) {
 		ok, tot := checkMasked(t, m, tr.name, tr.f(csv), names)
 		if ok != tot {
 			out, _ := m.Mask(tr.f(csv))
-			t.Errorf("%s: %d/%d mascarados\n%s", tr.name, ok, tot, out)
+			t.Errorf("%s: %d/%d masked\n%s", tr.name, ok, tot, out)
 		}
 	}
 }
@@ -93,25 +93,25 @@ func TestNormalizeMap(t *testing.T) {
 	for _, c := range cases {
 		n, ok := normalize(c)
 		if !ok {
-			t.Errorf("%q: nada normalizado", c)
+			t.Errorf("%q: nothing normalized", c)
 			continue
 		}
 		if len(n.mp) != len(n.t)+1 {
-			t.Fatalf("%q: mapa com tamanho errado", c)
+			t.Fatalf("%q: map with the wrong size", c)
 		}
 		for i := 0; i < len(n.t); i++ {
 			if p := n.mp[i]; p < 0 || p >= len(c) || i > 0 && p < n.mp[i-1] {
-				t.Fatalf("%q: posição %d fora de ordem", c, i)
+				t.Fatalf("%q: position %d out of order", c, i)
 			}
 		}
 		if strings.ContainsAny(n.t, "\x1b\r→│┆") || strings.Contains(n.t, "\ufeff") {
-			t.Errorf("%q: sobrou transporte: %q", c, n.t)
+			t.Errorf("%q: transport left over: %q", c, n.t)
 		}
 	}
 	// common text is not touched
 	for _, c := range []string{"SELECT a FROM b\nWHERE c = 1\n", "nome: x\n12: y\nz: 3\n", "- name: a\n- name: b\n"} {
 		if _, ok := normalize(c); ok {
-			t.Errorf("%q: normalizado sem transporte", c)
+			t.Errorf("%q: normalized without transport", c)
 		}
 	}
 }

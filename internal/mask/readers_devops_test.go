@@ -34,10 +34,10 @@ func sameStructure(t *testing.T, before, after string) {
 		}
 	}
 	if !equal {
-		t.Errorf("a estrutura mudou:\nantes:  %v\ndepois: %v\nsaída:\n%s", a, d, after)
+		t.Errorf("the structure changed:\nbefore: %v\nafter:  %v\noutput:\n%s", a, d, after)
 	}
 	if strings.Count(before, "\n") != strings.Count(after, "\n") {
-		t.Errorf("número de linhas mudou:\n%s", after)
+		t.Errorf("number of lines changed:\n%s", after)
 	}
 }
 
@@ -127,11 +127,11 @@ func TestK8sYAML(t *testing.T) {
 	for real, typ := range map[string]string{"svc-pedidos-x9": "obj.service", "ns-financeiro-demo": "obj.namespace",
 		"sa-pedidos-leitor": "obj.user", "pvc-pedidos-demo": "obj.service"} {
 		if got := typeOf(m, k8sManifest, real); got != typ {
-			t.Errorf("%s: tipo %q, esperado %q", real, got, typ)
+			t.Errorf("%s: type %q, expected %q", real, got, typ)
 		}
 	}
 	if got := typeOf(m, "apiVersion: v1\nkind: Namespace\nmetadata:\n  name: ns-contabil-demo\n", "ns-contabil-demo"); got != "obj.namespace" {
-		t.Errorf("Namespace: tipo %q", got)
+		t.Errorf("Namespace: type %q", got)
 	}
 }
 
@@ -170,7 +170,7 @@ spec:
 	for _, v := range []string{"apiVersion: apps/v1", "kind: Deployment", "namespace: default", "serviceAccountName: default",
 		"image: registry.k8s.io/nginx-slim:0.8", "image: ghcr.io/prometheus/prometheus:2.0", "imagePullPolicy: Always", "restartPolicy: Always", "app: nginx"} {
 		if !strings.Contains(out, v) {
-			t.Errorf("%q deveria ficar:\n%s", v, out)
+			t.Errorf("%q should stay:\n%s", v, out)
 		}
 	}
 	// "nginx" in metadata.name is masked in place, but a plain word does not propagate
@@ -180,7 +180,7 @@ spec:
 	// without apiVersion/kind it is not a manifest
 	for _, s := range []string{"metadata:\n  name: algo-x9\n", "kind: Pessoa\nnome: algo-x9\n", "apiVersion: str\nkind: str\nmetadata:\n  name: algo-x9\n"} {
 		if o, _ := m.Mask(s); !strings.Contains(o, "algo-x9") {
-			t.Errorf("não é manifesto, mas mascarou: %q", o)
+			t.Errorf("not a manifest, but it masked: %q", o)
 		}
 	}
 }
@@ -190,7 +190,7 @@ func TestK8sHelmTemplateUntouched(t *testing.T) {
 	s := "apiVersion: v1\nkind: Service\nmetadata:\n  name: {{ include \"chart.fullname\" . }}\n  namespace: {{ .Release.Namespace }}\nspec:\n  type: {{ .Values.service.type }}\n"
 	out, _ := m.Mask(s)
 	if out != s {
-		t.Errorf("template mudou:\n%s", out)
+		t.Errorf("template changed:\n%s", out)
 	}
 }
 
@@ -222,7 +222,7 @@ current-context: ctx-financeiro-demo
 		[]string{"kind: Config", "https://", ":6443", "arn:aws:eks:us-east-1:", ":cluster/", "current-context: "})
 	sameStructure(t, s, out)
 	if got := typeOf(m, s, "usr-deploy-demo"); got != "obj.user" {
-		t.Errorf("users[].name: tipo %q", got)
+		t.Errorf("users[].name: type %q", got)
 	}
 }
 
@@ -231,7 +231,7 @@ func TestServiceDNS(t *testing.T) {
 	check(t, m, "conecte em pg-pedidos.ns-contabil-x3.svc.cluster.local:5432 e kubernetes.default.svc.cluster.local",
 		[]string{"pg-pedidos", "ns-contabil-x3"}, []string{".svc.cluster.local:5432", "kubernetes.default.svc.cluster.local"})
 	if got := typeOf(m, "x: pg-pedidos.ns-contabil-x3.svc.cluster.local", "ns-contabil-x3"); got != "obj.namespace" {
-		t.Errorf("tipo %q", got)
+		t.Errorf("type %q", got)
 	}
 }
 
@@ -242,7 +242,7 @@ func TestHelmChart(t *testing.T) {
 	sameStructure(t, s, out)
 	// values.yaml (without apiVersion) is not for this reader
 	if o, _ := m.Mask("replicaCount: 1\nimage:\n  repository: nginx\n"); !strings.Contains(o, "repository: nginx") {
-		t.Errorf("values.yaml mexido: %q", o)
+		t.Errorf("values.yaml touched: %q", o)
 	}
 }
 
@@ -275,7 +275,7 @@ volumes:
 	sameStructure(t, s, out)
 	// any YAML with "services:" that does not look like compose
 	if o, _ := m.Mask("services:\n  pagamento-x1:\n    descricao: algo\n"); !strings.Contains(o, "pagamento-x1") {
-		t.Errorf("não é compose, mas mascarou: %q", o)
+		t.Errorf("not compose, but it masked: %q", o)
 	}
 }
 
@@ -321,16 +321,16 @@ resource "azurerm_mssql_server" "sql" {
 		[]string{`resource "aws_s3_bucket" "relatorios"`, `resource "aws_db_instance" "principal"`, `region  = "southamerica-east1"`, `engine         = "postgres"`,
 			`"db.t3.micro"`, "aws_security_group.db.id", `data "aws_caller_identity" "atual"`, "${var.prefixo}-", `"Standard_LRS"`, `"eastus2"`, `"us-east-1a"`, `Ambiente = "dev"`})
 	if strings.Count(out, "\n") != strings.Count(s, "\n") {
-		t.Errorf("linhas mudaram")
+		t.Errorf("lines changed")
 	}
 	for real, typ := range map[string]string{"bkt-relatorios-demo": "obj.bucket", "db-exemplo-01": "obj.database", "vendas_demo": "obj.database",
 		"sqlsrv-exemplo-01": "obj.server", "proj-relatorios-demo": "obj.cloud_account"} {
 		if got := typeOf(m, s, real); got != typ {
-			t.Errorf("%s: tipo %q, esperado %q", real, got, typ)
+			t.Errorf("%s: type %q, expected %q", real, got, typ)
 		}
 	}
 	if got := typeOf(m, "resource \"aws_iam_role\" \"x\" {\n  account_id = \"123456789012\"\n}\n", "123456789012"); got != "obj.cloud_account" {
-		t.Errorf("account_id: tipo %q", got)
+		t.Errorf("account_id: type %q", got)
 	}
 }
 
@@ -363,12 +363,12 @@ func TestAnsibleINI(t *testing.T) {
 	out := check(t, m, s, []string{"srv-exemplo-01", "srv-exemplo-02", "usr-ansible-x1", "usr-deploy-x2"},
 		[]string{"[dbservers]", "ansible_host=", "ansible_user=", "[web:children]", "dbservers", "[all:vars]", "ansible_port=2222"})
 	if strings.Count(out, "\n") != strings.Count(s, "\n") {
-		t.Errorf("linhas mudaram: %q", out)
+		t.Errorf("lines changed: %q", out)
 	}
 	// common INI (my.cnf, setup.cfg, tox.ini) is not an inventory
 	for _, s := range []string{"[mysqld]\nskip-name-resolve\nport=3306\n", "[tox]\nenvlist = py310\n[testenv]\ndeps =\n    pytest-x1\n", "[package]\nname = \"pacote-x1\"\n"} {
 		if o, _ := m.Mask(s); o != s {
-			t.Errorf("INI comum mexido:\n%q\n-> %q", s, o)
+			t.Errorf("common INI touched:\n%q\n-> %q", s, o)
 		}
 	}
 }
@@ -380,7 +380,7 @@ func TestAnsibleYAML(t *testing.T) {
 	play := "- hosts: grupo-web-x1\n  become: true\n  tasks:\n    - name: instalar pacote\n      ansible.builtin.apt:\n        name: nginx\n        state: present\n      delegate_to: srv-exemplo-03\n"
 	check(t, m, play, []string{"grupo-web-x1", "srv-exemplo-03"}, []string{"ansible.builtin.apt:", "name: nginx", "state: present", "become: true", "name: instalar pacote"})
 	if o, _ := m.Mask("- hosts: all\n  tasks: []\n"); !strings.Contains(o, "hosts: all") {
-		t.Errorf("hosts: all mexido: %q", o)
+		t.Errorf("hosts: all touched: %q", o)
 	}
 }
 
@@ -424,7 +424,7 @@ func TestARMAndBicep(t *testing.T) {
  ]}`
 	check(t, m, arm, []string{"sqlsrv-exemplo-01", "db-vendas-x1"}, []string{`"Microsoft.Sql/servers"`, "[resourceGroup().location]", "[parameters('nomeConta')]", `"apiVersion": "2023-08-01"`})
 	if got := typeOf(m, arm, "db-vendas-x1"); got != "obj.database" {
-		t.Errorf("ARM filho: tipo %q", got)
+		t.Errorf("ARM child: type %q", got)
 	}
 	bicep := "param location string = resourceGroup().location\nresource sql 'Microsoft.Sql/servers@2023-08-01' = {\n  name: 'sqlsrv-exemplo-02'\n  location: location\n  properties: {\n    name: 'interno'\n  }\n}\n"
 	check(t, m, bicep, []string{"sqlsrv-exemplo-02"}, []string{"resource sql 'Microsoft.Sql/servers@2023-08-01'", "location: location", "name: 'interno'"})
@@ -458,14 +458,14 @@ jobs:
 	check(t, m, az, []string{"pool-financeiro-x5"}, []string{"trigger:", "- main", "script: echo ok"})
 	az2 := "pool:\n  vmImage: ubuntu-latest\nsteps:\n  - script: echo ok\n"
 	if o, _ := m.Mask(az2); o != az2 {
-		t.Errorf("rótulo público mexido: %q", o)
+		t.Errorf("public label touched: %q", o)
 	}
 	jk := "pipeline {\n  agent { label 'agente-build-x6' }\n  stages {\n    stage('b') {\n      agent { docker { image 'registry.exemplo.interno/ci/mvn-x7:3' } }\n      steps { sh 'mvn package' }\n    }\n  }\n}\n"
 	check(t, m, jk, []string{"agente-build-x6", "registry.exemplo.interno", "mvn-x7"}, []string{"pipeline {", "stage('b')", "sh 'mvn package'", ":3'"})
 	// Ansible task tags are not runners
 	ans := "- hosts: all\n  tasks:\n    - name: x\n      script: run.sh\n      tags:\n        - configuracao-x1\n"
 	if o, _ := m.Mask(ans); !strings.Contains(o, "configuracao-x1") {
-		t.Errorf("tag de tarefa mascarada: %q", o)
+		t.Errorf("task tag masked: %q", o)
 	}
 }
 
@@ -483,14 +483,14 @@ func TestDevopsLearnedInOtherFormat(t *testing.T) {
 	} {
 		out, _ := m.Mask(s)
 		if l := strings.ToLower(out); strings.Contains(l, "ns-tesouraria-x8") || strings.Contains(l, "bkt-extratos-x8") {
-			t.Errorf("não propagou:\n   %q\n-> %q", s, out)
+			t.Errorf("did not propagate:\n   %q\n-> %q", s, out)
 		}
 	}
 	// weak evidence (just a label) does not teach
 	m2 := newTest(t)
 	m2.Mask("name: ci\njobs:\n  b:\n    runs-on: runner-fraco-x1\n    steps: []\n")
 	if out, _ := m2.Mask("o runner-fraco-x1 está fora"); !strings.Contains(out, "runner-fraco-x1") {
-		t.Errorf("evidência fraca ensinou: %q", out)
+		t.Errorf("weak evidence taught: %q", out)
 	}
 }
 
@@ -514,7 +514,7 @@ func TestDevopsSkipsCodeAndProse(t *testing.T) {
 	} {
 		for _, l := range ls {
 			l.Find(s, func(o ObjFinding) {
-				t.Errorf("%s pegou %q (%s) em:\n%s", l.Name, s[o.Start:o.End], o.Rule, s)
+				t.Errorf("%s caught %q (%s) in:\n%s", l.Name, s[o.Start:o.End], o.Rule, s)
 			})
 		}
 	}

@@ -55,11 +55,11 @@ func TestLogSummary(t *testing.T) {
 		wants time.Duration
 	}{{"24h", 24 * time.Hour}, {"7d", 7 * 24 * time.Hour}, {"90m", 90 * time.Minute}, {"3", 3 * time.Hour}} {
 		if d, err := period(p.s); err != nil || d != p.wants {
-			t.Errorf("período %q: %v %v", p.s, d, err)
+			t.Errorf("period %q: %v %v", p.s, d, err)
 		}
 	}
 	if _, err := period("ontem"); err == nil {
-		t.Error("período inválido aceito")
+		t.Error("invalid period accepted")
 	}
 }
 
@@ -70,28 +70,28 @@ func TestLogRotates(t *testing.T) {
 	maxLog = 200
 	defer func() { maxLog = before }()
 	p := filepath.Join(t.TempDir(), "llm-dlp.log")
-	a, b := &rotatingLog{p: p}, &rotatingLog{p: p} // dois processos
+	a, b := &rotatingLog{p: p}, &rotatingLog{p: p} // two processes
 	a.reopen()
 	b.reopen()
 	la, lb := log.New(a, "", 0), log.New(b, "", 0)
 	for i := 0; i < 20; i++ {
-		la.Printf("linha %02d do processo a, com algum texto", i)
-		lb.Printf("linha %02d do processo b, com algum texto", i)
+		la.Printf("line %02d from process a, with some text", i)
+		lb.Printf("line %02d from process b, with some text", i)
 	}
 	st, err := os.Stat(p)
 	if err != nil || st.Size() > maxLog {
-		t.Fatalf("log atual: %v %v", st, err)
+		t.Fatalf("current log: %v %v", st, err)
 	}
 	if st1, err := os.Stat(p + ".1"); err != nil || st1.Size() > maxLog+100 {
-		t.Fatalf("log antigo: %v %v", st1, err)
+		t.Fatalf("old log: %v %v", st1, err)
 	}
 	old, _ := os.ReadFile(p + ".1")
 	current, _ := os.ReadFile(p)
-	if !strings.HasSuffix(string(current), "linha 19 do processo b, com algum texto\n") ||
-		!strings.Contains(string(old)+string(current), "linha 19 do processo a") {
-		t.Errorf("as últimas linhas se perderam:\n%s\n---\n%s", old, current)
+	if !strings.HasSuffix(string(current), "line 19 from process b, with some text\n") ||
+		!strings.Contains(string(old)+string(current), "line 19 from process a") {
+		t.Errorf("the last lines were lost:\n%s\n---\n%s", old, current)
 	}
 	if logFile(la) == nil {
-		t.Error("arquivoDoLog: nil")
+		t.Error("logFile: nil")
 	}
 }

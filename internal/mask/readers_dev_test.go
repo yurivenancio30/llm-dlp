@@ -49,7 +49,7 @@ func checkReader(t *testing.T, name string, find func(string, func(ObjFinding)),
 			})
 		}, c.s)
 		if strings.Join(got, " ") != strings.Join(c.wants, " ") {
-			t.Errorf("%s: %q\n   achou %q\n   quer  %q", name, c.s, got, c.wants)
+			t.Errorf("%s: %q\n   found %q\n   want  %q", name, c.s, got, c.wants)
 		}
 	}
 }
@@ -207,18 +207,18 @@ func TestReaderPublicIP(t *testing.T) {
 	})
 	// off by default
 	if ls := configReaders(config.Default()); len(ls) != 0 {
-		t.Errorf("leitores de configuração ligados por padrão: %d", len(ls))
+		t.Errorf("configuration readers on by default: %d", len(ls))
 	}
 	cfg := config.Default()
 	cfg.Objects.PublicIP = true
 	m, _ := NewMasker(cfg, testKey, nil, nil)
 	out, _ := m.Mask("servidor em 34.120.10.5")
 	if strings.Contains(out, "34.120.10.5") {
-		t.Errorf("IP público ficou com a opção ligada: %q", out)
+		t.Errorf("public IP stayed with the option on: %q", out)
 	}
 	m2, _ := NewMasker(config.Default(), testKey, nil, nil)
 	if out, _ := m2.Mask("servidor em 34.120.10.5"); !strings.Contains(out, "34.120.10.5") {
-		t.Errorf("IP público mascarado com a opção desligada: %q", out)
+		t.Errorf("public IP masked with the option off: %q", out)
 	}
 }
 
@@ -236,11 +236,11 @@ func TestReaderEmbeddedTerms(t *testing.T) {
 	m, _ := NewMasker(cfg, testKey, nil, nil)
 	out, _ := m.Mask("o job svc-acmex-carga falhou")
 	if strings.Contains(strings.ToLower(out), "acmex") {
-		t.Errorf("termo embutido ficou: %q", out)
+		t.Errorf("embedded term stayed: %q", out)
 	}
 	// learned in a strong position: masked again in prose
 	if out, _ := m.Mask("reinicie o svc-acmex-carga"); strings.Contains(out, "svc-acmex-carga") {
-		t.Errorf("nome com termo não propagou: %q", out)
+		t.Errorf("name with a term did not propagate: %q", out)
 	}
 }
 
@@ -257,11 +257,11 @@ func TestDevReadersRoundTrip(t *testing.T) {
 	} {
 		out, ents := m.Mask(s)
 		if out == s {
-			t.Errorf("nada mascarado: %q", s)
+			t.Errorf("nothing masked: %q", s)
 			continue
 		}
 		if back := NewTable(ents).Unmask(out, false); back != s {
-			t.Errorf("ida e volta:\n   %q\n-> %q\n-> %q", s, out, back)
+			t.Errorf("round trip:\n   %q\n-> %q\n-> %q", s, out, back)
 		}
 	}
 }
@@ -280,7 +280,7 @@ func TestDevReadersPropagate(t *testing.T) {
 		out, _ := m.Mask(s)
 		for _, v := range []string{"vendas-prod-x9", "bkt-relatorios-demo", "repo-demo", "org-exemplo"} {
 			if strings.Contains(out, v) {
-				t.Errorf("%q não propagou:\n   %q\n-> %q", v, s, out)
+				t.Errorf("%q did not propagate:\n   %q\n-> %q", v, s, out)
 			}
 		}
 	}
@@ -302,7 +302,7 @@ func FuzzReadersDev(f *testing.F) {
 		for _, l := range append(defaultReaders(), ls...) {
 			l.Find(s, func(o ObjFinding) {
 				if o.Start < 0 || o.End > len(s) || o.End < o.Start {
-					t.Fatalf("%s: trecho fora do texto %d..%d de %d", l.Name, o.Start, o.End, len(s))
+					t.Fatalf("%s: snippet outside the text %d..%d of %d", l.Name, o.Start, o.End, len(s))
 				}
 			})
 		}
@@ -314,11 +314,11 @@ func TestKeyValueExpressionIsNotName(t *testing.T) {
 	m := newTest(t)
 	for _, s := range []string{"// addr = arg0 + auxInt + aux", "host = base_x1 + sufixo", "server = srv_a1 - 1", "user = u_x1 * 2"} {
 		if out, ents := m.Mask(s); len(ents) > 0 {
-			t.Errorf("expressão virou nome:\n   %q\n-> %q", s, out)
+			t.Errorf("expression became a name:\n   %q\n-> %q", s, out)
 		}
 	}
 	if out, _ := m.Mask("host = db-exemplo-01.interno\n"); strings.Contains(out, "db-exemplo-01") {
-		t.Errorf("valor simples deixou de ser mascarado: %q", out)
+		t.Errorf("plain value stopped being masked: %q", out)
 	}
 }
 
@@ -337,10 +337,10 @@ func TestExplicitKeyTeaches(t *testing.T) {
 	} {
 		m := newTest(t)
 		if out, _ := m.Mask(c.teaches); strings.Contains(out, c.name) {
-			t.Errorf("na posição: %q", out)
+			t.Errorf("in position: %q", out)
 		}
 		if out, _ := m.Mask("depois, em prosa: " + c.name + " caiu"); strings.Contains(out, c.name) {
-			t.Errorf("não aprendeu %q: %q", c.name, out)
+			t.Errorf("did not learn %q: %q", c.name, out)
 		}
 	}
 }

@@ -67,16 +67,16 @@ func TestProxyInventoryAndEcho(t *testing.T) {
 	r := messages(t, bodies[0])
 	for _, n := range []string{"pagamentos", "cobranca", "vitrine"} {
 		if strings.Contains(r[2], n) {
-			t.Errorf("%s em claro no inventário", n)
+			t.Errorf("%s in plain text in the inventory", n)
 		}
 	}
 	if strings.Contains(r[3], "vitrine") {
-		t.Errorf("eco em claro no tool_use: %s", r[3])
+		t.Errorf("echo in plain text in the tool_use: %s", r[3])
 	}
 	if strings.Contains(r[6], "cobranca") {
-		t.Errorf("palavra traduzida em claro na saída: %s", r[6])
+		t.Errorf("translated word in plain text in the output: %s", r[6])
 	}
 	if !strings.Contains(r[8], "docs") || !strings.Contains(r[8], "internal") {
-		t.Errorf("ls de outro turno mascarado: %s", r[8])
+		t.Errorf("ls from another turn masked: %s", r[8])
 	}
 }

@@ -11,12 +11,12 @@ import (
 func TestCommonWord(t *testing.T) {
 	for _, v := range []string{"conta", "CONTA", "Tabela", "linhagem", "\"status\"", "[relatório]"} {
 		if !commonWord(v) {
-			t.Errorf("%s devia ser palavra comum", v)
+			t.Errorf("%s should be a common word", v)
 		}
 	}
 	for _, v := range []string{"tb_conta", "conta2", "tag_name", "FIN.CONTA", "vendas-sul", "x"} {
 		if commonWord(v) {
-			t.Errorf("%s não é uma palavra comum sozinha", v)
+			t.Errorf("%s is not a common word by itself", v)
 		}
 	}
 }
@@ -30,12 +30,12 @@ func TestTermBeatsModelAndCommonWord(t *testing.T) {
 	l := m.NewBatch()
 	l.UsePublic(map[string]bool{"tb_azul_pedidos": true, "tb_vendas_ok": true})
 	if l.fromModel("tb_azul_pedidos") {
-		t.Error("nome com termo cadastrado foi tratado como conhecimento do modelo")
+		t.Error("name with a registered term was treated as the model's knowledge")
 	}
 	if !l.fromModel("tb_vendas_ok") {
-		t.Error("nome sem termo, escrito pelo modelo, devia ser dele")
+		t.Error("name without a term, written by the model, should be the model's")
 	}
 	if m.freeCommon("azul") || !m.freeCommon("conta") {
-		t.Error("termo cadastrado devia vencer a lista de palavras comuns")
+		t.Error("a registered term should win over the common words list")
 	}
 }

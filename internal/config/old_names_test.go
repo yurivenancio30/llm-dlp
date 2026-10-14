@@ -35,7 +35,7 @@ func expectedFromOld() Config {
 	c := Default()
 	c.Port = 9999
 	c.Providers["gemini"] = Provider{Upstream: "https://g.example", Format: "gemini"} // adds to the defaults
-	c.InternalDomains, c.EmailsLiberados, c.AllowedEmailDomains = []string{"acme"}, []string{"a@b.c"}, []string{"example.com"}
+	c.InternalDomains, c.AllowedEmails, c.AllowedEmailDomains = []string{"acme"}, []string{"a@b.c"}, []string{"example.com"}
 	c.HostRoles = []string{"mysql"}
 	c.ExtraPatterns = []ExtraPattern{{Label: "CONTRATO", Regex: "CT-[0-9]+"}}
 	c.Terms = []Term{{Label: "nome", Values: []string{"SGP", "Acme"}}}
@@ -57,7 +57,7 @@ func TestConfigWithOldNames(t *testing.T) {
 		t.Fatal(err)
 	}
 	if want := expectedFromOld(); !reflect.DeepEqual(c, want) {
-		t.Fatalf("lido:\n%+v\nesperado:\n%+v", c, want)
+		t.Fatalf("read:\n%+v\nexpected:\n%+v", c, want)
 	}
 }
 
@@ -76,18 +76,18 @@ func TestMigrateFileRoundTrip(t *testing.T) {
 	b, _ := os.ReadFile(p)
 	for stale := range oldFields {
 		if strings.Contains(string(b), `"`+stale+`"`) {
-			t.Errorf("o nome antigo %q ficou no arquivo", stale)
+			t.Errorf("the old name %q stayed in the file", stale)
 		}
 	}
 	if !strings.Contains(string(b), `"mode": "block"`) || !strings.Contains(string(b), "campo_que_nao_existe") {
-		t.Errorf("ocr.mode ou o campo desconhecido não ficou como devia:\n%s", b)
+		t.Errorf("ocr.mode or the unknown field did not stay as it should:\n%s", b)
 	}
 	c, err := Load()
 	if err != nil || !reflect.DeepEqual(c, expectedFromOld()) {
-		t.Fatalf("depois da ida, lido diferente (err %v):\n%+v", err, c)
+		t.Fatalf("after going forward, read differently (err %v):\n%+v", err, c)
 	}
 	if bak2, _ := MigrateFile(false, false); bak2 != "" {
-		t.Errorf("segunda ida devia não ter o que trocar")
+		t.Errorf("going forward a second time should have nothing to swap")
 	}
 
 	if _, err := MigrateFile(true, true); err != nil {
@@ -115,7 +115,7 @@ func TestMigrateFileRoundTrip(t *testing.T) {
 	if old.Port != 9999 || len(old.Domains) != 1 || len(old.Terms) != 1 || len(old.Terms[0].Values) != 2 ||
 		old.OCR.Mode != "bloquear" || old.Objects.Enabled == nil || *old.Objects.Enabled ||
 		!reflect.DeepEqual(old.Disabled, []string{"endereco"}) || !reflect.DeepEqual(old.Objects.Mask, map[string]bool{"coluna": false}) {
-		t.Errorf("a volta não deixou o arquivo como a 0.8.0 lê:\n%s", b)
+		t.Errorf("going back did not leave the file as 0.8.0 reads it:\n%s", b)
 	}
 }
 

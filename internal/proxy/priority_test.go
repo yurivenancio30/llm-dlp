@@ -38,14 +38,14 @@ func TestPrioritySystemSQLBeforeOutput(t *testing.T) {
 	api := rtAPI(t, "", msgs)
 	for _, p := range []string{"TAG_NAME", "TAG_VALUE", "APPLY_METHOD", "OBJECT_NAME", "TAG_REFERENCES"} {
 		if rtTok(api, p) < rtTok(q, p) {
-			t.Errorf("%s (o modelo escreveu antes) foi mascarado", p)
+			t.Errorf("%s (the model wrote it before) was masked", p)
 		}
 	}
 	// (the TAG_VALUE values, like squad_receita, are not object names: a known gap, older than
 	// priority)
 	for _, s := range []string{"VW_FATURAMENTO_DIA", "TB_CLIENTE_PJ"} {
 		if rtTok(api, s) > 0 {
-			t.Errorf("%s (do cliente) foi em claro", s)
+			t.Errorf("%s (the customer's) went in plain text", s)
 		}
 	}
 }
@@ -57,7 +57,7 @@ func TestPriorityCopyIsNotFromModel(t *testing.T) {
 	msgs = append(msgs, rtTurns("", [2]string{"kubectl logs -n pagto-core-prd deploy/api --tail 2", "ERROR timeout em pagto-core-prd\n"})[1:]...)
 	api := rtAPI(t, "", msgs)
 	if n := rtTok(api, "pagto-core-prd"); n > 0 {
-		t.Errorf("nome que o modelo copiou de um dado foi em claro %d vez(es)", n)
+		t.Errorf("a name the model copied from data went in plain text %d time(s)", n)
 	}
 }
 
@@ -77,7 +77,7 @@ func TestPrioritySystemIsData(t *testing.T) {
 	ms, _ := json.Marshal(c.Messages)
 	for _, n := range []string{"acme-cobranca-core", "dw_cobranca_prd"} {
 		if rtTok(string(sys), n) == 0 && rtTok(string(ms), n) > 0 {
-			t.Errorf("%s: mascarado no system, mas em claro no que o modelo escreveu", n)
+			t.Errorf("%s: masked in the system, but in plain text in what the model wrote", n)
 		}
 	}
 }
@@ -90,7 +90,7 @@ func TestPriorityPackages(t *testing.T) {
 	api := rtAPI(t, "", msgs)
 	for _, p := range []string{"apache-airflow", "flask-appbuilder", "marshmallow-sqlalchemy"} {
 		if rtTok(api, p) < 3 {
-			t.Errorf("pacote %s mascarado", p)
+			t.Errorf("package %s masked", p)
 		}
 	}
 }
@@ -101,10 +101,10 @@ func TestPriorityGenericGuess(t *testing.T) {
 	msgs := rtTurns("me mostra os clientes", [2]string{`psql -c "SELECT * FROM customers LIMIT 2"`, "ERROR: relation \"customers\" does not exist"})
 	msgs = append(msgs, rtTurns("", [2]string{`psql -c "\dt"`, " Schema |      Name       | Type  \n--------+-----------------+-------\n public | customers       | table\n public | tb_cliente_pj_x | table\n public | tb_contrato_y   | table\n"})[1:]...)
 	api := rtAPI(t, "", msgs)
-	t.Logf("chute genérico 'customers' em claro: %v (risco aceito); específico em claro: %v",
+	t.Logf("generic guess 'customers' in plain text: %v (accepted risk); specific in plain text: %v",
 		rtTok(api, "customers") > 0, rtTok(api, "tb_cliente_pj_x") > 0)
 	if rtTok(api, "tb_cliente_pj_x") > 0 || rtTok(api, "tb_contrato_y") > 0 {
-		t.Errorf("nome específico do cliente foi em claro")
+		t.Errorf("the customer's specific name went in plain text")
 	}
 }
 
@@ -132,10 +132,10 @@ func TestPriorityResultInsideModelIsData(t *testing.T) {
 	a.inData = false
 	a.all(msgs[1].(map[string]any)["content"])
 	if a.model["tb_contrato_zq"] || a.model["num_cpf_socio_zq"] {
-		t.Errorf("nome de um resultado de ferramenta da API virou conhecimento do modelo: %v", a.model)
+		t.Errorf("a name from an API tool result became the model's knowledge: %v", a.model)
 	}
 	if !a.model["code_execution"] {
-		t.Errorf("o que o modelo escreveu (a chamada) devia contar: %v", a.model)
+		t.Errorf("what the model wrote (the call) should count: %v", a.model)
 	}
 }
 
@@ -150,10 +150,10 @@ func TestPriorityMentionKeepsAuthorship(t *testing.T) {
 	msgs = append(msgs, rtTurns("", [2]string{"cat consulta.py", "q = \"\"\"\n    SELECT tag_name AS \"TAG_NAME\",\n           object_name AS \"OBJETO\"\n    FROM snowflake.account_usage.tag_references\n\"\"\"\n"})[1:]...)
 	api := rtAPI(t, "", msgs)
 	if rtTok(api, "tag_name") < rtTok(q, "tag_name")+1 {
-		t.Errorf("tag_name (o modelo escreveu antes de um dado decidi-lo) foi mascarado")
+		t.Errorf("tag_name (the model wrote it before data decided it) was masked")
 	}
 	if rtTok(api, "TB_CLIENTE_PJ") > 0 {
-		t.Errorf("TB_CLIENTE_PJ (do cliente) foi em claro")
+		t.Errorf("TB_CLIENTE_PJ (the customer's) went in plain text")
 	}
 }
 
@@ -166,13 +166,13 @@ func TestCommonWordInModelProse(t *testing.T) {
 	msgs = append(msgs, map[string]any{"role": "user", "content": "ok"})
 	api := rtAPI(t, "", msgs)
 	if !strings.Contains(api, "acesso a conta trial") {
-		t.Errorf("palavra comum trocada na prosa do modelo")
+		t.Errorf("common word swapped in the model's prose")
 	}
 	if rtTok(api, "TB_PEDIDO_X9") > 0 {
-		t.Errorf("nome com cara de identificador em claro")
+		t.Errorf("name that looks like an identifier in plain text")
 	}
 	if strings.Contains(api, ".CONTA (") {
-		t.Errorf("CONTA no DDL (onde é nome) devia continuar mascarada")
+		t.Errorf("CONTA in the DDL (where it is a name) should stay masked")
 	}
 }
 
@@ -185,9 +185,9 @@ func TestCommonWordInUserProse(t *testing.T) {
 	msgs = append(msgs, map[string]any{"role": "user", "content": "em qual conta você rodaria? olha esse DDL:\nCREATE TABLE FIN.CONTA (ID INTEGER, NM_TITULAR VARCHAR(10));"})
 	api := rtAPI(t, "", msgs)
 	if !strings.Contains(api, "em qual conta você rodaria") {
-		t.Errorf("palavra comum trocada no texto do usuário")
+		t.Errorf("common word swapped in the user's text")
 	}
 	if strings.Contains(api, ".CONTA (") {
-		t.Errorf("CONTA no DDL colado (onde é nome) devia continuar mascarada")
+		t.Errorf("CONTA in the pasted DDL (where it is a name) should stay masked")
 	}
 }

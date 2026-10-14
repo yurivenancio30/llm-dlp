@@ -12,7 +12,7 @@ func TestContractDecider(t *testing.T) {
 	name := "teste-contrato"
 	registerDecider(Decider{Name: name, Decide: func(c *TextCtx) {
 		if c.Ext != "" && c.Ext != "ext-ok" {
-			t.Errorf("extensão da dica: %q", c.Ext)
+			t.Errorf("hint extension: %q", c.Ext)
 		}
 		for i := strings.Index(c.S, "cofre "); i >= 0; i = -1 {
 			a := i + len("cofre ")
@@ -32,10 +32,10 @@ func TestContractDecider(t *testing.T) {
 	s := "abre o cofre tesouro agora"
 	out, ents := m.Mask(s)
 	if strings.Contains(out, "tesouro") {
-		t.Fatalf("o decisor não mascarou: %s", out)
+		t.Fatalf("the decider did not mask: %s", out)
 	}
 	if back := NewTable(ents).Unmask(out, false); back != s {
-		t.Fatalf("ida e volta: %q", back)
+		t.Fatalf("round trip: %q", back)
 	}
 	ds := m.Decided(s, "")
 	foundIt := false
@@ -45,16 +45,16 @@ func TestContractDecider(t *testing.T) {
 		}
 	}
 	if !foundIt {
-		t.Fatalf("decisão não ficou no memo: %+v", ds)
+		t.Fatalf("decision not kept in the memo: %+v", ds)
 	}
 	// the hint extension reaches the decider, and the table reader's hint stays readable
 	r, _ := m.maskD("abre o cofre tesouro de novo", true, "f||| "+sepExt+"ext-ok")
 	if strings.Contains(r.text, "tesouro") || len(r.decidedSet) == 0 {
-		t.Fatalf("com dica estendida: %q %+v", r.text, r.decidedSet)
+		t.Fatalf("with an extended hint: %q %+v", r.text, r.decidedSet)
 	}
 	// a decided common word does not go to vistos (it has no identifier shape)
 	if _, ok := m.learnedEnt("tesouro"); ok {
-		t.Fatalf("decisão de palavra comum foi aprendida")
+		t.Fatalf("decision of a common word was learned")
 	}
 }
 
@@ -67,13 +67,13 @@ func TestContractReaderDecisions(t *testing.T) {
 		ents[d.Name] = d.Ent
 	}
 	if ents["t_lanc"] != "table" || ents["sch_fin"] != "schema" {
-		t.Fatalf("decisões dos leitores: %v", ents)
+		t.Fatalf("decisions of the readers: %v", ents)
 	}
 	if (Decision{Name: "T_LANC", Ent: "table"}).Key() != (Decision{Name: "t_lanc", Ent: "table"}).Key() {
-		t.Fatalf("chave de SQL deveria ser sem caixa")
+		t.Fatalf("an SQL key should be caseless")
 	}
 	if (Decision{Name: "Pagto", Ent: "bucket"}).Key() == (Decision{Name: "pagto", Ent: "bucket"}).Key() {
-		t.Fatalf("chave de bucket deveria ser exata")
+		t.Fatalf("a bucket key should be exact")
 	}
 }
 
@@ -97,21 +97,21 @@ func TestContractWhoWrote(t *testing.T) {
 		}
 	}
 	if ps == "" {
-		t.Fatal("sem pseudônimo")
+		t.Fatal("no pseudonym")
 	}
 	orig := "olhe a tabela " + ps + " e a palavra lanc"
 	des := m.RecordResponse(orig, tab)
 	if des != tab.Unmask(orig, false) || !strings.Contains(des, "t_lanc") {
-		t.Fatalf("desmascarado: %q", des)
+		t.Fatalf("unmasked: %q", des)
 	}
 	if o, ok := m.OriginalOf(des); !ok || o != orig {
 		t.Fatalf("OriginalDe: %q %v", o, ok)
 	}
 	tr, ok := m.Translated(des)
 	if !ok || len(tr) != 1 || des[tr[0].Start:tr[0].End] != "t_lanc" || tr[0].Pseudo != ps {
-		t.Fatalf("Traduzidas: %+v %v", tr, ok)
+		t.Fatalf("Translated: %+v %v", tr, ok)
 	}
 	if _, ok := m.OriginalOf("texto que ninguém registrou"); ok {
-		t.Fatal("sem registro deveria dar false")
+		t.Fatal("without a record it should give false")
 	}
 }

@@ -71,27 +71,27 @@ func TestClientTextUnchanged(t *testing.T) {
 	// premise: the conversation learned the names (in the DDL they go out masked)
 	for _, n := range []string{tabCommon, tabCommon2, tabAcronym, tabName} {
 		if strings.Contains(string(wentOut.Messages[2]), "TABLE "+n+" ") {
-			t.Fatalf("premissa: a tabela %q devia sair mascarada no DDL: %s", n, wentOut.Messages[2])
+			t.Fatalf("premise: table %q should come out masked in the DDL: %s", n, wentOut.Messages[2])
 		}
 	}
 	// the client name that is not a common word stays masked in the system text
 	if strings.Contains(wentOut.System[3].Text, tabName) {
-		t.Errorf("nome aprendido na conversa vazou no system: %s", wentOut.System[3].Text)
+		t.Errorf("name learned in the conversation leaked in the system: %s", wentOut.System[3].Text)
 	}
 	if wentOut.System[0].Text != hdr {
-		t.Errorf("o cabeçalho do Claude Code mudou:\n%s\n%s", hdr, wentOut.System[0].Text)
+		t.Errorf("the Claude Code header changed:\n%s\n%s", hdr, wentOut.System[0].Text)
 	}
 	if wentOut.System[1].Text != ident {
-		t.Errorf("a frase de identidade mudou:\n%s\n%s", ident, wentOut.System[1].Text)
+		t.Errorf("the identity sentence changed:\n%s\n%s", ident, wentOut.System[1].Text)
 	}
 	if wentOut.System[2].Text != instr {
-		t.Errorf("palavra comum trocada nas instruções:\n%s\n%s", instr, wentOut.System[2].Text)
+		t.Errorf("common word swapped in the instructions:\n%s\n%s", instr, wentOut.System[2].Text)
 	}
 	var originalTools map[string]any
 	b, _ := json.Marshal(tool)
 	json.Unmarshal(b, &originalTools)
 	if !reflect.DeepEqual(wentOut.Tools[0], originalTools) {
-		t.Errorf("a definição da ferramenta mudou:\n%v\n%v", originalTools, wentOut.Tools[0])
+		t.Errorf("the tool definition changed:\n%v\n%v", originalTools, wentOut.Tools[0])
 	}
 }
 
@@ -106,7 +106,7 @@ func TestClientHeaderShapeOnly(t *testing.T) {
 		"You are a Claude agent, built on Anthropic's Claude Agent SDK.",
 	} {
 		if !clientFixedText(s) {
-			t.Errorf("devia passar intacto: %q", s)
+			t.Errorf("should pass through intact: %q", s)
 		}
 	}
 	for _, s := range []string{
@@ -118,7 +118,7 @@ func TestClientHeaderShapeOnly(t *testing.T) {
 		"",
 	} {
 		if clientFixedText(s) {
-			t.Errorf("não devia passar intacto: %q", s)
+			t.Errorf("should not pass intact: %q", s)
 		}
 	}
 
@@ -135,9 +135,9 @@ func TestClientHeaderShapeOnly(t *testing.T) {
 	io.Copy(io.Discard, resp.Body)
 	resp.Body.Close()
 	if bytes.Contains(bodies[0], []byte(email)) {
-		t.Errorf("dado vazou ao lado do cabeçalho: %s", bodies[0])
+		t.Errorf("data leaked next to the header: %s", bodies[0])
 	}
 	if !bytes.Contains(bodies[0], []byte(hdr)) {
-		t.Errorf("o cabeçalho devia sair intacto: %s", bodies[0])
+		t.Errorf("the header should come out intact: %s", bodies[0])
 	}
 }

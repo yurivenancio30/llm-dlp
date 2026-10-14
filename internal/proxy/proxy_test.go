@@ -138,12 +138,12 @@ func TestStreamingEndToEnd(t *testing.T) {
 	// 1) the API saw nothing real
 	for _, r := range reals {
 		if bytes.Contains(received, []byte(r)) {
-			t.Errorf("valor real chegou à API: %q", r)
+			t.Errorf("real value reached the API: %q", r)
 		}
 	}
 	// 2) the signed reasoning was sent intact
 	if !bytes.Contains(received, []byte(thinkingReq)) || !bytes.Contains(received, []byte("SIG123")) {
-		t.Error("bloco thinking foi alterado")
+		t.Error("thinking block was changed")
 	}
 	// 3) the client receives everything real; the new reasoning, intact
 	var text, tool, think strings.Builder
@@ -168,17 +168,17 @@ func TestStreamingEndToEnd(t *testing.T) {
 	}
 	expected := "O owner " + email + " (JOAO CARLOS SILVA, " + cpf + ") não alcança " + host + " em " + ip + "."
 	if text.String() != expected {
-		t.Errorf("texto:\n got %q\nwant %q", text.String(), expected)
+		t.Errorf("text:\n got %q\nwant %q", text.String(), expected)
 	}
 	var in map[string]string
 	if err := json.Unmarshal([]byte(tool.String()), &in); err != nil {
-		t.Fatalf("tool_use JSON inválido: %v (%s)", err, tool.String())
+		t.Fatalf("invalid tool_use JSON: %v (%s)", err, tool.String())
 	}
 	if want := `grep "` + email + `" /var/log/x && nc -z ` + ip + ` 3306`; in["command"] != want {
-		t.Errorf("comando:\n got %q\nwant %q", in["command"], want)
+		t.Errorf("command:\n got %q\nwant %q", in["command"], want)
 	}
 	if !strings.Contains(think.String(), ".invalid") || strings.Contains(think.String(), email) {
-		t.Errorf("thinking deveria passar intacto (com pseudônimo): %q", think.String())
+		t.Errorf("thinking should pass intact (with a pseudonym): %q", think.String())
 	}
 }
 
@@ -195,7 +195,7 @@ func TestResponseWithoutStreaming(t *testing.T) {
 	resp, _ := http.Post(px.URL+"/v1/messages", "application/json", bytes.NewReader(requestBody(false)))
 	b, _ := io.ReadAll(resp.Body)
 	if strings.Count(string(b), "joao.silva@empresa-ficticia.com.br") != 2 {
-		t.Errorf("resposta JSON não desmascarada: %s", b)
+		t.Errorf("JSON response not unmasked: %s", b)
 	}
 }
 
@@ -209,7 +209,7 @@ func TestCountTokensMasked(t *testing.T) {
 	http.Post(px.URL+"/v1/messages/count_tokens", "application/json", bytes.NewReader(requestBody(false)))
 	for _, r := range reals {
 		if bytes.Contains(received, []byte(r)) {
-			t.Errorf("count_tokens vazou %q", r)
+			t.Errorf("count_tokens leaked %q", r)
 		}
 	}
 }
@@ -219,7 +219,7 @@ func TestFailClosed(t *testing.T) {
 	_, px := build(t, func(w http.ResponseWriter, r *http.Request) { called = true })
 	resp, _ := http.Post(px.URL+"/v1/messages", "text/plain", strings.NewReader("isto não é JSON "+email))
 	if resp.StatusCode != http.StatusBadGateway || called {
-		t.Errorf("deveria recusar sem chamar a API: status %d, chamou=%v", resp.StatusCode, called)
+		t.Errorf("should refuse without calling the API: status %d, called=%v", resp.StatusCode, called)
 	}
 }
 
@@ -227,7 +227,7 @@ func TestHealth(t *testing.T) {
 	_, px := build(t, func(w http.ResponseWriter, r *http.Request) {})
 	resp, err := http.Get(px.URL + "/__llm-dlp/saude")
 	if err != nil || resp.StatusCode != 200 {
-		t.Fatal("saúde falhou")
+		t.Fatal("health failed")
 	}
 }
 
@@ -271,10 +271,10 @@ func TestWebFetchDoesNotUnmask(t *testing.T) {
 		}
 	}
 	if strings.Contains(byIdx[0], email) || !strings.Contains(byIdx[0], ".invalid") {
-		t.Errorf("WebFetch recebeu o real (ou nada): %s", byIdx[0])
+		t.Errorf("WebFetch received the real value (or nothing): %s", byIdx[0])
 	}
 	if !strings.Contains(byIdx[1], email) {
-		t.Errorf("Bash deveria receber o real: %s", byIdx[1])
+		t.Errorf("Bash should receive the real value: %s", byIdx[1])
 	}
 }
 
@@ -291,7 +291,7 @@ func TestCompleteEntryAtStart(t *testing.T) {
 	resp, _ := http.Post(px.URL+"/v1/messages", "application/json", bytes.NewReader(requestBody(true)))
 	b, _ := io.ReadAll(resp.Body)
 	if !strings.Contains(string(b), email) {
-		t.Errorf("entrada completa não desmascarada: %s", b)
+		t.Errorf("complete input not unmasked: %s", b)
 	}
 }
 
@@ -311,17 +311,17 @@ func TestUnknownFieldAndTools(t *testing.T) {
 	})
 	http.Post(px.URL+"/v1/messages", "application/json", bytes.NewReader(body))
 	if s, _ := received["campo_novo_da_api"].(string); strings.Contains(s, email) {
-		t.Errorf("campo desconhecido vazou: %q", s)
+		t.Errorf("unknown field leaked: %q", s)
 	}
 	tool := received["tools"].([]any)[0].(map[string]any)
 	if strings.Contains(tool["description"].(string), email) {
-		t.Errorf("descrição de ferramenta vazou: %v", tool["description"])
+		t.Errorf("tool description leaked: %v", tool["description"])
 	}
 	if tool["name"] != "buscar_owner" {
-		t.Errorf("nome de ferramenta mudou: %v", tool["name"])
+		t.Errorf("tool name changed: %v", tool["name"])
 	}
 	if received["model"] != "claude-x" {
-		t.Errorf("model mudou: %v", received["model"])
+		t.Errorf("model changed: %v", received["model"])
 	}
 }
 
@@ -342,13 +342,13 @@ func TestMediaMemoWithoutCacheControl(t *testing.T) {
 		return
 	}
 	if n, lastPos := has(r.output(with)); n != 1 || !lastPos {
-		t.Fatalf("com marcador: %d marcadores, no último=%v", n, lastPos)
+		t.Fatalf("with a marker: %d markers, on the last one=%v", n, lastPos)
 	}
 	if n, _ := has(r.output(without)); n != 0 {
-		t.Fatalf("o marcador da requisição anterior ficou no resultado memorizado (%d)", n)
+		t.Fatalf("the marker of the previous request stayed in the memoized result (%d)", n)
 	}
 	if out := (mediaRes{clean: true}).output(with); len(out) != 1 || out[0].(map[string]any)["cache_control"] == nil {
-		t.Fatal("imagem sem nada a cobrir deve sair como veio")
+		t.Fatal("an image with nothing to cover should go out as it came")
 	}
 }
 
@@ -377,12 +377,12 @@ func TestJSONKeysStayKeys(t *testing.T) {
 	resp.Body.Close()
 	for _, key := range []string{`\"nome\":`, `\"cpf\":`, `\"email\":`, `\"telefone\":`} {
 		if !strings.Contains(string(received), key) {
-			t.Errorf("a chave %s virou pseudônimo: %s", key, received)
+			t.Errorf("the key %s became a pseudonym: %s", key, received)
 		}
 	}
 	for _, real := range []string{"Fabio Augusto Leme", cpf, "fabio.leme@acme-seguros.com.br", "(81) 99876-5432"} {
 		if strings.Contains(string(received), real) {
-			t.Errorf("passou %q: %s", real, received)
+			t.Errorf("got through %q: %s", real, received)
 		}
 	}
 }

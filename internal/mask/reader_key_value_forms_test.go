@@ -73,7 +73,7 @@ func TestEntNormalizedKey(t *testing.T) {
 		"tableName": "table", "schemaname": "schema", "rolename": "user", "warehousename": "service", "accountname": "cloud_account",
 		"HostName": "server", "fieldPath": "column", "column_name": "column", "COLUMN": "column", "role": "user", "serviceAccountName": "user"} {
 		if g, strong := entKey(k); g != e || !strong {
-			t.Errorf("%s: %q forte=%v, esperado %q", k, g, strong, e)
+			t.Errorf("%s: %q strong=%v, expected %q", k, g, strong, e)
 		}
 	}
 }

@@ -19,7 +19,7 @@ import (
 //	LLM_DLP_STRESS=1 go test ./internal/mask -run Stress -v -timeout 60m
 func stressOnly(t *testing.T) {
 	if os.Getenv("LLM_DLP_STRESS") == "" {
-		t.Skip("defina LLM_DLP_STRESS=1 para rodar")
+		t.Skip("set LLM_DLP_STRESS=1 to run")
 	}
 }
 
@@ -82,7 +82,7 @@ func TestStressMemoryText(t *testing.T) {
 				if done/batch != before {
 					h := heapMB()
 					samples = append(samples, h)
-					t.Logf("%5d MB processados | heap %6.1f MB | valores em RAM %d | hashes em disco %d | %s",
+					t.Logf("%5d MB processed | heap %6.1f MB | values in RAM %d | hashes on disk %d | %s",
 						done>>20, h, m.known.generation()-m.known.base, len(vs.ids), time.Since(t0).Round(time.Second))
 				}
 				mu.Unlock()
@@ -100,13 +100,13 @@ func TestStressMemoryText(t *testing.T) {
 			end += a / float64(n-n*2/3)
 		}
 	}
-	t.Logf("heap máximo %.1f MB, média do último terço %.1f MB, vazão %.1f MB/s (%d núcleos)", larger, end,
+	t.Logf("max heap %.1f MB, average of the last third %.1f MB, throughput %.1f MB/s (%d cores)", larger, end,
 		float64(total>>20)/time.Since(t0).Seconds(), runtime.NumCPU())
 	if larger > 450 {
-		t.Fatalf("heap passou de 450 MB: %.1f", larger)
+		t.Fatalf("heap passed 450 MB: %.1f", larger)
 	}
 	if samples[n-1] > samples[n/2]*1.25+20 {
-		t.Fatalf("heap ainda crescendo no fim: metade %.1f MB, fim %.1f MB", samples[n/2], samples[n-1])
+		t.Fatalf("heap still growing at the end: half %.1f MB, end %.1f MB", samples[n/2], samples[n-1])
 	}
 }
 
@@ -128,7 +128,7 @@ func TestStressLearnedValues(t *testing.T) {
 		return ts[len(ts)/2]
 	}
 	base := measure()
-	t.Logf("%7d valores | trecho novo (6 KB) %s | heap %.1f MB", 0, base, heapMB())
+	t.Logf("%7d values | new snippet (6 KB) %s | heap %.1f MB", 0, base, heapMB())
 	learnedOnes, worst := 0, base
 	for _, target := range []int{100, 1000, 10000, 50000, 120000} {
 		for ; learnedOnes < target; learnedOnes++ {
@@ -138,7 +138,7 @@ func TestStressLearnedValues(t *testing.T) {
 		if d > worst {
 			worst = d
 		}
-		t.Logf("%7d valores | trecho novo (6 KB) %s | heap %.1f MB | em RAM %d | hashes %d | tamanhos de senha %d",
+		t.Logf("%7d values | new snippet (6 KB) %s | heap %.1f MB | in RAM %d | hashes %d | password lengths %d",
 			target, d, heapMB(), len(m.known.reals), len(vs.ids), len(vs.size))
 	}
 	t0 := time.Now()
@@ -148,9 +148,9 @@ func TestStressLearnedValues(t *testing.T) {
 	fi, _ := os.Stat(dir + "/v.json")
 	t0 = time.Now()
 	LoadSeen(dir + "/v.json")
-	t.Logf("arquivo de hashes: %.1f MB | gravar %s | carregar %s", float64(fi.Size())/(1<<20), saveNow, time.Since(t0))
+	t.Logf("hashes file: %.1f MB | write %s | load %s", float64(fi.Size())/(1<<20), saveNow, time.Since(t0))
 	if worst > base*4+2*time.Millisecond {
-		t.Fatalf("tempo por trecho cresceu com a quantidade de valores: base %s, pior %s", base, worst)
+		t.Fatalf("time per snippet grew with the number of values: base %s, worst %s", base, worst)
 	}
 }
 
@@ -194,10 +194,10 @@ func TestStressPathological(t *testing.T) {
 		out, ents := m.Mask(c.text)
 		d := time.Since(t0)
 		back := NewTable(ents).Unmask(out, false)
-		t.Logf("%-40s %8s  %6.2f MB/s  %7d substituições  ida e volta ok=%v", c.name, d.Round(time.Millisecond),
+		t.Logf("%-40s %8s  %6.2f MB/s  %7d replacements  round trip ok=%v", c.name, d.Round(time.Millisecond),
 			2/d.Seconds(), len(ents), back == c.text)
 		if d > 60*time.Second {
-			t.Errorf("%s: demorou %s", c.name, d)
+			t.Errorf("%s: took %s", c.name, d)
 		}
 	}
 }
@@ -231,6 +231,6 @@ func TestStressConcurrency(t *testing.T) {
 		}(w)
 	}
 	wg.Wait()
-	errs.Range(func(k, _ any) bool { t.Errorf("resultado mudou sob concorrência: %v", k); return false })
-	t.Logf("128 mil aprendizados em 32 goroutines | em RAM %d | hashes %d | heap %.1f MB", len(m.known.reals), len(vs.ids), heapMB())
+	errs.Range(func(k, _ any) bool { t.Errorf("result changed under concurrency: %v", k); return false })
+	t.Logf("128 thousand learnings in 32 goroutines | in RAM %d | hashes %d | heap %.1f MB", len(m.known.reals), len(vs.ids), heapMB())
 }

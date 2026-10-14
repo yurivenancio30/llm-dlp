@@ -28,12 +28,12 @@ func checkBench(t *testing.T, cases []benchCase) {
 		out, _ := m.Mask(c.src)
 		for _, w := range c.maskIt {
 			if tok(w).MatchString(out) {
-				t.Errorf("%s: %q em claro:\n%s", c.name, w, out)
+				t.Errorf("%s: %q in plain text:\n%s", c.name, w, out)
 			}
 		}
 		for _, w := range c.keep {
 			if n, k := len(tok(w).FindAllStringIndex(c.src, -1)), len(tok(w).FindAllStringIndex(out, -1)); k < n {
-				t.Errorf("%s: %q (público) mascarado %d de %d:\n%s", c.name, w, n-k, n, out)
+				t.Errorf("%s: %q (public) masked %d of %d:\n%s", c.name, w, n-k, n, out)
 			}
 		}
 	}
@@ -220,12 +220,12 @@ func TestBenchAttributeAssignment(t *testing.T) {
 	out, _ := m.Mask(src)
 	for _, w := range []string{"return_value", "mock_session", "mock_scalars"} {
 		if !strings.Contains(out, w) {
-			t.Errorf("%q mascarado:\n%s", w, out)
+			t.Errorf("%q masked:\n%s", w, out)
 		}
 	}
 	// the qualified name outside the assignment is still caught
 	if out, _ := m.Mask("copiado para hx_dw.fin_contab.vendas_hx ontem\n"); strings.Contains(out, "vendas_hx") {
-		t.Errorf("qualificado com schema conhecido em claro:\n%s", out)
+		t.Errorf("qualified with a known schema in plain text:\n%s", out)
 	}
 }
 

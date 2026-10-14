@@ -46,7 +46,7 @@ func TestDetects(t *testing.T) {
 			}
 		}
 		if !foundIt {
-			t.Errorf("não detectou %s %q em %q; achados: %+v", c.typ, c.real, c.text, m.Detect(c.text))
+			t.Errorf("did not detect %s %q in %q; findings: %+v", c.typ, c.real, c.text, m.Detect(c.text))
 		}
 	}
 }
@@ -70,7 +70,7 @@ func TestDoesNotDetect(t *testing.T) {
 	}
 	for _, s := range cleanedOnes {
 		if as := m.Detect(s); len(as) > 0 {
-			t.Errorf("falso positivo em %q: %+v", s, as)
+			t.Errorf("false positive in %q: %+v", s, as)
 		}
 	}
 }
@@ -81,27 +81,27 @@ func TestIdempotentAndDeterministic(t *testing.T) {
 	a, _ := m.Mask(s)
 	b, _ := m.Mask(s)
 	if a != b {
-		t.Fatal("não determinístico")
+		t.Fatal("not deterministic")
 	}
 	if c, ents := m.Mask(a); c != a || len(ents) > 0 {
-		t.Fatalf("mascarar de novo mudou o texto (pseudônimo re-detectado): %q -> %q", a, c)
+		t.Fatalf("masking again changed the text (pseudonym detected again): %q -> %q", a, c)
 	}
 	// name and e-mail of the same person get the same identifier
 	if !strings.Contains(a, "Person ") {
-		t.Fatalf("nome não mascarado: %q", a)
+		t.Fatalf("name not masked: %q", a)
 	}
 	pid := a[strings.Index(a, "p.")+2 : strings.Index(a, "p.")+10]
 	if !strings.Contains(a, "Person "+pid) {
-		t.Errorf("nome e e-mail sem o mesmo id: %q", a)
+		t.Errorf("name and e-mail without the same id: %q", a)
 	}
 	// the same /24 subnet stays in the same fake subnet, with the same host
 	if !strings.Contains(a, ".15") || !strings.Contains(a, ".80") {
-		t.Errorf("octeto do host não preservado: %q", a)
+		t.Errorf("host octet not kept: %q", a)
 	}
 	// another key -> other pseudonyms
 	m2, _ := NewMasker(m.cfg, []byte("ffffffffffffffffffffffffffffffff"), nil, nil)
 	if c, _ := m2.Mask(s); c == a {
-		t.Error("chave diferente gerou os mesmos pseudônimos")
+		t.Error("a different key generated the same pseudonyms")
 	}
 }
 
@@ -135,7 +135,7 @@ func TestPasswords(t *testing.T) {
 	}
 	for text, password := range takes {
 		if out, _ := newTest(t).Mask(text); strings.Contains(out, password) {
-			t.Errorf("senha passou: %q -> %q", text, out)
+			t.Errorf("password went through: %q -> %q", text, out)
 		}
 	}
 	cleanedOnes := []string{
@@ -195,7 +195,7 @@ func TestExtraDetectors(t *testing.T) {
 	}
 	for text, real := range takes {
 		if out, _ := newTest(t).Mask(text); strings.Contains(out, real) {
-			t.Errorf("passou %q em %q -> %q", real, text, out)
+			t.Errorf("%q went through in %q -> %q", real, text, out)
 		}
 	}
 	stays := []string{
@@ -215,7 +215,7 @@ func TestExtraDetectors(t *testing.T) {
 	}
 	for _, s := range stays {
 		if out, ents := newTest(t).Mask(s); len(ents) > 0 {
-			t.Errorf("mascarou sem precisar: %q -> %q", s, out)
+			t.Errorf("masked needlessly: %q -> %q", s, out)
 		}
 	}
 }
@@ -226,7 +226,7 @@ func TestNameAnySpelling(t *testing.T) {
 	for _, s := range []string{"falei com joão silva ontem", "o JOAO CARLOS SILVA saiu", "Joao Carlos Silva", "ana paula souza aprovou"} {
 		// the pseudonym follows the case of the name: Person, PERSON or person
 		if out, _ := m.Mask(s); !strings.Contains(strings.ToLower(out), "person ") {
-			t.Errorf("nome não mascarado em %q: %q", s, out)
+			t.Errorf("name not masked in %q: %q", s, out)
 		}
 	}
 	// common words that are not an imported name stay intact
@@ -245,7 +245,7 @@ func TestSecretInBase64(t *testing.T) {
 	} {
 		out, _ := m.Mask(s)
 		if strings.Contains(out, enc) || strings.Contains(out, enc[:20]) {
-			t.Errorf("base64 com segredo não mascarado:\n%s", out)
+			t.Errorf("base64 with a secret not masked:\n%s", out)
 		}
 	}
 }
@@ -258,13 +258,13 @@ func TestSecretAtWindowBoundary(t *testing.T) {
 	for _, pos := range []int{0, leaksWindow - 20, leaksWindow - 5, leaksWindow, leaksWindow + 3, 2*leaksWindow - leaksLeftover - 10, 3 * leaksWindow} {
 		s := strings.Repeat(line, pos/len(line)+1)[:pos] + "\ntoken=" + tok + "\n" + strings.Repeat(line, 2*leaksWindow/len(line))
 		if out, _ := newTest(t).Mask(s); strings.Contains(out, tok) {
-			t.Errorf("token na posição %d (janela de %d) passou", pos, leaksWindow)
+			t.Errorf("token at position %d (window of %d) went through", pos, leaksWindow)
 		}
 	}
 	// without any line break (a single block)
 	block := strings.Repeat("a ", leaksWindow/2-10) + "token=" + tok + " " + strings.Repeat("b ", leaksWindow)
 	if out, _ := newTest(t).Mask(block); strings.Contains(out, tok) {
-		t.Error("token em cima do corte, sem quebra de linha, passou")
+		t.Error("token on top of the cut, without a line break, went through")
 	}
 }
 
@@ -285,7 +285,7 @@ func TestDigitsOnlyDocumentWithoutContext(t *testing.T) {
 		out, _ := newTest(t).Mask(text)
 		for _, r := range reals {
 			if strings.Contains(out, r) {
-				t.Errorf("passou %q em %q -> %q", r, text, out)
+				t.Errorf("%q went through in %q -> %q", r, text, out)
 			}
 		}
 	}
@@ -303,13 +303,13 @@ func TestDigitsOnlyDocumentExceptions(t *testing.T) {
 	}
 	for _, s := range stays {
 		if out, ents := newTest(t).Mask(s); len(ents) > 0 {
-			t.Errorf("mascarou sem precisar: %q -> %q", s, out)
+			t.Errorf("masked needlessly: %q -> %q", s, out)
 		}
 	}
 	cfg := newTest(t).cfg
 	cfg.DocumentsWithoutContext = false
 	m, _ := NewMasker(cfg, testKey, nil, nil)
 	if out, _ := m.Mask("valor " + cpf); !strings.Contains(out, cpf) {
-		t.Errorf("com documentos_sem_contexto desligado, deveria ficar como está: %q", out)
+		t.Errorf("with documents_without_context off, it should stay as it is: %q", out)
 	}
 }

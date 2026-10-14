@@ -17,11 +17,11 @@ func TestRoundTrip(t *testing.T) {
 	masked, ents := m.Mask(s)
 	for _, real := range []string{"joao.silva", "mysql-dh", "10.42.7.15", "JOAO CARLOS", "98765", "ghp_"} {
 		if strings.Contains(masked, real) {
-			t.Errorf("vazou %q: %s", real, masked)
+			t.Errorf("leaked %q: %s", real, masked)
 		}
 	}
 	if back := NewTable(ents).Unmask(masked, false); back != s {
-		t.Errorf("ida e volta não bateu:\n%s\n---\n%s", s, back)
+		t.Errorf("round trip did not match:\n%s\n---\n%s", s, back)
 	}
 }
 
@@ -41,7 +41,7 @@ func TestStreamCut(t *testing.T) {
 			f := tab.NewStream(false)
 			out := f.Push(masked[:cut]) + f.Push(masked[cut:]) + f.Close()
 			if out != real {
-				t.Fatalf("chave %d, corte em %d: %q", c, cut, out)
+				t.Fatalf("key %d, cut at %d: %q", c, cut, out)
 			}
 		}
 	}
@@ -62,7 +62,7 @@ func TestStreamCut(t *testing.T) {
 		}
 		b.WriteString(f.Close())
 		if b.String() != real {
-			t.Fatalf("pedaços aleatórios: %q", b.String())
+			t.Fatalf("random pieces: %q", b.String())
 		}
 	}
 }
@@ -88,22 +88,22 @@ func TestLabelWithSpellingCase(t *testing.T) {
 	s := "o Projeto Fenix (PROJETO FENIX no ERP, projeto fenix no git) e o login u1001 / U1001"
 	masked, ents := m.Mask(s)
 	if strings.Contains(strings.ToLower(masked), "fenix") {
-		t.Fatalf("premissa: o termo não foi mascarado: %s", masked)
+		t.Fatalf("premise: the term was not masked: %s", masked)
 	}
 	tab := NewTable(ents)
 	if back := tab.Unmask(masked, false); back != s {
-		t.Errorf("a volta mudou a caixa:\n quer %q\n veio %q\n mascarado %q", s, back, masked)
+		t.Errorf("the way back changed the case:\n wants %q\n got   %q\n masked %q", s, back, masked)
 	}
 	ps := m.Pseudonym("t:projeto", "PROJETO FENIX")
 	id := strings.TrimPrefix(ps, "PROJETO-")
 	if ps == id || m.Pseudonym("t:projeto", "projeto fenix") != "projeto-"+id || m.Pseudonym("t:projeto", "Projeto Fenix") != "Projeto-"+id {
-		t.Fatalf("formas do pseudônimo: %s %s %s", ps, m.Pseudonym("t:projeto", "projeto fenix"), m.Pseudonym("t:projeto", "Projeto Fenix"))
+		t.Fatalf("pseudonym forms: %s %s %s", ps, m.Pseudonym("t:projeto", "projeto fenix"), m.Pseudonym("t:projeto", "Projeto Fenix"))
 	}
 	if v := tab.Unmask("PROJETO-"+strings.ToUpper(id), false); v != "PROJETO FENIX" {
-		t.Errorf("variante em maiúsculas: %q", v)
+		t.Errorf("uppercase variant: %q", v)
 	}
 	if _, ok := fieldValue("name", "projeto-"+id); ok {
-		t.Errorf("o pseudônimo em minúsculas foi tratado como valor de campo")
+		t.Errorf("the lowercase pseudonym was treated as a field value")
 	}
 
 	sp, spAccent := "sao paulo", "SÃO PAULO"
@@ -111,7 +111,7 @@ func TestLabelWithSpellingCase(t *testing.T) {
 	tab = NewTable([]Entry{{pA, spAccent, "t:cidade"}, {pa, sp, "t:cidade"}})
 	for ps, wants := range map[string]string{pA: spAccent, pa: sp, strings.ToUpper(pA): spAccent, "Cidade" + strings.TrimPrefix(pA, "CIDADE"): spAccent} {
 		if v := tab.Unmask(ps, false); v != wants {
-			t.Errorf("%s: quer %q, veio %q", ps, wants, v)
+			t.Errorf("%s: want %q, got %q", ps, wants, v)
 		}
 	}
 }
@@ -131,7 +131,7 @@ func TestCollisionDoesNotUnmask(t *testing.T) {
 		t.Fatalf("\n got %q\nwant %q", got, want)
 	}
 	if tab.Conflicts != 2 || strings.Join(tab.Collided(), " ") != "250.1.2.x pessoa.aaaa@dom-x.invalid" {
-		t.Errorf("conflitos = %d %v, esperado 2", tab.Conflicts, tab.Collided())
+		t.Errorf("conflicts = %d %v, expected 2", tab.Conflicts, tab.Collided())
 	}
 }
 
@@ -150,7 +150,7 @@ func TestSamePersonNamesDoNotCollide(t *testing.T) {
 func TestConfigNoUnmask(t *testing.T) {
 	c := config.Default()
 	if !c.NoUnmask("WebFetch") || !c.NoUnmask("WebSearch") || c.NoUnmask("Bash") {
-		t.Error("padrão de ferramentas sem desmascarar incorreto")
+		t.Error("wrong default of tools never unmasked")
 	}
 }
 
@@ -164,16 +164,16 @@ func TestUnmaskWithManyPseudonyms(t *testing.T) {
 	}
 	masked, ents := m.Mask(real.String())
 	if strings.Contains(masked, "fulano") {
-		t.Fatal("e-mail passou")
+		t.Fatal("e-mail got through")
 	}
 	t0 := time.Now()
 	tab := NewTable(ents)
 	back := tab.Unmask(masked, false)
 	if d := time.Since(t0); d > 3*time.Second {
-		t.Errorf("montar a tabela e desmascarar %d KB com %d pseudônimos levou %s", len(masked)>>10, len(tab.m), d)
+		t.Errorf("building the table and unmasking %d KB with %d pseudonyms took %s", len(masked)>>10, len(tab.m), d)
 	}
 	if back != real.String() {
-		t.Error("ida e volta não bateu")
+		t.Error("round trip did not match")
 	}
 	f := tab.NewStream(false)
 	var b strings.Builder
@@ -182,7 +182,7 @@ func TestUnmaskWithManyPseudonyms(t *testing.T) {
 	}
 	b.WriteString(f.Close())
 	if b.String() != real.String() {
-		t.Error("ida e volta em streaming não bateu")
+		t.Error("streaming round trip did not match")
 	}
 }
 
@@ -193,7 +193,7 @@ func TestEmailDomainComesBack(t *testing.T) {
 	masked, ents := m.Mask("o e-mail é joao.silva@empresa-ficticia.com.br")
 	dom := masked[strings.LastIndexByte(masked, '@')+1:]
 	if back := NewTable(ents).Unmask("o domínio "+dom+" não aparece em vazamentos", false); !strings.Contains(back, "empresa-ficticia.com.br") {
-		t.Fatalf("domínio sozinho não voltou: %q", back)
+		t.Fatalf("domain alone did not come back: %q", back)
 	}
 }
 
@@ -209,9 +209,9 @@ func TestNotUndone(t *testing.T) {
 	back := tab.Unmask("o "+foreign+" no PR-features, t_abcdefgh e 245.1.2.3; "+thisOne[0].Pseudo, false)
 	nd := tab.NotUndone()
 	if len(nd) != 2 || nd[0] != foreign || nd[1] != "245.1.2.3" {
-		t.Errorf("não desfeitos: %q (volta %q)", nd, back)
+		t.Errorf("not undone: %q (way back %q)", nd, back)
 	}
 	if strings.Contains(back, thisOne[0].Pseudo) {
-		t.Errorf("o desta requisição não voltou: %q", back)
+		t.Errorf("this request's one did not come back: %q", back)
 	}
 }

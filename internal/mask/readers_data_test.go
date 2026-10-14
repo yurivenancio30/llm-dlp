@@ -17,12 +17,12 @@ func check(t *testing.T, m *Masker, s string, gone, stays []string) string {
 	out, _ := m.Mask(s)
 	for _, v := range gone {
 		if regexp.MustCompile(`(?i)(^|[^A-Za-z0-9_])` + regexp.QuoteMeta(v) + `($|[^A-Za-z0-9_])`).MatchString(out) {
-			t.Errorf("%q continuou legível em:\n   %q\n-> %q", v, s, out)
+			t.Errorf("%q stayed readable in:\n   %q\n-> %q", v, s, out)
 		}
 	}
 	for _, v := range stays {
 		if !strings.Contains(out, v) {
-			t.Errorf("%q deveria ficar em:\n   %q\n-> %q", v, s, out)
+			t.Errorf("%q should stay in:\n   %q\n-> %q", v, s, out)
 		}
 	}
 	return out
@@ -45,12 +45,12 @@ func TestReaderSQL(t *testing.T) {
 		[]string{"srv-exemplo-01", "vendas_demo", "financeiro", "tb_pedido_x9", "tb_cliente_x2", "vl_total", "cd_cliente", "id_cliente"},
 		[]string{"SELECT p.[", "], c.", "dbo.", " AS p JOIN ", " c ON c.", "'2026-01-01'"})
 	if !strings.Contains(out, "[HOST_") && !strings.Contains(out, "[host_") {
-		t.Errorf("o colchete em volta do servidor tem que ficar: %q", out)
+		t.Errorf("the bracket around the server has to stay: %q", out)
 	}
 	for real, typ := range map[string]string{"srv-exemplo-01": "obj.server", "vendas_demo": "obj.database", "financeiro": "obj.schema",
 		"tb_pedido_x9": "obj.table", "vl_total": "obj.column"} {
 		if got := typeOf(m, "SELECT p.[vl_total] FROM [srv-exemplo-01].vendas_demo.financeiro.tb_pedido_x9 AS p", real); got != typ {
-			t.Errorf("%s: tipo %q, esperado %q", real, got, typ)
+			t.Errorf("%s: type %q, expected %q", real, got, typ)
 		}
 	}
 	// Snowflake, lowercase, with several clauses
@@ -67,7 +67,7 @@ func TestReaderSQL(t *testing.T) {
 	check(t, m, "SELECT COUNT(*), MAX(dt_ref_x) FROM tb_pedido_x9 GROUP BY cd_loja_x ORDER BY 1", []string{"dt_ref_x", "cd_loja_x"}, []string{"COUNT(*)", "MAX(", "GROUP BY", "ORDER BY"})
 	check(t, m, "EXEC financeiro.sp_fecha_mes_x 2026", []string{"financeiro", "sp_fecha_mes_x"}, []string{"EXEC "})
 	if typeOf(m, "EXEC financeiro.sp_fecha_mes_x 2026", "sp_fecha_mes_x") != "obj.procedure" {
-		t.Errorf("EXEC: tipo procedure")
+		t.Errorf("EXEC: procedure type")
 	}
 	check(t, m, "CREATE INDEX ix_pedido_x9 ON tb_pedido_x9 (dt_ref)", []string{"ix_pedido_x9", "tb_pedido_x9"}, []string{"CREATE INDEX ", " ON "})
 }
@@ -83,7 +83,7 @@ func TestReaderSQLSkipsProseAndCode(t *testing.T) {
 		"Selecione os campos e depois clique em FROM para ver",
 	} {
 		if out, ents := m.Mask(s); len(ents) > 0 {
-			t.Errorf("mascarou fora de SQL:\n   %q\n-> %q", s, out)
+			t.Errorf("masked outside SQL:\n   %q\n-> %q", s, out)
 		}
 	}
 }
@@ -96,7 +96,7 @@ func TestReaderError(t *testing.T) {
 	check(t, m, "SQL compilation error: Object 'ANALYTICS_X.STG.TB_PEDIDO_X9' does not exist or not authorized.", []string{"ANALYTICS_X", "STG", "TB_PEDIDO_X9"}, nil)
 	check(t, m, "Not Found: Dataset projeto-demo:dataset_x", []string{"projeto-demo", "dataset_x"}, []string{"Not Found: Dataset "})
 	if out, ents := m.Mask(`if (typeof x === "object") { return 'table' }`); len(ents) > 0 {
-		t.Errorf("código JS virou objeto: %q", out)
+		t.Errorf("JS code became an object: %q", out)
 	}
 }
 
@@ -124,7 +124,7 @@ func TestReaderConnection(t *testing.T) {
 		"for (i=0; i<n; i++) { x=y; }",
 	} {
 		if out, ents := m.Mask(s); len(ents) > 0 {
-			t.Errorf("não é conexão:\n   %q\n-> %q", s, out)
+			t.Errorf("not a connection:\n   %q\n-> %q", s, out)
 		}
 	}
 }
@@ -148,7 +148,7 @@ func TestReaderTable(t *testing.T) {
 		"NAME          STATUS    AGE\nmysql-0       Running   3d\n",
 	} {
 		if out, ents := m.Mask(s); len(ents) > 0 {
-			t.Errorf("tabela comum foi mascarada:\n   %q\n-> %q", s, out)
+			t.Errorf("common table was masked:\n   %q\n-> %q", s, out)
 		}
 	}
 }
@@ -165,18 +165,18 @@ func TestNameLearnedInOtherFormat(t *testing.T) {
 		"ls /dados/tb_pedido_x9/",
 	} {
 		if out, _ := m.Mask(s); strings.Contains(strings.ToLower(out), "tb_pedido_x9") || strings.Contains(strings.ToLower(out), "financeiro_x") {
-			t.Errorf("não propagou:\n   %q\n-> %q", s, out)
+			t.Errorf("did not propagate:\n   %q\n-> %q", s, out)
 		}
 	}
 	if out, _ := m.Mask("soma de vl_total_x7 no relatório"); !strings.Contains(out, "vl_total_x7") {
-		t.Errorf("coluna não deveria propagar: %q", out)
+		t.Errorf("column should not propagate: %q", out)
 	}
 	// a name seen only in a one-clause statement without an unambiguous shape (weak evidence) does
 	// not teach; "UPDATE tb_x SET a = 1" has an unambiguous shape and teaches, in any case
 	m2 := newTest(t)
 	m2.Mask("SELECT nome total FROM tb_fraca_x1")
 	if out, _ := m2.Mask("depois: tb_fraca_x1"); !strings.Contains(out, "tb_fraca_x1") {
-		t.Errorf("evidência fraca ensinou: %q", out)
+		t.Errorf("weak evidence taught: %q", out)
 	}
 }
 
@@ -186,11 +186,11 @@ func TestMaskedSQLStaysValid(t *testing.T) {
 	orig := "SELECT p.vl_total, [cd cliente] FROM vendas_demo.financeiro.tb_pedido_x9 AS p WHERE p.id_x = 10;"
 	out, _ := m.Mask(orig)
 	if !reSQLShape.MatchString(out) {
-		t.Fatalf("a saída deixou de ter a forma de SQL: %q", out)
+		t.Fatalf("the output no longer has the shape of SQL: %q", out)
 	}
 	strips := func(s string) string { return reAnyPseudo.ReplaceAllString(s, "X") }
 	if !strings.Contains(out, "[") || strings.Count(strips(out), "X") < 5 {
-		t.Errorf("estrutura mudou: %q", out)
+		t.Errorf("structure changed: %q", out)
 	}
 	n := 0
 	findSQL(out, func(o ObjFinding) {
@@ -199,7 +199,7 @@ func TestMaskedSQLStaysValid(t *testing.T) {
 		}
 	})
 	if n > 0 {
-		t.Errorf("sobrou nome legível na instrução mascarada: %q", out)
+		t.Errorf("a readable name was left in the masked statement: %q", out)
 	}
 }
 
@@ -215,7 +215,7 @@ func TestLowercaseSQLOneClause(t *testing.T) {
 		{"select count(*) from vendas", "vendas"},
 	} {
 		if out, _ := m.Mask(c.s); strings.Contains(out, c.name) {
-			t.Errorf("não reconheceu %q -> %q", c.s, out)
+			t.Errorf("did not recognize %q -> %q", c.s, out)
 		}
 	}
 	for _, s := range []string{
@@ -226,7 +226,7 @@ func TestLowercaseSQLOneClause(t *testing.T) {
 		"update the docs and insert into the index the new page",
 	} {
 		if out, ents := m.Mask(s); len(ents) > 0 {
-			t.Errorf("prosa virou SQL: %q -> %q", s, out)
+			t.Errorf("prose became SQL: %q -> %q", s, out)
 		}
 	}
 }
@@ -241,7 +241,7 @@ func TestVocabularyCatalogStays(t *testing.T) {
 		"select start_time, user_name, role_name, query_type from snowflake.account_usage.query_history where 1=1",
 	} {
 		if out, ents := m.Mask(s); len(ents) > 0 {
-			t.Errorf("vocabulário de catálogo mascarado: %q -> %q", s, out)
+			t.Errorf("catalog vocabulary masked: %q -> %q", s, out)
 		}
 	}
 }
@@ -258,7 +258,7 @@ func TestDSNGoAndPDO(t *testing.T) {
 	check(t, m, `new PDO("oci:dbname=//db-ora-x5:1521/ORCL_X5")`, []string{"db-ora-x5", "ORCL_X5"}, []string{"oci:dbname=//", ":1521/"})
 	for _, s := range []string{"git push origin main@tcp", "time:12:00 a=b"} {
 		if out, ents := m.Mask(s); len(ents) > 0 {
-			t.Errorf("não é DSN: %q -> %q", s, out)
+			t.Errorf("not a DSN: %q -> %q", s, out)
 		}
 	}
 }
@@ -272,7 +272,7 @@ func TestTableHeaderShapedLikeIdentifier(t *testing.T) {
 		"name    | Data Type | table\n--------+-----------+------\nid_x3   | int       | tb_x3\n",
 	} {
 		if out, ents := m.Mask(s); len(ents) > 0 {
-			t.Errorf("não é catálogo: %q -> %q", s, out)
+			t.Errorf("not a catalog: %q -> %q", s, out)
 		}
 	}
 	check(t, m, "table_schema,table_name\nfinanceiro_x4,tb_pedido_x4\n", []string{"financeiro_x4", "tb_pedido_x4"}, nil)

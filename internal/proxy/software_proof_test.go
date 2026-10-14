@@ -41,11 +41,11 @@ func TestSoftwareProof(t *testing.T) {
 		rtSend(t, px, msgs)
 		sent := string(bodies[len(bodies)-1])
 		if rtTok(sent, "pg-hx-prd") != 0 {
-			t.Errorf("%s: o host do cliente vazou", c.name)
+			t.Errorf("%s: the customer's host leaked", c.name)
 		}
 		// the DSN always masks the database; the final sentence only stays in the clear with proof
 		if plain := rtTok(lastMessage(t, bodies[len(bodies)-1]), c.word) > 0; plain != c.plain {
-			t.Errorf("%s: %q em claro na frase final = %v, queria %v", c.name, c.word, plain, c.plain)
+			t.Errorf("%s: %q in plain text in the final sentence = %v, wanted %v", c.name, c.word, plain, c.plain)
 		}
 	}
 }
@@ -55,7 +55,7 @@ func lastMessage(t *testing.T, body []byte) string {
 	t.Helper()
 	var r struct{ Messages []struct{ Content any } }
 	if err := json.Unmarshal(body, &r); err != nil || len(r.Messages) == 0 {
-		t.Fatal("corpo sem mensagens")
+		t.Fatal("body without messages")
 	}
 	b, _ := json.Marshal(r.Messages[len(r.Messages)-1].Content)
 	return string(b)
@@ -83,7 +83,7 @@ func TestOriginByPath(t *testing.T) {
 		}
 		rtSend(t, px, msgs)
 		if plain := rtTok(lastMessage(t, bodies[len(bodies)-1]), c.table) > 0; plain != c.plain {
-			t.Errorf("%s: %q em claro na frase = %v, queria %v", c.name, c.table, plain, c.plain)
+			t.Errorf("%s: %q in plain text in the sentence = %v, wanted %v", c.name, c.table, plain, c.plain)
 		}
 	}
 }

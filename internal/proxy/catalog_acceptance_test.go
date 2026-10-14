@@ -116,7 +116,7 @@ func TestAcceptanceCatalogScript(t *testing.T) {
 	}
 	ls := strings.Split(strings.TrimRight(out, "\n"), "\n")
 	if len(ls) != len(cat) {
-		t.Fatalf("saída com %d linhas", len(ls))
+		t.Fatalf("output with %d lines", len(ls))
 	}
 	colClear, colTotal, tabClear := 0, 0, map[string]bool{}
 	regexOK := 0
@@ -151,7 +151,7 @@ func TestAcceptanceCatalogScript(t *testing.T) {
 			nTab[p] = true
 		}
 	}
-	t.Logf("colunas em claro: %d de %d linhas (fora as palavras do programa); tabelas/schemas em claro: %d de %d; regex intactas: %d de %d linhas",
+	t.Logf("columns in plain text: %d of %d lines (apart from the program's words); tables/schemas in plain text: %d of %d; regexes intact: %d of %d lines",
 		colClear, colTotal, len(tabClear), len(nTab), regexOK, len(ls))
 	nHead := 0
 	for c, n := range leaked {
@@ -160,20 +160,20 @@ func TestAcceptanceCatalogScript(t *testing.T) {
 		if inHead {
 			nHead++
 		}
-		t.Logf("coluna vazada: %d vezes, no head=%v, cara de identificador=%v, %d letras", n, inHead, ident, len(c))
+		t.Logf("leaked column: %d times, in the head=%v, looks like an identifier=%v, %d letters", n, inHead, ident, len(c))
 	}
 	if colClear > 0 || len(tabClear) > 0 {
 		var cs []string
 		for p := range tabClear {
 			cs = append(cs, p)
 		}
-		t.Errorf("em claro: %d colunas, tabelas %v", colClear, cs)
+		t.Errorf("in plain text: %d columns, tables %v", colClear, cs)
 	}
 	if regexOK != len(ls) {
-		t.Errorf("regex do script trocadas em %d linhas", len(ls)-regexOK)
+		t.Errorf("script regexes swapped in %d lines", len(ls)-regexOK)
 	}
 	// the SQL comment in Portuguese stays readable
 	if !strings.Contains(outSQL, "-- busca o nome e o valor do cliente pelo codigo") {
-		t.Errorf("comentário do SQL alterado: %q", outSQL)
+		t.Errorf("SQL comment changed: %q", outSQL)
 	}
 }

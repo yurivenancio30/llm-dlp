@@ -43,7 +43,7 @@ func TestWeakPasswordIsRemembered(t *testing.T) {
 		for _, s := range weakOnes {
 			m.Mask(strings.Replace(originV, "%s", s, 1))
 			if out, _ := m.Mask("tentei " + s + " e falhou"); strings.Contains(out, s) {
-				t.Errorf("senha fraca não foi lembrada (origem %q): %q", originV[:8], out)
+				t.Errorf("weak password was not remembered (origin %q): %q", originV[:8], out)
 			}
 		}
 	}
@@ -58,24 +58,24 @@ func TestWebContentDoesNotTeach(t *testing.T) {
 	page := "Exemplo da documentação: mysql://app:" + ex + "@db.example.com:3306/base"
 	out, _ := m.NewBatch().Mask(page, true, posA)
 	if strings.Contains(out, ex) {
-		t.Fatalf("na própria página, a senha de exemplo deveria ser mascarada: %q", out)
+		t.Fatalf("on the page itself, the example password should be masked: %q", out)
 	}
 	loose := "a palavra " + ex + " aparece em outro texto"
 	if out, _ := m.Mask(loose); out != loose {
-		t.Errorf("valor vindo da web foi lembrado: %q", out)
+		t.Errorf("value coming from the web was remembered: %q", out)
 	}
 	if _, ok := vs.Type(m.p.ID("visto", "s:"+ex)); ok {
-		t.Errorf("valor vindo da web foi gravado em vistos.json")
+		t.Errorf("value coming from the web was written to seen.json")
 	}
 	vs.SaveIfDirty()
 	m2, _ := diskMasker(t, dir)
 	if out, _ := m2.Mask(loose); out != loose {
-		t.Errorf("após reinício, valor vindo da web é mascarado: %q", out)
+		t.Errorf("after the restart, a value coming from the web is masked: %q", out)
 	}
 	// the same text coming from a local source teaches normally
 	m.Mask(page)
 	if out, _ := m.Mask(loose); out == loose {
-		t.Errorf("o mesmo texto, de fonte local, deveria ensinar")
+		t.Errorf("the same text, from a local source, should teach")
 	}
 }
 
@@ -89,21 +89,21 @@ func TestSentTextStaysFrozen(t *testing.T) {
 	l := m.NewBatch()
 	sent, _ := l.Mask(old, false, posA)
 	if !strings.Contains(sent, s) {
-		t.Skip("premissa mudou: a palavra já é mascarada sem rótulo")
+		t.Skip("premise changed: the word is already masked without a label")
 	}
 	l.Freeze()
 
 	m.Mask(teaches(s)) // learns later
 	if out, _ := m.NewBatch().Mask(old, false, posA); out != sent {
-		t.Fatalf("texto já enviado mudou depois de aprender um valor:\nantes:  %q\ndepois: %q", sent, out)
+		t.Fatalf("text already sent changed after learning a value:\nbefore: %q\nafter:  %q", sent, out)
 	}
 	if out, _ := m.Mask("de novo: " + s); strings.Contains(out, s) {
-		t.Fatalf("texto novo não usou o valor aprendido: %q", out)
+		t.Fatalf("new text did not use the learned value: %q", out)
 	}
 	// the SAME text, at another position (another conversation, new message): does not inherit the
 	// old mask
 	if out, _ := m.NewBatch().Mask(old, false, posB); strings.Contains(out, s) {
-		t.Fatalf("o mesmo texto noutra posição saiu com a máscara antiga: %q", out)
+		t.Fatalf("the same text in another position came out with the old mask: %q", out)
 	}
 
 	m.Persist()
@@ -111,16 +111,16 @@ func TestSentTextStaysFrozen(t *testing.T) {
 	m2, _ := diskMasker(t, dir) // restart
 	out, ents := m2.NewBatch().Mask(old, false, posA)
 	if out != sent {
-		t.Fatalf("após reinício, o texto enviado mudou:\nantes:  %q\ndepois: %q", sent, out)
+		t.Fatalf("after the restart, the sent text changed:\nbefore: %q\nafter:  %q", sent, out)
 	}
 	if len(ents) == 0 || ents[0].Real != testCPF {
-		t.Errorf("após reinício, faltou a entrada para desmascarar a resposta: %+v", ents)
+		t.Errorf("after the restart, the entry to unmask the response was missing: %+v", ents)
 	}
 	if out, _ := m2.Mask("outra vez: " + s); strings.Contains(out, s) {
-		t.Errorf("após reinício, texto novo não usou o valor aprendido: %q", out)
+		t.Errorf("after the restart, new text did not use the learned value: %q", out)
 	}
 	if b, _ := os.ReadFile(dir + "/enviados.log"); strings.Contains(string(b), s) || strings.Contains(string(b), testCPF) {
-		t.Errorf("valor real gravado em enviados.log")
+		t.Errorf("real value written to sent.log")
 	}
 }
 
@@ -142,7 +142,7 @@ func TestSentFromOtherConfigInvalid(t *testing.T) {
 	m2, _ := NewMasker(newTest(t).cfg, testKey, nil, vs)
 	m2.UseSent(dir+"/enviados.log", "outra configuração")
 	if out, _ := m2.NewBatch().Mask(old, false, posA); strings.Contains(out, s) {
-		t.Errorf("registro de outra configuração foi usado: %q", out)
+		t.Errorf("record of another configuration was used: %q", out)
 	}
 }
 
@@ -153,7 +153,7 @@ func TestSentCorrupted(t *testing.T) {
 	text := "CPF " + testCPF
 	m.sentSet.Record(m.posID(posA), []snippet{{4, 99, "cpf", "CPF-x"}})
 	if out, _ := m.NewBatch().Mask(text, false, posA); strings.Contains(out, text[4:]) {
-		t.Errorf("trecho inválido foi usado: %q", out)
+		t.Errorf("invalid snippet was used: %q", out)
 	}
 	m.Persist()
 	f, _ := os.OpenFile(dir+"/enviados.log", os.O_APPEND|os.O_WRONLY, 0o600)
@@ -179,9 +179,9 @@ func TestFrozenOnlySamePositionAfterRestart(t *testing.T) {
 	vs.SaveIfDirty()
 	m2, _ := diskMasker(t, dir)
 	if out, _ := m2.NewBatch().Mask(old, false, posA); out != sent {
-		t.Errorf("reenvio na mesma posição mudou depois do reinício")
+		t.Errorf("resend in the same position changed after the restart")
 	}
 	if out, _ := m2.NewBatch().Mask(old, false, posB); strings.Contains(out, s) {
-		t.Errorf("noutra posição, depois do reinício, saiu com a máscara antiga: %q", out)
+		t.Errorf("in another position, after the restart, it came out with the old mask: %q", out)
 	}
 }

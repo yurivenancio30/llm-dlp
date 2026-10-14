@@ -78,7 +78,7 @@ func corpusFiles(dirs []string, max int64) []string {
 func TestMeasurePublicCorpus(t *testing.T) {
 	dirs := os.Getenv("LLM_DLP_CORPUS")
 	if dirs == "" {
-		t.Skip("LLM_DLP_CORPUS não definido")
+		t.Skip("LLM_DLP_CORPUS not set")
 	}
 	lim := int64(40 << 20)
 	if os.Getenv("LLM_DLP_CORPUS_MB") != "" {
@@ -107,7 +107,7 @@ func TestMeasurePublicCorpus(t *testing.T) {
 	var ls []string
 	tot := 0
 	for k, n := range c.findings {
-		ls = append(ls, fmt.Sprintf("  %-40s %6d achados %6d valores distintos  %7.2f/MB", k, n, len(c.values[k]), float64(n)/mb))
+		ls = append(ls, fmt.Sprintf("  %-40s %6d findings %6d distinct values  %7.2f/MB", k, n, len(c.values[k]), float64(n)/mb))
 		tot += n
 	}
 	sort.Strings(ls)
@@ -122,7 +122,7 @@ func TestMeasurePublicCorpus(t *testing.T) {
 			t.Logf("amostra %s: %s", k, strings.Join(xs, " "))
 		}
 	}
-	t.Logf("corpus público: %d arquivos, %.1f MB, %d achados (%.2f/MB)\n%s", len(files), mb, tot, float64(tot)/mb, strings.Join(ls, "\n"))
+	t.Logf("public corpus: %d files, %.1f MB, %d findings (%.2f/MB)\n%s", len(files), mb, tot, float64(tot)/mb, strings.Join(ls, "\n"))
 }
 
 // publicIdentifiers: the identifiers (name-shaped) that appear in the public corpus.
@@ -146,7 +146,7 @@ func publicIdentifiers(dirs []string) map[string]bool {
 func TestMeasureRealSessions(t *testing.T) {
 	dir, corpus := os.Getenv("LLM_DLP_SESSIONS"), os.Getenv("LLM_DLP_CORPUS")
 	if dir == "" || corpus == "" {
-		t.Skip("LLM_DLP_SESSIONS e LLM_DLP_CORPUS não definidos")
+		t.Skip("LLM_DLP_SESSIONS and LLM_DLP_CORPUS not set")
 	}
 	pub := publicIdentifiers(strings.Split(corpus, ":"))
 	var files []string
@@ -205,12 +205,12 @@ func TestMeasureRealSessions(t *testing.T) {
 			mark = "  <-- acima de 2%" + shapes(vs, pub)
 			bad++
 		}
-		ls = append(ls, fmt.Sprintf("  %-40s %6d aprendidos %5d no corpus público %6.1f%%%s", k, len(vs), p, rate, mark))
+		ls = append(ls, fmt.Sprintf("  %-40s %6d learned %5d in the public corpus %6.1f%%%s", k, len(vs), p, rate, mark))
 	}
 	sort.Strings(ls)
-	t.Logf("sessões: %d arquivos, %d textos; identificadores públicos de referência: %d\n%s", len(files), texts, len(pub), strings.Join(ls, "\n"))
+	t.Logf("sessions: %d files, %d texts; public reference identifiers: %d\n%s", len(files), texts, len(pub), strings.Join(ls, "\n"))
 	if bad > 0 {
-		t.Logf("%d regras acima de 2%%", bad)
+		t.Logf("%d rules above 2%%", bad)
 	}
 	sort.Ints(commons)
 	q := func(p float64) int {
@@ -229,10 +229,10 @@ func TestMeasureRealSessions(t *testing.T) {
 		tr = append(tr, fmt.Sprintf("%s=%d", k, n))
 	}
 	sort.Strings(tr)
-	t.Logf("trocas no texto do usuário, por tipo/forma: %s", strings.Join(tr, " "))
+	t.Logf("swaps in the user's text, by type/shape: %s", strings.Join(tr, " "))
 	pct := func(a, b int) float64 { return 100 * float64(a) / float64(max(1, b)) }
-	t.Logf("memória da conversa: palavras comuns por conversa p50=%d p90=%d máx=%d (por regra, somando as conversas: %s)\n"+
-		"texto corrido trocado pela memória: usuário %d de %d palavras (%.3f%%); assistente, pior caso sem registro, %d de %d (%.3f%%)",
+	t.Logf("conversation memory: common words per conversation p50=%d p90=%d max=%d (by rule, adding up the conversations: %s)\n"+
+		"running text swapped by the memory: user %d of %d words (%.3f%%); assistant, worst case without a record, %d of %d (%.3f%%)",
 		q(.5), q(.9), q(1), strings.Join(rs, " "), tu, pu, pct(tu, pu), ta, pa, pct(ta, pa))
 }
 

@@ -94,7 +94,7 @@ func TestServesOnlyLocalProgram(t *testing.T) {
 			r.Header.Set("Sec-Fetch-Site", c.site)
 		}
 		if Local(r) != c.local {
-			t.Errorf("Host %q Origin %q Sec-Fetch-Site %q: local=%v, esperado %v", c.host, c.origin, c.site, !c.local, c.local)
+			t.Errorf("Host %q Origin %q Sec-Fetch-Site %q: local=%v, expected %v", c.host, c.origin, c.site, !c.local, c.local)
 		}
 	}
 
@@ -106,18 +106,18 @@ func TestServesOnlyLocalProgram(t *testing.T) {
 	} {
 		for _, path := range []string{"/v1/messages", "/__llm-dlp/saude", "/__llm-dlp/ultima"} {
 			if st, _ := ask(t, "POST", px.URL+path, body, f); st != http.StatusForbidden {
-				t.Errorf("%s de fora: status %d, esperado 403", path, st)
+				t.Errorf("%s from outside: status %d, expected 403", path, st)
 			}
 		}
 	}
 	if *arrived != 0 {
-		t.Errorf("requisição de fora chegou à API %d vez(es)", *arrived)
+		t.Errorf("request from outside reached the API %d time(s)", *arrived)
 	}
 	if !strings.Contains(lg.String(), "REFUSED") {
-		t.Errorf("a recusa devia estar no log: %s", lg.String())
+		t.Errorf("the refusal should be in the log: %s", lg.String())
 	}
 	if st, _ := ask(t, "POST", px.URL+"/v1/messages", body, nil); st != 200 || *arrived != 1 {
-		t.Errorf("o programa local devia ser atendido: status %d, chegou=%d", st, *arrived)
+		t.Errorf("the local program should be served: status %d, reached=%d", st, *arrived)
 	}
 }
 
@@ -139,13 +139,13 @@ func TestLastOnlyWithProof(t *testing.T) {
 	}
 	st, b := ask(t, "GET", px.URL+"/__llm-dlp/ultima", nil, func(r *http.Request) { r.Header.Set(ProofHeader, Proof(testKey, "ultima")) })
 	if st != 200 || !bytes.Contains(b, []byte("texto da conversa")) {
-		t.Errorf("com a prova: status %d, corpo %.80s", st, b)
+		t.Errorf("with the proof: status %d, body %.80s", st, b)
 	}
 
 	// without the key on, nobody can read it
 	noKey, _, _ := buildLocal(t, false)
 	if st, _ := ask(t, "GET", noKey.URL+"/__llm-dlp/ultima", nil, func(r *http.Request) { r.Header.Set(ProofHeader, Proof(nil, "ultima")) }); st != http.StatusForbidden {
-		t.Errorf("sem chave: status %d, esperado 403", st)
+		t.Errorf("without a key: status %d, expected 403", st)
 	}
 }
 
@@ -161,15 +161,15 @@ func TestHealthProvesIdentity(t *testing.T) {
 	}
 	json.Unmarshal(b, &s)
 	if !s.OK || !ProofMatches(testKey, "saude\x00"+challenge, s.Proof) {
-		t.Fatalf("prova errada: %s", b)
+		t.Fatalf("wrong proof: %s", b)
 	}
 	if ProofMatches([]byte("outra chave, de outro usuario...."), "saude\x00"+challenge, s.Proof) || ProofMatches(nil, "saude\x00"+challenge, s.Proof) {
-		t.Error("a prova conferiu com outra chave")
+		t.Error("the proof matched with another key")
 	}
 	for _, d := range []string{"", "ultima", "curto", strings.Repeat("zz", 16), strings.Repeat("0f", 40)} {
 		_, b := ask(t, "GET", px.URL+"/__llm-dlp/saude?desafio="+d, nil, nil)
 		if bytes.Contains(b, []byte(`"prova"`)) {
-			t.Errorf("assinou um desafio inválido %q: %s", d, b)
+			t.Errorf("signed an invalid challenge %q: %s", d, b)
 		}
 	}
 }
@@ -181,6 +181,6 @@ func TestLogWithoutForgedLine(t *testing.T) {
 	ask(t, "GET", px.URL+"/v1/x%0aPOST%20/v1/messages%20-%3E%20200%20%7C%20linha%20forjada", nil, nil)
 	lines := strings.Split(strings.TrimSpace(lg.String()), "\n")
 	if len(lines) != 1 || !strings.Contains(lines[0], "/v1/x?POST") {
-		t.Errorf("o log devia ter uma linha só, com o caminho limpo: %q", lines)
+		t.Errorf("the log should have a single line, with the clean path: %q", lines)
 	}
 }

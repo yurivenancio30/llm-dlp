@@ -10,7 +10,7 @@ import (
 // Before, the last write kept only what its own process knew.
 
 func TestSeenFromTwoProcessesKept(t *testing.T) {
-	p := filepath.Join(t.TempDir(), "vistos.json")
+	p := filepath.Join(t.TempDir(), "seen.json")
 	a, err := LoadSeen(p)
 	if err != nil {
 		t.Fatal(err)
@@ -32,17 +32,17 @@ func TestSeenFromTwoProcessesKept(t *testing.T) {
 	c, _ := LoadSeen(p)
 	for _, id := range []string{"id-a", "id-a2", "id-b", "id-obj"} {
 		if _, ok := c.Type(id); !ok {
-			t.Errorf("%s sumiu do arquivo", id)
+			t.Errorf("%s disappeared from the file", id)
 		}
 	}
 	// what came from the other process also counts in the memory of whoever merged
 	if !a.Has("email") || !a.HasObj() {
-		t.Errorf("a juntou o arquivo mas não conta o que veio dele: email=%v obj=%v", a.Has("email"), a.HasObj())
+		t.Errorf("a merged the file but does not count what came from it: email=%v obj=%v", a.Has("email"), a.HasObj())
 	}
 }
 
 func TestPeopleFromTwoProcessesKept(t *testing.T) {
-	p := filepath.Join(t.TempDir(), "pessoas.json")
+	p := filepath.Join(t.TempDir(), "people.json")
 	ps := NewPseudo(testKey)
 	a, err := LoadPeople(p)
 	if err != nil {
@@ -63,12 +63,12 @@ func TestPeopleFromTwoProcessesKept(t *testing.T) {
 	together.Import(ps, "Ana Paula Souza", "", "U2001")
 	c, _ := LoadPeople(p)
 	if c.Total() != together.Total() {
-		t.Fatalf("o registro gravado tem %d nomes, esperado %d", c.Total(), together.Total())
+		t.Fatalf("the written registry has %d names, expected %d", c.Total(), together.Total())
 	}
 	if !c.IsCode(ps, "U1001") || !c.IsCode(ps, "U2001") {
-		t.Errorf("os códigos das duas pessoas deviam estar no registro")
+		t.Errorf("the codes of both people should be in the registry")
 	}
 	if b.Total() != together.Total() || !b.IsCode(ps, "U1001") {
-		t.Errorf("b juntou o arquivo mas não reconhece quem veio dele (total %d)", b.Total())
+		t.Errorf("b merged the file but does not recognize who came from it (total %d)", b.Total())
 	}
 }

@@ -103,15 +103,15 @@ func TestHistorySameWhenLearning(t *testing.T) {
 	for i := 1; i < 3; i++ {
 		for j := range r[i-1] {
 			if r[i][j] != r[i-1][j] {
-				t.Fatalf("requisição %d mudou a mensagem %d do histórico:\nantes:  %s\ndepois: %s", i+1, j, r[i-1][j], r[i][j])
+				t.Fatalf("request %d changed message %d of the history:\nbefore: %s\nafter:  %s", i+1, j, r[i-1][j], r[i][j])
 			}
 		}
 	}
 	if !strings.Contains(r[2][0], s) {
-		t.Fatalf("premissa: a primeira mensagem saiu sem o valor (já era mascarado)")
+		t.Fatalf("premise: the first message went out without the value (it was already masked)")
 	}
 	if strings.Contains(r[1][2], s) || strings.Contains(r[2][4], s) {
-		t.Errorf("texto novo não usou o valor aprendido: %s | %s", r[1][2], r[2][4])
+		t.Errorf("new text did not use the learned value: %s | %s", r[1][2], r[2][4])
 	}
 
 	// the SAME text of the first message, now in a new message: goes out masked
@@ -120,15 +120,15 @@ func TestHistorySameWhenLearning(t *testing.T) {
 	send(t, px, conversation)
 	r3 := messages(t, bodies[3])
 	if r3[0] != r[2][0] {
-		t.Fatalf("o reenvio da primeira mensagem mudou")
+		t.Fatalf("the resend of the first message changed")
 	}
 	if strings.Contains(r3[6], s) {
-		t.Errorf("o mesmo texto numa mensagem nova saiu com a máscara antiga: %s", r3[6])
+		t.Errorf("the same text in a new message came out with the old mask: %s", r3[6])
 	}
 	// e numa conversa nova
 	send(t, px, []any{msg("user", "outra conversa"), msg("assistant", "ok"), msg("user", firstOne)})
 	if got := messages(t, bodies[4]); strings.Contains(got[2], s) {
-		t.Errorf("o mesmo texto numa conversa nova saiu com a máscara antiga: %s", got[2])
+		t.Errorf("the same text in a new conversation came out with the old mask: %s", got[2])
 	}
 	conversation = conversation[:5]
 	r[2] = messages(t, bodies[2])
@@ -138,13 +138,13 @@ func TestHistorySameWhenLearning(t *testing.T) {
 	px2 := buildDisk(t, dir, &bodies2)
 	send(t, px2, conversation)
 	if got := messages(t, bodies2[0]); strings.Join(got, "\n") != strings.Join(r[2], "\n") {
-		t.Fatalf("depois do reinício o histórico mudou:\nantes:  %v\ndepois: %v", r[2], got)
+		t.Fatalf("after the restart the history changed:\nbefore: %v\nafter:  %v", r[2], got)
 	}
 	// and new text after the restart stays masked (value remembered in vistos.json)
 	conversation = append(conversation, msg("assistant", "ok"), msg("user", "e agora "+s+"?"))
 	send(t, px2, conversation)
 	if got := messages(t, bodies2[1]); strings.Contains(got[6], s) {
-		t.Errorf("após reinício, texto novo saiu com o valor: %s", got[6])
+		t.Errorf("after the restart, new text came out with the value: %s", got[6])
 	}
 }
 
@@ -168,16 +168,16 @@ func TestWebFetchResultDoesNotTeach(t *testing.T) {
 	send(t, px, conversation)
 	r := messages(t, bodies[0])
 	if strings.Contains(r[2], ex) {
-		t.Errorf("no resultado do WebFetch, a senha de exemplo deveria sair mascarada: %s", r[2])
+		t.Errorf("in the WebFetch result, the example password should come out masked: %s", r[2])
 	}
 	if !strings.Contains(r[4], ex) {
-		t.Errorf("valor vindo da web foi lembrado: %s", r[4])
+		t.Errorf("value coming from the web was remembered: %s", r[4])
 	}
 	var bodies2 [][]byte
 	px2 := buildDisk(t, dir, &bodies2) // restart: only what is on disk
 	send(t, px2, []any{msg("user", "outra conversa: "+ex+" aparece aqui")})
 	if r := messages(t, bodies2[0]); !strings.Contains(r[0], ex) {
-		t.Errorf("valor vindo da web foi gravado em vistos.json: %s", r[0])
+		t.Errorf("value coming from the web was written to seen.json: %s", r[0])
 	}
 }
 
@@ -221,10 +221,10 @@ func TestConnectorDoesNotUnmask(t *testing.T) {
 		}
 	}
 	if pseudoEmail == "" || strings.Contains(byIdx[0], email) || !strings.Contains(byIdx[0], pseudoEmail) {
-		t.Errorf("o conector recebeu o real (ou nada): %s", byIdx[0])
+		t.Errorf("the connector received the real value (or nothing): %s", byIdx[0])
 	}
 	if !strings.Contains(byIdx[1], email) {
-		t.Errorf("Bash deveria receber o real: %s", byIdx[1])
+		t.Errorf("Bash should receive the real value: %s", byIdx[1])
 	}
 }
 
@@ -248,6 +248,6 @@ func TestCacheControlKeepsPosition(t *testing.T) {
 	json.Unmarshal([]byte(messages(t, bodies[0])[0]), &struct{ Content *[]map[string]any }{&a})
 	json.Unmarshal([]byte(messages(t, bodies[1])[0]), &struct{ Content *[]map[string]any }{&b})
 	if len(a) != 2 || len(b) != 2 || a[1]["text"] != b[1]["text"] {
-		t.Errorf("o cache_control num bloco anterior mudou a máscara do texto seguinte")
+		t.Errorf("the cache_control in an earlier block changed the mask of the next text")
 	}
 }

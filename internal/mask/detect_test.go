@@ -92,7 +92,7 @@ func compareCut(m *Masker, s, real string, require bool) string {
 			i++
 		}
 		a, b := max(0, i-50), min(len(wants), i+70)
-		return fmt.Sprintf("difere em %d\n inteiro: %q\n pedaços: %q", i, wants[a:b], got[a:min(len(got), b)])
+		return fmt.Sprintf("differs at %d\n whole:  %q\n pieces: %q", i, wants[a:b], got[a:min(len(got), b)])
 	}
 	return ""
 }
@@ -121,7 +121,7 @@ func scanCuts(t *testing.T, cases []cutCase, require bool, step, total int, buil
 			for tf := range queue {
 				n.Add(1)
 				if msg := compareCut(m, build(tf.c, tf.e, tf.pos), tf.c.real, require); msg != "" && errs.Add(1) <= 12 {
-					t.Errorf("caso %.40q, enchimento %q, posição %d: %s", tf.c.text, tf.e, tf.pos, msg)
+					t.Errorf("case %.40q, filler %q, position %d: %s", tf.c.text, tf.e, tf.pos, msg)
 				}
 			}
 		}()
@@ -135,7 +135,7 @@ func scanCuts(t *testing.T, cases []cutCase, require bool, step, total int, buil
 	}
 	close(queue)
 	wg.Wait()
-	t.Logf("%d textos comparados, %d diferenças", n.Load(), errs.Load())
+	t.Logf("%d texts compared, %d differences", n.Load(), errs.Load())
 }
 
 // sep: what separates the datum from the padding. With padding without line breaks the separator is
@@ -205,7 +205,7 @@ func TestCutsLooseKnownValue(t *testing.T) {
 // With the real sizes (48 KB pieces, 8 KB margin), by sampling positions.
 func TestCutsRealSize(t *testing.T) {
 	if os.Getenv("LLM_DLP_STRESS") == "" {
-		t.Skip("lento (minutos): defina LLM_DLP_STRESS=1 para rodar")
+		t.Skip("slow (minutes): set LLM_DLP_STRESS=1 to run")
 	}
 	step := 211
 	key4096 := "-----BEGIN RSA PRIVATE KEY-----\n" + strings.Repeat("MIIEpAIBAAKCAQEA7bq2Xk9mQ2vLp7wZt4nBc6HfG1aE5uQiOk3Jd9sLq2mXv8Rt\n", 50) + "-----END RSA PRIVATE KEY-----"
@@ -231,12 +231,12 @@ func TestCutsRealSize(t *testing.T) {
 				s := fill(e, pos) + sep(e) + c.text + sep(e) + fill(e, largeMin+largePiece-pos)
 				n++
 				if msg := compareCut(m, s, c.real, true); msg != "" {
-					t.Fatalf("caso %.30q, enchimento %q, posição %d: %s", c.text, e, pos, msg)
+					t.Fatalf("case %.30q, filler %q, position %d: %s", c.text, e, pos, msg)
 				}
 			}
 		}
 	}
-	t.Logf("%d textos comparados", n)
+	t.Logf("%d texts compared", n)
 }
 
 // The test above only counts if it catches a badly made cut. Without a margin, it has to report a
@@ -253,9 +253,9 @@ func TestCutsWithoutMarginFail(t *testing.T) {
 			}
 		}
 	}
-	t.Logf("sem margem: %d textos com vazamento ou diferença", dif)
+	t.Logf("without margin: %d texts with a leak or a difference", dif)
 	if dif == 0 {
-		t.Fatal("o teste de cortes não detecta um corte sem margem")
+		t.Fatal("the cuts test does not detect a cut without margin")
 	}
 }
 
@@ -298,7 +298,7 @@ func TestLargeEqualsWhole(t *testing.T) {
 	for name, generates := range cases {
 		s := generates()
 		if len(s) <= largeMin {
-			t.Fatalf("%s: texto pequeno demais para o teste (%d)", name, len(s))
+			t.Fatalf("%s: text too small for the test (%d)", name, len(s))
 		}
 		wants := whole(newTest(t), s)
 		got, _ := newTest(t).Mask(s)
@@ -308,11 +308,11 @@ func TestLargeEqualsWhole(t *testing.T) {
 				i++
 			}
 			a, b := max(0, i-60), min(len(wants), i+60)
-			t.Errorf("%s: difere na posição %d de %d\n inteiro: %q\n pedaços: %q", name, i, len(s), wants[a:b], got[a:min(len(got), b)])
+			t.Errorf("%s: differs at position %d of %d\n whole:  %q\n pieces: %q", name, i, len(s), wants[a:b], got[a:min(len(got), b)])
 		}
 		for _, real := range []string{"Ficticia@2024", "12.345.678-9", "MIIEpAIBAAKCAQEA7bq2Xk9mQ2vLp7wZt4nBc6"} {
 			if strings.Contains(s, real) && strings.Contains(got, real) {
-				t.Errorf("%s: %q passou", name, real)
+				t.Errorf("%s: %q got through", name, real)
 			}
 		}
 	}

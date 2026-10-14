@@ -40,7 +40,7 @@ func checkCommand(t *testing.T, m *Masker, label string, ps []step, names []stri
 		ok += a - b
 	}
 	if back := NewTable(ents).Unmask(out, false); back != lastPos {
-		t.Errorf("%s: a volta não reproduz o original", label)
+		t.Errorf("%s: the way back does not reproduce the original", label)
 	}
 	return ok, tot, out, showOut(out, ents)
 }
@@ -101,9 +101,9 @@ func TestCommandTypesOutput(t *testing.T) {
 		for _, n := range c.names {
 			without += strings.Count(lastPos, n) - strings.Count(o2, n)
 		}
-		t.Logf("%s: %d/%d com o comando, %d sem", c.name, ok, tot, without)
+		t.Logf("%s: %d/%d with the command, %d without", c.name, ok, tot, without)
 		if without == tot {
-			t.Errorf("%s: sem o comando já mascarava tudo (o caso não testa a dica)", c.name)
+			t.Errorf("%s: without the command it already masked everything (the case does not test the hint)", c.name)
 		}
 	}
 }
@@ -116,7 +116,7 @@ func TestCommandWithoutHintDoesNotType(t *testing.T) {
 		m := newTest(t)
 		_, _, out, seen := checkCommand(t, m, cmd, []step{{cmd, output}}, nil)
 		if out != output {
-			t.Errorf("%q: mascarou sem dica\n%s", cmd, seen)
+			t.Errorf("%q: masked without a hint\n%s", cmd, seen)
 		}
 	}
 }
@@ -197,7 +197,7 @@ func TestQualifiedType(t *testing.T) {
 	s := "Loading table dwprd_fin.fin_contab.t_lanc_diario\n"
 	for real, wants := range map[string]string{"dwprd_fin": "obj.database", "fin_contab": "obj.schema", "t_lanc_diario": "obj.table"} {
 		if tp := typeOf(m, s, real); tp != wants {
-			t.Errorf("%s: tipo %q, queria %q", real, tp, wants)
+			t.Errorf("%s: type %q, wanted %q", real, tp, wants)
 		}
 	}
 }
@@ -251,10 +251,10 @@ func TestHomogeneousList(t *testing.T) {
 	m.Mask(sqlTeaches)
 	m.Mask("t_lanc_diario\nt_saldo_mes\nt_razao_aux\n")
 	if out, _ := m.Mask("a t_razao_aux tem 3 linhas"); strings.Contains(out, "t_razao_aux") {
-		t.Errorf("item da lista não foi aprendido: %s", out)
+		t.Errorf("list item was not learned: %s", out)
 	}
 	if tp := typeOf(m, "t_razao_aux", "t_razao_aux"); tp != "obj.table" {
-		t.Errorf("tipo %q", tp)
+		t.Errorf("type %q", tp)
 	}
 }
 

@@ -86,17 +86,17 @@ func TestRoundTripValueFollowedByPunctuation(t *testing.T) {
 				resp.Body.Close()
 				var in map[string]string
 				if err := json.Unmarshal([]byte(entry), &in); err != nil {
-					t.Fatalf("depois=%q stream=%v pedaço=%d: entrada inválida", after, stream, piece)
+					t.Fatalf("after=%q stream=%v chunk=%d: invalid input", after, stream, piece)
 				}
-				tc := fmt.Sprintf("depois=%q stream=%v pedaço=%d", after, stream, piece)
+				tc := fmt.Sprintf("after=%q stream=%v chunk=%d", after, stream, piece)
 				if strings.Contains(seen, u) {
-					t.Errorf("%s: o valor foi em claro para a API", tc)
+					t.Errorf("%s: the value went in plain text to the API", tc)
 				}
 				if after != "" && !strings.Contains(seen, after+" fim") {
-					t.Errorf("%s: a pontuação depois do valor sumiu da vista do modelo", tc)
+					t.Errorf("%s: the punctuation after the value disappeared from the model's view", tc)
 				}
 				if in["content"] != original {
-					t.Errorf("%s: o arquivo gravado difere do original", tc)
+					t.Errorf("%s: the written file differs from the original", tc)
 				}
 			}
 		}
@@ -145,10 +145,10 @@ func TestRoundTripTableName(t *testing.T) {
 		}
 		resp.Body.Close()
 		if pseudo == "" {
-			t.Fatalf("a tabela não foi mascarada na ida")
+			t.Fatalf("the table was not masked on the way out")
 		}
 		if !strings.Contains(entry, "FROM tb_pedido_x9") {
-			t.Errorf("caixa %s: o comando não voltou com o nome real", letterCase)
+			t.Errorf("case %s: the command did not come back with the real name", letterCase)
 		}
 	}
 }
@@ -205,10 +205,10 @@ func TestRoundTripObjectAnyCase(t *testing.T) {
 			}
 			resp.Body.Close()
 			if len(pseudos) == 0 {
-				t.Fatalf("%s: não foi mascarado na ida", c.real)
+				t.Fatalf("%s: not masked on the way out", c.real)
 			}
 			if !strings.Contains(entry, c.real) {
-				t.Errorf("%s, caixa %s: o comando não voltou com o nome real", c.real, letterCase)
+				t.Errorf("%s, case %s: the command did not come back with the real name", c.real, letterCase)
 			}
 		}
 	}

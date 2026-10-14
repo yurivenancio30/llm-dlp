@@ -30,7 +30,7 @@ import (
 //	LLM_DLP_STRESS=1 go test ./internal/proxy -run Stress -v -timeout 60m
 func stressOnly(t *testing.T) {
 	if os.Getenv("LLM_DLP_STRESS") == "" {
-		t.Skip("defina LLM_DLP_STRESS=1 para rodar")
+		t.Skip("set LLM_DLP_STRESS=1 to run")
 	}
 }
 
@@ -183,9 +183,9 @@ func TestStressProxyLoad(t *testing.T) {
 	sort.Slice(timings, func(i, j int) bool { return timings[i] < timings[j] })
 	q := func(p float64) time.Duration { return timings[int(float64(len(timings)-1)*p)].Round(time.Millisecond) }
 	time.Sleep(300 * time.Millisecond)
-	t.Logf("%d requisições, %.0f MB enviados, em %s | por requisição (ida, eco e volta): mediana %s, p95 %s, máx %s",
+	t.Logf("%d requests, %.0f MB sent, in %s | per request (out, echo and back): median %s, p95 %s, max %s",
 		len(timings), float64(totalBytes.Load())/(1<<20), time.Since(t0).Round(time.Second), q(.5), q(.95), q(1))
-	t.Logf("erros %d | vazamentos %d | quebras de cache %d | goroutines %d -> %d | heap %.0f -> %.0f MB",
+	t.Logf("errors %d | leaks %d | cache breaks %d | goroutines %d -> %d | heap %.0f -> %.0f MB",
 		errs.Load(), leaked.Load(), broke.Load(), g0, runtime.NumGoroutine(), h0, heapMB())
 	if errs.Load() > 0 || leaked.Load() > 0 || broke.Load() > 0 {
 		t.Fatal("falhou sob carga")
@@ -241,10 +241,10 @@ func TestStressProxyAborts(t *testing.T) {
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
-	t.Logf("400 respostas abandonadas no meio | goroutines %d -> %d", g0, g)
+	t.Logf("400 responses abandoned midway | goroutines %d -> %d", g0, g)
 	if g > g0+8 {
 		buf := make([]byte, 1<<16)
-		t.Fatalf("goroutines sobrando: %d -> %d\n%s", g0, g, buf[:runtime.Stack(buf, true)])
+		t.Fatalf("leftover goroutines: %d -> %d\n%s", g0, g, buf[:runtime.Stack(buf, true)])
 	}
 }
 
@@ -262,7 +262,7 @@ func TestStressProxyBadUpstream(t *testing.T) {
 			fmt.Fprint(w, `{"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}`)
 		case 1:
 			w.WriteHeader(500)
-			fmt.Fprint(w, "erro interno em texto puro")
+			fmt.Fprint(w, "internal error in plain text")
 		case 2: // cuts the connection in the middle of streaming
 			w.Header().Set("content-type", "text/event-stream")
 			fmt.Fprint(w, "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"meio p.\"}}\n\n")
@@ -311,12 +311,12 @@ func TestStressProxyBadUpstream(t *testing.T) {
 			}()
 		}
 		wg.Wait()
-		t.Logf("%-42s 40 requisições em %-6s status (-1 = cliente desistiu): %v", name, time.Since(ti).Round(time.Millisecond), status)
+		t.Logf("%-42s 40 requests in %-6s status (-1 = client gave up): %v", name, time.Since(ti).Round(time.Millisecond), status)
 	}
 	// after all of that, the proxy still answers
 	resp, err := http.Get(px.URL + "/__llm-dlp/saude")
 	if err != nil || resp.StatusCode != 200 {
-		t.Fatalf("proxy não responde mais: %v", err)
+		t.Fatalf("proxy no longer answers: %v", err)
 	}
 	resp.Body.Close()
 	http.DefaultClient.CloseIdleConnections()
@@ -329,7 +329,7 @@ func TestStressProxyBadUpstream(t *testing.T) {
 	}
 	t.Logf("goroutines %d -> %d", g0, g)
 	if g > g0+8 {
-		t.Fatalf("goroutines sobrando: %d -> %d", g0, g)
+		t.Fatalf("leftover goroutines: %d -> %d", g0, g)
 	}
 }
 
@@ -357,11 +357,11 @@ func TestStressProxyHugeRequest(t *testing.T) {
 		t.Logf("%-26s %d MB, %d mensagens: %s | status %d | resposta correta=%v | heap %.0f MB", turnNo, len(body)>>20, len(msgs),
 			time.Since(ti).Round(time.Millisecond), resp.StatusCode, got == "fim "+turnData(7, 1), heapMB())
 		if resp.StatusCode != 200 || got != "fim "+turnData(7, 1) {
-			t.Fatal("requisição gigante falhou")
+			t.Fatal("giant request failed")
 		}
 	}
 	if leaked.Load() > 0 || broke.Load() > 0 {
-		t.Fatalf("vazamentos %d, quebras de cache %d", leaked.Load(), broke.Load())
+		t.Fatalf("leaks %d, cache breaks %d", leaked.Load(), broke.Load())
 	}
 }
 
@@ -401,9 +401,9 @@ func TestStressProxyAfterRestart(t *testing.T) {
 			resp.Body.Close()
 			ds = append(ds, time.Since(ti).Round(time.Millisecond))
 		}
-		t.Logf("%-52s %4d KB em %d mensagens | a frio %s | depois %s e %s | vazamentos %d", tc.name, len(body)>>10, len(msgs), ds[0], ds[1], ds[2], leaked.Load())
+		t.Logf("%-52s %4d KB in %d messages | cold %s | after %s and %s | leaks %d", tc.name, len(body)>>10, len(msgs), ds[0], ds[1], ds[2], leaked.Load())
 		if leaked.Load() > 0 || broke.Load() > 0 {
-			t.Fatal("vazou ou mudou entre requisições")
+			t.Fatal("leaked or changed between requests")
 		}
 	}
 }

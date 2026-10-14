@@ -86,7 +86,7 @@ func TestSimulateReadsSubagent(t *testing.T) {
 		}
 		output := outputOf(t, func() error { return simulateSession(file, cfg, m, 100, 600<<10) })
 		if !strings.Contains(output, c.wants) {
-			t.Errorf("%s: esperava %q em:\n%s", c.name, c.wants, output)
+			t.Errorf("%s: expected %q in:\n%s", c.name, c.wants, output)
 		}
 	}
 }

@@ -23,7 +23,7 @@ func FuzzReaders(f *testing.F) {
 		for _, l := range defaultReaders() {
 			l.Find(s, func(o ObjFinding) {
 				if o.Start < 0 || o.End > len(s) || o.End < o.Start {
-					t.Fatalf("%s: trecho fora do texto %d..%d de %d", l.Name, o.Start, o.End, len(s))
+					t.Fatalf("%s: snippet outside the text %d..%d of %d", l.Name, o.Start, o.End, len(s))
 				}
 			})
 		}

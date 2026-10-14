@@ -31,11 +31,11 @@ func TestSensitiveInText(t *testing.T) {
 		out, ents := m.Mask(c.s)
 		for _, x := range c.gone {
 			if strings.Contains(out, x) {
-				t.Errorf("%q: ficou %q\n   saiu %q", c.s, x, out)
+				t.Errorf("%q: kept %q\n   out %q", c.s, x, out)
 			}
 		}
 		if back := NewTable(ents).Unmask(out, false); back != c.s {
-			t.Errorf("volta de %q:\n   %q", c.s, back)
+			t.Errorf("way back of %q:\n   %q", c.s, back)
 		}
 	}
 	for _, s := range []string{
@@ -45,7 +45,7 @@ func TestSensitiveInText(t *testing.T) {
 		"ssh-keygen -lf: fingerprint: SHA256:abc", "Rk1SA é só texto",
 	} {
 		if out, _ := m.Mask(s); out != s {
-			t.Errorf("mascarou o que não é dado sensível: %q -> %q", s, out)
+			t.Errorf("masked what is not sensitive data: %q -> %q", s, out)
 		}
 	}
 }

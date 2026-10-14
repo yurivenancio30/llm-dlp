@@ -143,7 +143,7 @@ func inputCommand(t *testing.T, entry string) string {
 	t.Helper()
 	var in map[string]string
 	if err := json.Unmarshal([]byte(entry), &in); err != nil {
-		t.Fatalf("entrada inválida: %q", entry)
+		t.Fatalf("invalid input: %q", entry)
 	}
 	return in["command"]
 }
@@ -160,7 +160,7 @@ func TestMemoryTranslatedInCommand(t *testing.T) {
 		cmd := inputCommand(t, entry)
 		ps := rePseNS.FindString(string(bodies[0]))
 		if ps == "" || cmd != "echo "+nsWord+" pronto" {
-			t.Fatalf("stream=%v: premissa: pseudônimo %q, comando %q", stream, ps, cmd)
+			t.Fatalf("stream=%v: premise: pseudonym %q, command %q", stream, ps, cmd)
 		}
 		output := nsWord + " pronto\n"
 		conversation := []any{
@@ -171,10 +171,10 @@ func TestMemoryTranslatedInCommand(t *testing.T) {
 		sendRead(t, px, stream, conversation)
 		ms := messages(t, bodies[1])
 		if !strings.Contains(ms[1], "echo "+ps+" pronto") {
-			t.Errorf("stream=%v: a chamada não voltou como a API mandou: %s", stream, ms[1])
+			t.Errorf("stream=%v: the call did not come back as the API sent it: %s", stream, ms[1])
 		}
 		if strings.Contains(ms[2], nsWord) || !strings.Contains(ms[2], ps) {
-			t.Errorf("stream=%v: a saída com a palavra traduzida saiu em claro: %s", stream, ms[2])
+			t.Errorf("stream=%v: the output with the translated word went out in plain text: %s", stream, ms[2])
 		}
 
 		// without a registry (another process): current behavior, the common word passes
@@ -182,7 +182,7 @@ func TestMemoryTranslatedInCommand(t *testing.T) {
 		px2 := buildMem(t, t.TempDir(), &othersSet, respText(false, "ok"))
 		sendRead(t, px2, false, conversation)
 		if ms := messages(t, othersSet[0]); !strings.Contains(ms[2], nsWord) {
-			t.Errorf("stream=%v: sem registro, a palavra comum foi mascarada: %s", stream, ms[2])
+			t.Errorf("stream=%v: without a record, the common word was masked: %s", stream, ms[2])
 		}
 	}
 }
@@ -221,13 +221,13 @@ func TestMemoryWhoWroteEndToEnd(t *testing.T) {
 			json.Unmarshal([]byte(ms[1]), &a)
 			tc := map[bool]string{true: "stream", false: "json"}[stream] + map[bool]string{true: " depois do reinício", false: ""}[restartN]
 			if len(a.Content) != 2 || a.Content[1].Text != original || a.Content[0].Thinking != "pensando" {
-				t.Errorf("%s: o texto do assistente não voltou como a API mandou:\n%s\nesperado %q", tc, ms[1], original)
+				t.Errorf("%s: the assistant text did not come back as the API sent it:\n%s\nexpected %q", tc, ms[1], original)
 			}
 			if !strings.Contains(ms[2], nsWord) {
-				t.Errorf("%s: palavra comum trocada na mensagem nova do usuário: %s", tc, ms[2])
+				t.Errorf("%s: common word swapped in the user's new message: %s", tc, ms[2])
 			}
 			if strings.Contains(ms[0], nsWord) {
-				t.Errorf("%s: o inventário saiu em claro: %s", tc, ms[0])
+				t.Errorf("%s: the inventory went out in plain text: %s", tc, ms[0])
 			}
 		}
 	}
@@ -241,11 +241,11 @@ func TestMemoryOtherConversation(t *testing.T) {
 		msg("assistant", []any{map[string]any{"type": "tool_use", "id": "t5", "name": "Bash", "input": map[string]any{"command": "kubectl logs deploy/web --tail 5"}}}),
 		msg("user", []any{map[string]any{"type": "tool_result", "tool_use_id": "t5", "content": "o " + nsWord + " caiu"}})})
 	if ms := messages(t, bodies[0]); strings.Contains(ms[2], nsWord) {
-		t.Fatalf("premissa: com o inventário, a palavra devia sair mascarada na saída: %s", ms[2])
+		t.Fatalf("premise: with the inventory, the word should come out masked in the output: %s", ms[2])
 	}
 	sendRead(t, px, false, []any{msg("user", "o "+nsWord+" caiu")})
 	if ms := messages(t, bodies[1]); !strings.Contains(ms[0], nsWord) {
-		t.Fatalf("outra conversa: a palavra comum foi mascarada: %s", ms[0])
+		t.Fatalf("another conversation: the common word was masked: %s", ms[0])
 	}
 }
 
@@ -263,16 +263,16 @@ func TestMemoryDoesNotRewritePastEndToEnd(t *testing.T) {
 	sendRead(t, px, false, conversation)
 	r := [][]string{messages(t, bodies[0]), messages(t, bodies[1]), messages(t, bodies[2])}
 	if r[1][0] != r[0][0] || r[2][0] != r[0][0] || !strings.Contains(r[2][0], nsWord) {
-		t.Fatalf("texto enviado mudou:\n%s\n%s\n%s", r[0][0], r[1][0], r[2][0])
+		t.Fatalf("sent text changed:\n%s\n%s\n%s", r[0][0], r[1][0], r[2][0])
 	}
 	for j := range r[1] {
 		if r[2][j] != r[1][j] {
-			t.Fatalf("reenvio mudou a mensagem %d:\n%s\n%s", j, r[1][j], r[2][j])
+			t.Fatalf("resending changed message %d:\n%s\n%s", j, r[1][j], r[2][j])
 		}
 	}
 	// the inventory pasted in the new text stays a name (the reader decides there); the common word
 	// in prose stays a word (mask/vocab_words.go)
 	if strings.Contains(r[1][2], "-n "+nsWord) || !strings.Contains(r[2][4], nsWord) {
-		t.Fatalf("texto novo: %s | %s", r[1][2], r[2][4])
+		t.Fatalf("new text: %s | %s", r[1][2], r[2][4])
 	}
 }

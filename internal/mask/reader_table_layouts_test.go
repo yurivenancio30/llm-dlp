@@ -201,12 +201,12 @@ func TestTableNegatives(t *testing.T) {
 func TestIsDataType(t *testing.T) {
 	for _, v := range []string{"varchar(20)", "NUMBER(12,2)", "datetime64[ns]", "<chr>", "Int64", "string", "i64", "StringType()", "decimal(10,2)"} {
 		if !isDataType(v) {
-			t.Errorf("%q deveria ser tipo de dado", v)
+			t.Errorf("%q should be a data type", v)
 		}
 	}
 	for _, v := range []string{"lanc_diario", "fin_contab", "Running", "ClusterIP"} {
 		if isDataType(v) {
-			t.Errorf("%q não é tipo de dado", v)
+			t.Errorf("%q is not a data type", v)
 		}
 	}
 }

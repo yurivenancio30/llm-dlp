@@ -25,7 +25,7 @@ func TestCommandTypesResult(t *testing.T) {
 	r := messages(t, bodies[0])
 	for _, n := range names {
 		if strings.Contains(r[2], n) {
-			t.Errorf("%s saiu legível no resultado do SELECT", n)
+			t.Errorf("%s came out readable in the SELECT result", n)
 		}
 	}
 	var bodies2 [][]byte
@@ -34,7 +34,7 @@ func TestCommandTypesResult(t *testing.T) {
 	r = messages(t, bodies2[0])
 	for _, n := range names {
 		if !strings.Contains(r[2], n) {
-			t.Errorf("%s mascarado sem dica do comando", n)
+			t.Errorf("%s masked without a hint from the command", n)
 		}
 	}
 }

@@ -277,9 +277,9 @@ func TestMatrixCoverage(t *testing.T) {
 			ss = append(ss, fmt.Sprintf("%s (%d)", k, v))
 		}
 		sort.Strings(ss)
-		t.Logf("em claro:\n  %s", strings.Join(ss, "\n  "))
+		t.Logf("in plain text:\n  %s", strings.Join(ss, "\n  "))
 	}
 	if pct < 90 {
-		t.Errorf("cobertura %.1f%% abaixo da meta de 90%%", pct)
+		t.Errorf("coverage %.1f%% below the 90%% goal", pct)
 	}
 }

@@ -22,7 +22,7 @@ func TestLexicalT7(t *testing.T) {
 	s := `namespace = "payments"`
 	check(t, m, s, []string{"payments"}, []string{"namespace = "})
 	if !decided(m, s, "payments", "namespace", "") {
-		t.Errorf("payments não ficou nas decisões do texto: %+v", m.Decided(s, ""))
+		t.Errorf("payments not in the decisions of the text: %+v", m.Decided(s, ""))
 	}
 	for _, s := range []string{
 		`payments = load()`,              // code identifier
@@ -56,7 +56,7 @@ func TestLexicalKeyClue(t *testing.T) {
 	} {
 		check(t, m, c.s, []string{c.name}, nil)
 		if !decided(m, c.s, c.name, c.ent, "") {
-			t.Errorf("%q: %s não ficou decidido como %s: %+v", c.s, c.name, c.ent, m.Decided(c.s, ""))
+			t.Errorf("%q: %s not decided as %s: %+v", c.s, c.name, c.ent, m.Decided(c.s, ""))
 		}
 	}
 	// without a section header, or with code in the middle, it is still a code assignment
@@ -103,7 +103,7 @@ func TestLexicalAnchor(t *testing.T) {
 		out, _ := m.Mask(s)
 		for _, w := range []string{"billing", "checkout", "admin", "rodar", "testar"} {
 			if strings.Contains(s, w) && !strings.Contains(out, w) {
-				t.Errorf("%s mascarado a mais: %q -> %q", w, s, out)
+				t.Errorf("%s masked too much: %q -> %q", w, s, out)
 			}
 		}
 	}
@@ -112,7 +112,7 @@ func TestLexicalAnchor(t *testing.T) {
 	m.Mask(`bucket = "bkt-01"`)
 	s = `xs = ["pgsrv-02", "bkt-01", "billing"]`
 	if out, _ := m.Mask(s); !strings.Contains(out, "billing") {
-		t.Errorf("âncoras de tipos diferentes: %q", out)
+		t.Errorf("anchors of different types: %q", out)
 	}
 }
 

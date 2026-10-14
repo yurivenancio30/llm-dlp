@@ -282,12 +282,12 @@ func TestMatrixTransportLayout(t *testing.T) {
 	}
 	sort.Strings(cs)
 	pct := 100 * float64(okT) / float64(totT)
-	t.Logf("matriz CONTEÚDO × TRANSPORTE × DESENHO:\n%s\npor conteúdo:\n%s\nTOTAL %d/%d = %.1f%%", b.String(), strings.Join(cs, "\n"), okT, totT, pct)
+	t.Logf("CONTENT × TRANSPORT × LAYOUT matrix:\n%s\nby content:\n%s\nTOTAL %d/%d = %.1f%%", b.String(), strings.Join(cs, "\n"), okT, totT, pct)
 	if testing.Verbose() && len(failures) > 0 {
-		t.Logf("células incompletas:\n  %s", strings.Join(failures, "\n  "))
+		t.Logf("incomplete cells:\n  %s", strings.Join(failures, "\n  "))
 	}
 	if pct < 95 {
-		t.Errorf("cobertura %.1f%% abaixo da meta de 95%%", pct)
+		t.Errorf("coverage %.1f%% below the 95%% goal", pct)
 	}
 }
 
@@ -314,5 +314,5 @@ func TestMatrixNegatives(t *testing.T) {
 			}
 		}
 	}
-	t.Logf("negativos: %d células, %d com máscara", n, bad)
+	t.Logf("negatives: %d cells, %d masked", n, bad)
 }

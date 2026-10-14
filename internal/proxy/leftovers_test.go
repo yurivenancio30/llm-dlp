@@ -40,11 +40,11 @@ func TestPersonReturnsEachSpellingCase(t *testing.T) {
 	body := string(bodies[len(bodies)-1])
 	for _, real := range []string{"Maria da Silva", "MARIA DA SILVA", "maria da silva", "João Pereira Santos", "JOÃO PEREIRA SANTOS"} {
 		if strings.Contains(body, real) {
-			t.Errorf("%q saiu em claro", real)
+			t.Errorf("%q went out in plain text", real)
 		}
 	}
 	if back != text {
-		t.Errorf("a volta mudou a caixa:\n quer %q\n veio %q", text, back)
+		t.Errorf("the way back changed the case:\n want %q\n got  %q", text, back)
 	}
 }
 
@@ -124,16 +124,16 @@ func TestWritingReturnsEachSpellingCase(t *testing.T) {
 		body := string(bodies[len(bodies)-1])
 		for _, real := range []string{"SgP", "sgp", "SGP", "etl_carga", "ETL_CARGA", "propostas_ativas", "PROPOSTAS_ATIVAS"} {
 			if strings.Contains(body, real) {
-				t.Errorf("%q saiu em claro", real)
+				t.Errorf("%q went out in plain text", real)
 			}
 		}
 		var got map[string]any
 		if err := json.Unmarshal([]byte(back), &got); err != nil {
-			t.Fatalf("entrada inválida: %q", back)
+			t.Fatalf("invalid input: %q", back)
 		}
 		for k, v := range in {
 			if got[k] != v {
-				t.Errorf("a escrita voltou com outra caixa (%s):\n quer %q\n veio %q", k, v, got[k])
+				t.Errorf("the writing came back with another case (%s):\n wants %q\n got   %q", k, v, got[k])
 			}
 		}
 	}
@@ -156,11 +156,11 @@ func TestWritingWithOtherPseudonymCase(t *testing.T) {
 	})
 	_, back := sendRead(t, px, true, []any{msg("user", "a sigla SGP aparece no relatório")})
 	if c := string(bodies[0]); !reCompany.MatchString(c) {
-		t.Fatalf("premissa: a sigla não foi mascarada: %s", c)
+		t.Fatalf("premise: the acronym was not masked: %s", c)
 	}
 	const wants = "ls /dados/SGP/ && echo SGP SGP"
 	if cmd := inputCommand(t, back); cmd != wants {
-		t.Errorf("o pseudônimo em outra caixa não voltou à sigla como ela entrou:\n quer %q\n veio %q", wants, cmd)
+		t.Errorf("the pseudonym in another case did not go back to the acronym as it came in:\n wants %q\n got   %q", wants, cmd)
 	}
 }
 
@@ -182,7 +182,7 @@ func TestCommonWordDoesNotMaskLargerWord(t *testing.T) {
 	body := string(bodies[len(bodies)-1])
 	for _, p := range []string{"user_status", "total_valor"} {
 		if !strings.Contains(body, p) {
-			t.Errorf("%q foi mascarado: palavra comum não vale por pedaço", p)
+			t.Errorf("%q was masked: a common word does not count by piece", p)
 		}
 	}
 }
@@ -238,10 +238,10 @@ func TestKnownNameNotLeftOver(t *testing.T) {
 				msg("assistant", []any{usage("t2", "python3 listar.py")}),
 				msg("user", []any{res("t2", c.output)})})
 			if body := string(bodies[len(bodies)-1]); strings.Contains(body, c.real) {
-				t.Errorf("%q saiu em claro", c.real)
+				t.Errorf("%q went out in plain text", c.real)
 			}
 			if text != c.output {
-				t.Errorf("a volta não trouxe o original:\n quer %q\n veio %q", c.output, text)
+				t.Errorf("the way back did not bring the original:\n wants %q\n got   %q", c.output, text)
 			}
 		})
 	}

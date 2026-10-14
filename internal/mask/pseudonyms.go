@@ -361,7 +361,7 @@ func (m *Masker) allowedEmail(e string) bool {
 	if strings.HasSuffix(dom, ".invalid") {
 		return true
 	}
-	for _, x := range m.cfg.EmailsLiberados {
+	for _, x := range m.cfg.AllowedEmails {
 		if strings.ToLower(x) == e {
 			return true
 		}

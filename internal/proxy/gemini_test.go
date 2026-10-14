@@ -46,7 +46,7 @@ func buildGemini(t *testing.T, f func(*config.Config), resp func(p geminiRequest
 		resp(p, w)
 	}))
 	anthropic := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		t.Errorf("a requisição do Gemini foi para o upstream da Anthropic: %s", r.URL.Path)
+		t.Errorf("the Gemini request went to the Anthropic upstream: %s", r.URL.Path)
 	}))
 	cfg.Upstream = anthropic.URL
 	cfg.Providers = map[string]config.Provider{"gemini": {Upstream: up.URL, Format: "gemini"}}
@@ -124,11 +124,11 @@ func TestGeminiMaskedOutbound(t *testing.T) {
 	}
 	p := (*requests)[0]
 	if p.path != pathG+"?alt=json" || p.key != "chave-de-teste" {
-		t.Errorf("caminho ou chave não chegaram como vieram: %q %q", p.path, p.key)
+		t.Errorf("path or key did not arrive as they came: %q %q", p.path, p.key)
 	}
 	for _, r := range []string{email, ip, host, cpf} {
 		if bytes.Contains(p.body, []byte(r)) {
-			t.Errorf("vazou %q: %s", r, p.body)
+			t.Errorf("leaked %q: %s", r, p.body)
 		}
 	}
 	var wentOut, orig map[string]any
@@ -136,12 +136,12 @@ func TestGeminiMaskedOutbound(t *testing.T) {
 	b, _ := json.Marshal(geminiRequestOf())
 	json.Unmarshal(b, &orig)
 	if !reflect.DeepEqual(wentOut["generationConfig"], orig["generationConfig"]) {
-		t.Errorf("generationConfig mudou: %v", wentOut["generationConfig"])
+		t.Errorf("generationConfig changed: %v", wentOut["generationConfig"])
 	}
 	fd := wentOut["tools"].([]any)[0].(map[string]any)["functionDeclarations"].([]any)[0].(map[string]any)
 	fdOrig := orig["tools"].([]any)[0].(map[string]any)["functionDeclarations"].([]any)[0].(map[string]any)
 	if fd["name"] != "run_shell_command" || !reflect.DeepEqual(fd["parameters"], fdOrig["parameters"]) {
-		t.Errorf("nome ou schema da ferramenta mudou: %v", fd)
+		t.Errorf("tool name or schema changed: %v", fd)
 	}
 	cs := wentOut["contents"].([]any)
 	if len(cs) != 3 {
@@ -150,22 +150,22 @@ func TestGeminiMaskedOutbound(t *testing.T) {
 	model := cs[1].(map[string]any)
 	ps := model["parts"].([]any)
 	if model["role"] != "model" || len(ps) != 2 {
-		t.Fatalf("mensagem do modelo mudou de forma: %v", model)
+		t.Fatalf("model message changed shape: %v", model)
 	}
 	if thought := ps[0].(map[string]any); thought["text"] != "vou conferir o p.aaaaaaaa" || thought["thought"] != true {
-		t.Errorf("o raciocínio mudou: %v", thought)
+		t.Errorf("the reasoning changed: %v", thought)
 	}
 	call := ps[1].(map[string]any)
 	if call["thoughtSignature"] != signature {
-		t.Errorf("a assinatura do raciocínio mudou: %v", call["thoughtSignature"])
+		t.Errorf("the reasoning signature changed: %v", call["thoughtSignature"])
 	}
 	if cmd := call["functionCall"].(map[string]any)["args"].(map[string]any)["command"].(string); !strings.HasPrefix(cmd, "ping -c1 ") {
-		t.Errorf("comando: %q", cmd)
+		t.Errorf("command: %q", cmd)
 	}
 	fr := cs[2].(map[string]any)["parts"].([]any)[0].(map[string]any)["functionResponse"].(map[string]any)
 	output := fr["response"].(map[string]any)
 	if fr["name"] != "run_shell_command" || !strings.HasPrefix(output["output"].(string), "PING ") || fmt.Sprint(output["exitCode"]) != "0" {
-		t.Errorf("resposta da ferramenta mudou de forma: %v", fr)
+		t.Errorf("tool response changed shape: %v", fr)
 	}
 }
 
@@ -196,17 +196,17 @@ func TestGeminiReturnWithoutStreaming(t *testing.T) {
 		t.Fatalf("partes: %v", ps)
 	}
 	if s, _ := ps[0]["text"].(string); strings.Contains(s, email) || ps[0]["thought"] != true {
-		t.Errorf("o raciocínio não devia ser desmascarado: %v", ps[0])
+		t.Errorf("the reasoning should not be unmasked: %v", ps[0])
 	}
 	if ps[1]["text"] != userText {
-		t.Errorf("texto não voltou real:\n%v\n%v", userText, ps[1]["text"])
+		t.Errorf("text did not come back real:\n%v\n%v", userText, ps[1]["text"])
 	}
 	fc := ps[2]["functionCall"].(map[string]any)
 	if fc["args"].(map[string]any)["command"] != "ping -c1 "+ip || ps[2]["thoughtSignature"] != signature {
-		t.Errorf("chamada de ferramenta não voltou real: %v", ps[2])
+		t.Errorf("tool call did not come back real: %v", ps[2])
 	}
 	if !bytes.Contains(b, []byte(`"promptTokenCount":10`)) {
-		t.Errorf("o resto da resposta mudou: %s", b)
+		t.Errorf("the rest of the response changed: %s", b)
 	}
 }
 
@@ -247,7 +247,7 @@ func TestGeminiReturnStreaming(t *testing.T) {
 			}
 			var r respG
 			if err := json.Unmarshal([]byte(data), &r); err != nil {
-				t.Fatalf("pedaço inválido: %s", data)
+				t.Fatalf("invalid chunk: %s", data)
 			}
 			usage = usage || strings.Contains(data, `"totalTokenCount":42`)
 			for _, c := range r.Candidates {
@@ -262,7 +262,7 @@ func TestGeminiReturnStreaming(t *testing.T) {
 		}
 		resp.Body.Close()
 		if text.String() != userText || end != "STOP" || !usage {
-			t.Errorf("pedaços de %d: fim=%q uso=%v\n%q\n%q", n, end, usage, userText, text.String())
+			t.Errorf("chunks of %d: end=%q usage=%v\n%q\n%q", n, end, usage, userText, text.String())
 		}
 	}
 }
@@ -294,11 +294,11 @@ func TestGeminiFrozenHistory(t *testing.T) {
 	}
 	for i := range a {
 		if !bytes.Equal(a[i], b[i]) {
-			t.Errorf("a mensagem %d mudou no reenvio:\n%s\n%s", i, a[i], b[i])
+			t.Errorf("message %d changed on the resend:\n%s\n%s", i, a[i], b[i])
 		}
 	}
 	if bytes.Contains(b[4], []byte(host)) || bytes.Contains(b[4], []byte(weakTest)) {
-		t.Errorf("a mensagem nova vazou: %s", b[4])
+		t.Errorf("the new message leaked: %s", b[4])
 	}
 }
 
@@ -321,7 +321,7 @@ func TestGeminiFileWithoutCheck(t *testing.T) {
 	}
 	body := (*requests)[0].body
 	if bytes.Contains(body, []byte(minimalPNG)) || bytes.Contains(body, []byte(audio)) || bytes.Contains(body, []byte("inlineData")) {
-		t.Fatalf("arquivo sem verificação saiu: %s", body)
+		t.Fatalf("unchecked file went out: %s", body)
 	}
 	var v struct {
 		Contents []struct {
@@ -334,10 +334,10 @@ func TestGeminiFileWithoutCheck(t *testing.T) {
 		t.Fatalf("partes: %v", ps)
 	}
 	if s, _ := ps[1]["text"].(string); !strings.Contains(s, "An image was removed") {
-		t.Errorf("aviso da imagem: %v", ps[1])
+		t.Errorf("image notice: %v", ps[1])
 	}
 	if s, _ := ps[2]["text"].(string); !strings.Contains(s, "can only check images and PDFs") {
-		t.Errorf("aviso do áudio: %v", ps[2])
+		t.Errorf("audio notice: %v", ps[2])
 	}
 }
 
@@ -345,7 +345,7 @@ func TestGeminiFileWithoutCheck(t *testing.T) {
 // the address (?key=...), does not go to the log when the API does not answer.
 func TestGeminiErrorInLogWithoutKey(t *testing.T) {
 	if s := errorSummary([]byte(`{"error":{"code":429,"message":"Quota exceeded for metric","status":"RESOURCE_EXHAUSTED"}}`)); s != " | API: RESOURCE_EXHAUSTED: Quota exceeded for metric" {
-		t.Errorf("erro do Gemini: %q", s)
+		t.Errorf("Gemini error: %q", s)
 	}
 	cfg := config.Default()
 	m, _ := mask.NewMasker(cfg, testKey, nil, nil)
@@ -360,7 +360,7 @@ func TestGeminiErrorInLogWithoutKey(t *testing.T) {
 	b, _ := io.ReadAll(resp.Body)
 	resp.Body.Close()
 	if resp.StatusCode != http.StatusBadGateway || strings.Contains(lg.String(), "CHAVE-SECRETA") || bytes.Contains(b, []byte("CHAVE-SECRETA")) {
-		t.Errorf("status %d; a chave apareceu no log ou na resposta:\n%s\n%s", resp.StatusCode, lg.String(), b)
+		t.Errorf("status %d; the key showed up in the log or in the response:\n%s\n%s", resp.StatusCode, lg.String(), b)
 	}
 }
 
@@ -400,6 +400,6 @@ func TestGeminiLast(t *testing.T) {
 		t.Errorf("status %d, corpo %.120s", st, b)
 	}
 	if bytes.Contains(b, []byte("joao.silva@")) || !bytes.Contains(b, []byte(".invalid")) {
-		t.Errorf("a última conversa devia estar mascarada: %.160s", b)
+		t.Errorf("the last conversation should be masked: %.160s", b)
 	}
 }

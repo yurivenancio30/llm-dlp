@@ -16,10 +16,10 @@ func TestOldCommandNames(t *testing.T) {
 	help := helpText()
 	for stale, newOne := range oldNames {
 		if !strings.Contains(help, "llm-dlp "+newOne) && !strings.Contains(help, newOne+",") && !strings.HasSuffix(strings.TrimSpace(help), newOne) {
-			t.Errorf("%s -> %s: o nome novo não está na ajuda", stale, newOne)
+			t.Errorf("%s -> %s: the new name is not in the help", stale, newOne)
 		}
 		if strings.Contains(help, "llm-dlp "+stale+" ") || strings.Contains(help, "llm-dlp "+stale+"\n") {
-			t.Errorf("a ajuda ainda mostra o nome antigo %q", stale)
+			t.Errorf("the help still shows the old name %q", stale)
 		}
 	}
 }
@@ -57,27 +57,27 @@ func TestHooksNewAndOldNames(t *testing.T) {
 	}
 	h := readHooks(t, target)
 	if strings.Contains(h, " garantir") || strings.Contains(h, " verificar") {
-		t.Errorf("install deixou hooks antigos: %s", h)
+		t.Errorf("install left old hooks: %s", h)
 	}
 	if strings.Count(h, bin+" ensure") != 1 || strings.Count(h, bin+" check") != 1 || !strings.Contains(h, "outro-programa") {
-		t.Errorf("install: esperava ensure e check uma vez cada, e o hook do outro programa: %s", h)
+		t.Errorf("install: expected ensure and check once each, and the other program's hook: %s", h)
 	}
 	if _, err := applyClaude(home, bin, cfg); err != nil {
 		t.Fatal(err)
 	}
 	if h2 := readHooks(t, target); strings.Count(h2, bin+" ensure") != 1 {
-		t.Errorf("install de novo duplicou: %s", h2)
+		t.Errorf("install again duplicated: %s", h2)
 	}
 
 	if changed, err := hooksForVersion(home, bin, "0.8.0"); err != nil || !changed {
-		t.Fatalf("voltar para a 0.8.0: mudou=%v err=%v", changed, err)
+		t.Fatalf("going back to 0.8.0: changed=%v err=%v", changed, err)
 	}
 	h = readHooks(t, target)
 	if !strings.Contains(h, bin+" garantir") || !strings.Contains(h, bin+" verificar") || strings.Contains(h, " ensure") {
-		t.Errorf("voltar para a 0.8.0 devia pôr os nomes antigos: %s", h)
+		t.Errorf("going back to 0.8.0 should put the old names: %s", h)
 	}
 	if changed, _ := hooksForVersion(home, bin, "0.8.0"); changed {
-		t.Errorf("já estava com os nomes da 0.8.0: não devia mexer")
+		t.Errorf("it already had the 0.8.0 names: it should not touch them")
 	}
 
 	if err := uninstall(nil); err != nil {
@@ -85,6 +85,6 @@ func TestHooksNewAndOldNames(t *testing.T) {
 	}
 	h = readHooks(t, target)
 	if strings.Contains(h, "llm-dlp") || !strings.Contains(h, "outro-programa") {
-		t.Errorf("uninstall: devia tirar só os do llm-dlp: %s", h)
+		t.Errorf("uninstall: should remove only llm-dlp's: %s", h)
 	}
 }

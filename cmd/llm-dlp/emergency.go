@@ -41,8 +41,8 @@ const defaultEmergencyDuration = 30 * time.Minute
 
 // emergencyState: the deadline, also under "ate", the name versions up to 0.9 read.
 type emergencyState struct {
-	Until time.Time `json:"until"`
-	Ate   time.Time `json:"ate"`
+	Until    time.Time `json:"until"`
+	OldUntil time.Time `json:"ate"`
 }
 
 // emergencyFiles: the state file and the one with the name up to 0.9. Emergency is written to both
@@ -63,7 +63,7 @@ func emergencyActive() (time.Time, bool) {
 		}
 		until := e.Until
 		if until.IsZero() {
-			until = e.Ate
+			until = e.OldUntil
 		}
 		if time.Now().Before(until) {
 			return until, true
@@ -110,7 +110,7 @@ Type UNLOCK to continue: `, dur)
 		return err
 	}
 	until := time.Now().Add(dur)
-	b, _ := json.Marshal(emergencyState{Until: until, Ate: until})
+	b, _ := json.Marshal(emergencyState{Until: until, OldUntil: until})
 	for _, f := range emergencyFiles() {
 		if err := os.WriteFile(f, b, 0o644); err != nil {
 			return err

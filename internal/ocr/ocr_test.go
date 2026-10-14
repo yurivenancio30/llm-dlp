@@ -32,7 +32,7 @@ func TestImageDeclaringHugeSize(t *testing.T) {
 	for _, d := range [][2]uint32{{60000, 60000}, {sideMax + 1, 10}, {10, sideMax + 1}, {12000, 12000}} {
 		_, _, err := o.Read(pngDeclaring(t, d[0], d[1]))
 		if err == nil || !strings.Contains(err.Error(), "grande demais") {
-			t.Errorf("%d x %d: devia recusar pelo tamanho, veio: %v", d[0], d[1], err)
+			t.Errorf("%d x %d: should refuse by size, got: %v", d[0], d[1], err)
 		}
 	}
 	// the normal-size one passes the header and only fails at tesseract (which does not exist here)
@@ -46,14 +46,14 @@ func TestImageDeclaringHugeSize(t *testing.T) {
 func TestLimitedOutput(t *testing.T) {
 	s := &limited{max: 10}
 	if _, err := s.Write([]byte("12345678")); err != nil || s.overflowed {
-		t.Fatal("dentro do teto não devia falhar")
+		t.Fatal("within the ceiling it should not fail")
 	}
 	if _, err := s.Write([]byte("12345678")); err == nil || !s.overflowed {
-		t.Error("passou do teto e não falhou")
+		t.Error("passed the ceiling and did not fail")
 	}
 	e := &limited{max: 10, discards: true}
 	e.Write([]byte("12345678"))
 	if n, err := e.Write([]byte("12345678")); err != nil || n != 8 || e.b.Len() != 8 {
-		t.Errorf("o erro do programa devia ser cortado sem falhar: n=%d err=%v guardado=%d", n, err, e.b.Len())
+		t.Errorf("the program's error should be cut without failing: n=%d err=%v kept=%d", n, err, e.b.Len())
 	}
 }

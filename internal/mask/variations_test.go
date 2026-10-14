@@ -243,13 +243,13 @@ func variations(c varCase) []varText {
 		}
 	}
 	for _, e := range c.spc {
-		add(fmt.Sprintf("espaço %q", e), build(c, 0, e, "", "", 1, "", false))
+		add(fmt.Sprintf("space %q", e), build(c, 0, e, "", "", 1, "", false))
 	}
 	for _, q := range c.quoted {
 		add("citação "+q, build(c, 0, " ", q, "", 1, "", false))
 	}
 	for _, cm := range c.with {
-		add(fmt.Sprintf("comentário %q", cm), build(c, 0, " ", "", cm, 1, "", false))
+		add(fmt.Sprintf("comment %q", cm), build(c, 0, " ", "", cm, 1, "", false))
 	}
 	if c.punct {
 		for _, p := range []string{".", ",", ";", ")", ":"} {
@@ -262,7 +262,7 @@ func variations(c varCase) []varText {
 		for n := 2; n <= 4; n++ {
 			add(fmt.Sprintf("%d partes", n), build(c, 0, " ", "", "", n, "", false))
 			if len(c.quoted) > 0 {
-				add(fmt.Sprintf("%d partes citadas %s", n, c.quoted[0]), build(c, 0, " ", c.quoted[0], "", n, "", false))
+				add(fmt.Sprintf("%d parts quoted %s", n, c.quoted[0]), build(c, 0, " ", c.quoted[0], "", n, "", false))
 			}
 		}
 	}
@@ -315,11 +315,11 @@ func TestReaderVariations(t *testing.T) {
 			}
 			if len(clearOnes)+len(surplus) > 0 {
 				failures++
-				t.Errorf("%s\n   texto: %q\n   saída: %q\n   em claro: %v  mascarado a mais: %v", v.lbl, v.text, out, clearOnes, surplus)
+				t.Errorf("%s\n   text:   %q\n   output: %q\n   in plain text: %v  masked too much: %v", v.lbl, v.text, out, clearOnes, surplus)
 			}
 		}
 	}
-	t.Logf("%d variações, %d falhas", total, failures)
+	t.Logf("%d variations, %d failures", total, failures)
 }
 
 // Portuguese prose with SQL snippets between backticks (and loose uppercase keywords): the table
@@ -350,12 +350,12 @@ func TestProseWithSQLInBackticks(t *testing.T) {
 		out, _ := m.Mask(c.text)
 		for _, n := range c.gone {
 			if readable(out, n) {
-				t.Errorf("%q ficou legível:\n%s", n, out)
+				t.Errorf("%q stayed readable:\n%s", n, out)
 			}
 		}
 		for _, w := range c.stays {
 			if !strings.Contains(out, w) {
-				t.Errorf("%q foi mascarada (prosa):\n%s", w, out)
+				t.Errorf("%q was masked (prose):\n%s", w, out)
 			}
 		}
 	}

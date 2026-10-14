@@ -32,7 +32,7 @@ func TestLastMessages(t *testing.T) {
 	}
 	for _, c := range cases {
 		if came := lastMessages([]byte(c.body)); !reflect.DeepEqual(came, c.wants) {
-			t.Errorf("%s:\n veio %q\n quer %q", c.name, came, c.wants)
+			t.Errorf("%s:\n got  %q\n want %q", c.name, came, c.wants)
 		}
 	}
 }
@@ -42,7 +42,7 @@ func TestLastMessages(t *testing.T) {
 func TestLastMessagesSignatures(t *testing.T) {
 	codeAssist := `{"model":"m","project":"p","request":{"contents":[{"role":"user","parts":[{"text":"oi"}]}]}}`
 	if came, wants := lastMessages([]byte(codeAssist)), []seenMessage{{"user", []string{"oi"}}}; !reflect.DeepEqual(came, wants) {
-		t.Errorf("code assist: veio %q", came)
+		t.Errorf("code assist: got %q", came)
 	}
 	responses := `{"instructions":"seja breve","input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"oi"}]},
 		{"type":"function_call","name":"shell","arguments":"{\"command\":[\"ls\"]}","call_id":"c1"},
@@ -53,6 +53,6 @@ func TestLastMessagesSignatures(t *testing.T) {
 		{"assistant", []string{`[tool shell] {"command":["ls"]}`}}, {"user", []string{"[tool result]\na.txt"}},
 		{"assistant", []string{"[tool apply_patch] *** Begin Patch"}}}
 	if came := lastMessages([]byte(responses)); !reflect.DeepEqual(came, wants) {
-		t.Errorf("responses:\n veio %q\n quer %q", came, wants)
+		t.Errorf("responses:\n got  %q\n want %q", came, wants)
 	}
 }

@@ -38,12 +38,12 @@ func TestSQLEmbeddedInCode(t *testing.T) {
 		out, _ := m.Mask(c.src)
 		for _, n := range []string{"tb_pedido_hx", "sch_vendas_hx", "col_valor_hx"} {
 			if reTok(n).MatchString(out) {
-				t.Errorf("%s: %s (do SQL) em claro:\n%s", c.name, n, out)
+				t.Errorf("%s: %s (from the SQL) in plain text:\n%s", c.name, n, out)
 			}
 		}
 		for _, p := range []string{"urn", "payload"} {
 			if len(reTok(p).FindAllString(out, -1)) < len(reTok(p).FindAllString(c.src, -1)) {
-				t.Errorf("%s: %s (do código depois da string) lido como nome:\n%s", c.name, p, out)
+				t.Errorf("%s: %s (from the code after the string) read as a name:\n%s", c.name, p, out)
 			}
 		}
 	}
@@ -56,7 +56,7 @@ func TestSQLAfterClosedString(t *testing.T) {
 	out, _ := m.Mask("x = \"abc\"\nSELECT col_valor_hx FROM sch_vendas_hx.tb_pedido_hx\nWHERE col_data_hx > 1\n")
 	for _, n := range []string{"tb_pedido_hx", "col_data_hx"} {
 		if strings.Contains(out, n) {
-			t.Errorf("%s em claro: o SQL depois de uma string fechada deixou de ser lido:\n%s", n, out)
+			t.Errorf("%s in plain text: the SQL after a closed string stopped being read:\n%s", n, out)
 		}
 	}
 }
@@ -84,12 +84,12 @@ func TestFormatsEmbeddedInCode(t *testing.T) {
 		out, _ := m.Mask(c.src)
 		for _, n := range reHx.FindAllString(c.src, -1) {
 			if reTok(n).MatchString(out) {
-				t.Errorf("%s: %s em claro:\n%s", c.name, n, out)
+				t.Errorf("%s: %s in plain text:\n%s", c.name, n, out)
 			}
 		}
 		for _, p := range []string{"urn", "payload"} {
 			if len(reTok(p).FindAllString(out, -1)) < len(reTok(p).FindAllString(c.src, -1)) {
-				t.Errorf("%s: %s (do código depois da string) lido como nome:\n%s", c.name, p, out)
+				t.Errorf("%s: %s (from the code after the string) read as a name:\n%s", c.name, p, out)
 			}
 		}
 	}

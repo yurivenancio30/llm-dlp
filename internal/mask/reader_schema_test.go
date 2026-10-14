@@ -68,7 +68,7 @@ func TestSchemaNegatives(t *testing.T) {
 		"Rodei: string\nde novo: hoje\n",
 	} {
 		if out, _ := m.Mask(s); out != s {
-			t.Errorf("não é esquema: %q -> %q", s, out)
+			t.Errorf("not a schema: %q -> %q", s, out)
 		}
 	}
 }

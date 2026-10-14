@@ -119,32 +119,32 @@ func TestImageWithoutOCRDoesNotBlockConversation(t *testing.T) {
 	body := conversationWithFile(imageBlock(minimalPNG))
 	for i := 0; i < 2; i++ {
 		if st := post(t, px, body); st != 200 {
-			t.Fatalf("requisição %d recusada: status %d", i, st)
+			t.Fatalf("request %d refused: status %d", i, st)
 		}
 	}
 	if len(*bodies) != 2 {
-		t.Fatalf("a API devia receber as 2 requisições, recebeu %d", len(*bodies))
+		t.Fatalf("the API should get the 2 requests, it got %d", len(*bodies))
 	}
 	for _, c := range *bodies {
 		if bytes.Contains(c, []byte(minimalPNG)) || bytes.Contains(c, []byte(`"image"`)) {
-			t.Fatalf("a imagem sem verificação saiu: %s", c)
+			t.Fatalf("the unchecked image went out: %s", c)
 		}
 	}
 	blocks := whatWentOut(t, (*bodies)[0])
 	if len(blocks) != 1 || blocks[0]["type"] != "text" || blocks[0]["cache_control"] == nil {
-		t.Fatalf("devia sair um bloco de texto, com o marcador de cache da imagem: %v", blocks)
+		t.Fatalf("a text block should go out, with the image's cache marker: %v", blocks)
 	}
 	warning, _ := blocks[0]["text"].(string)
 	for _, part := range []string{"[llm-dlp] An image was removed", "OCR is not installed", "tesseract"} {
 		if !strings.Contains(warning, part) {
-			t.Errorf("o aviso devia ter %q: %s", part, warning)
+			t.Errorf("the notice should have %q: %s", part, warning)
 		}
 	}
 	if !bytes.Equal((*bodies)[0], (*bodies)[1]) {
-		t.Error("o reenvio devia sair igual (cache da API)")
+		t.Error("the resend should go out the same (API cache)")
 	}
 	if n := strings.Count(lg.String(), "WARNING"); n != 1 {
-		t.Errorf("o motivo devia ir uma vez para o log, foi %d:\n%s", n, lg.String())
+		t.Errorf("the reason should go to the log once, it went %d:\n%s", n, lg.String())
 	}
 }
 
@@ -154,17 +154,17 @@ func TestUnreadableImageIsRemoved(t *testing.T) {
 	px, bodies, lg := buildMedia(t, func(c *config.Config) {})
 	junk := base64.StdEncoding.EncodeToString([]byte("isto não é uma imagem"))
 	if st := post(t, px, conversationWithFile(imageBlock(junk))); st != 200 {
-		t.Fatalf("recusada: status %d", st)
+		t.Fatalf("refused: status %d", st)
 	}
 	warning, _ := whatWentOut(t, (*bodies)[0])[0]["text"].(string)
 	if !strings.Contains(warning, "reading the file failed") || strings.Contains(warning, "is not installed") || strings.Contains(warning, "unreadable") {
-		t.Errorf("aviso: %s", warning)
+		t.Errorf("notice: %s", warning)
 	}
 	if bytes.Contains((*bodies)[0], []byte(junk)) {
-		t.Error("o arquivo ilegível saiu")
+		t.Error("the unreadable file went out")
 	}
 	if !strings.Contains(lg.String(), "unreadable image") {
-		t.Errorf("o detalhe devia estar no log: %s", lg.String())
+		t.Errorf("the detail should be in the log: %s", lg.String())
 	}
 }
 
@@ -173,14 +173,14 @@ func TestMediaBlockedByConfig(t *testing.T) {
 	px, bodies, _ := buildMedia(t, func(c *config.Config) { c.OCR.Mode = "block" })
 	pdf := map[string]any{"type": "document", "source": map[string]any{"type": "base64", "media_type": "application/pdf", "data": minimalPNG}}
 	if st := post(t, px, conversationWithFile(pdf)); st != 200 {
-		t.Fatalf("recusada: status %d", st)
+		t.Fatalf("refused: status %d", st)
 	}
 	warning, _ := whatWentOut(t, (*bodies)[0])[0]["text"].(string)
 	if !strings.Contains(warning, "[llm-dlp] A PDF was removed") || !strings.Contains(warning, "ocr.mode = block") {
-		t.Errorf("aviso: %s", warning)
+		t.Errorf("notice: %s", warning)
 	}
 	if bytes.Contains((*bodies)[0], []byte(minimalPNG)) {
-		t.Error("o PDF bloqueado saiu")
+		t.Error("the blocked PDF went out")
 	}
 }
 
@@ -208,7 +208,7 @@ func TestAPIErrorInLog(t *testing.T) {
 	b, _ := io.ReadAll(resp.Body)
 	resp.Body.Close()
 	if resp.StatusCode != 429 || !bytes.Contains(b, []byte("rate_limit_error")) {
-		t.Fatalf("o erro devia chegar ao cliente como veio: %d %s", resp.StatusCode, b)
+		t.Fatalf("the error should reach the client as it came: %d %s", resp.StatusCode, b)
 	}
 	if !strings.Contains(lg.String(), "-> 429") || !strings.Contains(lg.String(), "| API: rate_limit_error: This request would exceed your limit") {
 		t.Errorf("log: %s", lg.String())

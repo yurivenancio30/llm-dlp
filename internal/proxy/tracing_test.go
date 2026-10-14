@@ -124,16 +124,16 @@ func TestTracingRoundTrip(t *testing.T) {
 		o, _ := json.Marshal(hist)
 		for _, s := range secrets {
 			if rtTok(api, s) > 0 {
-				t.Errorf("%s: %s foi em claro para a API", lbl, s)
+				t.Errorf("%s: %s went in clear to the API", lbl, s)
 			}
 		}
 		for _, p := range publicSet {
 			if rtTok(string(o), p) > rtTok(api, p) {
-				t.Errorf("%s: público %s trocado", lbl, p)
+				t.Errorf("%s: public %s replaced", lbl, p)
 			}
 		}
 		if n := len(rePsRT.FindAllString(txt, -1)); n > 0 {
-			t.Errorf("%s: %d código(s) chegaram ao cliente: %s", lbl, n, txt)
+			t.Errorf("%s: %d code(s) reached the client: %s", lbl, n, txt)
 		}
 		return txt
 	}
@@ -196,7 +196,7 @@ func TestTracingFormats(t *testing.T) {
 		}
 		for _, c := range allOf {
 			if rtTok(string(b), c) > 0 {
-				t.Errorf("mensagem %d: coluna %s em claro", i, c)
+				t.Errorf("message %d: column %s in clear", i, c)
 			}
 		}
 	}
@@ -217,7 +217,7 @@ func TestTracingDeductionSameSource(t *testing.T) {
 	b, _ := json.Marshal(api.Messages[len(api.Messages)-1])
 	for _, p := range []string{"apache-airflow", "flask-appbuilder", "marshmallow-sqlalchemy", "sqlalchemy-utils"} {
 		if rtTok(string(b), p) == 0 {
-			t.Errorf("pacote %s virou nome do cliente por dedução de outra fonte: %s", p, b)
+			t.Errorf("package %s became a client name by deduction from another source: %s", p, b)
 		}
 	}
 }
@@ -237,12 +237,12 @@ func TestTracingAssistantSQL(t *testing.T) {
 	api := string(bodies[0])
 	for _, p := range []string{"OBJECT_DEPENDENCIES", "REFERENCED_DATABASE", "REFERENCED_OBJECT_NAME", "REFERENCING_DATABASE", "REFERENCING_SCHEMA", "REFERENCING_OBJECT_NAME", "TAG_REFERENCES", "TAG_NAME", "TAG_VALUE", "OBJECT_DATABASE", "OBJECT_NAME", "NIVEL", "deps"} {
 		if rtTok(sqlLine, p) > rtTok(api, p) {
-			t.Errorf("público %s trocado no SQL do modelo", p)
+			t.Errorf("public %s replaced in the model's SQL", p)
 		}
 	}
 	for _, s := range []string{"DW_COMERCIAL_PRD", "MART_VENDAS", "VW_FATURAMENTO_DIA"} {
 		if rtTok(api, s) > 0 {
-			t.Errorf("%s foi em claro para a API", s)
+			t.Errorf("%s went in clear to the API", s)
 		}
 	}
 }
@@ -259,12 +259,12 @@ func TestTracingSystemCatalog(t *testing.T) {
 	api := string(bodies[0])
 	for _, p := range []string{"TAG_NAME", "TAG_VALUE", "APPLY_METHOD", "OBJECT_DATABASE"} {
 		if rtTok(api, p) == 0 {
-			t.Errorf("coluna pública %s (catálogo de sistema) foi mascarada", p)
+			t.Errorf("public column %s (system catalog) was masked", p)
 		}
 	}
 	for _, s := range []string{"NUM_CNPJ_MATRIZ", "DES_RAZAO_SOC", "DTA_ABERTURA"} {
 		if rtTok(api, s) > 0 {
-			t.Errorf("coluna do cliente %s foi em claro", s)
+			t.Errorf("client column %s went in clear", s)
 		}
 	}
 }
@@ -284,16 +284,16 @@ func TestTracingMixedSystemCatalog(t *testing.T) {
 		api := string(bodies[0])
 		for _, s := range []string{"comercial_sul_x", "clientes_vip_x", "comercial_norte_x", "metas_regionais_x"} {
 			if rtTok(api, s) > 0 {
-				t.Errorf("%s (do cliente) foi em claro com um DESC de sistema no mesmo comando", s)
+				t.Errorf("%s (from the client) went in clear with a system DESC in the same command", s)
 			}
 		}
 	}
 	if !mask.SystemTarget(`snow sql -q "DESC VIEW SNOWFLAKE.ACCOUNT_USAGE.TAG_REFERENCES; DESC VIEW SNOWFLAKE.ACCOUNT_USAGE.OBJECT_DEPENDENCIES"`) {
-		t.Error("só DESC de sistema devia continuar sendo de sistema")
+		t.Error("only a system DESC should still be system")
 	}
 	for _, c := range []string{`snow sql -q "DESC VIEW SNOWFLAKE.ACCOUNT_USAGE.TABLES; SHOW TABLES"`, `snow sql -q "DESC TABLE SNOWFLAKE.ACCOUNT_USAGE.TABLES; DESC TABLE DW_PRD.MART.TB_X"`} {
 		if mask.SystemTarget(c) {
-			t.Errorf("comando com instrução do cliente tratado como sistema: %s", c)
+			t.Errorf("command with a client statement treated as system: %s", c)
 		}
 	}
 }

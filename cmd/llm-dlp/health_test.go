@@ -42,7 +42,7 @@ func TestHealthRequiresProof(t *testing.T) {
 	})
 	cfg := onPort(t, impostor)
 	if info, ok := health(cfg); ok || !info.WithoutProof {
-		t.Fatalf("o impostor passou: ok=%v semProva=%v", ok, info.WithoutProof)
+		t.Fatalf("the impostor got through: ok=%v noProof=%v", ok, info.WithoutProof)
 	}
 
 	// the real llm-dlp, with the key of the same folder, passes
@@ -58,19 +58,19 @@ func TestHealthRequiresProof(t *testing.T) {
 	}
 	h = proxy.New(cfg, m, nil, log.New(io.Discard, "", 0)).WithKey(key)
 	if info, ok := health(cfg); !ok || info.WithoutProof {
-		t.Fatalf("o llm-dlp com a chave certa não passou: ok=%v semProva=%v", ok, info.WithoutProof)
+		t.Fatalf("llm-dlp with the right key did not pass: ok=%v withoutProof=%v", ok, info.WithoutProof)
 	}
 
 	// the same llm-dlp with another key (another user's) does not pass
 	h = proxy.New(cfg, m, nil, log.New(io.Discard, "", 0)).WithKey([]byte("a chave de outro usuario........"))
 	if info, ok := health(cfg); ok || !info.WithoutProof {
-		t.Fatalf("passou com a chave de outro: ok=%v", ok)
+		t.Fatalf("passed with someone else's key: ok=%v", ok)
 	}
 
 	// earlier version, which does not know how to prove
 	h = proxy.New(cfg, m, nil, log.New(io.Discard, "", 0))
 	if info, ok := health(cfg); ok || !info.WithoutProof {
-		t.Fatalf("passou sem prova: ok=%v", ok)
+		t.Fatalf("passed without proof: ok=%v", ok)
 	}
 }
 
@@ -83,14 +83,23 @@ func TestHealthEmergencyOnlyWithFile(t *testing.T) {
 		json.NewEncoder(w).Encode(map[string]any{"ok": true, "servico": "llm-dlp", "modo": "emergencia"})
 	}))
 	if info, ok := health(cfg); ok || !info.WithoutProof {
-		t.Fatalf("emergência sem o arquivo do administrador passou: ok=%v", ok)
+		t.Fatalf("emergency without the administrator's file passed: ok=%v", ok)
 	}
-	b, _ := json.Marshal(emergencyState{Until: time.Now().Add(time.Hour)})
-	if err := os.WriteFile(filepath.Join(emergencyDir, "emergencia.json"), b, 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if _, ok := health(cfg); !ok {
-		t.Fatal("emergência ligada pelo administrador devia passar")
+	// the current file, and the one versions up to 0.9 wrote (other name, deadline under "ate")
+	until := time.Now().Add(time.Hour)
+	for _, f := range []struct {
+		name  string
+		state emergencyState
+	}{{"emergency.json", emergencyState{Until: until}}, {"emergencia.json", emergencyState{OldUntil: until}}} {
+		b, _ := json.Marshal(f.state)
+		p := filepath.Join(emergencyDir, f.name)
+		if err := os.WriteFile(p, b, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if _, ok := health(cfg); !ok {
+			t.Fatalf("%s: emergency turned on by the administrator should pass", f.name)
+		}
+		os.Remove(p)
 	}
 }
 
@@ -99,7 +108,7 @@ func TestHealthEmergencyOnlyWithFile(t *testing.T) {
 func TestReducedProtection(t *testing.T) {
 	t.Setenv("LLM_DLP_HOME", "")
 	if a := reducedProtection(config.Default()); len(a) != 0 {
-		t.Fatalf("a configuração padrão não devia avisar: %v", a)
+		t.Fatalf("the default configuration should not warn: %v", a)
 	}
 	cases := map[string]func(*config.Config){
 		"atacante.example":     func(c *config.Config) { c.Upstream = "https://atacante.example/v1" },
@@ -117,11 +126,11 @@ func TestReducedProtection(t *testing.T) {
 		f(&c)
 		a := reducedProtection(c)
 		if len(a) != 1 || !strings.Contains(a[0], part) {
-			t.Errorf("esperava um aviso com %q, veio %v", part, a)
+			t.Errorf("expected a warning with %q, got %v", part, a)
 		}
 	}
 	t.Setenv("LLM_DLP_HOME", "/tmp/outra-pasta")
 	if a := reducedProtection(config.Default()); len(a) != 1 || !strings.Contains(a[0], "LLM_DLP_HOME") {
-		t.Errorf("LLM_DLP_HOME devia avisar: %v", a)
+		t.Errorf("LLM_DLP_HOME should warn: %v", a)
 	}
 }

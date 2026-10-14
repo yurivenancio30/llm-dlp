@@ -41,7 +41,7 @@ func buildSignatures(t *testing.T, resp func(p assistRequest, w http.ResponseWri
 		resp(p, w)
 	}))
 	anthropic := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		t.Errorf("a requisição foi para o upstream da Anthropic: %s", r.URL.Path)
+		t.Errorf("the request went to the Anthropic upstream: %s", r.URL.Path)
 	}))
 	cfg.Upstream = anthropic.URL
 	cfg.Providers = map[string]config.Provider{"codeassist": {Upstream: up.URL, Format: "codeassist"},
@@ -100,10 +100,10 @@ func TestCodeAssistRoundTrip(t *testing.T) {
 	}
 	pd := (*requests)[0]
 	if pd.path != "/v1internal:streamGenerateContent?alt=sse" || pd.auth != "Bearer token-google" {
-		t.Errorf("chegou em %q com %q", pd.path, pd.auth)
+		t.Errorf("arrived at %q with %q", pd.path, pd.auth)
 	}
 	if bytes.Contains(pd.body, []byte(oaEmail)) || bytes.Contains(pd.body, []byte(oaIP)) {
-		t.Errorf("valor real chegou à API: %s", pd.body)
+		t.Errorf("real value reached the API: %s", pd.body)
 	}
 	var env struct {
 		Model, Project string
@@ -114,7 +114,7 @@ func TestCodeAssistRoundTrip(t *testing.T) {
 	}
 	json.Unmarshal(pd.body, &env)
 	if env.Model != "gemini-2.5-pro" || env.Project != "projeto-123" || env.UserPromptID != "upi-1" || env.Request.SessionID != "8f14e45f-ceea-467a-9ad7-0b5d1a2c3e4f" {
-		t.Errorf("o envelope mudou: %+v", env)
+		t.Errorf("the envelope changed: %+v", env)
 	}
 	var text strings.Builder
 	for _, l := range strings.Split(string(b), "\n") {
@@ -141,7 +141,7 @@ func TestCodeAssistRoundTrip(t *testing.T) {
 
 	_, b = ask(t, "POST", px.URL+"/codeassist/v1internal:generateContent", codeAssistReq(), nil)
 	if !bytes.Contains(b, []byte(`"avise `+oaEmail+`"`)) || !bytes.Contains(b, []byte(`"content":"`+oaEmail+`"`)) || !bytes.Contains(b, []byte(`"traceId":"tr-2"`)) {
-		t.Errorf("sem streaming: %s", b)
+		t.Errorf("without streaming: %s", b)
 	}
 }
 
@@ -158,7 +158,7 @@ func TestCodeAssistAccountMethodsPassAsIs(t *testing.T) {
 			t.Fatalf("%s: status %d", method, st)
 		}
 		if got := (*requests)[len(*requests)-1].body; !bytes.Equal(got, body) {
-			t.Errorf("%s: o corpo mudou:\n %s\n %s", method, body, got)
+			t.Errorf("%s: the body changed:\n %s\n %s", method, body, got)
 		}
 	}
 }
@@ -200,10 +200,10 @@ func TestResponsesMaskedOutbound(t *testing.T) {
 	}
 	pd := (*requests)[0]
 	if pd.path != "/backend-api/codex/responses" || pd.auth != "Bearer token-chatgpt" {
-		t.Errorf("chegou em %q com %q", pd.path, pd.auth)
+		t.Errorf("arrived at %q with %q", pd.path, pd.auth)
 	}
 	if bytes.Contains(pd.body, []byte(oaEmail)) || bytes.Contains(pd.body, []byte(oaIP)) {
-		t.Fatalf("valor real chegou à API: %s", pd.body)
+		t.Fatalf("real value reached the API: %s", pd.body)
 	}
 	var req struct {
 		Model, Instructions string
@@ -215,34 +215,34 @@ func TestResponsesMaskedOutbound(t *testing.T) {
 		t.Fatal(err)
 	}
 	if req.Model != "gpt-5-codex" || req.PromptCacheKey != "0f3c2b1a-9e8d-4c7b-a6f5-e4d3c2b1a090" || len(req.Input) != 9 || len(req.Tools) != 2 {
-		t.Fatalf("a forma mudou: %s", pd.body)
+		t.Fatalf("the shape changed: %s", pd.body)
 	}
 	if !rePseEmail.MatchString(req.Instructions) {
-		t.Errorf("instruções: %q", req.Instructions)
+		t.Errorf("instructions: %q", req.Instructions)
 	}
 	if f, _ := req.Tools[1]["format"].(map[string]any); f["definition"] != patchGrammar || req.Tools[1]["name"] != "apply_patch" {
-		t.Errorf("a gramática do apply_patch mudou: %v", req.Tools[1])
+		t.Errorf("the apply_patch grammar changed: %v", req.Tools[1])
 	}
 	if req.Input[2]["encrypted_content"] != "gAAAAB-opaco" {
-		t.Errorf("o raciocínio mudou: %v", req.Input[2])
+		t.Errorf("the reasoning changed: %v", req.Input[2])
 	}
 	var args struct{ Command []string }
 	if err := json.Unmarshal([]byte(req.Input[3]["arguments"].(string)), &args); err != nil || len(args.Command) != 3 || !strings.HasPrefix(args.Command[2], "ping ") {
-		t.Errorf("argumentos mascarados deviam continuar um JSON: %v", req.Input[3]["arguments"])
+		t.Errorf("masked arguments should still be JSON: %v", req.Input[3]["arguments"])
 	}
 	if req.Input[5]["arguments"] != `{ "command" : ["date"] }` {
-		t.Errorf("argumentos sem dado sensível mudaram: %v", req.Input[5]["arguments"])
+		t.Errorf("arguments without sensitive data changed: %v", req.Input[5]["arguments"])
 	}
 	if in, _ := req.Input[7]["input"].(string); !strings.HasPrefix(in, "*** Begin Patch\n+host = ") || strings.Contains(in, oaIP) {
 		t.Errorf("patch: %q", in)
 	}
 	if out, _ := req.Input[4]["output"].(string); !strings.HasPrefix(out, "PING ") {
-		t.Errorf("resultado: %v", req.Input[4]["output"])
+		t.Errorf("result: %v", req.Input[4]["output"])
 	}
 	// the same request again goes out identical (the API cache depends on it)
 	ask(t, "POST", px.URL+"/chatgpt/responses", responsesReq(false), nil)
 	if n := len(*requests); !bytes.Equal((*requests)[0].body, (*requests)[n-1].body) {
-		t.Errorf("a mesma requisição saiu diferente na segunda vez")
+		t.Errorf("the same request went out differently the second time")
 	}
 }
 
@@ -307,10 +307,10 @@ func TestResponsesReturnStreaming(t *testing.T) {
 		}
 		var ev map[string]any
 		if err := json.Unmarshal([]byte(data), &ev); err != nil {
-			t.Fatalf("evento inválido: %q", block)
+			t.Fatalf("invalid event: %q", block)
 		}
 		if name != ev["type"] {
-			t.Errorf("o nome do evento (%q) não bate com o tipo (%v)", name, ev["type"])
+			t.Errorf("the event name (%q) does not match the type (%v)", name, ev["type"])
 		}
 		names++
 		d, _ := ev["delta"].(string)
@@ -331,11 +331,11 @@ func TestResponsesReturnStreaming(t *testing.T) {
 			}
 		}
 		if ev["item_id"] != "w1" && !strings.Contains(data, "webfetch") && rePseEmail.MatchString(data) {
-			t.Errorf("pseudônimo entregue ao cliente: %s", data)
+			t.Errorf("pseudonym delivered to the client: %s", data)
 		}
 	}
 	if text.String() != "avise "+oaEmail+" agora" {
-		t.Errorf("texto: %q", text.String())
+		t.Errorf("text: %q", text.String())
 	}
 	var a struct{ Command []string }
 	if err := json.Unmarshal([]byte(args.String()), &a); err != nil || a.Command[2] != "echo "+oaEmail {
@@ -345,7 +345,7 @@ func TestResponsesReturnStreaming(t *testing.T) {
 		t.Errorf("patch: %q", patch.String())
 	}
 	if !rePseEmail.MatchString(web.String()) {
-		t.Errorf("a busca na internet devia seguir com o pseudônimo: %q", web.String())
+		t.Errorf("the internet search should go on with the pseudonym: %q", web.String())
 	}
 	reals := 0
 	for _, d := range dones {
@@ -354,7 +354,7 @@ func TestResponsesReturnStreaming(t *testing.T) {
 	// text.done, message item, arguments.done, call item, input.done, patch item and the 3 items of
 	// response.completed
 	if reals != 9 {
-		t.Errorf("os eventos com o item inteiro deviam trazer o valor real 9 vezes, vieram %d", reals)
+		t.Errorf("the events with the whole item should bring the real value 9 times, they brought %d", reals)
 	}
 }
 
@@ -371,10 +371,10 @@ func TestResponsesReturnWithoutStreaming(t *testing.T) {
 	})
 	_, b := ask(t, "POST", px.URL+"/chatgpt/responses", responsesReq(false), nil)
 	if strings.Count(string(b), oaEmail) != 3 {
-		t.Errorf("devia voltar o valor real 3 vezes (texto, argumentos, patch): %s", b)
+		t.Errorf("the real value should come back 3 times (text, arguments, patch): %s", b)
 	}
 	if !bytes.Contains(b, []byte("pensando em p.")) {
-		t.Errorf("o resumo do raciocínio não muda: %s", b)
+		t.Errorf("the reasoning summary does not change: %s", b)
 	}
 }
 
@@ -399,7 +399,7 @@ func TestDestinationByPath(t *testing.T) {
 	} {
 		r := httptest.NewRequest("POST", "http://127.0.0.1:8787"+path, nil)
 		if came, _, _ := p.destination(r); came != wants {
-			t.Errorf("%s: formato %q, esperado %q", path, came, wants)
+			t.Errorf("%s: format %q, expected %q", path, came, wants)
 		}
 	}
 }

@@ -43,19 +43,19 @@ func TestMemoryWholeWordAndCase(t *testing.T) {
 	_, outs, ents := batchWith(m, inv, sql, prose)
 	p := outs[2]
 	if strings.Contains(p, " "+nsCommon+" ") {
-		t.Errorf("namespace solto ficou em claro: %s", p)
+		t.Errorf("loose namespace stayed in plain text: %s", p)
 	}
 	if !strings.Contains(p, strings.ToUpper(nsCommon)+" é") {
-		t.Errorf("namespace é exato: a grafia em maiúsculas é outra palavra: %s", p)
+		t.Errorf("namespace is exact: the uppercase spelling is another word: %s", p)
 	}
 	if !strings.Contains(p, nsCommon+"X") || !strings.Contains(p, tabCommon+"_old") {
-		t.Errorf("palavra inteira: pedaço de outra palavra foi trocado: %s", p)
+		t.Errorf("whole word: a piece of another word was swapped: %s", p)
 	}
 	if strings.Contains(p, strings.ToUpper(tabCommon)) {
-		t.Errorf("tabela é sem caixa: a grafia em maiúsculas devia sair mascarada: %s", p)
+		t.Errorf("table is caseless: the uppercase spelling should come out masked: %s", p)
 	}
 	if v := NewTable(ents).Unmask(p, false); v != prose {
-		t.Fatalf("ida e volta: %q", v)
+		t.Fatalf("round trip: %q", v)
 	}
 }
 
@@ -66,7 +66,7 @@ func TestMemoryOnlyInRequest(t *testing.T) {
 	batchWith(m, "kubectl logs -n "+nsCommon+" deploy/web --tail 10", "o "+nsCommon+" caiu")
 	_, outs, _ := batchWith(m, "o "+nsCommon+" caiu de novo")
 	if !strings.Contains(outs[0], nsCommon) {
-		t.Fatalf("outra conversa: a palavra comum foi mascarada: %s", outs[0])
+		t.Fatalf("another conversation: the common word was masked: %s", outs[0])
 	}
 }
 
@@ -79,7 +79,7 @@ func TestMemoryGenericOut(t *testing.T) {
 	m := newTest(t)
 	_, outs, _ := batchWith(m, "kubectl logs -n "+nsCommon+" deploy/web --tail 10", "o "+nsCommon+" caiu")
 	if !strings.Contains(outs[1], nsCommon) {
-		t.Fatalf("genérica entrou na memória: %s", outs[1])
+		t.Fatalf("generic word entered the memory: %s", outs[1])
 	}
 }
 
@@ -92,17 +92,17 @@ func TestMemoryDoesNotRewritePast(t *testing.T) {
 	inv := "kubectl logs -n " + nsCommon + " deploy/web --tail 10"
 	l2, o2, _ := batchWith(m, stale, inv, "e o "+nsCommon+" hoje")
 	if o2[0] != o1[0] || !strings.Contains(o2[0], nsCommon) {
-		t.Fatalf("texto enviado mudou: %q -> %q", o1[0], o2[0])
+		t.Fatalf("sent text changed: %q -> %q", o1[0], o2[0])
 	}
 	if strings.Contains(o2[2], nsCommon) {
-		t.Fatalf("texto novo sem a memória: %s", o2[2])
+		t.Fatalf("new text without the memory: %s", o2[2])
 	}
 	// freezing writes the text with the memory applied: the resend goes out the same
 	l2.Freeze()
 	_, o3, _ := batchWith(m, stale, inv, "e o "+nsCommon+" hoje")
 	for i := range o3 {
 		if o3[i] != o2[i] {
-			t.Fatalf("reenvio mudou o texto %d: %q -> %q", i, o2[i], o3[i])
+			t.Fatalf("resending changed text %d: %q -> %q", i, o2[i], o3[i])
 		}
 	}
 }
@@ -122,14 +122,14 @@ func TestMemoryWhoWrote(t *testing.T) {
 		}
 	}
 	if ps == "" || strings.Contains(outs[0], nsCommon) {
-		t.Fatalf("premissa: o inventário não mascarou: %s", outs[0])
+		t.Fatalf("premise: the inventory did not mask: %s", outs[0])
 	}
 	orig := "o namespace " + ps + " tem o serviço " + nsCommon + " do modelo"
 	des := m.RecordResponse(orig, tab)
 	l := m.NewBatch()
 	d, ok := l.Written(des)
 	if !ok || len(d) != 1 || d[0].Name != nsCommon || d[0].Ent != "namespace" || d[0].Rule != "translated" {
-		t.Fatalf("decisões traduzidas: %+v %v", d, ok)
+		t.Fatalf("translated decisions: %+v %v", d, ok)
 	}
 	output := "logs de " + nsCommon + " ok"
 	items := []BatchItem{{S: output, Pos: testPos(output)}}
@@ -137,10 +137,10 @@ func TestMemoryWhoWrote(t *testing.T) {
 	l.Memory(items, d)
 	o, _ := l.MaskWritten(des, false, testPos(des), "")
 	if o != orig {
-		t.Fatalf("texto do assistente: %q, esperado %q", o, orig)
+		t.Fatalf("assistant text: %q, expected %q", o, orig)
 	}
 	if only, _ := l.MaskHint(output, false, testPos(output), ""); strings.Contains(only, nsCommon) {
-		t.Fatalf("palavra traduzida não entrou na memória: %s", only)
+		t.Fatalf("translated word did not enter the memory: %s", only)
 	}
 }
 
@@ -167,11 +167,11 @@ func TestWhoWroteOnDisk(t *testing.T) {
 		t.Fatal(err)
 	}
 	if o, ok := m2.OriginalOf(des); !ok || o != orig {
-		t.Fatalf("depois do reinício: %q %v", o, ok)
+		t.Fatalf("after the restart: %q %v", o, ok)
 	}
 	tr, ok := m2.Translated(des)
 	if !ok || len(tr) != 1 || tr[0].Type != objTypePrefix+"namespace" {
-		t.Fatalf("Traduzidas depois do reinício: %+v", tr)
+		t.Fatalf("Translated after the restart: %+v", tr)
 	}
 }
 
@@ -211,7 +211,7 @@ func TestInComment(t *testing.T) {
 	}
 	for s, wants := range cases {
 		if got := inComment(s, strings.LastIndex(s, "faturas")); got != wants {
-			t.Errorf("%q: emComentario=%v, esperado %v", s, got, wants)
+			t.Errorf("%q: inComment=%v, expected %v", s, got, wants)
 		}
 	}
 }
@@ -225,11 +225,11 @@ func TestProvenanceInDataComment(t *testing.T) {
 	fileName := "def carregar():\n    # carrega as " + tabCommon + " do dia\n    return 1\n"
 	l, outs, _ := batchWith(m, sql, fileName)
 	if strings.Contains(outs[1], tabCommon) {
-		t.Fatalf("o nome provado no SQL ficou em claro no comentário do arquivo: %s", outs[1])
+		t.Fatalf("the name proven in the SQL stayed in plain text in the file comment: %s", outs[1])
 	}
 	glued := "olha isto:\n# carrega as " + tabCommon + " do dia"
 	if o, _ := l.MaskHintProse(glued, false, testPos(glued), ""); !strings.Contains(o, tabCommon) {
-		t.Fatalf("na mensagem do usuário o comentário devia ficar como antes: %s", o)
+		t.Fatalf("in the user message the comment should stay as before: %s", o)
 	}
 }
 
@@ -238,7 +238,7 @@ func TestProvenanceInDataComment(t *testing.T) {
 func TestDocumentAndProseOutsideCode(t *testing.T) {
 	tab := "pro" + "postas" // common-word table (it is in the list)
 	if !commonWord(tab) {
-		t.Fatalf("premissa: %q devia ser palavra comum", tab)
+		t.Fatalf("premise: %q should be a common word", tab)
 	}
 	m := newTest(t)
 	sql := "SELECT valor FROM " + tab + " WHERE id = 1 AND x = 2"
@@ -258,12 +258,12 @@ func TestDocumentAndProseOutsideCode(t *testing.T) {
 		outs = append(outs, o)
 	}
 	if !strings.Contains(outs[1], "revisa as "+tab+" toda") {
-		t.Errorf("na prosa do README a palavra comum devia ficar: %s", outs[1])
+		t.Errorf("in the README prose the common word should stay: %s", outs[1])
 	}
 	if strings.Contains(outs[1], "from "+tab) || strings.Contains(outs[1], "-- as "+tab) {
-		t.Errorf("no bloco de código do README o nome devia ser mascarado: %s", outs[1])
+		t.Errorf("in the README code block the name should be masked: %s", outs[1])
 	}
 	if strings.Contains(outs[2], tab) {
-		t.Errorf("no arquivo de código o nome devia ser mascarado: %s", outs[2])
+		t.Errorf("in the code file the name should be masked: %s", outs[2])
 	}
 }

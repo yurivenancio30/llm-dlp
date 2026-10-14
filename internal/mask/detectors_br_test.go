@@ -11,24 +11,24 @@ import (
 // (473124829).
 func TestValidatorsBR(t *testing.T) {
 	if checkDigitMod10("01230067896") != 3 || billPaymentCheckDigit("01230067896", true) != 0 {
-		t.Errorf("DAC da FEBRABAN: %d %d", checkDigitMod10("01230067896"), billPaymentCheckDigit("01230067896", true))
+		t.Errorf("FEBRABAN check digit: %d %d", checkDigitMod10("01230067896"), billPaymentCheckDigit("01230067896", true))
 	}
 	code := "1049" + "4" + "3242" + "0000032112" + "0055077222133347777777771"
 	if !ValidBoletoBarcode(code) || ValidBoletoBarcode(code[:4]+"5"+code[5:]) {
-		t.Errorf("código de barras do manual da CAIXA")
+		t.Errorf("barcode from CAIXA's manual")
 	}
 	if !ValidBoleto(boletoLine(code)) || ValidBoleto(strings.Replace(boletoLine(code), "77777", "77776", 1)) {
-		t.Errorf("linha digitável: %s", boletoLine(code))
+		t.Errorf("typeable line: %s", boletoLine(code))
 	}
 	arr := billPaymentLine("836" + "00000001234" + "5004" + "8100500123456789012345678")
 	if !ValidBillPayment(arr) || ValidBillPayment(arr[:5]+"9"+arr[6:]) {
-		t.Errorf("arrecadação: %s", arr)
+		t.Errorf("collection slip: %s", arr)
 	}
 	if !ValidTracking("RR473124829BR") || ValidTracking("RR473124828BR") {
 		t.Errorf("S10")
 	}
 	if !ValidCertificateNumber("10453901552013100012021000012312") || ValidCertificateNumber("10453901542013100012021000012312") {
-		t.Errorf("matrícula de certidão")
+		t.Errorf("certificate registration number")
 	}
 }
 
@@ -67,10 +67,10 @@ func TestDetectsBR(t *testing.T) {
 	for _, c := range cases {
 		out, ents := m.Mask(c.s)
 		if strings.Contains(out, c.gone) {
-			t.Errorf("%q: ficou %q\n   saiu %q", c.s, c.gone, out)
+			t.Errorf("%q: kept %q\n   out %q", c.s, c.gone, out)
 		}
 		if back := NewTable(ents).Unmask(out, false); back != c.s {
-			t.Errorf("volta de %q:\n   %q", c.s, back)
+			t.Errorf("way back of %q:\n   %q", c.s, back)
 		}
 	}
 	// RG of any state, by the label
@@ -83,10 +83,10 @@ func TestDetectsBR(t *testing.T) {
 	} {
 		out, ents := m.Mask(c.s)
 		if strings.Contains(out, c.gone) {
-			t.Errorf("%q: ficou %q\n   saiu %q", c.s, c.gone, out)
+			t.Errorf("%q: kept %q\n   out %q", c.s, c.gone, out)
 		}
 		if back := NewTable(ents).Unmask(out, false); back != c.s {
-			t.Errorf("volta de %q:\n   %q", c.s, back)
+			t.Errorf("way back of %q:\n   %q", c.s, back)
 		}
 	}
 	for _, s := range []string{
@@ -95,7 +95,7 @@ func TestDetectsBR(t *testing.T) {
 		"cid do e-mail: cid:image001.png", "o diagnóstico ficou para depois", "CID-10 é a classificação",
 	} {
 		if out, _ := m.Mask(s); out != s {
-			t.Errorf("mascarou o que não é dado: %q -> %q", s, out)
+			t.Errorf("masked what is not data: %q -> %q", s, out)
 		}
 	}
 }

@@ -33,7 +33,7 @@ func TestDFeKey(t *testing.T) {
 	}
 	for _, c := range validOnes {
 		if !ValidDFeKey(c) {
-			t.Errorf("chave válida recusada: %s", c)
+			t.Errorf("valid key refused: %s", c)
 		}
 	}
 	v := validOnes[0]
@@ -46,7 +46,7 @@ func TestDFeKey(t *testing.T) {
 	}
 	for _, c := range invalidOnes {
 		if ValidDFeKey(c) {
-			t.Errorf("chave inválida aceita: %s", c)
+			t.Errorf("invalid key accepted: %s", c)
 		}
 	}
 	m := newTest(t)
@@ -57,15 +57,15 @@ func TestDFeKey(t *testing.T) {
 	for _, s := range []string{"chave " + v + " ok", "<infNFe Id=\"NFe" + v + "\" versao=\"4.00\">", "DANFE " + strings.TrimSpace(groups)} {
 		out, ents := m.Mask(s)
 		if strings.Contains(out, cnpj) || strings.Contains(out, v[20:]) || strings.Contains(out, v[:20]) {
-			t.Errorf("chave ficou: %q", out)
+			t.Errorf("key stayed: %q", out)
 		}
 		if back := NewTable(ents).Unmask(out, false); back != s {
-			t.Errorf("volta: %q", back)
+			t.Errorf("back: %q", back)
 		}
 	}
 	// 44 digits that are not a key (check digit, state or month do not match) stay
 	if out, _ := m.Mask("id " + invalidOnes[0]); !strings.Contains(out, invalidOnes[0]) {
-		t.Errorf("número que não é chave mascarado: %q", out)
+		t.Errorf("number that is not a key masked: %q", out)
 	}
 }
 
@@ -81,13 +81,13 @@ func TestBRCode(t *testing.T) {
 		s := "pague com o código " + e + " até amanhã"
 		out, ents := m.Mask(s)
 		if strings.Contains(out, "Fulano") || strings.Contains(out, "BRASILIA") || strings.Contains(out, "br.gov.bcb.pix") {
-			t.Errorf("BR Code ficou: %q", out)
+			t.Errorf("BR Code kept: %q", out)
 		}
 		if !strings.HasPrefix(out, "pague com o código ") || !strings.HasSuffix(out, " até amanhã") {
-			t.Errorf("mascarou além do código: %q", out)
+			t.Errorf("masked beyond the code: %q", out)
 		}
 		if back := NewTable(ents).Unmask(out, false); back != s {
-			t.Errorf("volta: %q", back)
+			t.Errorf("back: %q", back)
 		}
 	}
 	// wrong CRC or without the Pix GUI: not a Pix BR Code
@@ -96,6 +96,6 @@ func TestBRCode(t *testing.T) {
 	findBRCode(examples[0][:len(examples[0])-4]+"1D3E", add)
 	findBRCode(strings.Replace(examples[0], "br.gov.bcb.pix", "br.gov.bcb.xyz", 1), add)
 	if len(foundIt) != 0 {
-		t.Errorf("aceitou BR Code inválido: %d", len(foundIt))
+		t.Errorf("accepted an invalid BR Code: %d", len(foundIt))
 	}
 }

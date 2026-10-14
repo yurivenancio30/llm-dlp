@@ -75,7 +75,7 @@ func compiled(t *testing.T) (a, b string) {
 		t.Skip("compila o llm-dlp duas vezes")
 	}
 	if runtime.GOOS != "linux" {
-		t.Skip("a troca sem pausa é do Linux")
+		t.Skip("the swap without a pause is Linux's")
 	}
 	binaries.once.Do(func() {
 		goBin, err := exec.LookPath("go")
@@ -244,7 +244,7 @@ func (e *environment) ask(cli *http.Client, text string) error {
 	defer r.Body.Close()
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
-		return fmt.Errorf("resposta cortada: %w", err)
+		return fmt.Errorf("response cut: %w", err)
 	}
 	if r.StatusCode != 200 || !bytes.Contains(b, []byte("message_stop")) {
 		return fmt.Errorf("status %d, resposta incompleta: %.120s", r.StatusCode, b)
@@ -293,10 +293,10 @@ func (c *load) stop(t *testing.T, what string) {
 	close(c.stopped)
 	c.wg.Wait()
 	if n := c.errs.Load(); n > 0 {
-		t.Errorf("%s: %d de %d mensagens falharam (ex.: %v)", what, n, n+c.ok.Load(), c.examples[0])
+		t.Errorf("%s: %d of %d messages failed (e.g. %v)", what, n, n+c.ok.Load(), c.examples[0])
 	}
 	if c.ok.Load() < 8 {
-		t.Errorf("%s: só %d mensagens passaram; a carga não cobriu a troca", what, c.ok.Load())
+		t.Errorf("%s: only %d messages went through; the load did not cover the swap", what, c.ok.Load())
 	}
 }
 
@@ -349,29 +349,29 @@ func TestUpdateWithoutPause(t *testing.T) {
 	// like install.sh: the new binary, from outside, updates the installed one
 	out, err := e.runIt(b, "update", "--file", pkgName(t, b))
 	if err != nil {
-		t.Fatalf("atualizar: %v\n%s\nlog:\n%s", err, out, e.log())
+		t.Fatalf("update: %v\n%s\nlog:\n%s", err, out, e.log())
 	}
 	newOne, _ := e.health()
 	if newOne.Commit != "bbbbbbb" || newOne.PID == old.PID {
-		t.Fatalf("depois do atualizar responde %+v; esperado o commit bbbbbbb num processo novo\n%s", newOne, out)
+		t.Fatalf("after update it answers %+v; expected commit bbbbbbb in a new process\n%s", newOne, out)
 	}
 	time.Sleep(300 * time.Millisecond)
 	c.stop(t, "durante a troca")
 	if err := <-longOne; err != nil {
-		t.Errorf("a resposta longa, começada antes da troca, foi cortada: %v", err)
+		t.Errorf("the long response, started before the swap, was cut: %v", err)
 	}
 	if _, commit, _ := versionOf(e.destination); commit != "bbbbbbb" {
-		t.Errorf("o instalado ficou com o commit %q", commit)
+		t.Errorf("the installed one kept commit %q", commit)
 	}
 	if copies, _ := filepath.Glob(e.destination + ".bak-*"); len(copies) != 1 {
-		t.Errorf("cópias do binário anterior: %v; esperada uma", copies)
+		t.Errorf("copies of the previous binary: %v; expected one", copies)
 	}
 	if !wentOut(old.PID, graceDeadline+5*time.Second) {
-		t.Errorf("o proxy antigo (pid %d) não saiu", old.PID)
+		t.Errorf("the old proxy (pid %d) did not exit", old.PID)
 	}
 	// the supervisor also moved to the new binary (re-executed, without releasing the port)
 	if exe, _ := os.Readlink(fmt.Sprintf("/proc/%d/exe", e.supervisor())); exe != e.destination {
-		t.Errorf("o supervisor roda %q; esperado o binário instalado %s\nlog:\n%s", exe, e.destination, e.log())
+		t.Errorf("the supervisor runs %q; expected the installed binary %s\nlog:\n%s", exe, e.destination, e.log())
 	}
 
 	// reload: the same binary in a new process, also without any failure
@@ -383,15 +383,15 @@ func TestUpdateWithoutPause(t *testing.T) {
 	time.Sleep(300 * time.Millisecond)
 	c.stop(t, "durante o recarregar")
 	if r, _ := e.health(); r.Commit != "bbbbbbb" || r.PID == newOne.PID {
-		t.Errorf("depois do recarregar responde %+v; esperado o bbbbbbb num processo novo", r)
+		t.Errorf("after reload it answers %+v; expected bbbbbbb in a new process", r)
 	}
 
 	// the lock and supervisor.pid moved to the new supervisor: stop works
 	if out, err := e.runIt(e.destination, "stop"); err != nil {
-		t.Fatalf("parar depois da troca: %v\n%s", err, out)
+		t.Fatalf("stop after the swap: %v\n%s", err, out)
 	}
 	if s, ok := e.health(); ok {
-		t.Errorf("depois do parar ainda responde: %+v", s)
+		t.Errorf("after stop it still answers: %+v", s)
 	}
 }
 
@@ -421,13 +421,13 @@ func TestProxyDownWithoutRefusing(t *testing.T) {
 		}
 	}
 	if refused > 0 {
-		t.Errorf("%d mensagens receberam connection refused com o proxy fora", refused)
+		t.Errorf("%d messages got connection refused with the proxy down", refused)
 	}
 	if c.ok.Load() == before {
-		t.Errorf("nenhuma mensagem passou depois que o proxy voltou")
+		t.Errorf("no message went through after the proxy came back")
 	}
 	if s, _ := e.health(); s.PID == old.PID || s.Commit != "aaaaaaa" {
-		t.Errorf("depois da queda responde %+v", s)
+		t.Errorf("after the crash it answers %+v", s)
 	}
 }
 
@@ -451,16 +451,16 @@ func TestUpdateRollsBackIfNotUp(t *testing.T) {
 	time.Sleep(time.Second)
 	c.stop(t, "durante e depois da tentativa")
 	if err == nil || !strings.Contains(out, "went back to") {
-		t.Fatalf("o atualizar devia falhar e voltar; err=%v\n%s", err, out)
+		t.Fatalf("update should fail and go back; err=%v\n%s", err, out)
 	}
 	if s, _ := e.health(); s.PID != old.PID || s.Commit != "aaaaaaa" {
-		t.Errorf("responde %+v; esperado o proxy anterior (%+v), que nunca devia ter saído", s, old)
+		t.Errorf("answers %+v; expected the previous proxy (%+v), which should never have exited", s, old)
 	}
 	if _, commit, _ := versionOf(e.destination); commit != "aaaaaaa" {
-		t.Errorf("o instalado ficou com o commit %q; esperado o anterior de volta", commit)
+		t.Errorf("the installed one kept commit %q; expected the previous one back", commit)
 	}
 	if out, err := e.runIt(e.destination, "stop"); err != nil {
-		t.Errorf("parar: %v\n%s\nsaída do atualizar:\n%s\nlog:\n%s", err, out, updateOutput, e.log())
+		t.Errorf("stop: %v\n%s\nupdate output:\n%s\nlog:\n%s", err, out, updateOutput, e.log())
 	}
 }
 
@@ -468,7 +468,7 @@ func TestUpdateRollsBackIfNotUp(t *testing.T) {
 // used.
 func TestDownloadReleaseChecksChecksum(t *testing.T) {
 	if runtime.GOOS != "linux" {
-		t.Skip("só há binário pronto para Linux")
+		t.Skip("there is a ready binary only for Linux")
 	}
 	name := fmt.Sprintf("llm-dlp_1.2.3_linux_%s.tar.gz", runtime.GOARCH)
 	content := []byte("pacote")
@@ -491,17 +491,17 @@ func TestDownloadReleaseChecksChecksum(t *testing.T) {
 
 	v, err := publishedVersion(srv.URL, "")
 	if err != nil || v != "1.2.3" {
-		t.Fatalf("versão mais nova: %q, %v", v, err)
+		t.Fatalf("newest version: %q, %v", v, err)
 	}
 	if _, err := downloadRelease(srv.URL, v, t.TempDir()); err != nil {
-		t.Fatalf("pacote certo recusado: %v", err)
+		t.Fatalf("right package refused: %v", err)
 	}
 	served = []byte("pacote trocado")
 	if _, err := downloadRelease(srv.URL, v, t.TempDir()); err == nil || !strings.Contains(err.Error(), "checksum") {
-		t.Fatalf("pacote com checksum errado aceito: %v", err)
+		t.Fatalf("package with a wrong checksum accepted: %v", err)
 	}
 	if _, err := publishedVersion(srv.URL, "1.2"); err == nil {
-		t.Errorf("versão pedida inválida aceita")
+		t.Errorf("invalid requested version accepted")
 	}
 }
 
@@ -531,20 +531,20 @@ func TestSupervisorWithoutPidFile(t *testing.T) {
 	time.Sleep(300 * time.Millisecond)
 	c.stop(t, "durante o reload")
 	if r, _ := e.health(); r.Commit != "bbbbbbb" || r.PID == old.PID {
-		t.Errorf("depois do reload responde %+v; esperado o bbbbbbb num processo novo", r)
+		t.Errorf("after reload it answers %+v; expected bbbbbbb in a new process", r)
 	}
 	if !strings.Contains(e.log(), fmt.Sprintf("now on the installed binary (pid %d)", sup)) {
-		t.Errorf("o supervisor %d não fez a troca (SIGHUP) nem se reexecutou\nlog:\n%s", sup, e.log())
+		t.Errorf("supervisor %d neither swapped (SIGHUP) nor re-executed itself\nlog:\n%s", sup, e.log())
 	}
 	if p := e.supervisor(); p != sup {
-		t.Errorf("supervisor.pid = %d; esperado %d de volta", p, sup)
+		t.Errorf("supervisor.pid = %d; expected %d back", p, sup)
 	}
 
 	os.Remove(pidFile)
 	if out, err := e.runIt(e.destination, "stop"); err != nil {
-		t.Fatalf("stop sem o supervisor.pid: %v\n%s", err, out)
+		t.Fatalf("stop without supervisor.pid: %v\n%s", err, out)
 	}
 	if !wentOut(sup, 5*time.Second) {
-		t.Errorf("o supervisor (pid %d) não saiu com o stop", sup)
+		t.Errorf("the supervisor (pid %d) did not exit with stop", sup)
 	}
 }

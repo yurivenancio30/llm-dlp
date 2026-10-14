@@ -30,19 +30,19 @@ func TestRoundTripWithoutContext(t *testing.T) {
 		m := newTest(t)
 		masked, ents := m.Mask(c.original)
 		if strings.Contains(masked, c.real) || len(ents) == 0 {
-			t.Errorf("%s: nem a primeira passada mascarou: %q", c.name, masked)
+			t.Errorf("%s: not even the first pass masked: %q", c.name, masked)
 			continue
 		}
 		response := "Anotado: o valor " + ents[0].Pseudo + " foi registrado."
 		history := NewTable(ents).Unmask(response, false) // it is what Claude Code keeps
 		if !strings.Contains(history, c.real) {
-			t.Fatalf("%s: desmascarar falhou: %q", c.name, history)
+			t.Fatalf("%s: unmasking failed: %q", c.name, history)
 		}
 		again, _ := m.Mask(history)
 		if strings.Contains(again, c.real) {
-			t.Errorf("%s: VAZA na volta: %q", c.name, again)
+			t.Errorf("%s: LEAKS on the way back: %q", c.name, again)
 		} else if again != response {
-			t.Errorf("%s: pseudônimo mudou na volta (quebra o cache): %q != %q", c.name, again, response)
+			t.Errorf("%s: pseudonym changed on the way back (breaks the cache): %q != %q", c.name, again, response)
 		}
 	}
 }
@@ -67,12 +67,12 @@ func TestRoundTripAfterRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 	if b, _ := os.ReadFile(dir + "/vistos.json"); strings.Contains(string(b), "12.345") || strings.Contains(string(b), "Xk9mP2") {
-		t.Fatalf("valor legível gravado em disco: %s", b)
+		t.Fatalf("readable value written to disk: %s", b)
 	}
 	m2 := newOne() // "restarted": empty memory
 	for _, real := range []string{"12.345.678-9", "Xk9mP2qL7vT4zR8w", "01310-100", "11 98765-4321"} {
 		if out, _ := m2.Mask("o valor " + real + " apareceu de novo"); strings.Contains(out, real) {
-			t.Errorf("após reinício, vazou: %q", out)
+			t.Errorf("after the restart, it leaked: %q", out)
 		}
 	}
 }
@@ -83,11 +83,11 @@ func TestMemoRedoneWhenLearning(t *testing.T) {
 	m := newTest(t)
 	looseOne := "pedido referente a 12.345.678-9 em análise"
 	if out, _ := m.Mask(looseOne); out != looseOne {
-		t.Fatalf("sem contexto não deveria mascarar ainda: %q", out)
+		t.Fatalf("without context it should not mask yet: %q", out)
 	}
 	m.Mask("RG: 12.345.678-9")
 	if out, _ := m.Mask(looseOne); strings.Contains(out, "12.345.678-9") {
-		t.Errorf("memo antigo reaproveitado depois de aprender o valor: %q", out)
+		t.Errorf("old memo reused after learning the value: %q", out)
 	}
 }
 
@@ -98,16 +98,16 @@ func TestKnownWithoutFalsePositive(t *testing.T) {
 	m.Mask("agência 4321-0")
 	cleaned := "a porta 43210 respondeu em 43210 ms; linha 4321 ok"
 	if out, _ := m.Mask(cleaned); out != cleaned {
-		t.Errorf("número curto aprendido gerou falso positivo: %q", out)
+		t.Errorf("learned short number caused a false positive: %q", out)
 	}
 	m.Mask("RG: 12.345.678-9")
 	masked, ents := m.Mask("cadastro 123456789 e também 12.345.678-9")
 	if strings.Contains(masked, "123456789") || strings.Contains(masked, "12.345.678-9") {
-		t.Fatalf("outra pontuação do mesmo RG não foi mascarada: %q", masked)
+		t.Fatalf("another punctuation of the same RG was not masked: %q", masked)
 	}
 	tab := NewTable(ents)
 	if tab.Conflicts != 0 {
-		t.Errorf("mesma numeração com pontuações diferentes foi tratada como colisão")
+		t.Errorf("the same numbering with different punctuation was treated as a collision")
 	}
 }
 
@@ -127,15 +127,15 @@ func TestRecognizedByHashReturnsToMemory(t *testing.T) {
 		vs3, _ := LoadSeen(dir + "/v.json")
 		m3, _ := NewMasker(m.cfg, testKey, nil, vs3)
 		if out, _ := m3.Mask(stuck); strings.Contains(out, "Ficticia@2024") {
-			t.Fatalf("grudado, logo depois do reinício, passou: %s", out)
+			t.Fatalf("glued, right after the restart, went through: %s", out)
 		}
 	}
 	if out, _ := m2.Mask("erro ao logar com Ficticia@2024 no banco"); strings.Contains(out, "Ficticia@2024") {
-		t.Fatalf("solto, depois do reinício, deveria ser pego pelo hash: %s", out)
+		t.Fatalf("loose, after the restart, should be caught by the hash: %s", out)
 	}
 	// recognized by the hash, goes back to the memory: from then on it is caught in any position
 	if out, _ := m2.Mask("xFicticia@2024;y e (Ficticia@2024)"); strings.Count(out, "Ficticia@2024") != 1 {
-		t.Fatalf("esperava só a ocorrência colada em letra sem máscara: %s", out)
+		t.Fatalf("expected only the occurrence glued to a letter without a mask: %s", out)
 	}
 }
 
@@ -168,7 +168,7 @@ func TestScanEqualsNaiveSearch(t *testing.T) {
 	index := map[string]bool{}
 	c.scan(text, 0, func(ini, end int, _ string) bool { index[fmt.Sprint(ini, "-", end)] = true; return true })
 	if len(naive) < 7 || fmt.Sprint(naive) != fmt.Sprint(index) {
-		t.Fatalf("ingênua %v\níndice  %v", naive, index)
+		t.Fatalf("naive %v\nindex %v", naive, index)
 	}
 }
 
@@ -182,20 +182,20 @@ func TestKnownHasCap(t *testing.T) {
 		m.known.learnIt("secret", fmt.Sprintf("Lixo%08dabc", i))
 	}
 	if n := len(m.known.reals); n > maxKnown {
-		t.Fatalf("RAM sem teto: %d valores", n)
+		t.Fatalf("RAM without a ceiling: %d values", n)
 	}
 	if len(m.known.typ) != len(m.known.reals) || len(m.known.seq) != len(m.known.reals) {
-		t.Fatalf("mapas não acompanharam a lista: %d %d %d", len(m.known.typ), len(m.known.seq), len(m.known.reals))
+		t.Fatalf("maps did not follow the list: %d %d %d", len(m.known.typ), len(m.known.seq), len(m.known.reals))
 	}
 	if _, ok := m.known.typ["Zq8wPrimeiroValor01"]; ok {
-		t.Fatal("o valor mais antigo deveria ter saído da RAM")
+		t.Fatal("the oldest value should have left the RAM")
 	}
 	if out, _ := m.Mask("erro com Zq8wPrimeiroValor01 no log"); strings.Contains(out, "Zq8wPrimeiroValor01") {
-		t.Fatalf("valor que saiu da RAM vazou: %s", out)
+		t.Fatalf("value that left the RAM leaked: %s", out)
 	}
 	// text memoized before leaving: it can no longer be checked, so it is redone
 	if !m.known.containsSince("qualquer", 0) {
-		t.Fatal("geração anterior ao teto deveria forçar refazer")
+		t.Fatal("a generation before the ceiling should force a redo")
 	}
 }
 
@@ -205,7 +205,7 @@ func TestSeenHasCap(t *testing.T) {
 		v.Mark(fmt.Sprint("id", i), "rg")
 	}
 	if len(v.ids) > maxSeen || v.n["rg"] != len(v.ids) {
-		t.Fatalf("hashes sem teto: %d (contador %d)", len(v.ids), v.n["rg"])
+		t.Fatalf("hashes without a ceiling: %d (counter %d)", len(v.ids), v.n["rg"])
 	}
 }
 
@@ -216,10 +216,10 @@ func TestMemoRedoneWhenLearningOtherSpelling(t *testing.T) {
 	m := newTest(t)
 	old := "linha 7: 123456789;ATIVO"
 	if out, _ := m.Mask(old); !strings.Contains(out, "123456789") {
-		t.Skip("premissa mudou: o número já é mascarado sozinho")
+		t.Skip("premise changed: the number is already masked by itself")
 	}
 	m.Mask("RG: 12.345.678-9`") // learns the same number, with punctuation
 	if out, _ := m.Mask(old); strings.Contains(out, "123456789") {
-		t.Fatalf("o texto antigo continuou em claro depois de o valor ser aprendido: %q", out)
+		t.Fatalf("the old text stayed in plain text after the value was learned: %q", out)
 	}
 }

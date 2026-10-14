@@ -43,16 +43,16 @@ func TestInternalIPByData(t *testing.T) {
 		out, ents := m.Mask(c.s)
 		for _, x := range c.gone {
 			if strings.Contains(out, x) {
-				t.Errorf("%q: ficou %q\n   saiu %q", c.s, x, out)
+				t.Errorf("%q: kept %q\n   out %q", c.s, x, out)
 			}
 		}
 		for _, x := range c.stays {
 			if !strings.Contains(out, x) {
-				t.Errorf("%q: sumiu %q\n   saiu %q", c.s, x, out)
+				t.Errorf("%q: lost %q\n   out %q", c.s, x, out)
 			}
 		}
 		if back := NewTable(ents).Unmask(out, false); back != c.s {
-			t.Errorf("volta de %q:\n   %q", c.s, back)
+			t.Errorf("way back of %q:\n   %q", c.s, back)
 		}
 	}
 }
@@ -65,7 +65,7 @@ func TestFakeIPSameSpelling(t *testing.T) {
 	dot := m.Pseudonym("ip", "10.42.7.15")
 	o := strings.Split(dot, ".")
 	if len(o) != 4 || o[3] != "15" {
-		t.Fatalf("pseudônimo do IP: %q", dot)
+		t.Fatalf("IP pseudonym: %q", dot)
 	}
 	wants := map[string]string{
 		"10-42-7-15":              strings.Join(o, "-"),
@@ -75,7 +75,7 @@ func TestFakeIPSameSpelling(t *testing.T) {
 	}
 	for real, q := range wants {
 		if p := m.Pseudonym("ip", real); p != q {
-			t.Errorf("%q -> %q, quer %q", real, p, q)
+			t.Errorf("%q -> %q, want %q", real, p, q)
 		}
 	}
 }
@@ -102,14 +102,14 @@ func TestPublicIPInName(t *testing.T) {
 	m, _ := NewMasker(cfg, testKey, nil, nil)
 	out, ents := m.Mask(s)
 	if strings.Contains(out, "52-14-88-21") || strings.Contains(out, "d.c.b.a") || !strings.Contains(out, ".sa-east-1.compute.amazonaws.com") {
-		t.Errorf("com public_ip: %q", out)
+		t.Errorf("with public_ip: %q", out)
 	}
 	if back := NewTable(ents).Unmask(out, false); back != s {
-		t.Errorf("volta: %q", back)
+		t.Errorf("back: %q", back)
 	}
 	m2, _ := NewMasker(config.Default(), testKey, nil, nil)
 	if out, _ := m2.Mask(s); out != s {
-		t.Errorf("sem public_ip: %q", out)
+		t.Errorf("without public_ip: %q", out)
 	}
 }
 
@@ -126,6 +126,6 @@ func TestIDsAWS(t *testing.T) {
 	b, _ := m.Mask("arn:aws:ec2:sa-east-1:123456789012:vpc/vpc-0a1b2c3d4e5f67890")
 	p := strings.TrimPrefix(a, "vpc ")
 	if strings.Contains(a, "0a1b2c3d") || !strings.HasSuffix(b, "/"+p) {
-		t.Errorf("solto %q, no ARN %q", a, b)
+		t.Errorf("loose %q, in the ARN %q", a, b)
 	}
 }

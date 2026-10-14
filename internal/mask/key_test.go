@@ -8,7 +8,7 @@ import (
 
 // Key created by several processes at the same time: all of them have to see the SAME key.
 func TestConcurrentKey(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "chave")
+	path := filepath.Join(t.TempDir(), "key")
 	var wg sync.WaitGroup
 	keys := make([]string, 32)
 	for i := range keys {
@@ -25,7 +25,7 @@ func TestConcurrentKey(t *testing.T) {
 	wg.Wait()
 	for _, k := range keys[1:] {
 		if k != keys[0] {
-			t.Fatal("processos concorrentes ficaram com chaves diferentes")
+			t.Fatal("concurrent processes ended up with different keys")
 		}
 	}
 }

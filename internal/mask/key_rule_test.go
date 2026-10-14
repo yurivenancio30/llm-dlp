@@ -47,12 +47,12 @@ func TestPseudonymsComeFromKey(t *testing.T) {
 		typ, real, _ := strings.Cut(k, "\x00")
 		types[typ] = true
 		if pb, ok := b[k]; !ok {
-			t.Errorf("%s %q: mascarado só com uma das chaves", typ, real)
+			t.Errorf("%s %q: masked with only one of the keys", typ, real)
 		} else if pa == pb {
-			t.Errorf("%s %q: o mesmo pseudônimo %q com as duas chaves", typ, real, pa)
+			t.Errorf("%s %q: the same pseudonym %q with both keys", typ, real, pa)
 		}
 		if len(real) >= 4 && strings.Contains(strings.ToLower(pa), strings.ToLower(real)) {
-			t.Errorf("%s: o pseudônimo %q contém o valor real", typ, pa)
+			t.Errorf("%s: the pseudonym %q contains the real value", typ, pa)
 		}
 	}
 	ts := make([]string, 0, len(types))
@@ -61,9 +61,9 @@ func TestPseudonymsComeFromKey(t *testing.T) {
 	}
 	sort.Strings(ts)
 	if len(ts) < 12 {
-		t.Errorf("poucos tipos cobertos: %v", ts)
+		t.Errorf("few types covered: %v", ts)
 	}
-	t.Logf("tipos: %v", ts)
+	t.Logf("types: %v", ts)
 }
 
 // The case of the ID of a mixed-case object also comes from the key: it does not follow an unkeyed
@@ -88,6 +88,6 @@ func TestObjectCaseComesFromKey(t *testing.T) {
 		}
 	}
 	if letters < 10 || equalOnes == letters {
-		t.Errorf("a caixa de %d de %d letras segue o SHA-256 sem chave do nome", equalOnes, letters)
+		t.Errorf("the case of %d of %d letters follows the unkeyed SHA-256 of the name", equalOnes, letters)
 	}
 }

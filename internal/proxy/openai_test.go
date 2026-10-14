@@ -49,7 +49,7 @@ func buildOpenAI(t *testing.T, resp func(p oaRequest, w http.ResponseWriter)) (*
 		resp(p, w)
 	}))
 	anthropic := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		t.Errorf("a requisição foi para o upstream da Anthropic: %s", r.URL.Path)
+		t.Errorf("the request went to the Anthropic upstream: %s", r.URL.Path)
 	}))
 	cfg.Upstream = anthropic.URL
 	cfg.Providers = map[string]config.Provider{"xai": {Upstream: up.URL, Format: "openai"}, "gemini": {Upstream: up.URL, Format: "gemini"}}
@@ -99,10 +99,10 @@ func TestOpenAIMaskedOutbound(t *testing.T) {
 		}
 		p := (*requests)[len(*requests)-1]
 		if wants := strings.SplitN(path, "/", 3)[2]; p.path != "/"+wants || p.auth != "Bearer chave-de-teste" {
-			t.Errorf("%s: chegou em %q com a credencial %q", path, p.path, p.auth)
+			t.Errorf("%s: arrived at %q with the credential %q", path, p.path, p.auth)
 		}
 		if bytes.Contains(p.body, []byte(oaEmail)) || bytes.Contains(p.body, []byte(oaIP)) {
-			t.Errorf("%s: valor real chegou à API: %s", path, p.body)
+			t.Errorf("%s: real value reached the API: %s", path, p.body)
 		}
 		var req struct {
 			Model string
@@ -123,34 +123,34 @@ func TestOpenAIMaskedOutbound(t *testing.T) {
 			t.Fatal(err)
 		}
 		if req.Model != "m" || len(req.Messages) != 6 || len(req.Tools) != 1 || req.Tools[0].Function.Name != "bash" {
-			t.Fatalf("%s: a forma mudou: %s", path, p.body)
+			t.Fatalf("%s: the shape changed: %s", path, p.body)
 		}
 		if !rePseEmail.MatchString(req.Tools[0].Function.Description) || !rePseEmail.MatchString(fmt.Sprint(req.Messages[0].Content)) {
-			t.Errorf("%s: instruções e ferramentas deviam sair com o pseudônimo: %s", path, p.body)
+			t.Errorf("%s: instructions and tools should go out with the pseudonym: %s", path, p.body)
 		}
 		a := req.Messages[2]
 		if a.Role != "assistant" || a.Content != nil || len(a.ToolCalls) != 2 || a.ToolCalls[0].ID != "call_1" || a.ToolCalls[0].Function.Name != "bash" {
-			t.Fatalf("%s: chamadas: %+v", path, a)
+			t.Fatalf("%s: calls: %+v", path, a)
 		}
 		var args struct{ Command string }
 		if err := json.Unmarshal([]byte(a.ToolCalls[0].Function.Arguments), &args); err != nil || !strings.HasPrefix(args.Command, "ping -c1 ") {
-			t.Errorf("%s: os argumentos mascarados deviam continuar um JSON: %q", path, a.ToolCalls[0].Function.Arguments)
+			t.Errorf("%s: the masked arguments should still be JSON: %q", path, a.ToolCalls[0].Function.Arguments)
 		}
 		// what had no sensitive data goes out exactly as the client sent it (spaces and all)
 		if a.ToolCalls[1].Function.Arguments != `{ "command" : "date" }` {
-			t.Errorf("%s: argumentos sem dado sensível mudaram: %q", path, a.ToolCalls[1].Function.Arguments)
+			t.Errorf("%s: arguments without sensitive data changed: %q", path, a.ToolCalls[1].Function.Arguments)
 		}
 		if req.Messages[3].ToolCallID != "call_1" || !strings.HasPrefix(fmt.Sprint(req.Messages[3].Content), "PING ") {
-			t.Errorf("%s: resultado de ferramenta: %+v", path, req.Messages[3])
+			t.Errorf("%s: tool result: %+v", path, req.Messages[3])
 		}
 		if _, list := req.Messages[4].Content.([]any); !list {
-			t.Errorf("%s: conteúdo em partes devia continuar em partes: %+v", path, req.Messages[4])
+			t.Errorf("%s: content in parts should stay in parts: %+v", path, req.Messages[4])
 		}
 	}
 	// the same conversation, sent again, goes out identical (the API cache depends on it)
 	ask(t, "POST", px.URL+"/xai/v1/chat/completions", body, nil)
 	if n := len(*requests); !bytes.Equal((*requests)[0].body, (*requests)[n-1].body) {
-		t.Errorf("a mesma requisição saiu diferente na segunda vez")
+		t.Errorf("the same request went out differently the second time")
 	}
 }
 
@@ -182,15 +182,15 @@ func TestOpenAIReturnWithoutStreaming(t *testing.T) {
 	}
 	m := resp.Choices[0].Message
 	if m.Content != "vou avisar "+oaEmail {
-		t.Errorf("texto: %q", m.Content)
+		t.Errorf("text: %q", m.Content)
 	}
 	var args struct{ Content string }
 	if err := json.Unmarshal([]byte(m.ToolCalls[0].Function.Arguments), &args); err != nil || args.Content != "AVISAR "+oaEmail+" \"hoje\"" {
-		t.Errorf("argumentos da escrita: %q (%v)", m.ToolCalls[0].Function.Arguments, err)
+		t.Errorf("writing arguments: %q (%v)", m.ToolCalls[0].Function.Arguments, err)
 	}
 	// what goes to the internet keeps the pseudonym
 	if strings.Contains(m.ToolCalls[1].Function.Arguments, oaEmail) || !rePseEmail.MatchString(m.ToolCalls[1].Function.Arguments) {
-		t.Errorf("a busca na internet devia seguir mascarada: %q", m.ToolCalls[1].Function.Arguments)
+		t.Errorf("the internet search should go on masked: %q", m.ToolCalls[1].Function.Arguments)
 	}
 }
 
@@ -237,7 +237,7 @@ func TestOpenAIReturnStreaming(t *testing.T) {
 				continue
 			}
 			if rePseEmail.MatchString(data) {
-				t.Errorf("comFim=%v: pseudônimo num pedaço entregue ao cliente: %s", withEnd, data)
+				t.Errorf("withEnd=%v: pseudonym in a chunk delivered to the client: %s", withEnd, data)
 			}
 			var ev struct {
 				ID      string
@@ -249,7 +249,7 @@ func TestOpenAIReturnStreaming(t *testing.T) {
 				}
 			}
 			if err := json.Unmarshal([]byte(data), &ev); err != nil || ev.ID != "c1" {
-				t.Fatalf("comFim=%v: pedaço inválido: %s", withEnd, data)
+				t.Fatalf("withEnd=%v: invalid chunk: %s", withEnd, data)
 			}
 			for _, c := range ev.Choices {
 				text.WriteString(c.Delta.Content)
@@ -259,10 +259,10 @@ func TestOpenAIReturnStreaming(t *testing.T) {
 			}
 		}
 		if lines[len(lines)-1] != "data: [DONE]" {
-			t.Errorf("comFim=%v: a última linha devia ser o [DONE]: %q", withEnd, lines[len(lines)-1])
+			t.Errorf("withEnd=%v: the last line should be [DONE]: %q", withEnd, lines[len(lines)-1])
 		}
 		if text.String() != "vou avisar "+oaEmail+" agora" {
-			t.Errorf("comFim=%v: texto: %q", withEnd, text.String())
+			t.Errorf("withEnd=%v: text: %q", withEnd, text.String())
 		}
 		var a struct{ Content string }
 		if err := json.Unmarshal([]byte(args.String()), &a); err != nil || a.Content != "AVISAR "+oaEmail {
@@ -287,12 +287,12 @@ func TestOpenAIAttachmentAndUnknownField(t *testing.T) {
 	}
 	b := (*requests)[0].body
 	if bytes.Contains(b, []byte("QUJDREVGRw")) || !bytes.Contains(b, []byte("[llm-dlp] An attached file was removed")) {
-		t.Errorf("o áudio devia ter sido retirado, com a nota no lugar: %s", b)
+		t.Errorf("the audio should have been removed, with the note in its place: %s", b)
 	}
 	if !bytes.Contains(b, []byte("https://exemplo.example/foto.png")) {
-		t.Errorf("a imagem por endereço (que a API busca sozinha) devia seguir: %s", b)
+		t.Errorf("the image by address (which the API fetches by itself) should go on: %s", b)
 	}
 	if bytes.Contains(b, []byte(oaEmail)) {
-		t.Errorf("o campo desconhecido devia ter sido mascarado: %s", b)
+		t.Errorf("the unknown field should have been masked: %s", b)
 	}
 }

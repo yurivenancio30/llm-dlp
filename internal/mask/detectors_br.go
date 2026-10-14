@@ -215,13 +215,13 @@ func findLabeledRG(s string, add func(ini, end int, typ string)) {
 // diagnosis is health data, sensitive (LGPD, art. 5, II). It only counts right after "CID" or
 // "diagnóstico": alone, "A10" is anything. It takes the list ("CID F32.1, F41.0 e Z73").
 var (
-	reCIDGatilho = regexp.MustCompile(`(?i)(?:^|[^\p{L}\p{N}])(?:cids?(?:[- ]?10)?|diagn[oó]stico|diagnosis)["']?(?:\s*(?:[:=]|n[º°o]\.?))?\s*["']?`)
+	reICDTrigger = regexp.MustCompile(`(?i)(?:^|[^\p{L}\p{N}])(?:cids?(?:[- ]?10)?|diagn[oó]stico|diagnosis)["']?(?:\s*(?:[:=]|n[º°o]\.?))?\s*["']?`)
 	reCIDCodigo  = regexp.MustCompile(`^[A-Za-z]\d{2}(?:\.?\d)?`)
 	reCIDSep     = regexp.MustCompile(`^(?:\s*[,;/+]\s*|\s+(?:e|and|ou|or)\s+)`)
 )
 
 func findCID(s string, add func(ini, end int, typ string)) {
-	for _, ix := range reCIDGatilho.FindAllStringIndex(s, -1) {
+	for _, ix := range reICDTrigger.FindAllStringIndex(s, -1) {
 		p := ix[1]
 		for n := 0; n < 10; n++ {
 			c := reCIDCodigo.FindString(s[p:])

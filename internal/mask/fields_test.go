@@ -52,7 +52,7 @@ func TestLabeledFields(t *testing.T) {
 		out, _ := newTest(t).Mask(text)
 		for _, r := range reals {
 			if strings.Contains(out, r) {
-				t.Errorf("passou %q em %q -> %q", r, text, out)
+				t.Errorf("%q went through in %q -> %q", r, text, out)
 			}
 		}
 	}
@@ -71,7 +71,7 @@ func TestLabeledFields(t *testing.T) {
 		out, _ := newTest(t).Mask(text)
 		for _, r := range stayOnes {
 			if !strings.Contains(out, r) {
-				t.Errorf("mascarou %q sem precisar em %q -> %q", r, text, out)
+				t.Errorf("masked %q needlessly in %q -> %q", r, text, out)
 			}
 		}
 	}
@@ -84,15 +84,15 @@ func TestFieldNameBecomesKnownPerson(t *testing.T) {
 	m.Mask("NOM_CLIENTE;SALDO\nMaria Aparecida Lopes;10\n")
 	out, ents := m.Mask("falei com a MARIA APARECIDA LOPES e com Maria Aparecida Lopes ontem")
 	if strings.Contains(strings.ToLower(out), "aparecida") {
-		t.Fatalf("nome aprendido pelo campo passou solto: %s", out)
+		t.Fatalf("name learned by the field went through loose: %s", out)
 	}
 	if back := NewTable(ents).Unmask(out, false); !strings.Contains(back, "MARIA APARECIDA LOPES") {
-		t.Fatalf("duas grafias do mesmo nome não voltaram: %s", back)
+		t.Fatalf("two spellings of the same name did not come back: %s", back)
 	}
 	// a code learned by the field: recognized loose, in any case
 	m.Mask("COD_USU_OWNER=B123456")
 	if out, _ := m.Mask("o usuário b123456 e B123456 travaram"); strings.Contains(strings.ToUpper(out), "B123456") {
-		t.Fatalf("código aprendido passou solto: %s", out)
+		t.Fatalf("learned code went through loose: %s", out)
 	}
 }
 
@@ -101,11 +101,11 @@ func TestImportedPersonCode(t *testing.T) {
 	m := newTest(t) // imports "João Carlos Silva" with the code U1001
 	out, _ := m.Mask("o usuário U1001 (JOAO CARLOS SILVA) abriu o chamado")
 	if strings.Contains(out, "U1001") {
-		t.Fatalf("código importado passou: %s", out)
+		t.Fatalf("imported code went through: %s", out)
 	}
 	i := strings.Index(out, "USER-")
 	if i < 0 || !strings.Contains(strings.ToLower(out), "person "+out[i+5:i+13]) { // the name in uppercase: PERSON ID
-		t.Errorf("código e nome da mesma pessoa sem o mesmo id: %s", out)
+		t.Errorf("code and name of the same person without the same id: %s", out)
 	}
 }
 
@@ -158,7 +158,7 @@ func TestGenericFormats(t *testing.T) {
 		out, _ := newTest(t).Mask(c.text)
 		for _, r := range c.reals {
 			if strings.Contains(out, r) {
-				t.Errorf("%s: passou %q\n   %q", c.name, r, out)
+				t.Errorf("%s: got through %q\n   %q", c.name, r, out)
 			}
 		}
 	}
@@ -190,7 +190,7 @@ func TestGenericFormats(t *testing.T) {
 	}
 	for _, s := range intact {
 		if out, ents := newTest(t).Mask(s); len(ents) > 0 {
-			t.Errorf("mascarou sem precisar:\n   %q\n-> %q", s, out)
+			t.Errorf("masked needlessly:\n   %q\n-> %q", s, out)
 		}
 	}
 }
@@ -209,14 +209,14 @@ func TestExtraAndOptionalFields(t *testing.T) {
 	out, _ := m.Mask("RE;NOME_COOPERADO;SEXO;IDADE\n778899;Livia Duarte Pinho;F;34\n")
 	for _, r := range []string{"778899", "Livia Duarte Pinho", ";F;", ";34"} {
 		if strings.Contains(out, r) {
-			t.Errorf("com campos_extras e quase ligado, passou %q: %q", r, out)
+			t.Errorf("with extra_fields and quasi on, %q went through: %q", r, out)
 		}
 	}
 	if out, _ := newTest(t).Mask("RE;NOME_COOPERADO\n778899;Livia Duarte Pinho\n"); !strings.Contains(out, "778899") {
-		t.Errorf("sem campos_extras não deveria reconhecer: %q", out)
+		t.Errorf("without extra_fields it should not recognize: %q", out)
 	}
 	if _, err := NewMasker(config.Config{ExtraFields: []config.ExtraField{{Type: "xpto", Words: []string{"a"}}}}, testKey, nil, nil); err == nil {
-		t.Error("tipo desconhecido em campos_extras deveria dar erro")
+		t.Error("an unknown type in extra_fields should give an error")
 	}
 	cols := m.DescribeFields("RE;NOME_COOPERADO;NOM_SISTEMA\n1;a;b\n")
 	if len(cols) != 3 || cols[0].Class != "user" || cols[1].Class != "name" || cols[2].Class != "" {
@@ -228,12 +228,12 @@ func TestExtraAndOptionalFields(t *testing.T) {
 func TestDocumentLabels(t *testing.T) {
 	for _, r := range []string{"document", "documento", "userDocument", "user_document", "num_documento", "tax_id", "taxpayer", "taxpayer_id", "nr_documento_cliente", "CPF_CNPJ"} {
 		if labelClass(r) == "" {
-			t.Errorf("%q deveria ser reconhecido como documento", r)
+			t.Errorf("%q should be recognized as a document", r)
 		}
 	}
 	for _, r := range []string{"document_type", "tipo_documento", "documento_url"} {
 		if c := labelClass(r); c != "" {
-			t.Errorf("%q não guarda o número do documento, mas virou %q", r, c)
+			t.Errorf("%q does not hold the document number, but became %q", r, c)
 		}
 	}
 }
@@ -259,11 +259,11 @@ func TestLayoutMasksResources(t *testing.T) {
 			if strings.HasPrefix(e.Type, "obj.") {
 				obj++
 			} else {
-				t.Errorf("detector de dado pessoal disparou (%s) em %q", e.Type, s)
+				t.Errorf("personal data detector fired (%s) on %q", e.Type, s)
 			}
 		}
 		if obj == 0 {
-			t.Errorf("nenhum nome de recurso mascarado em %q", s)
+			t.Errorf("no resource name masked in %q", s)
 		}
 	}
 }

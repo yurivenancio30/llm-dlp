@@ -31,13 +31,13 @@ func TestMemoTwoGenerations(t *testing.T) {
 		}
 		m.mu.Unlock()
 		if !a && !b {
-			t.Fatalf("texto em uso foi esquecido na volta %d", i)
+			t.Fatalf("text in use was forgotten in round %d", i)
 		}
 		if tot > larger {
 			larger = tot
 		}
 	}
 	if larger > memoMax+(4<<20) {
-		t.Fatalf("memo passou do teto: %d MB (%d textos)", larger>>20, k())
+		t.Fatalf("memo passed the ceiling: %d MB (%d texts)", larger>>20, k())
 	}
 }

@@ -30,7 +30,7 @@ func TestLockRoundTrip(t *testing.T) {
 		t.Errorf("env: %v", env)
 	}
 	if n := len(s["permissions"].(map[string]any)["deny"].([]any)); n != 1+len(denyLLMDLP) {
-		t.Errorf("deny duplicado ou faltando: %d regras", n)
+		t.Errorf("deny duplicated or missing: %d rules", n)
 	}
 	if _, err := applyLock(p, 8787, true); err != nil {
 		t.Fatal(err)
@@ -40,9 +40,9 @@ func TestLockRoundTrip(t *testing.T) {
 	json.Unmarshal(b, &after)
 	json.Unmarshal([]byte(orig), &before)
 	if !reflect.DeepEqual(before, after) {
-		t.Errorf("remover não voltou ao original:\n antes  %v\n depois %v", before, after)
+		t.Errorf("removing did not go back to the original:\n before %v\n after  %v", before, after)
 	}
 	if bs, _ := filepath.Glob(p + ".bak-*"); len(bs) != 3 {
-		t.Errorf("esperava 3 backups distintos, achei %d", len(bs))
+		t.Errorf("expected 3 distinct backups, found %d", len(bs))
 	}
 }

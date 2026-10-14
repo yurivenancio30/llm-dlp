@@ -22,7 +22,7 @@ func TestValidatorsReference(t *testing.T) {
 	}
 	for _, c := range cases {
 		if c.f(c.v) != c.valid {
-			t.Errorf("%s: esperado %v", c.v, c.valid)
+			t.Errorf("%s: expected %v", c.v, c.valid)
 		}
 	}
 }
@@ -32,7 +32,7 @@ func TestValidatorsReference(t *testing.T) {
 func TestValidatorsExternalLibrary(t *testing.T) {
 	file := os.Getenv("LLM_DLP_VECTORS")
 	if file == "" {
-		t.Skip("defina LLM_DLP_VECTORS para conferir contra a validate-docbr")
+		t.Skip("set LLM_DLP_VECTORS to check against validate-docbr")
 	}
 	f, err := os.Open(file)
 	if err != nil {
@@ -54,9 +54,9 @@ func TestValidatorsExternalLibrary(t *testing.T) {
 		}
 	}
 	for typ, n := range total {
-		t.Logf("%-5s %d vetores, %d divergências", typ, n, errs[typ])
+		t.Logf("%-5s %d vectors, %d divergences", typ, n, errs[typ])
 		if errs[typ] > 0 {
-			t.Errorf("%s diverge da biblioteca externa em %d de %d", typ, errs[typ], n)
+			t.Errorf("%s diverges from the external library in %d of %d", typ, errs[typ], n)
 		}
 	}
 }
@@ -67,16 +67,16 @@ func TestValidatorsExtra(t *testing.T) {
 		t.Error("IBAN")
 	}
 	if !ValidAlphaCNPJ("12.ABC.345/01DE-35") || ValidAlphaCNPJ("12.ABC.345/01DE-36") || ValidAlphaCNPJ("11.222.333/0001-81") {
-		t.Error("CNPJ alfanumérico (o numérico é do CNPJValido)")
+		t.Error("alphanumeric CNPJ (the numeric one is ValidCNPJ's)")
 	}
 	ttl := genValid("1234567801", 12, ValidVoterID)
 	cns := genValid("7000000000000", 15, ValidCNS)
 	ren := genValid("6392748451", 11, ValidRenavam)
 	if ttl == "" || cns == "" || ren == "" {
-		t.Fatalf("não gerou: título %q cns %q renavam %q", ttl, cns, ren)
+		t.Fatalf("did not generate: voter ID %q cns %q renavam %q", ttl, cns, ren)
 	}
 	if ValidVoterID("123456780199") && ValidVoterID("123456780198") && ValidVoterID("123456780197") {
-		t.Error("título aceita qualquer coisa")
+		t.Error("voter ID accepts anything")
 	}
 }
 
@@ -85,10 +85,10 @@ func TestCNPJZeroOrder(t *testing.T) {
 	for dv := 0; dv < 100; dv++ {
 		c := fmt.Sprintf("123456780000%02d", dv)
 		if ValidCNPJ(c) {
-			t.Fatalf("CNPJ com ordem 0000 aceito: %s", c)
+			t.Fatalf("CNPJ with order 0000 accepted: %s", c)
 		}
 	}
 	if !ValidCNPJ("11.222.333/0001-81") {
-		t.Fatal("CNPJ real de exemplo (ordem 0001) recusado")
+		t.Fatal("real example CNPJ (order 0001) refused")
 	}
 }

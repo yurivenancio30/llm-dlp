@@ -44,7 +44,7 @@ type Config struct {
 	// Hostnames and e-mails that contain one of these pieces are treated as internal.
 	InternalDomains []string `json:"internal_domains"`
 	// E-mails and domains that pass without masking.
-	EmailsLiberados     []string `json:"allowed_emails"`
+	AllowedEmails       []string `json:"allowed_emails"`
 	AllowedEmailDomains []string `json:"allowed_email_domains"`
 	// First hostname label that may stay visible (e.g. "mysql" in mysql.company.intra).
 	HostRoles []string `json:"host_roles"`
@@ -146,7 +146,7 @@ func Default() Config {
 		Upstream:            "https://api.anthropic.com",
 		Providers:           DefaultProviders(),
 		InternalDomains:     []string{},
-		EmailsLiberados:     []string{},
+		AllowedEmails:       []string{},
 		AllowedEmailDomains: []string{"example.com", "example.org", "example.net", "users.noreply.github.com", "anthropic.com"},
 		HostRoles: []string{"mysql", "postgres", "redis", "kafka", "zookeeper", "elasticsearch", "opensearch", "neo4j",
 			"nginx", "gms", "frontend", "dh-gms", "dh-frontend", "schema-registry", "actions", "mae", "mce", "api", "db", "web"},

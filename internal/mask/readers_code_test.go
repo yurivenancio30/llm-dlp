@@ -50,7 +50,7 @@ func TestReaderCodeName(t *testing.T) {
 		`label = "Nome da fila"`,
 	} {
 		if out, ents := m.Mask(s); len(ents) > 0 {
-			t.Errorf("código comum mascarado: %q -> %q", s, out)
+			t.Errorf("common code masked: %q -> %q", s, out)
 		}
 	}
 }
@@ -79,7 +79,7 @@ func TestReaderCodeCall(t *testing.T) {
 		`Paths.get("dados")`,
 	} {
 		if out, ents := m.Mask(s); len(ents) > 0 {
-			t.Errorf("chamada comum mascarada: %q -> %q", s, out)
+			t.Errorf("common call masked: %q -> %q", s, out)
 		}
 	}
 }
@@ -98,7 +98,7 @@ func TestReaderCLI(t *testing.T) {
 		"tar -czf a.tgz -C /tmp dados",
 	} {
 		if out, ents := m.Mask(s); len(ents) > 0 {
-			t.Errorf("comando comum mascarado: %q -> %q", s, out)
+			t.Errorf("common command masked: %q -> %q", s, out)
 		}
 	}
 }
@@ -116,7 +116,7 @@ func TestReaderPathsOutside(t *testing.T) {
 		`C:\Windows\System32\drivers`,
 	} {
 		if out, ents := m.Mask(s); len(ents) > 0 {
-			t.Errorf("caminho público mascarado: %q -> %q", s, out)
+			t.Errorf("public path masked: %q -> %q", s, out)
 		}
 	}
 }
@@ -128,14 +128,14 @@ func TestReaderCloudURLs(t *testing.T) {
 	check(t, m, "Endpoint=sb://sb-n3.servicebus.windows.net/;SharedAccessKeyName=x;EntityPath=fila-n3", []string{"sb-n3", "fila-n3"}, []string{".servicebus.windows.net/"})
 	check(t, m, "https://sqs.sa-east-1.amazonaws.com/210987654321/fila-n4", []string{"210987654321", "fila-n4"}, []string{"sqs.sa-east-1.amazonaws.com/"})
 	if got := typeOf(m, "/subscriptions/1a2b3c4d-1111-2222-3333-abcdefabcdef/resourceGroups/rg-n5/providers/Microsoft.Sql/servers/sqlsrv-n5/databases/vendas_n5", "sqlsrv-n5"); got != "obj.server" {
-		t.Errorf("Azure: servidor tipo %q", got)
+		t.Errorf("Azure: server type %q", got)
 	}
 	if got := typeOf(m, "/subscriptions/1a2b3c4d-1111-2222-3333-abcdefabcdef/resourceGroups/rg-n5/providers/Microsoft.Sql/servers/sqlsrv-n5/databases/vendas_n5", "vendas_n5"); got != "obj.database" {
-		t.Errorf("Azure: banco tipo %q", got)
+		t.Errorf("Azure: database type %q", got)
 	}
 	for _, s := range []string{"https://docs.aws.amazon.com/sqs/", "https://learn.microsoft.com/azure/storage/"} {
 		if out, ents := m.Mask(s); len(ents) > 0 {
-			t.Errorf("documentação pública mascarada: %q -> %q", s, out)
+			t.Errorf("public documentation masked: %q -> %q", s, out)
 		}
 	}
 }
@@ -145,15 +145,15 @@ func TestReaderCloudURLs(t *testing.T) {
 func TestBrakesCodeAndNetworkUser(t *testing.T) {
 	m := newTest(t)
 	if out, ents := m.Mask(`fmt.Printf("TEXTO\nPCALIGN %d")`); len(ents) > 0 {
-		t.Errorf("escape virou usuário de rede: %q", out)
+		t.Errorf("escape became a network user: %q", out)
 	}
 	check(t, m, `await ch.assertQueue("payments-queue")`, []string{"payments-queue"}, nil)
 	if out, _ := m.Mask("a payments-queue encheu"); !strings.Contains(out, "payments-queue") {
-		t.Errorf("valor sem dígito/_/. ensinou sozinho: %q", out)
+		t.Errorf("value without digit/_/. taught by itself: %q", out)
 	}
 	check(t, m, `await ch.assertQueue("payments-queue-01")`, []string{"payments-queue-01"}, nil)
 	if out, _ := m.Mask("a payments-queue-01 encheu"); strings.Contains(out, "payments-queue-01") {
-		t.Errorf("valor com dígito deveria ensinar: %q", out)
+		t.Errorf("value with a digit should teach: %q", out)
 	}
 }
 
@@ -177,7 +177,7 @@ func TestFinalFormatAdjustments(t *testing.T) {
 		`${HOME}/x e ${PATH}`,
 	} {
 		if out, ents := m.Mask(s); len(ents) > 0 {
-			t.Errorf("mascarou sem precisar: %q -> %q", s, out)
+			t.Errorf("masked needlessly: %q -> %q", s, out)
 		}
 	}
 }
@@ -201,7 +201,7 @@ func TestLongLineLinear(t *testing.T) {
 	for _, typ := range []string{"url", "sqljson", "urn", "email", "k8sdns", "conexao", "urlcolada", "esquemas"} {
 		p, g := elapsed(longLine(typ, 128<<10)), elapsed(longLine(typ, 512<<10))
 		if r := float64(g) / float64(p); r > 8 {
-			t.Errorf("%s: 512 KB levou %.1fx o tempo de 128 KB (%v / %v)", typ, r, g, p)
+			t.Errorf("%s: 512 KB took %.1fx the time of 128 KB (%v / %v)", typ, r, g, p)
 		}
 	}
 	// the window does not change the result: git config with the section above the url and git
@@ -217,7 +217,7 @@ func TestUppercaseSQLOneClauseTeaches(t *testing.T) {
 	m := newTest(t)
 	check(t, m, "SELECT * FROM fin.tb_nota_fiscal", []string{"tb_nota_fiscal"}, []string{"SELECT * FROM "})
 	if out, _ := m.Mask("a tb_nota_fiscal cresceu"); strings.Contains(out, "tb_nota_fiscal") {
-		t.Errorf("maiúsculas com uma cláusula não ensinou: %q", out)
+		t.Errorf("uppercase with one clause did not teach: %q", out)
 	}
 }
 
@@ -226,13 +226,13 @@ func TestDottedTopic(t *testing.T) {
 	m := newTest(t)
 	check(t, m, "KAFKA_TOPIC=fin.notas.emitidas", []string{"fin.notas.emitidas"}, []string{"KAFKA_TOPIC="})
 	if out, _ := m.Mask("a fin.notas.emitidas parou"); strings.Contains(out, "fin.notas.emitidas") {
-		t.Errorf("tópico com ponto não ensinou: %q", out)
+		t.Errorf("dotted topic did not teach: %q", out)
 	}
 	check(t, m, "kafka.topic=fin.notas.pagas", []string{"fin.notas.pagas"}, nil)
 	check(t, m, "  topic: fin.notas.canceladas", []string{"fin.notas.canceladas"}, nil)
 	for _, s := range []string{"topic = cfg.topic", "TOPIC=settings.queue_name", "QUEUE_URL=api.example.com", "KAFKA_TOPIC=notas.json"} {
 		if out, ents := m.Mask(s); len(ents) > 0 {
-			t.Errorf("mascarou sem precisar: %q -> %q", s, out)
+			t.Errorf("masked needlessly: %q -> %q", s, out)
 		}
 	}
 }
@@ -244,7 +244,7 @@ func TestPDOUserAndTerraformMetadata(t *testing.T) {
 	check(t, m, "$pdo = new PDO('mysql:host=db-x1;dbname=vendas_x1', '"+u+"', $senha);", []string{"db-x1", "vendas_x1", u}, []string{"', $senha);"})
 	// without a literal DSN before it, the argument has no owner; "root" is public
 	if out, ents := m.Mask("$pdo = new PDO($dsn, 'svc_pdo_x2', $senha);"); len(ents) > 0 {
-		t.Errorf("string sem DSN antes mascarada: %q", out)
+		t.Errorf("string without a DSN before it masked: %q", out)
 	}
 	check(t, m, "new PDO('mysql:host=db-x3;dbname=vendas_x3', 'root', '')", []string{"db-x3", "vendas_x3"}, []string{"'root'"})
 	tf := "resource \"kubernetes_deployment\" \"d\" {\n  metadata {\n    name = \"api-tf-x5\"\n    namespace = \"ns-tf-x5\"\n  }\n" +

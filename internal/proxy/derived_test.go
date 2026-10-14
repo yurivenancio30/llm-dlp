@@ -58,13 +58,13 @@ func TestPseudonymDerivedByModel(t *testing.T) {
 	}
 	lines := strings.Split(entry.Content, "\n")
 	if len(lines) != len(shapes) {
-		t.Fatalf("linhas: %q", lines)
+		t.Fatalf("lines: %q", lines)
 	}
 	for i, f := range shapes {
 		cameBack := strings.TrimSuffix(strings.TrimPrefix(lines[i], "SELECT * FROM "), ";")
-		t.Logf("%-24s volta o real: %-5v -> %s", f.name, cameBack == f.real, cameBack)
+		t.Logf("%-24s real comes back: %-5v -> %s", f.name, cameBack == f.real, cameBack)
 		if (cameBack == f.real) != f.back {
-			t.Errorf("%s: esperava volta=%v, veio %q", f.name, f.back, cameBack)
+			t.Errorf("%s: expected back=%v, got %q", f.name, f.back, cameBack)
 		}
 	}
 }

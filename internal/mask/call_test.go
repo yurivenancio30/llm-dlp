@@ -134,23 +134,23 @@ func TestT2InventoryCommonWord(t *testing.T) {
 			}
 			for _, n := range ar.names {
 				if wholeWord(r.text, n) {
-					t.Errorf("%s em claro na saída do inventário", n)
+					t.Errorf("%s in plain text in the inventory output", n)
 				}
 				d, ok := dec[n]
 				if !ok {
-					t.Errorf("%s não ficou nas decisões", n)
+					t.Errorf("%s not in the decisions", n)
 					continue
 				}
 				if d.Generic {
-					t.Errorf("%s marcado como genérico", n)
+					t.Errorf("%s marked as generic", n)
 				}
 				if ar.typ != "" && d.Ent != ar.typ {
-					t.Errorf("%s: tipo %q, esperado %q", n, d.Ent, ar.typ)
+					t.Errorf("%s: type %q, expected %q", n, d.Ent, ar.typ)
 				}
 				for _, f := range sixFormats(n) {
 					o, _ := m.Mask(f)
 					if o = simpleMemory(m, o, r.dec); wholeWord(o, n) {
-						t.Errorf("%s em claro em %q", n, f)
+						t.Errorf("%s in plain text in %q", n, f)
 					}
 				}
 			}
@@ -209,23 +209,23 @@ func TestT1Catalog(t *testing.T) {
 	// the identifier-shaped tables (learned in the head)
 	for _, l := range ls {
 		if wholeWord(py, l.column) {
-			t.Errorf("coluna %s em claro na saída do script", l.column)
+			t.Errorf("column %s in plain text in the script output", l.column)
 		}
 		if l.table != "carteira" && wholeWord(py, l.table) {
-			t.Errorf("tabela %s em claro na saída do script", l.table)
+			t.Errorf("table %s in plain text in the script output", l.table)
 		}
 	}
 	// with the conversation memory (simulated): also the common-word table
 	if o := simpleMemory(m, py, dec); wholeWord(o, "carteira") {
-		t.Errorf("tabela de palavra comum em claro com a memória da conversa")
+		t.Errorf("common-word table in plain text with the conversation memory")
 	}
 	// tags and regexes: program literals, stay readable
 	for _, l := range ls {
 		if !wholeWord(py, l.tag) {
-			t.Errorf("tag %s foi mascarada", l.tag)
+			t.Errorf("tag %s was masked", l.tag)
 		}
 		if !strings.Contains(py, l.regex) {
-			t.Errorf("regex %s foi mascarada", l.regex)
+			t.Errorf("regex %s was masked", l.regex)
 		}
 	}
 }
@@ -259,11 +259,11 @@ func TestCallNegatives(t *testing.T) {
 		r := runConversation(t, m, []conversationStep{p})[0]
 		base, _ := m.maskD(p.output, true, "")
 		if r.text != base.text {
-			t.Errorf("%s: as regras de chamada mascararam a mais:\n%s", p.cmd, r.text)
+			t.Errorf("%s: the call rules masked too much:\n%s", p.cmd, r.text)
 		}
 		for _, d := range r.dec {
 			if d.Rule != "reader" {
-				t.Errorf("%s: decisão %+v", p.cmd, d)
+				t.Errorf("%s: decision %+v", p.cmd, d)
 			}
 		}
 	}
@@ -278,19 +278,19 @@ func TestUserRequestOnlyInNextResponse(t *testing.T) {
 		{cmd: "ls", output: list},
 	})
 	if wholeWord(rs[0].text, "cobranca") {
-		t.Errorf("inventário pedido pelo usuário não mascarou")
+		t.Errorf("inventory asked by the user did not mask")
 	}
 	if rs[1].text != list {
-		t.Errorf("o pedido do usuário valeu para a chamada de outro turno: %q", rs[1].text)
+		t.Errorf("the user's request applied to the call of another turn: %q", rs[1].text)
 	}
 	for _, f := range []string{"lista os grupos com acesso ao banco", "show me all the queues", "Liste as tabelas do schema"} {
 		if _, ok := typeInProse(f); !ok {
-			t.Errorf("sem tipo em %q", f)
+			t.Errorf("no type in %q", f)
 		}
 	}
 	for _, f := range []string{"o build quebrou", "mostra o arquivo", "quais tabelas existem?", "veja a lista"} {
 		if e, ok := typeInProse(f); ok {
-			t.Errorf("tipo %q em %q", e, f)
+			t.Errorf("type %q in %q", e, f)
 		}
 	}
 }
@@ -314,13 +314,13 @@ func TestCommandType(t *testing.T) {
 	for cmd, spc := range cases {
 		e, ok := commandType(cmd)
 		if !ok || spc != "" && e != spc {
-			t.Errorf("%q: %q %v, esperado %q", cmd, e, ok, spc)
+			t.Errorf("%q: %q %v, expected %q", cmd, e, ok, spc)
 		}
 	}
 	for _, cmd := range []string{"ls -la", "ps aux", "git log -3", "pip list", "git branch -a", "log = logging.getLogger(x)",
 		"select nome from clientes", "cat notas.txt", "docker ps"} {
 		if e, ok := commandType(cmd); ok {
-			t.Errorf("%q: tipo %q", cmd, e)
+			t.Errorf("%q: type %q", cmd, e)
 		}
 	}
 }
@@ -334,20 +334,20 @@ func TestEchoAndTranslated(t *testing.T) {
 		{cmd: "kubectl logs -n cobranca deploy/api --tail 20 && curl -s https://h.exemplo/api/ambientes/vitrine", output: "iniciando cobranca\npronto\n"},
 	})
 	if rs[0].text != "pagamentos\ncobranca\nvitrine\n" {
-		t.Errorf("lista sem pedido mascarada: %q", rs[0].text)
+		t.Errorf("list without a request masked: %q", rs[0].text)
 	}
 	if wholeWord(rs[1].entry, "cobranca") {
-		t.Errorf("eco não mascarado na entrada: %q", rs[1].entry)
+		t.Errorf("echo not masked in the input: %q", rs[1].entry)
 	}
 	if wholeWord(rs[1].entry, "vitrine") {
-		t.Errorf("eco no caminho REST não mascarado: %q", rs[1].entry)
+		t.Errorf("echo in the REST path not masked: %q", rs[1].entry)
 	}
 	foundIt := false
 	for _, d := range rs[1].decUsage {
 		foundIt = foundIt || d.Name == "vitrine" && d.Rule == "echo"
 	}
 	if !foundIt {
-		t.Errorf("eco não decidido: %+v", rs[1].decUsage)
+		t.Errorf("echo not decided: %+v", rs[1].decUsage)
 	}
 
 	// the model wrote the pseudonym; the proxy translated it; the output brings the word
@@ -357,14 +357,14 @@ func TestEchoAndTranslated(t *testing.T) {
 	des := m2.RecordResponse("kubectl logs -n "+ps+" deploy/api", tab)
 	trans := m2.TranslatedWords(des)
 	if len(trans) != 1 || trans[0].Name != "pagamentos" || trans[0].Ent != "namespace" {
-		t.Fatalf("palavras traduzidas: %+v", trans)
+		t.Fatalf("translated words: %+v", trans)
 	}
 	r := runConversation(t, m2, []conversationStep{{cmd: des, trans: trans, output: "conectado a pagamentos\nfila vazia\n"}})[0]
 	if wholeWord(r.text, "pagamentos") || wholeWord(r.entry, "pagamentos") {
-		t.Errorf("palavra traduzida em claro: %q / %q", r.entry, r.text)
+		t.Errorf("translated word in plain text: %q / %q", r.entry, r.text)
 	}
 	if !strings.Contains(r.text, ps) {
-		t.Errorf("deveria usar o mesmo pseudônimo (%s): %q", ps, r.text)
+		t.Errorf("should use the same pseudonym (%s): %q", ps, r.text)
 	}
 }
 
@@ -378,7 +378,7 @@ func TestNameSegmentMasked(t *testing.T) {
 			"vitrine      vitrine-web-6b5a4c3d2      1/1     Running   0          9d\n"}})[0]
 	for _, n := range []string{"tesouraria", "vitrine", "tesouraria-api-7d9f8c6b5"} {
 		if wholeWord(r.text, n) {
-			t.Errorf("%s em claro: %s", n, r.text)
+			t.Errorf("%s in plain text: %s", n, r.text)
 		}
 	}
 }
@@ -410,5 +410,5 @@ func TestMatrixNegativesAsOutput(t *testing.T) {
 			}
 		}
 	}
-	t.Logf("negativos como saída de comando: %d células, %d com máscara", n, bad)
+	t.Logf("negatives as command output: %d cells, %d masked", n, bad)
 }

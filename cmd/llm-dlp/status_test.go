@@ -10,12 +10,12 @@ import (
 // status warns when the running process is not the installed binary.
 func TestStatusWarnsNewBinary(t *testing.T) {
 	if newBinary("outro", os.Getpid()) == "" {
-		t.Error("commit diferente deveria avisar")
+		t.Error("a different commit should warn")
 	}
 	if newBinary("", 0) == "" {
-		t.Error("processo sem commit (versão antiga) deveria avisar")
+		t.Error("process without a commit (old version) should warn")
 	}
 	if a := newBinary(version.Commit, os.Getpid()); a != "" {
-		t.Errorf("mesmo commit e executável intacto não deveria avisar: %s", a)
+		t.Errorf("same commit and intact executable should not warn: %s", a)
 	}
 }

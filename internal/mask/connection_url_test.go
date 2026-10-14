@@ -25,7 +25,7 @@ func TestConnectionURLEachPartItsType(t *testing.T) {
 		out, ents := m.Mask(s)
 		for _, real := range []string{password, host, "app_crm", "crm_clientes"} {
 			if strings.Contains(out, real) {
-				t.Errorf("senha %q: %q ficou em claro:\n%s", password, real, out)
+				t.Errorf("password %q: %q stayed in plain text:\n%s", password, real, out)
 			}
 		}
 		pseudos := map[string]map[string]bool{}
@@ -35,17 +35,17 @@ func TestConnectionURLEachPartItsType(t *testing.T) {
 			}
 			pseudos[e.Real][e.Pseudo] = true
 			if e.Type == "email" {
-				t.Errorf("senha %q: %q virou e-mail (é a senha e o servidor de uma URL)", password, e.Real)
+				t.Errorf("password %q: %q became an e-mail (it is the password and the server of a URL)", password, e.Real)
 			}
 		}
 		if len(pseudos[host]) != 1 {
-			t.Errorf("senha %q: o servidor tem %d pseudônimos, devia ter 1: %v\n%s", password, len(pseudos[host]), pseudos[host], out)
+			t.Errorf("password %q: the server has %d pseudonyms, should have 1: %v\n%s", password, len(pseudos[host]), pseudos[host], out)
 		}
 		if len(pseudos[password]) != 1 {
-			t.Errorf("senha %q: a senha não foi mascarada inteira: %v\n%s", password, pseudos, out)
+			t.Errorf("password %q: the password was not masked whole: %v\n%s", password, pseudos, out)
 		}
 		if !regexp.MustCompile(`:SECRET-[a-z2-7]+@`).MatchString(out) {
-			t.Errorf("senha %q: sobrou parte da senha entre o pseudônimo e o @:\n%s", password, out)
+			t.Errorf("password %q: part of the password left between the pseudonym and the @:\n%s", password, out)
 		}
 	}
 }
@@ -67,7 +67,7 @@ func TestEmailOutsideURLAuthority(t *testing.T) {
 			foundIt = foundIt || e.Type == "email" && e.Real == email
 		}
 		if !foundIt {
-			t.Errorf("o e-mail devia ser mascarado como e-mail em %q: %v", s, ents)
+			t.Errorf("the e-mail should be masked as an e-mail in %q: %v", s, ents)
 		}
 	}
 	for _, c := range []struct {
@@ -81,7 +81,7 @@ func TestEmailOutsideURLAuthority(t *testing.T) {
 		{"x a@b.com", 2, false},
 	} {
 		if came := inURLAuthority(c.s, c.i); came != c.wants {
-			t.Errorf("naAutoridadeDeURL(%q, %d) = %v, esperado %v", c.s, c.i, came, c.wants)
+			t.Errorf("inURLAuthority(%q, %d) = %v, expected %v", c.s, c.i, came, c.wants)
 		}
 	}
 }

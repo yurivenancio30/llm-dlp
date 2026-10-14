@@ -89,12 +89,12 @@ func TestT2EndToEnd(t *testing.T) {
 			total += 6
 			if k := len(re.FindAllString(r[4], -1)); k > 0 {
 				plain += k
-				t.Errorf("%s: %s em claro %d vez(es) nos 6 formatos", ar.name, n, k)
+				t.Errorf("%s: %s in plain text %d time(s) in the 6 formats", ar.name, n, k)
 			}
 			if re.MatchString(r[2]) {
-				t.Errorf("%s: %s em claro no inventário", ar.name, n)
+				t.Errorf("%s: %s in plain text in the inventory", ar.name, n)
 			}
 		}
 	}
-	t.Logf("ponta a ponta: %d de %d ocorrências em claro depois do inventário", plain, total)
+	t.Logf("end to end: %d of %d occurrences in plain text after the inventory", plain, total)
 }

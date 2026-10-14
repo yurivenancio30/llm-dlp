@@ -76,11 +76,11 @@ func TestClaudeSameWithOrWithoutOtherAPIs(t *testing.T) {
 	}
 	a, b := (*bodiesWithout)[0], (*bodiesWith)[0]
 	if !bytes.Equal(a, b) {
-		t.Errorf("a requisição do Claude mudou com os provedores ligados:\n sem: %s\n com: %s", a, b)
+		t.Errorf("the Claude request changed with the providers on:\n without: %s\n with:    %s", a, b)
 	}
 	// fields and tools that only the other formats leave intact stay masked in Claude
 	if bytes.Contains(a, []byte(oaEmail)) || bytes.Contains(a, []byte(oaIP)) {
-		t.Errorf("valor real chegou à API da Anthropic: %s", a)
+		t.Errorf("real value reached the Anthropic API: %s", a)
 	}
 }
 
@@ -104,10 +104,10 @@ func TestClaudeReturnsWithoutOthersTools(t *testing.T) {
 		t.Fatalf("resposta: %s", b)
 	}
 	if resp.Content[0].Input["q"] != oaEmail {
-		t.Errorf("web_fetch no Claude devia voltar com o valor real: %q", resp.Content[0].Input["q"])
+		t.Errorf("web_fetch in Claude should come back with the real value: %q", resp.Content[0].Input["q"])
 	}
 	if !rePseEmail.MatchString(resp.Content[1].Input["q"]) {
-		t.Errorf("WebFetch devia seguir com o pseudônimo: %q", resp.Content[1].Input["q"])
+		t.Errorf("WebFetch should go on with the pseudonym: %q", resp.Content[1].Input["q"])
 	}
 }
 
@@ -233,7 +233,7 @@ func TestMalformedOtherAPIsDoNotBreakClaude(t *testing.T) {
 			}
 			resp, err := http.Post(px.URL+c.path, "application/json", bytes.NewReader(req))
 			if err != nil {
-				t.Fatalf("%s: o proxy caiu com\n req: %s\n resp: %s\n erro: %v", c.path, req, currentResponse, err)
+				t.Fatalf("%s: the proxy crashed with\n req:  %s\n resp: %s\n error: %v", c.path, req, currentResponse, err)
 			}
 			io.Copy(io.Discard, resp.Body)
 			resp.Body.Close()
@@ -241,9 +241,9 @@ func TestMalformedOtherAPIsDoNotBreakClaude(t *testing.T) {
 		}
 	}
 	if st, _ := ask(t, "POST", px.URL+"/v1/messages", claudeConversation(), nil); st != 200 {
-		t.Errorf("o Claude parou de funcionar depois das requisições malformadas: status %d", st)
+		t.Errorf("Claude stopped working after the malformed requests: status %d", st)
 	}
-	t.Logf("%d requisições e respostas malformadas, nenhuma derrubou o proxy", n)
+	t.Logf("%d malformed requests and responses, none took the proxy down", n)
 }
 
 // Malformed streaming (pieces that are not JSON, fields with the wrong type, a cut in the middle)
@@ -281,7 +281,7 @@ func TestOtherAPIsMalformedStreaming(t *testing.T) {
 			func() {
 				defer func() {
 					if r := recover(); r != nil {
-						t.Errorf("%s: o streaming malformado derrubou o proxy: %v", name, r)
+						t.Errorf("%s: the malformed streaming took the proxy down: %v", name, r)
 					}
 				}()
 				f(httptest.NewRecorder(), strings.NewReader(body.String()), tab)
