@@ -29,12 +29,12 @@ func TestTypeConsistentAcrossRules(t *testing.T) {
 	m.UseReaders([]Reader{
 		{Name: "a", Find: func(s string, add func(ObjFinding)) {
 			if i := strings.Index(s, name); i >= 0 {
-				add(ObjFinding{i, i + len(name), "pasta", "a", false})
+				add(ObjFinding{i, i + len(name), "folder", "a", false})
 			}
 		}},
 		{Name: "b", Find: func(s string, add func(ObjFinding)) {
 			if i := strings.LastIndex(s, name); i >= 0 {
-				add(ObjFinding{i, i + len(name), "servico", "b", true})
+				add(ObjFinding{i, i + len(name), "service", "b", true})
 			}
 		}},
 	})
@@ -51,7 +51,7 @@ func TestTypeConsistentAcrossRules(t *testing.T) {
 	vs, _ := LoadSeen(dir + "/v.json")
 	m1, _ := NewMasker(newTest(t).cfg, testKey, nil, vs)
 	ps1, tp1 := pseudoOf(m1, "kubectl rollout restart deployment/"+name+" -n xq-ns01", name)
-	if tp1 != "obj.servico" {
+	if tp1 != "obj.service" {
 		t.Fatalf("tipo pela linha de comando: %q", tp1)
 	}
 	if ps2, tp2 := pseudoOf(m1, "ls /srv/"+name+"/conf", name); ps2 != ps1 || tp2 != tp1 {

@@ -53,12 +53,12 @@ func TestSensitiveInText(t *testing.T) {
 func TestSensitiveLabels(t *testing.T) {
 	for _, r := range []string{"identidade_genero", "filiacao_partidaria", "opiniao_politica", "conviccao_religiosa",
 		"vida_sexual", "impressao_digital", "raca_cor", "Race", "comorbidades"} {
-		if c := labelClass(r); c != "sensivel" {
+		if c := labelClass(r); c != "sensitive" {
 			t.Errorf("%s: %q", r, c)
 		}
 	}
 	// "filiação" alone is still the name of the parents; "identidade", the RG
-	if labelClass("filiacao") != "nome" || labelClass("identidade") != "rg" {
+	if labelClass("filiacao") != "name" || labelClass("identidade") != "rg" {
 		t.Errorf("filiacao %q, identidade %q", labelClass("filiacao"), labelClass("identidade"))
 	}
 }

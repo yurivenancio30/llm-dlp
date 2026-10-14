@@ -214,7 +214,7 @@ func segments(c *TextCtx, cov ranges) {
 			continue
 		}
 		ent := strings.TrimPrefix(a.Type, objTypePrefix)
-		if ent == "coluna" || ent == "indice" {
+		if ent == "column" || ent == "index" {
 			continue // the pieces of a column name (cd_cliente) are data model vocabulary, not a resource
 		}
 		for _, p := range strings.FieldsFunc(a.Real, func(r rune) bool { return r < 0x80 && !letterD(byte(r)) }) {

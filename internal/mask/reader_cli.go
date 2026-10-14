@@ -20,13 +20,13 @@ import (
 // command has at least two of them with a value (psql -h x -d y -U z), or, for -n, when the command
 // also cites a <type>/<name> resource or an operation subcommand.
 
-var shortOption = map[string]string{"-h": "servidor", "-S": "servidor", "-d": "database", "-D": "database",
-	"-U": "usuario", "-u": "usuario", "-n": "namespace"}
+var shortOption = map[string]string{"-h": "server", "-S": "server", "-d": "database", "-D": "database",
+	"-U": "user", "-u": "user", "-n": "namespace"}
 
 var reTypeName = regexp.MustCompile(`^(deploy|deployment|deployments|svc|service|services|sts|statefulset|statefulsets|ds|daemonset|po|pod|pods|cm|configmap|configmaps|secret|secrets|job|jobs|cj|cronjob|cronjobs|ing|ingress|ns|namespace|namespaces|pvc|sa|serviceaccount|rs|replicaset|hpa|node|nodes)/([a-z0-9][a-z0-9.-]{0,252})$`)
 
 var entTypeName = map[string]string{"ns": "namespace", "namespace": "namespace", "namespaces": "namespace",
-	"sa": "usuario", "serviceaccount": "usuario", "node": "servidor", "nodes": "servidor"}
+	"sa": "user", "serviceaccount": "user", "node": "server", "nodes": "server"}
 
 // operation subcommands that go with -n (namespace)
 var operationSubcommands = setOf("get", "describe", "logs", "exec", "rollout", "scale", "delete", "apply", "edit",
@@ -173,7 +173,7 @@ func cliCommand(s string, toks []cliToken, add func(ObjFinding)) {
 			hasTypeName = true
 			ent := entTypeName[v[m[2]:m[3]]]
 			if ent == "" {
-				ent = "servico"
+				ent = "service"
 			}
 			if name := v[m[4]:m[5]]; !publicDev(name) && !publicDevops(name) {
 				add(ObjFinding{t.a + m[4], t.a + m[5], ent, "linha-de-comando", true})
@@ -205,7 +205,7 @@ func cliCommand(s string, toks []cliToken, add func(ObjFinding)) {
 		} else if nShort < 2 {
 			continue
 		}
-		if p.ent == "servidor" {
+		if p.ent == "server" {
 			addHost(s, p.a, p.b, "linha-de-comando", true, add)
 		} else {
 			add(ObjFinding{p.a, p.b, p.ent, "linha-de-comando", true})
@@ -222,10 +222,10 @@ func cliCommand(s string, toks []cliToken, add func(ObjFinding)) {
 					continue
 				}
 				if m[2] >= 0 && !publicDev(v[m[2]:m[3]]) {
-					add(ObjFinding{t.a + m[2], t.a + m[3], "usuario", "linha-de-comando", true})
+					add(ObjFinding{t.a + m[2], t.a + m[3], "user", "linha-de-comando", true})
 				}
 				if h := v[m[4]:m[5]]; !publicDev(h) && !publicDomain(strings.ToLower(h)) {
-					add(ObjFinding{t.a + m[4], t.a + m[5], "servidor", "linha-de-comando", true})
+					add(ObjFinding{t.a + m[4], t.a + m[5], "server", "linha-de-comando", true})
 				}
 			}
 		}

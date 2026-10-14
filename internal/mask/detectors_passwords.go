@@ -41,7 +41,7 @@ func looksLikePassword(v string, weak bool) bool {
 	if notPassword[strings.ToLower(v)] || strings.ContainsAny(v[:1], "$<{%*|=") || strings.ContainsAny(v, "()[]") {
 		return false
 	}
-	if strings.HasPrefix(v, "SEGREDO-") || strings.Trim(v, "*x.#-") == "" {
+	if strings.HasPrefix(v, "SECRET-") || strings.HasPrefix(v, "SEGREDO-") || strings.Trim(v, "*x.#-") == "" {
 		return false // already masked, or "*****"
 	}
 	if weak {
@@ -72,7 +72,7 @@ func (m *Masker) findPasswords(s, lower string, add func(ini, end int, typ strin
 				end--
 			}
 			if end-ini >= 3 && looksLikePassword(s[ini:end], weak) {
-				add(ini, end, "segredo")
+				add(ini, end, "secret")
 			}
 		}
 	}

@@ -19,7 +19,7 @@ func ciRule(s string, ents []yEnt, e *yEnt, v string, child func(int, string) *y
 	if n >= 3 {
 		prev2 = e.path[n-3]
 	}
-	runner := func() { addName(s, e.vi, e.vf, "servidor", "ci", false, add) }
+	runner := func() { addName(s, e.vi, e.vf, "server", "ci", false, add) }
 	job := func(id int) bool {
 		for _, x := range []string{"runs-on", "script", "steps", "strategy", "deployment", "stage"} {
 			if child(id, x) != nil {
@@ -43,14 +43,14 @@ func ciRule(s string, ents []yEnt, e *yEnt, v string, child func(int, string) *y
 	case k == "pool" || k == "name" && prev == "pool":
 		runner()
 	case k == "environment" && job(e.parent()):
-		addName(s, e.vi, e.vf, "servico", "ci", false, add)
+		addName(s, e.vi, e.vf, "service", "ci", false, add)
 	case k == "name" && prev == "environment":
 		owner := e.root // the container that has the environment key
 		if n >= 3 {
 			owner = e.ids[n-3]
 		}
 		if job(owner) {
-			addName(s, e.vi, e.vf, "servico", "ci", false, add)
+			addName(s, e.vi, e.vf, "service", "ci", false, add)
 		}
 	}
 }
@@ -73,7 +73,7 @@ func findJenkins(s string, add func(ObjFinding)) {
 	}
 	for _, re := range []*regexp.Regexp{reJkLabel, reJkNode} {
 		for _, m := range re.FindAllStringSubmatchIndex(s, -1) {
-			addName(s, m[2], m[3], "servidor", "jenkins", false, add)
+			addName(s, m[2], m[3], "server", "jenkins", false, add)
 		}
 	}
 	for _, m := range reJkImage.FindAllStringSubmatchIndex(s, -1) {

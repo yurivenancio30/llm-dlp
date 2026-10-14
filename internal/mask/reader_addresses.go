@@ -149,7 +149,7 @@ func urlIn(s string, i int, add func(ObjFinding)) {
 	host := s[ha:hb]
 	user := func(rule string) {
 		if ua >= 0 && ub > ua && simpleName(s[ua:ub]) && !publicDev(s[ua:ub]) {
-			add(ObjFinding{ua, ub, "usuario", rule, true})
+			add(ObjFinding{ua, ub, "user", rule, true})
 		}
 	}
 	switch left {
@@ -166,7 +166,7 @@ func urlIn(s string, i int, add func(ObjFinding)) {
 			}
 		}
 		if d := strings.IndexByte(host, '.'); d > 0 && !publicDev(host[:d]) {
-			add(ObjFinding{ha, ha + d, "conta_nuvem", "armazenamento", true})
+			add(ObjFinding{ha, ha + d, "cloud_account", "armazenamento", true})
 		}
 		addFolders(s, pa, pb, "armazenamento", add)
 	case "hdfs", "webhdfs", "viewfs":
@@ -175,7 +175,7 @@ func urlIn(s string, i int, add func(ObjFinding)) {
 		}
 		addFolders(s, pa, pb, "armazenamento", add)
 	case "amqp", "amqps", "kafka", "nats", "tls+nats", "mqtt", "mqtts", "pulsar", "pulsar+ssl", "stomp":
-		user("fila")
+		user("queue")
 		for x := ha; x < e; { // host list
 			y := strings.IndexByte(s[x:e], ',')
 			if y < 0 {
@@ -188,7 +188,7 @@ func urlIn(s string, i int, add func(ObjFinding)) {
 				z = x + c
 			}
 			if hh := s[x:z]; simpleName(hh) && !publicDomain(hh) {
-				addHost(s, x, z, "fila", true, add)
+				addHost(s, x, z, "queue", true, add)
 			}
 			x = y + 1
 		}
@@ -199,7 +199,7 @@ func urlIn(s string, i int, add func(ObjFinding)) {
 				r++
 			}
 			if v := s[q:r]; simpleName(v) && !publicDev(v) {
-				add(ObjFinding{q, r, "fila", "fila", true})
+				add(ObjFinding{q, r, "queue", "queue", true})
 			}
 		}
 	case "ssh", "git", "git+ssh", "ssh+git", "svn+ssh":
@@ -251,7 +251,7 @@ func addFolders(s string, a, b int, rule string, add func(ObjFinding)) {
 			}
 		}
 		if simpleName(v) && identifierShape(v) && !publicDev(v) && !publicFolder(v) {
-			add(ObjFinding{a, c, "pasta", rule, false})
+			add(ObjFinding{a, c, "folder", rule, false})
 		}
 		a = c
 	}
@@ -312,14 +312,14 @@ func addRepo(s string, a, b int, add func(ObjFinding)) {
 		lastPos[1] -= 4
 	}
 	if v := s[lastPos[0]:lastPos[1]]; simpleName(v) && !publicDev(v) {
-		add(ObjFinding{lastPos[0], lastPos[1], "repositorio", "git", true})
+		add(ObjFinding{lastPos[0], lastPos[1], "repository", "git", true})
 	}
 	for _, p := range ps[:len(ps)-1] {
 		v := s[p[0]:p[1]]
 		if hostingPieces[v] || strings.HasPrefix(v, "~") || !simpleName(v) || publicDev(v) {
 			continue
 		}
-		add(ObjFinding{p[0], p[1], "organizacao", "git", true})
+		add(ObjFinding{p[0], p[1], "organization", "git", true})
 	}
 }
 
@@ -413,7 +413,7 @@ func internalHostIn(s string, i, end int, add func(ObjFinding)) {
 	if publicDev(s[a:i]) {
 		return
 	}
-	add(ObjFinding{a, end, "servidor", "host-interno", true})
+	add(ObjFinding{a, end, "server", "host-interno", true})
 }
 
 // ---- user paths ----------------------------------------------------------------------------
@@ -478,7 +478,7 @@ func pathIn(s string, u int, add func(ObjFinding)) {
 	// a public user (/home/ubuntu, /home/ec2-user) stays, but the project folders below it are
 	// still read
 	if !publicDev(name) && len(name) >= 2 {
-		add(ObjFinding{u, e, "usuario", "caminho", true})
+		add(ObjFinding{u, e, "user", "caminho", true})
 	}
 	prev := ""
 	for n, a := 0, e; n < 8 && a < len(s) && pathSep(s[a]); n++ {
@@ -502,7 +502,7 @@ func pathIn(s string, u int, add func(ObjFinding)) {
 			return // arquivo
 		}
 		if v[0] != '.' && identifierShape(v) && !publicFolder(v) && !publicDev(v) {
-			add(ObjFinding{a, b, "pasta", "caminho", false})
+			add(ObjFinding{a, b, "folder", "caminho", false})
 		}
 		if !dir {
 			return
@@ -567,7 +567,7 @@ func findDomainUser(s string, add func(ObjFinding)) {
 				// user
 				escape = escape || strings.IndexByte("ntr", v[0]) >= 0 && len(v) > 1 && v[1] >= 'A' && v[1] <= 'Z'
 				if len(v) >= 2 && !escape && (b == len(s) || s[b] != '\\' && s[b] != '/') && !publicDev(v) {
-					add(ObjFinding{u, b, "usuario", "usuario-rede", true})
+					add(ObjFinding{u, b, "user", "usuario-rede", true})
 				}
 			}
 		}
@@ -605,7 +605,7 @@ func sshIn(s string, p int, add func(ObjFinding)) {
 				hb++
 			}
 			if v := s[ua:ub]; simpleName(v) && !publicDev(v) {
-				add(ObjFinding{ua, ub, "usuario", "ssh", true})
+				add(ObjFinding{ua, ub, "user", "ssh", true})
 			}
 			if h := strings.TrimRight(s[ha:hb], "."); h != "" && !isSimpleIPv4(h) && !publicDomain(h) && simpleName(h) {
 				addHost(s, ha, ha+len(h), "ssh", true, add)

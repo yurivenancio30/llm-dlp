@@ -546,7 +546,7 @@ func addName(s string, a, b int, ent, rule string, strong bool, add func(ObjFind
 		return
 	}
 	v := s[a:b]
-	if !reResourceName.MatchString(v) || allDigits(v) && !(ent == "conta_nuvem" && len(v) == 12) || isIPv4(v) {
+	if !reResourceName.MatchString(v) || allDigits(v) && !(ent == "cloud_account" && len(v) == 12) || isIPv4(v) {
 		return
 	}
 	add(ObjFinding{a, b, ent, rule, strong})
@@ -593,7 +593,7 @@ func addARNOrName(s string, a, b int, ent, rule string, add func(ObjFinding)) {
 		return
 	}
 	account := a + len(ps[0]) + len(ps[1]) + len(ps[2]) + len(ps[3]) + 4
-	addName(s, account, account+len(ps[4]), "conta_nuvem", rule, true, add)
+	addName(s, account, account+len(ps[4]), "cloud_account", rule, true, add)
 	if i := strings.LastIndexByte(v, '/'); i >= 0 {
 		addName(s, a+i+1, b, ent, rule, true, add)
 	}
@@ -658,9 +658,9 @@ var reAPIVersion = regexp.MustCompile(`^(?:[a-z0-9.-]+/)?v\d+(?:(?:alpha|beta)\d
 
 // CloudFormation properties that hold the real resource name
 var cfnProps = map[string]string{"BucketName": "bucket", "DBInstanceIdentifier": "database", "DBClusterIdentifier": "database",
-	"DBName": "database", "DatabaseName": "database", "TableName": "tabela", "ServerName": "servidor", "ClusterName": "servidor",
-	"QueueName": "fila", "TopicName": "fila", "StreamName": "fila", "FunctionName": "servico", "RepositoryName": "repositorio",
-	"ServiceName": "servico", "RoleName": "usuario", "UserName": "usuario", "MasterUsername": "usuario", "GroupName": "usuario"}
+	"DBName": "database", "DatabaseName": "database", "TableName": "table", "ServerName": "server", "ClusterName": "server",
+	"QueueName": "queue", "TopicName": "queue", "StreamName": "queue", "FunctionName": "service", "RepositoryName": "repository",
+	"ServiceName": "service", "RoleName": "user", "UserName": "user", "MasterUsername": "user", "GroupName": "user"}
 
 var k8sLabels = map[string]bool{"app.kubernetes.io/name": true, "app.kubernetes.io/instance": true, "app.kubernetes.io/part-of": true}
 
@@ -779,23 +779,23 @@ func structureRules(s string, ents []yEnt, add func(ObjFinding)) {
 			continue
 		}
 		if chart[e.root] && len(e.path) == 1 && k == "name" && v != "" {
-			addName(s, e.vi, e.vf, "servico", "helm", true, add)
+			addName(s, e.vi, e.vf, "service", "helm", true, add)
 		}
 		if compose[e.root] && len(e.path) >= 2 {
 			switch {
 			case e.path[0] == "services" && len(e.path) == 2 && e.ki >= 0 && composeSvc[e.id()]:
-				addName(s, e.ki, e.kf, "servico", "compose", true, add)
+				addName(s, e.ki, e.kf, "service", "compose", true, add)
 			case e.path[0] == "services" && len(e.path) == 3 && v != "":
 				switch k {
 				case "container_name":
-					addName(s, e.vi, e.vf, "servico", "compose", true, add)
+					addName(s, e.vi, e.vf, "service", "compose", true, add)
 				case "hostname":
-					addName(s, e.vi, e.vf, "servidor", "compose", true, add)
+					addName(s, e.vi, e.vf, "server", "compose", true, add)
 				case "image":
 					addImage(s, e.vi, e.vf, "imagem", add)
 				}
 			case (e.path[0] == "networks" || e.path[0] == "volumes") && len(e.path) == 2 && e.ki >= 0:
-				addName(s, e.ki, e.kf, "servico", "compose", false, add)
+				addName(s, e.ki, e.kf, "service", "compose", false, add)
 			case e.path[0] == "services" && len(e.path) == 4 && (e.path[2] == "networks" || e.path[2] == "volumes"):
 				// reference to a network/volume declared at the top: "- net", "net:", "-
 				// volume:/path"
@@ -809,7 +809,7 @@ func structureRules(s string, ents []yEnt, add func(ObjFinding)) {
 					}
 				}
 				if a >= 0 && b > a && composeDecl[e.root][e.path[2]+"\x00"+s[a:b]] {
-					addName(s, a, b, "servico", "compose", false, add)
+					addName(s, a, b, "service", "compose", false, add)
 				}
 			}
 		}
@@ -835,7 +835,7 @@ func structureRules(s string, ents []yEnt, add func(ObjFinding)) {
 		case k == "hosts" && e.vi < 0:
 			for _, f := range children[e.id()] {
 				if c := &ents[f]; c.ki >= 0 && !c.tmpl {
-					addName(s, c.ki, c.kf, "servidor", "ansible", true, add)
+					addName(s, c.ki, c.kf, "server", "ansible", true, add)
 				}
 			}
 		case k == "hosts" && v != "" && len(e.path) == 2 && e.path[0] == "-":
@@ -859,18 +859,18 @@ func structureRules(s string, ents []yEnt, add func(ObjFinding)) {
 					for b > a && s[b-1] == ' ' {
 						b--
 					}
-					addName(s, a, b, "servidor", "ansible", false, add)
+					addName(s, a, b, "server", "ansible", false, add)
 					x = y + 1
 				}
 			}
 		case (k == "ansible_host" || k == "ansible_user") && v != "":
-			ent := "servidor"
+			ent := "server"
 			if k == "ansible_user" {
-				ent = "usuario"
+				ent = "user"
 			}
 			addName(s, e.vi, e.vf, ent, "ansible", true, add)
 		case k == "delegate_to" && v != "":
-			addName(s, e.vi, e.vf, "servidor", "ansible", false, add)
+			addName(s, e.vi, e.vf, "server", "ansible", false, add)
 		}
 		if ci[e.root] {
 			ciRule(s, ents, e, v, child, add)

@@ -209,7 +209,7 @@ func (m *Masker) findStructure(s string, learn bool, base []Finding, d *outputHi
 				Find: func(s string, add func(ObjFinding)) { findWithHint(s, d, add) }}, s, learn, add)
 		}
 		m.findLists(s, learn, add)
-		if !m.cfg.Disabled("campo") {
+		if !m.cfg.Disabled("field") {
 			m.findTables(s, add)
 			out = append(out, namesInLine(s, append(base[:len(base):len(base)], out...))...)
 		}

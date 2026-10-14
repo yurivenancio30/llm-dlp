@@ -274,10 +274,10 @@ func columns(args []string) error {
 	if err != nil {
 		return err
 	}
-	names := map[string]string{"nome": "nome de pessoa", "nomecompleto": "nome de pessoa (só valor com nome e sobrenome)",
-		"nomesolto": "nome de pessoa (se a tabela tiver outra coluna de pessoa)", "usuario": "código/login de usuário",
-		"doc": "documento", "sensivel": "dado pessoal sensível", "quase": "quase identificador", "endereco": "endereço",
-		"nascimento": "data de nascimento", "telefone": "telefone", "conta": "conta bancária", "cartao": "cartão",
+	names := map[string]string{"name": "nome de pessoa", "name_full": "nome de pessoa (só valor com nome e sobrenome)",
+		"name_loose": "nome de pessoa (se a tabela tiver outra coluna de pessoa)", "user": "código/login de usuário",
+		"doc": "documento", "sensitive": "dado pessoal sensível", "quasi": "quase identificador", "address": "endereço",
+		"birthdate": "data de nascimento", "phone": "phone", "account": "conta bancária", "card": "cartão",
 		"email": "e-mail (pelo formato do valor)"}
 	for _, file := range args {
 		f, err := os.Open(file)

@@ -47,8 +47,8 @@ func TestReaderSQL(t *testing.T) {
 	if !strings.Contains(out, "[HOST_") && !strings.Contains(out, "[host_") {
 		t.Errorf("o colchete em volta do servidor tem que ficar: %q", out)
 	}
-	for real, typ := range map[string]string{"srv-exemplo-01": "obj.servidor", "vendas_demo": "obj.database", "financeiro": "obj.schema",
-		"tb_pedido_x9": "obj.tabela", "vl_total": "obj.coluna"} {
+	for real, typ := range map[string]string{"srv-exemplo-01": "obj.server", "vendas_demo": "obj.database", "financeiro": "obj.schema",
+		"tb_pedido_x9": "obj.table", "vl_total": "obj.column"} {
 		if got := typeOf(m, "SELECT p.[vl_total] FROM [srv-exemplo-01].vendas_demo.financeiro.tb_pedido_x9 AS p", real); got != typ {
 			t.Errorf("%s: tipo %q, esperado %q", real, got, typ)
 		}

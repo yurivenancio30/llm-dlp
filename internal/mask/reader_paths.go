@@ -94,7 +94,7 @@ func pathPieces(s string, a int, sep byte, strict bool, add func(ObjFinding)) {
 			return // arquivo
 		}
 		if folderOutside(v, strict) {
-			add(ObjFinding{a, b, "pasta", "caminho", false})
+			add(ObjFinding{a, b, "folder", "caminho", false})
 		}
 		if !dir {
 			return
@@ -171,7 +171,7 @@ func findPathsOutside(s string, add func(ObjFinding)) {
 		if !letterD(h[0]) && !isDig(h[0]) || publicDev(h) || publicDomain(strings.ToLower(h)) || len(h) < 2 || reTextEscape.MatchString(h) {
 			continue
 		}
-		add(ObjFinding{a, b, "servidor", "caminho", true})
+		add(ObjFinding{a, b, "server", "caminho", true})
 		slashPathPieces(s, b, add)
 		i = b
 	}
@@ -202,7 +202,7 @@ func slashPathPieces(s string, a int, add func(ObjFinding)) {
 			return
 		}
 		if folderOutside(v, false) {
-			add(ObjFinding{a, a + len(v), "pasta", "caminho", false})
+			add(ObjFinding{a, a + len(v), "folder", "caminho", false})
 		}
 		if !dir {
 			return

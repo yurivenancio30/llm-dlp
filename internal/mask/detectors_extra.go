@@ -38,11 +38,11 @@ var cookieAttribute = setOf("path", "domain", "expires", "max-age", "samesite", 
 // findExtras runs the detectors of this file.
 func (m *Masker) findExtras(s, lower string, longNum bool, add func(ini, end int, typ string)) {
 	on := func(d string) bool { return !m.cfg.Disabled(d) }
-	if on("segredo") {
+	if on("secret") {
 		if strings.Contains(lower, "authorization") {
 			for _, ix := range reAuthHTTP.FindAllStringSubmatchIndex(s, -1) {
 				if !strings.ContainsAny(s[ix[2]:ix[2]+1], "$<{%*") { // ${TOKEN}, <your-token>: a marker, not a credential
-					add(ix[2], ix[3], "segredo")
+					add(ix[2], ix[3], "secret")
 				}
 			}
 		}
@@ -61,7 +61,7 @@ func (m *Masker) findExtras(s, lower string, longNum bool, add func(ini, end int
 							b--
 						}
 						if !cookieAttribute[name] && b-a >= 8 {
-							add(a, b, "segredo")
+							add(a, b, "secret")
 						}
 					}
 					p = q + 1
@@ -69,9 +69,9 @@ func (m *Masker) findExtras(s, lower string, longNum bool, add func(ini, end int
 			}
 		}
 	}
-	if on("processo") && longNum && strings.Contains(s, ".") {
+	if on("lawsuit") && longNum && strings.Contains(s, ".") {
 		for _, ix := range reCNJ.FindAllStringIndex(s, -1) {
-			add(ix[0], ix[1], "processo")
+			add(ix[0], ix[1], "lawsuit")
 		}
 	}
 	if on("cnpj") && strings.Contains(s, "/") {
@@ -93,17 +93,17 @@ func (m *Masker) findExtras(s, lower string, longNum bool, add func(ini, end int
 	if on("boleto") && longNum && len(s) >= 44 {
 		findBoletos(s, add)
 	}
-	if on("rastreio") && longNum {
+	if on("tracking") && longNum {
 		findTrackingCodes(s, add)
 	}
 	if on("rg") && (strings.Contains(lower, "rg") || strings.Contains(lower, "r.g.") || strings.Contains(lower, "identidade") ||
 		strings.Contains(lower, "registro geral")) {
 		findLabeledRG(s, add)
 	}
-	if on("certidao") && longNum && len(s) >= 32 {
+	if on("certificate") && longNum && len(s) >= 32 {
 		findCertificates(s, add)
 	}
-	if on("sensivel") {
+	if on("sensitive") {
 		if hasCIDTrigger(lower) {
 			findCID(s, add)
 		}

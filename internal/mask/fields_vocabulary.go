@@ -53,17 +53,17 @@ func defaultVocabulary() *vocabulary {
 	by("pis", "pis", "pasep", "nis", "nit")
 	by("doc", "document", "documento", "documentos", "taxpayer", "taxid", "tin", "cpfcnpj", "passaporte", "passport", "renavam", "ctps", "chassi", "vin", "placa", "cns", "ssn", "nif", "dni", "curp", "rfc", "cuit", "rut",
 		"taxid", "imei", "certidao", "rne", "crm", "oab", "crea")
-	by("nascimento", "nascimento", "nasc", "birth", "birthdate", "birthday", "dob", "dateofbirth", "obito", "falecimento")
-	by("telefone", "telefone", "fone", "celular", "phone", "telephone", "mobile", "whatsapp", "tel", "fax", "cell", "cellphone", "ramal")
+	by("birthdate", "nascimento", "nasc", "birth", "birthdate", "birthday", "dob", "dateofbirth", "obito", "falecimento")
+	by("phone", "telefone", "fone", "celular", "phone", "telephone", "mobile", "whatsapp", "tel", "fax", "cell", "cellphone", "ramal")
 	by("cep", "cep", "zipcode", "zip", "postal", "postalcode", "postcode")
-	by("endereco", "endereco", "logradouro", "street", "rua")
-	by("usuario", "matricula", "login", "username", "userid", "logon", "chapa", "cracha", "badge", "employeeid", "empid", "customerid")
-	by("conta", "iban", "bban")
-	by("sensivel", "religiao", "religion", "crenca", "raca", "etnia", "ethnicity", "sindicato", "sindical", "doenca", "deficiencia", "sanguineo",
+	by("address", "endereco", "logradouro", "street", "rua")
+	by("user", "matricula", "login", "username", "userid", "logon", "chapa", "cracha", "badge", "employeeid", "empid", "customerid")
+	by("account", "iban", "bban")
+	by("sensitive", "religiao", "religion", "crenca", "raca", "etnia", "ethnicity", "sindicato", "sindical", "doenca", "deficiencia", "sanguineo",
 		"biometria", "biometrico", "diagnosis", "disability", "prontuario", "race", "racial", "genetico", "genetica",
 		"genetic", "hiv", "sorologia", "biometric", "biometrics", "comorbidade", "comorbidades")
-	by("nome", "sobrenome", "surname", "fullname", "firstname", "lastname", "fname", "lname", "maidenname", "nickname", "apelido", "filiacao")
-	by("quase", "sexo", "genero", "gender", "idade", "age", "nacionalidade", "naturalidade", "nationality", "profissao", "ocupacao", "occupation",
+	by("name", "sobrenome", "surname", "fullname", "firstname", "lastname", "fname", "lname", "maidenname", "nickname", "apelido", "filiacao")
+	by("quasi", "sexo", "genero", "gender", "idade", "age", "nacionalidade", "naturalidade", "nationality", "profissao", "ocupacao", "occupation",
 		"salario", "renda", "salary", "income", "latitude", "longitude", "lat", "lng", "lon", "escolaridade")
 	v.person = setOf("cliente", "customer", "pessoa", "person", "titular", "owner", "steward", "custodian", "custodiante", "funcionario",
 		"colaborador", "employee", "usuario", "usu", "user", "responsavel", "gestor", "manager", "gerente", "contato", "contact", "socio",
@@ -97,14 +97,14 @@ func (v *vocabulary) labelClass(label string) string {
 		return ""
 	}
 	if compoundSensitive(ts) {
-		return "sensivel"
+		return "sensitive"
 	}
 	class, name, person, abbrevOnly, user, codeID := "", false, false, true, false, false
 	for i, t := range ts {
 		switch {
 		case v.class[t] != "":
 			c := v.class[t]
-			if c == "quase" && !v.almost {
+			if c == "quasi" && !v.almost {
 				return ""
 			}
 			if class != "" && class != c {
@@ -149,42 +149,42 @@ func (v *vocabulary) labelClass(label string) string {
 		has("driver", "drivers") && has("license", "licence"):
 		return "doc"
 	case has("cartao", "card") && (has("credito", "credit", "debito") || has("num", "numero", "number", "nr", "nu")) && !has("sus"):
-		return "cartao"
+		return "card"
 	case has("conta", "account") && (has("corrente", "bancaria", "bank", "poupanca") || has("num", "numero", "number", "nr", "nu")),
 		has("agencia") && (has("conta") || has("num", "numero", "nr", "nu", "cod", "cd")):
-		return "conta"
+		return "account"
 	case has("orientacao") && has("sexual"), has("partido") && has("politico"):
-		return "sensivel"
+		return "sensitive"
 	case has("estado", "marital") && has("civil", "status"):
 		if v.almost {
-			return "quase"
+			return "quasi"
 		}
 		return ""
 	case has("titulo", "eleitor", "sus", "cartao", "card", "credito", "credit", "debito", "sexual", "orientacao", "politico", "partido",
 		"conta", "account", "bank", "bancaria", "corrente", "agencia", "poupanca", "estado", "civil", "marital", "status", "tax", "social",
 		"security", "license", "licence", "driver", "drivers"):
 		return ""
-	case has("tipo", "type") && class != "sensivel", has("cor") && class != "sensivel":
+	case has("tipo", "type") && class != "sensitive", has("cor") && class != "sensitive":
 		return "" // "tipo_usuario", "cor" sozinho; valem "tipo_sanguineo", "raca_cor"
 	case class != "":
 		return class
 	case name && user && len(ts) <= 3:
-		return "usuario" // "user_name", "nome_usuario": it is the login
+		return "user" // "user_name", "nome_usuario": it is the login
 	case name && person:
-		return "nome"
+		return "name"
 	case codeID && person:
-		return "usuario" // "cod_usu_owner", "id_cliente", "user_id", "cd_func"
+		return "user" // "cod_usu_owner", "id_cliente", "user_id", "cd_func"
 	case len(ts) == 1 && (ts[0] == "usuario" || ts[0] == "usu"):
-		return "usuario"
+		return "user"
 	case person && !abbrevOnly && !codeID && !name && !user && !has("completo", "full", "first", "last") &&
 		!has("pai"): // "pai" alone is usually "parent process", "parent node"
 		// "Cliente", "Paciente", "Owner", "Data Steward", "Responsável": usually the person's name,
 		// but it can also be a role or a system ("SYSADMIN", "TI"); only counts for a value with
 		// first and last name
-		return "nomecompleto"
+		return "name_full"
 	case name && len(ts) == 1:
 		// "nome" or "name" alone: only counts in a table that has another person column
-		return "nomesolto"
+		return "name_loose"
 	}
 	return ""
 }

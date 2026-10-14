@@ -127,7 +127,7 @@ func TestReaderCloudURLs(t *testing.T) {
 	check(t, m, "https://stcontasx2.queue.core.windows.net/fila-n2", []string{"stcontasx2", "fila-n2"}, nil)
 	check(t, m, "Endpoint=sb://sb-n3.servicebus.windows.net/;SharedAccessKeyName=x;EntityPath=fila-n3", []string{"sb-n3", "fila-n3"}, []string{".servicebus.windows.net/"})
 	check(t, m, "https://sqs.sa-east-1.amazonaws.com/210987654321/fila-n4", []string{"210987654321", "fila-n4"}, []string{"sqs.sa-east-1.amazonaws.com/"})
-	if got := typeOf(m, "/subscriptions/1a2b3c4d-1111-2222-3333-abcdefabcdef/resourceGroups/rg-n5/providers/Microsoft.Sql/servers/sqlsrv-n5/databases/vendas_n5", "sqlsrv-n5"); got != "obj.servidor" {
+	if got := typeOf(m, "/subscriptions/1a2b3c4d-1111-2222-3333-abcdefabcdef/resourceGroups/rg-n5/providers/Microsoft.Sql/servers/sqlsrv-n5/databases/vendas_n5", "sqlsrv-n5"); got != "obj.server" {
 		t.Errorf("Azure: servidor tipo %q", got)
 	}
 	if got := typeOf(m, "/subscriptions/1a2b3c4d-1111-2222-3333-abcdefabcdef/resourceGroups/rg-n5/providers/Microsoft.Sql/servers/sqlsrv-n5/databases/vendas_n5", "vendas_n5"); got != "obj.database" {

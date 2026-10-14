@@ -13,7 +13,7 @@ var reStrongTest = regexp.MustCompile(`\b(TABLE|HOST|COLUMN) ([\w.\-]+)`)
 var reWeakTest = regexp.MustCompile(`\b(tab|ref) ([\w.\-]+)`)
 
 func testReader() []Reader {
-	ent := map[string]string{"TABLE": "tabela", "HOST": "servidor", "COLUMN": "coluna", "tab": "tabela", "ref": "tabela"}
+	ent := map[string]string{"TABLE": "table", "HOST": "server", "COLUMN": "column", "tab": "table", "ref": "table"}
 	return []Reader{{Name: "teste", Public: func(v string) bool { return strings.EqualFold(v, "dual_x1") },
 		Find: func(s string, add func(ObjFinding)) {
 			for _, ix := range reStrongTest.FindAllStringSubmatchIndex(s, -1) {
@@ -35,26 +35,26 @@ var rePseudoT = regexp.MustCompile(`\b[Tt]_[a-z2-7]{8}\b`)
 
 func TestObjectPseudonym(t *testing.T) {
 	m := withReader(t)
-	a := m.Pseudonym("obj.tabela", "tb_pedido_x9")
+	a := m.Pseudonym("obj.table", "tb_pedido_x9")
 	if !regexp.MustCompile(`^t_[a-z2-7]{8}$`).MatchString(a) {
 		t.Fatalf("formato: %q", a)
 	}
-	if b := m.Pseudonym("obj.tabela", "TB_PEDIDO_X9"); b != "T"+a[1:] {
+	if b := m.Pseudonym("obj.table", "TB_PEDIDO_X9"); b != "T"+a[1:] {
 		t.Errorf("a mesma tabela em maiúsculas deveria ter o mesmo ID: %q %q", a, b)
 	}
-	if b := m.Pseudonym("obj.tabela", "[tb_pedido_x9]"); b[2:] != a[2:] {
+	if b := m.Pseudonym("obj.table", "[tb_pedido_x9]"); b[2:] != a[2:] {
 		t.Errorf("colchetes não deveriam mudar o ID")
 	}
-	if b := m.Pseudonym("obj.coluna", "tb_pedido_x9"); b[2:] == a[2:] {
+	if b := m.Pseudonym("obj.column", "tb_pedido_x9"); b[2:] == a[2:] {
 		t.Errorf("tipos diferentes deveriam ter IDs diferentes")
 	}
 	// stable across instances (restart) with the same key; another one with another key
 	m2, _ := NewMasker(m.cfg, testKey, nil, nil)
-	if m2.Pseudonym("obj.tabela", "tb_pedido_x9") != a {
+	if m2.Pseudonym("obj.table", "tb_pedido_x9") != a {
 		t.Errorf("pseudônimo mudou com outra instância da mesma chave")
 	}
 	m3, _ := NewMasker(m.cfg, []byte("outra-chave-outra-chave-outra-32"), nil, nil)
-	if m3.Pseudonym("obj.tabela", "tb_pedido_x9") == a {
+	if m3.Pseudonym("obj.table", "tb_pedido_x9") == a {
 		t.Errorf("chaves diferentes deram o mesmo pseudônimo")
 	}
 }
@@ -124,7 +124,7 @@ func TestSimpleWordAndColumnDoNotPropagate(t *testing.T) {
 	if out, _ := m.Mask("soma de vl_total_x2"); !strings.Contains(out, "vl_total_x2") {
 		t.Errorf("coluna não deveria propagar por padrão: %q", out)
 	}
-	m.cfg.Objects.Propagate = map[string]bool{"coluna": true}
+	m.cfg.Objects.Propagate = map[string]bool{"column": true}
 	m.Mask("COLUMN vl_outro_x3")
 	if out, _ := m.Mask("soma de vl_outro_x3"); strings.Contains(out, "vl_outro_x3") {
 		t.Errorf("com propagar.coluna ligado deveria propagar: %q", out)
@@ -144,7 +144,7 @@ func TestPublicVocabularyNotLearned(t *testing.T) {
 func TestToggleByType(t *testing.T) {
 	m := withReader(t)
 	m.Mask("HOST srv-exemplo-01")
-	m.cfg.Objects.Mask = map[string]bool{"servidor": false}
+	m.cfg.Objects.Mask = map[string]bool{"server": false}
 	if out, _ := m.Mask("HOST srv-exemplo-02"); !strings.Contains(out, "srv-exemplo-02") {
 		t.Errorf("servidor desligado foi mascarado na posição: %q", out)
 	}
@@ -258,10 +258,10 @@ func TestNameShapedLikePseudonymIsMasked(t *testing.T) {
 // Item 4a: case is only ignored in the SQL types; in the others, each spelling is a name.
 func TestCaseOnlyInSQLTypes(t *testing.T) {
 	m := newTest(t)
-	if m.Pseudonym("obj.tabela", "TB_X1") == "" || m.Pseudonym("obj.tabela", "TB_X1")[2:] != m.Pseudonym("obj.tabela", "tb_x1")[2:] {
+	if m.Pseudonym("obj.table", "TB_X1") == "" || m.Pseudonym("obj.table", "TB_X1")[2:] != m.Pseudonym("obj.table", "tb_x1")[2:] {
 		t.Errorf("tabela: a caixa deveria ser ignorada")
 	}
-	a, b := m.Pseudonym("obj.pasta", "Relatorios_x1"), m.Pseudonym("obj.pasta", "relatorios_x1")
+	a, b := m.Pseudonym("obj.folder", "Relatorios_x1"), m.Pseudonym("obj.folder", "relatorios_x1")
 	if a[strings.IndexByte(a, '_'):] == b[strings.IndexByte(b, '_'):] {
 		t.Errorf("pasta: grafias diferentes deveriam ter pseudônimos diferentes")
 	}

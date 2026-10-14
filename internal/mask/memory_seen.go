@@ -97,10 +97,12 @@ func LoadSeen(path string) (*Seen, error) {
 		v.ids = map[string]string{} // old format (list): start over; the values are learned again
 	}
 	for id, t := range v.ids {
+		t = currentType(t)
+		v.ids[id] = t
 		v.tally(id, t)
 	}
 	// a file from before lengths were stored: without the filter (tests every piece)
-	v.noSize = v.n["segredo"] > 0 && len(v.size) == 0
+	v.noSize = v.n["secret"] > 0 && len(v.size) == 0
 	return v, nil
 }
 
@@ -133,6 +135,7 @@ func (v *Seen) mergeFromDisk() {
 	}
 	for id, t := range other {
 		if _, ok := v.ids[id]; !ok {
+			t = currentType(t)
 			v.ids[id] = t
 			v.tally(id, t)
 		}

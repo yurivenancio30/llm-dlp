@@ -94,7 +94,7 @@ func entKey(k string) (ent string, strong bool) {
 			var b [24]byte
 			strong = cloudProjectPrefix[string(lowercase(k, ps[n-2], &b))]
 		}
-		return "conta_nuvem", strong
+		return "cloud_account", strong
 	}
 	// colado: "rolename", "warehousename", "accountname", "fieldpath"
 	for _, suf := range gluedSuffixes {
@@ -114,7 +114,7 @@ func entKey(k string) (ent string, strong bool) {
 		pen := lowercase(k, ps[n-2], &b2)
 		// "<type>Name", "<type>_id", "groupId": the piece before name/id gives the type
 		if string(pen) == "account" && n >= 3 && strings.EqualFold(k[ps[n-3][0]:ps[n-3][1]], "service") {
-			return "usuario", true // serviceAccountName: a service account is a user
+			return "user", true // serviceAccountName: a service account is a user
 		}
 		if u := string(lastPos); u == "name" || u == "names" || u == "id" || u == "ids" || u == "path" && (string(pen) == "field" || string(pen) == "column") {
 			if e, ok := entBeforeName[string(pen)]; ok {
@@ -136,11 +136,11 @@ func entKey(k string) (ent string, strong bool) {
 		switch string(lastPos) {
 		case "servers":
 			if string(pen) == "bootstrap" {
-				return "servidor", true
+				return "server", true
 			}
 		case "id":
 			if string(pen) == "project" {
-				return "conta_nuvem", true
+				return "cloud_account", true
 			}
 		case "name":
 			if e, ok := entBeforeName[string(pen)]; ok {
@@ -349,7 +349,7 @@ func kvIn(s string, p int, add func(ObjFinding)) {
 		for vb < len(s) && !kvValueEnd(s[vb]) {
 			vb++
 			// server list without spaces: "b1:9092,b2:9092"
-			if ent == "servidor" && vb+1 < len(s) && s[vb] == ',' && isAlnum(s[vb+1]) {
+			if ent == "server" && vb+1 < len(s) && s[vb] == ',' && isAlnum(s[vb+1]) {
 				vb++
 			}
 		}
@@ -405,8 +405,8 @@ func kvIn(s string, p int, add func(ObjFinding)) {
 		}
 		// topic/queue (fin.notas.emitidas) or user (maria.souza) with a dot in a configuration key
 		// (KAFKA_TOPIC=, kafka.topic=, user:): a name, not attribute access nor a domain
-		topic := (ent == "fila" || ent == "usuario") && (c == ':' || uppercaseOnly(key) || punctuated) && dottedName(val, ent == "usuario")
-		if i := strings.IndexByte(val, '.'); i >= 0 && ent != "database" && ent != "schema" && ent != "tabela" &&
+		topic := (ent == "queue" || ent == "user") && (c == ':' || uppercaseOnly(key) || punctuated) && dottedName(val, ent == "user")
+		if i := strings.IndexByte(val, '.'); i >= 0 && ent != "database" && ent != "schema" && ent != "table" &&
 			!topic && !internalSuffix(strings.ToLower(val)) {
 			return
 		}
@@ -548,8 +548,8 @@ func resourceValue(v, ent string) bool {
 	// SQL names accept "$" in the middle (V$SESSION, ped$hist); they and the user accept letters of
 	// any script ("Продажи", "客户数据", "josé"): for a Russian or Chinese customer the real name is in
 	// that script. Host, bucket, queue and namespace do not (the system only accepts ASCII).
-	sqlEnt := entSQL[ent] && ent != "servidor"
-	unicodeOK := sqlEnt || ent == "usuario"
+	sqlEnt := entSQL[ent] && ent != "server"
+	unicodeOK := sqlEnt || ent == "user"
 	c0 := v[0]
 	if !(isAlnum(c0) || c0 == '_' || unicodeOK && utf8Letter(v, 0) > 0) {
 		return false // caminho, $VAR, ${...}, {{...}}, %s, <x>, @x
@@ -574,29 +574,29 @@ func resourceValue(v, ent string) bool {
 			c == '|' || c == '^' || c == '~' || c == '`' || c == '\'' || c == '"' || c == ',' || c == ';' || c == '&' ||
 			c == '=' || c == '+' || c >= 0x80:
 			return false
-		case (c == ':' || c == '\\') && ent != "servidor":
+		case (c == ':' || c == '\\') && ent != "server":
 			return false
 		}
 		if !(c >= '0' && c <= '9' || c == '.' || c == ':' || c == '-' || c == '_') {
 			numOnly = false
 		}
 	}
-	if numOnly && !(ent == "conta_nuvem" && len(v) == 12 && allDigits(v)) || len(v) > 2 && (v[0] == '0' && (v[1] == 'x' || v[1] == 'X')) {
+	if numOnly && !(ent == "cloud_account" && len(v) == 12 && allDigits(v)) || len(v) > 2 && (v[0] == '0' && (v[1] == 'x' || v[1] == 'X')) {
 		return false // a number is not a name (the AWS account, 12 digits, is)
 	}
 	h := strings.ToLower(v)
 	if i := strings.IndexAny(h, ":\\"); i >= 0 {
 		h = h[:i]
 	}
-	if h == "" || publicDev(h) || ent != "conta_nuvem" && reVersionOrHash.MatchString(h) {
+	if h == "" || publicDev(h) || ent != "cloud_account" && reVersionOrHash.MatchString(h) {
 		return false
 	}
-	if d := strings.LastIndexByte(h, '.'); d >= 0 && ent != "database" && ent != "schema" && ent != "tabela" {
+	if d := strings.LastIndexByte(h, '.'); d >= 0 && ent != "database" && ent != "schema" && ent != "table" {
 		if publicDomain(h) || fileExtensions[h[d+1:]] {
 			return false
 		}
 		// "http.server", "xmlrpc.server": module path, not a machine name
-		if ent == "servidor" && !dashOrDigit(h) && !internalSuffix(h) {
+		if ent == "server" && !dashOrDigit(h) && !internalSuffix(h) {
 			return false
 		}
 	}
@@ -606,19 +606,19 @@ func resourceValue(v, ent string) bool {
 // markValue delivers the value s[a:b] with the key's entity.
 func markValue(s string, a, b int, ent, rule string, strong bool, add func(ObjFinding)) {
 	// 12 digits in an account or catalog key: the AWS account (the Glue catalog is the account)
-	if (ent == "conta_nuvem" || ent == "database") && b-a == 12 && allDigits(s[a:b]) {
-		add(ObjFinding{a, b, "conta_nuvem", rule, strong})
+	if (ent == "cloud_account" || ent == "database") && b-a == 12 && allDigits(s[a:b]) {
+		add(ObjFinding{a, b, "cloud_account", rule, strong})
 		return
 	}
 	// account followed by a region (Snowflake: xy12345.us-east-1, ABC12345.ap-south-1.aws): only
 	// the account
-	if ent == "conta_nuvem" {
+	if ent == "cloud_account" {
 		if d := strings.IndexByte(s[a:b], '.'); d > 0 && accountWithRegion(s[a+d+1:b]) {
 			b = a + d
 		}
 	}
 	switch ent {
-	case "servidor": // lista "h1:9092,h2:9092"
+	case "server": // lista "h1:9092,h2:9092"
 		for x := a; x < b; {
 			y := strings.IndexByte(s[x:b], ',')
 			if y < 0 {
@@ -631,7 +631,7 @@ func markValue(s string, a, b int, ent, rule string, strong bool, add func(ObjFi
 			}
 			x = y + 1
 		}
-	case "database", "schema", "tabela":
+	case "database", "schema", "table":
 		if !resourceValue(s[a:b], ent) {
 			return
 		}
@@ -684,7 +684,7 @@ func addHost(s string, a, b int, rule string, strong bool, add func(ObjFinding))
 	}
 	if i := strings.IndexByte(v, '\\'); i >= 0 {
 		if inst := v[i+1:]; inst != "" && reSimpleIdent.MatchString(inst) && !publicDev(inst) {
-			add(ObjFinding{a + i + 1, a + len(v), "servidor", rule, strong})
+			add(ObjFinding{a + i + 1, a + len(v), "server", rule, strong})
 		}
 		v = v[:i]
 	}
@@ -692,7 +692,7 @@ func addHost(s string, a, b int, rule string, strong bool, add func(ObjFinding))
 	if len(v) < 2 || publicDev(v) || isSimpleIPv4(v) {
 		return
 	}
-	add(ObjFinding{a, a + len(v), "servidor", rule, strong})
+	add(ObjFinding{a, a + len(v), "server", rule, strong})
 }
 
 // isSimpleIPv4: only digits and dots (the IP is left to the IP detector).

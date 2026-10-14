@@ -20,27 +20,27 @@ import "strings"
 
 // host suffix -> type of the client label (the first label of the host)
 var cloudHosts = []struct{ suf, ent string }{
-	{".rds.amazonaws.com", "servidor"},
-	{".redshift.amazonaws.com", "servidor"},
-	{".redshift-serverless.amazonaws.com", "servidor"},
-	{".cache.amazonaws.com", "servidor"},
-	{".es.amazonaws.com", "servidor"},
-	{".elb.amazonaws.com", "servidor"},
-	{".execute-api.", "servico"}, // <id>.execute-api.<region>.amazonaws.com
-	{".database.windows.net", "servidor"},
-	{".database.azure.com", "servidor"}, // <name>.postgres|mysql.database.azure.com
-	{".documents.azure.com", "servidor"},
-	{".redis.cache.windows.net", "servidor"},
-	{".vault.azure.net", "servico"},
-	{".azurewebsites.net", "servico"},
-	{".azurecr.io", "servidor"},
-	{".openai.azure.com", "servico"},
-	{".cognitiveservices.azure.com", "servico"},
-	{".azuredatabricks.net", "servidor"},
-	{".cloud.databricks.com", "servidor"},
-	{".gcp.databricks.com", "servidor"},
+	{".rds.amazonaws.com", "server"},
+	{".redshift.amazonaws.com", "server"},
+	{".redshift-serverless.amazonaws.com", "server"},
+	{".cache.amazonaws.com", "server"},
+	{".es.amazonaws.com", "server"},
+	{".elb.amazonaws.com", "server"},
+	{".execute-api.", "service"}, // <id>.execute-api.<region>.amazonaws.com
+	{".database.windows.net", "server"},
+	{".database.azure.com", "server"}, // <name>.postgres|mysql.database.azure.com
+	{".documents.azure.com", "server"},
+	{".redis.cache.windows.net", "server"},
+	{".vault.azure.net", "service"},
+	{".azurewebsites.net", "service"},
+	{".azurecr.io", "server"},
+	{".openai.azure.com", "service"},
+	{".cognitiveservices.azure.com", "service"},
+	{".azuredatabricks.net", "server"},
+	{".cloud.databricks.com", "server"},
+	{".gcp.databricks.com", "server"},
 	{".storage.googleapis.com", "bucket"},
-	{".appspot.com", "conta_nuvem"},
+	{".appspot.com", "cloud_account"},
 }
 
 // labels that are part of the host's shape, not of the client name
@@ -114,7 +114,7 @@ func findS3Virtual(s string, add func(ObjFinding)) {
 func findECRHost(s string, add func(ObjFinding)) {
 	for i := strings.Index(s, ".dkr.ecr."); i >= 0; {
 		if i >= 12 && allDigits(s[i-12:i]) && (i == 12 || !isAlnum(s[i-13])) {
-			add(ObjFinding{i - 12, i, "conta_nuvem", "nuvem-host", true})
+			add(ObjFinding{i - 12, i, "cloud_account", "nuvem-host", true})
 		}
 		j := strings.Index(s[i+1:], ".dkr.ecr.")
 		if j < 0 {

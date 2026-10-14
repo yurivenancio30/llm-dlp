@@ -44,7 +44,7 @@ func TestConnectionURLEachPartItsType(t *testing.T) {
 		if len(pseudos[password]) != 1 {
 			t.Errorf("senha %q: a senha não foi mascarada inteira: %v\n%s", password, pseudos, out)
 		}
-		if !regexp.MustCompile(`:SEGREDO-[a-z2-7]+@`).MatchString(out) {
+		if !regexp.MustCompile(`:SECRET-[a-z2-7]+@`).MatchString(out) {
 			t.Errorf("senha %q: sobrou parte da senha entre o pseudônimo e o @:\n%s", password, out)
 		}
 	}

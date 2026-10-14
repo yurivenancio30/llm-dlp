@@ -11,17 +11,17 @@ import (
 func entAzure(sgm string) string {
 	switch strings.ToLower(sgm) {
 	case "servers", "flexibleservers", "managedclusters", "clusters", "virtualmachines", "registries", "managedinstances":
-		return "servidor"
+		return "server"
 	case "databases", "databaseaccounts":
 		return "database"
 	case "storageaccounts", "containers":
 		return "bucket"
 	case "queues", "topics", "subscriptions", "eventhubs":
-		return "fila"
+		return "queue"
 	case "namespaces":
 		return "namespace"
 	}
-	return "servico"
+	return "service"
 }
 
 // addAzureName: the name of an ARM/Bicep resource; a child comes as "parent/child", one piece per
@@ -30,7 +30,7 @@ func addAzureName(s string, a, b int, typ, rule string, add func(ObjFinding)) {
 	sgmT := strings.Split(typ, "/")[1:]
 	ps := strings.Split(s[a:b], "/")
 	for k, p := range ps {
-		ent := "servico"
+		ent := "service"
 		if t := len(sgmT) - len(ps) + k; t >= 0 && t < len(sgmT) {
 			ent = entAzure(sgmT[t])
 		}
@@ -47,27 +47,27 @@ var (
 )
 
 // core of the attribute name -> entity
-var hclCore = map[string]string{"bucket": "bucket", "database": "database", "db": "database", "server": "servidor",
-	"instance": "servidor", "cluster": "servidor", "host": "servidor", "hostname": "servidor", "account": "conta_nuvem",
-	"project": "conta_nuvem", "namespace": "namespace", "topic": "fila", "queue": "fila", "subscription": "fila",
-	"repository": "repositorio", "repo": "repositorio", "dataset": "schema", "schema": "schema", "table": "tabela",
-	"username": "usuario", "user": "usuario", "organization": "organizacao", "org": "organizacao", "folder": "pasta",
-	"function": "servico"}
+var hclCore = map[string]string{"bucket": "bucket", "database": "database", "db": "database", "server": "server",
+	"instance": "server", "cluster": "server", "host": "server", "hostname": "server", "account": "cloud_account",
+	"project": "cloud_account", "namespace": "namespace", "topic": "queue", "queue": "queue", "subscription": "queue",
+	"repository": "repository", "repo": "repository", "dataset": "schema", "schema": "schema", "table": "table",
+	"username": "user", "user": "user", "organization": "organization", "org": "organization", "folder": "folder",
+	"function": "service"}
 
 // entHCLType: the entity of the name/identifier attribute by the resource type (aws_s3_bucket...).
 func entHCLType(t string) string {
 	t = strings.ToLower(t)
-	for _, p := range [][2]string{{"storage_account", "bucket"}, {"bucket", "bucket"}, {"service_account", "usuario"},
+	for _, p := range [][2]string{{"storage_account", "bucket"}, {"bucket", "bucket"}, {"service_account", "user"},
 		{"sql_database", "database"}, {"database", "database"}, {"db_instance", "database"}, {"rds_cluster", "database"},
-		{"dataset", "schema"}, {"table", "tabela"}, {"namespace", "namespace"}, {"topic", "fila"}, {"queue", "fila"},
-		{"subscription", "fila"}, {"repository", "repositorio"}, {"project", "conta_nuvem"}, {"folder", "pasta"},
-		{"organization", "organizacao"}, {"user", "usuario"}, {"role", "usuario"}, {"cluster", "servidor"},
-		{"server", "servidor"}, {"instance", "servidor"}, {"host", "servidor"}} {
+		{"dataset", "schema"}, {"table", "table"}, {"namespace", "namespace"}, {"topic", "queue"}, {"queue", "queue"},
+		{"subscription", "queue"}, {"repository", "repository"}, {"project", "cloud_account"}, {"folder", "folder"},
+		{"organization", "organization"}, {"user", "user"}, {"role", "user"}, {"cluster", "server"},
+		{"server", "server"}, {"instance", "server"}, {"host", "server"}} {
 		if strings.Contains(t, p[0]) {
 			return p[1]
 		}
 	}
-	return "servico"
+	return "service"
 }
 
 // entHCLAttr: (entity, strong, ok) of attribute attr in a resource of type t, at depth depth.

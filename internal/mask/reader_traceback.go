@@ -288,14 +288,14 @@ func (m *Masker) findTraceback(s string, add func(ObjFinding)) {
 				k := a + mt[2]
 				for _, p := range strings.Split(strings.TrimSuffix(pkg, "."), ".") {
 					if len(p) >= 2 && !javaDomains[p] && !publicDev(p) {
-						add(ObjFinding{k, k + len(p), "pacote", "traceback", true})
+						add(ObjFinding{k, k + len(p), "package", "traceback", true})
 					}
 					k += len(p) + 1
 				}
-				idents(a+mt[4], a+mt[5], "pacote")
+				idents(a+mt[4], a+mt[5], "package")
 				if f := l[mt[6]:mt[7]]; strings.IndexByte(f, '.') > 0 {
 					if st := f[:strings.IndexByte(f, '.')]; clientName(st) {
-						add(ObjFinding{a + mt[6], a + mt[6] + len(st), "pacote", "traceback", false})
+						add(ObjFinding{a + mt[6], a + mt[6] + len(st), "package", "traceback", false})
 					}
 				}
 			}
@@ -319,7 +319,7 @@ func (m *Masker) findTraceback(s string, add func(ObjFinding)) {
 				k := goFunc[0]
 				for i, p := range strings.Split(s[goFunc[0]:goFunc[1]], "/") {
 					if host := i == 0 && strings.IndexByte(p, '.') >= 0; !host && len(p) >= 2 && !publicDev(p) && !publicFolder(p) {
-						add(ObjFinding{k, k + len(p), "pacote", "traceback", true})
+						add(ObjFinding{k, k + len(p), "package", "traceback", true})
 						fromPackage[p] = true
 					}
 					k += len(p) + 1
@@ -327,7 +327,7 @@ func (m *Masker) findTraceback(s string, add func(ObjFinding)) {
 				k = a + mt[2]
 				for _, p := range strings.Split(l[mt[2]:mt[3]], "/") {
 					if fromPackage[p] {
-						add(ObjFinding{k, k + len(p), "pacote", "traceback", true})
+						add(ObjFinding{k, k + len(p), "package", "traceback", true})
 					}
 					k += len(p) + 1
 				}

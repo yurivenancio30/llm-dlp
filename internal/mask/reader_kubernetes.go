@@ -48,24 +48,24 @@ func addImage(s string, a, b int, rule string, add func(ObjFinding)) {
 		return
 	}
 	end := imagePathEnd(v, bar)
-	first := "servico" // type of the first piece of the path
+	first := "service" // type of the first piece of the path
 	switch {
 	case lh == "gcr.io" || strings.HasSuffix(lh, ".gcr.io") || strings.HasSuffix(lh, ".pkg.dev"):
-		first = "conta_nuvem" // gcr.io/<project>/..., <region>-docker.pkg.dev/<project>/<repo>/...
+		first = "cloud_account" // gcr.io/<project>/..., <region>-docker.pkg.dev/<project>/<repo>/...
 	case strings.HasSuffix(lh, ".amazonaws.com") && strings.Contains(lh, ".dkr.ecr."):
 		if p := strings.IndexByte(host, '.'); p == 12 && allDigits(host[:p]) {
-			addName(s, a, a+p, "conta_nuvem", rule, true, add)
+			addName(s, a, a+p, "cloud_account", rule, true, add)
 		}
 	case strings.HasSuffix(lh, ".azurecr.io"):
-		addName(s, a, a+strings.IndexByte(host, '.'), "servidor", rule, true, add)
+		addName(s, a, a+strings.IndexByte(host, '.'), "server", rule, true, add)
 	default:
 		if !isIPv4(host) {
-			addName(s, a, a+len(host), "servidor", rule, true, add)
+			addName(s, a, a+len(host), "server", rule, true, add)
 		}
 	}
 	k := a + bar + 1
 	for n, p := range strings.Split(v[bar+1:end], "/") {
-		ent := "servico"
+		ent := "service"
 		if n == 0 {
 			ent = first
 		}
@@ -116,7 +116,7 @@ func publicPath(s string, a, b int, rule string, add func(ObjFinding)) {
 	k := a
 	for _, p := range ps {
 		if p != "" {
-			addName(s, k, k+len(p), "servico", rule, true, add)
+			addName(s, k, k+len(p), "service", rule, true, add)
 		}
 		k += len(p) + 1
 	}
@@ -234,9 +234,9 @@ func entKind(kind string) string {
 	case "Namespace":
 		return "namespace"
 	case "ServiceAccount":
-		return "usuario"
+		return "user"
 	}
-	return "servico"
+	return "service"
 }
 
 func k8sRule(s string, e *yEnt, rel []string, kind, v string, add func(ObjFinding)) {
@@ -260,22 +260,22 @@ func k8sRule(s string, e *yEnt, rel []string, kind, v string, add func(ObjFindin
 	case k == "namespace" && prev == "metadata":
 		addName(s, a, b, "namespace", "k8s", true, add)
 	case k == "serviceName" || k == "claimName" || k == "secretName":
-		addName(s, a, b, "servico", "k8s", true, add)
+		addName(s, a, b, "service", "k8s", true, add)
 	case k == "serviceAccountName" || k == "serviceAccount":
-		addName(s, a, b, "usuario", "k8s", true, add)
+		addName(s, a, b, "user", "k8s", true, add)
 	case k == "name" && (prev == "secretKeyRef" || prev == "configMapKeyRef" || prev == "secretRef" || prev == "configMapRef" || prev == "configMap" || prev == "service"):
-		addName(s, a, b, "servico", "k8s", true, add)
+		addName(s, a, b, "service", "k8s", true, add)
 	case k == "name" && prev == "-" && n >= 3 && rel[n-3] == "imagePullSecrets":
-		addName(s, a, b, "servico", "k8s", true, add)
+		addName(s, a, b, "service", "k8s", true, add)
 	case kind == "Ingress" && (k == "host" && n >= 3 && rel[n-3] == "rules" || k == "-" && prev == "hosts"):
 		if strings.HasPrefix(v, "*.") {
 			a += 2
 		}
-		addName(s, a, b, "servidor", "k8s", true, add)
+		addName(s, a, b, "server", "k8s", true, add)
 	case k == "image":
 		addImage(s, a, b, "imagem", add)
 	case k8sLabels[k] && (prev == "labels" || prev == "matchLabels" || prev == "selector"):
-		addName(s, a, b, "servico", "k8s-label", false, add)
+		addName(s, a, b, "service", "k8s-label", false, add)
 	}
 }
 
@@ -286,9 +286,9 @@ func kubeconfigRule(s string, e *yEnt, rel []string, v string, add func(ObjFindi
 	p := strings.Join(rel, ".")
 	switch p {
 	case "clusters.-.name", "contexts.-.name", "current-context", "contexts.-.context.cluster":
-		addARNOrName(s, e.vi, e.vf, "servidor", "kubeconfig", add)
+		addARNOrName(s, e.vi, e.vf, "server", "kubeconfig", add)
 	case "users.-.name", "contexts.-.context.user":
-		addARNOrName(s, e.vi, e.vf, "usuario", "kubeconfig", add)
+		addARNOrName(s, e.vi, e.vf, "user", "kubeconfig", add)
 	case "contexts.-.context.namespace":
 		addName(s, e.vi, e.vf, "namespace", "kubeconfig", true, add)
 	case "clusters.-.cluster.server":
@@ -301,7 +301,7 @@ func kubeconfigRule(s string, e *yEnt, rel []string, v string, add func(ObjFindi
 		for b < e.vf && s[b] != ':' && s[b] != '/' {
 			b++
 		}
-		addName(s, a, b, "servidor", "kubeconfig", true, add)
+		addName(s, a, b, "server", "kubeconfig", true, add)
 	}
 }
 
@@ -325,7 +325,7 @@ func findK8sDNS(s string, add func(ObjFinding)) {
 		ns := f - len(ps[len(ps)-1])
 		sv := ns - 1 - len(ps[len(ps)-2])
 		addName(s, ns, f, "namespace", "k8s-dns", true, add)
-		addName(s, sv, ns-1, "servico", "k8s-dns", true, add)
+		addName(s, sv, ns-1, "service", "k8s-dns", true, add)
 	}
 }
 

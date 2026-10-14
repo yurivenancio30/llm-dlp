@@ -57,23 +57,23 @@ func checkReader(t *testing.T, name string, find func(string, func(ObjFinding)),
 func TestReaderKeyValue(t *testing.T) {
 	checkReader(t, "chave-valor", findKeyValue, publicDev, []readerCase{
 		// YAML, JSON, TOML, INI, .env, .properties
-		{"host: db-exemplo-01.interno\nport: 5432\n", []string{"servidor:db-exemplo-01.interno!"}},
+		{"host: db-exemplo-01.interno\nport: 5432\n", []string{"server:db-exemplo-01.interno!"}},
 		{"database: vendas_x\nschema: financeiro\n", []string{"database:vendas_x!", "schema:financeiro!"}},
-		{`{"host": "db-exemplo-01", "user": "svc_relatorio", "timeout": 30}`, []string{"servidor:db-exemplo-01!", "usuario:svc_relatorio!"}},
-		{"[conexao]\nhost=db-exemplo-01\ndbname=vendas_x\n", []string{"database:vendas_x!", "servidor:db-exemplo-01!"}},
-		{"export DB_HOST=db-exemplo-01\nDB_USER=svc_relatorio\n", []string{"servidor:db-exemplo-01!", "usuario:svc_relatorio!"}},
-		{"spring.datasource.username=svc_relatorio\n", []string{"usuario:svc_relatorio!"}},
-		{"bootstrap.servers=kafka-01:9092,kafka-02:9092\n", []string{"servidor:kafka-01!", "servidor:kafka-02!"}},
-		{"queue: fila-pedidos-x9\nbucket = \"bkt-relatorios-demo\"\n", []string{"bucket:bkt-relatorios-demo!", "fila:fila-pedidos-x9!"}},
-		{"table: financeiro.tb_pedido_x9\n", []string{"schema:financeiro!", "tabela:tb_pedido_x9!"}},
-		{"namespace: vendas-prod\napp: pedidos-api\n", []string{"namespace:vendas-prod!", "servico:pedidos-api!"}},
-		{"project_id = \"proj-exemplo-01\"\n", []string{"conta_nuvem:proj-exemplo-01!"}},
-		{`dbHost: "db-exemplo-02"`, []string{"servidor:db-exemplo-02!"}},
+		{`{"host": "db-exemplo-01", "user": "svc_relatorio", "timeout": 30}`, []string{"server:db-exemplo-01!", "user:svc_relatorio!"}},
+		{"[conexao]\nhost=db-exemplo-01\ndbname=vendas_x\n", []string{"database:vendas_x!", "server:db-exemplo-01!"}},
+		{"export DB_HOST=db-exemplo-01\nDB_USER=svc_relatorio\n", []string{"server:db-exemplo-01!", "user:svc_relatorio!"}},
+		{"spring.datasource.username=svc_relatorio\n", []string{"user:svc_relatorio!"}},
+		{"bootstrap.servers=kafka-01:9092,kafka-02:9092\n", []string{"server:kafka-01!", "server:kafka-02!"}},
+		{"queue: fila-pedidos-x9\nbucket = \"bkt-relatorios-demo\"\n", []string{"bucket:bkt-relatorios-demo!", "queue:fila-pedidos-x9!"}},
+		{"table: financeiro.tb_pedido_x9\n", []string{"schema:financeiro!", "table:tb_pedido_x9!"}},
+		{"namespace: vendas-prod\napp: pedidos-api\n", []string{"namespace:vendas-prod!", "service:pedidos-api!"}},
+		{"project_id = \"proj-exemplo-01\"\n", []string{"cloud_account:proj-exemplo-01!"}},
+		{`dbHost: "db-exemplo-02"`, []string{"server:db-exemplo-02!"}},
 		// XML: elemento e atributo
-		{"<host>db-exemplo-01</host><database>vendas_x</database>", []string{"database:vendas_x!", "servidor:db-exemplo-01!"}},
-		{`<conexao host="db-exemplo-01" porta="1">`, []string{"servidor:db-exemplo-01!"}},
+		{"<host>db-exemplo-01</host><database>vendas_x</database>", []string{"database:vendas_x!", "server:db-exemplo-01!"}},
+		{`<conexao host="db-exemplo-01" porta="1">`, []string{"server:db-exemplo-01!"}},
 		// command line
-		{"pg_dump --host db-exemplo-01 --dbname=vendas_x --username svc_relatorio", []string{"database:vendas_x!", "servidor:db-exemplo-01!", "usuario:svc_relatorio!"}},
+		{"pg_dump --host db-exemplo-01 --dbname=vendas_x --username svc_relatorio", []string{"database:vendas_x!", "server:db-exemplo-01!", "user:svc_relatorio!"}},
 		{"kubectl get pods --namespace vendas-prod", []string{"namespace:vendas-prod!"}},
 		// value that stays: number, boolean, localhost, path, expression, public domain
 		{"host: localhost\nport: 5432\nuser: root\nenabled: true\n", nil},
@@ -106,24 +106,24 @@ func TestReaderKeyValue(t *testing.T) {
 func TestReaderAddresses(t *testing.T) {
 	checkReader(t, "endereço", findAddresses, publicDev, []readerCase{
 		// internal host in a URL
-		{"veja http://wiki-interna/pagina e https://grafana.vendas.svc.cluster.local:3000/d/x", []string{"servidor:wiki-interna!"}}, // the Kubernetes DNS is left to the Kubernetes reader
-		{"grpc://svc-pedidos.internal:50051", []string{"servidor:svc-pedidos.internal!"}},
-		{"http://svc_relatorio@intranet-x9/painel", []string{"servidor:intranet-x9!", "usuario:svc_relatorio!"}},
+		{"veja http://wiki-interna/pagina e https://grafana.vendas.svc.cluster.local:3000/d/x", []string{"server:wiki-interna!"}}, // the Kubernetes DNS is left to the Kubernetes reader
+		{"grpc://svc-pedidos.internal:50051", []string{"server:svc-pedidos.internal!"}},
+		{"http://svc_relatorio@intranet-x9/painel", []string{"server:intranet-x9!", "user:svc_relatorio!"}},
 		// armazenamento
-		{"aws s3 cp s3://bkt-relatorios-demo/carga_diaria/2026/arquivo.csv .", []string{"bucket:bkt-relatorios-demo!", "pasta:carga_diaria"}},
-		{"gs://bkt-relatorios-demo/dados_x/", []string{"bucket:bkt-relatorios-demo!", "pasta:dados_x"}},
-		{"abfss://ctn-dados@contaexemplo01.dfs.core.windows.net/bruto_x/", []string{"bucket:ctn-dados!", "conta_nuvem:contaexemplo01!", "pasta:bruto_x"}},
-		{"hdfs://namenode-x1:8020/user/etl_x/", []string{"pasta:etl_x", "servidor:namenode-x1!"}},
+		{"aws s3 cp s3://bkt-relatorios-demo/carga_diaria/2026/arquivo.csv .", []string{"bucket:bkt-relatorios-demo!", "folder:carga_diaria"}},
+		{"gs://bkt-relatorios-demo/dados_x/", []string{"bucket:bkt-relatorios-demo!", "folder:dados_x"}},
+		{"abfss://ctn-dados@contaexemplo01.dfs.core.windows.net/bruto_x/", []string{"bucket:ctn-dados!", "cloud_account:contaexemplo01!", "folder:bruto_x"}},
+		{"hdfs://namenode-x1:8020/user/etl_x/", []string{"folder:etl_x", "server:namenode-x1!"}},
 		// filas
-		{"amqp://svc_relatorio:x@rabbit-01.interno:5672/vhost_pedidos", []string{"fila:vhost_pedidos!", "servidor:rabbit-01.interno!", "usuario:svc_relatorio!"}},
-		{"kafka://broker-01:9092/fila-pedidos-x9", []string{"fila:fila-pedidos-x9!", "servidor:broker-01!"}},
+		{"amqp://svc_relatorio:x@rabbit-01.interno:5672/vhost_pedidos", []string{"queue:vhost_pedidos!", "server:rabbit-01.interno!", "user:svc_relatorio!"}},
+		{"kafka://broker-01:9092/fila-pedidos-x9", []string{"queue:fila-pedidos-x9!", "server:broker-01!"}},
 		// git in context
-		{"git clone https://github.com/org-exemplo/repo-demo.git", []string{"organizacao:org-exemplo!", "repositorio:repo-demo!"}},
-		{"git remote add origin https://gitlab.interno/org-exemplo/sub/repo-demo", []string{"organizacao:org-exemplo!", "organizacao:sub!", "repositorio:repo-demo!", "servidor:gitlab.interno!"}},
-		{"ssh://git@git-interno/org-exemplo/repo-demo.git", []string{"organizacao:org-exemplo!", "repositorio:repo-demo!", "servidor:git-interno!"}},
-		{"[remote \"origin\"]\n\turl = https://bitbucket.org/org-exemplo/repo-demo\n", []string{"organizacao:org-exemplo!", "repositorio:repo-demo!"}},
+		{"git clone https://github.com/org-exemplo/repo-demo.git", []string{"organization:org-exemplo!", "repository:repo-demo!"}},
+		{"git remote add origin https://gitlab.interno/org-exemplo/sub/repo-demo", []string{"organization:org-exemplo!", "organization:sub!", "repository:repo-demo!", "server:gitlab.interno!"}},
+		{"ssh://git@git-interno/org-exemplo/repo-demo.git", []string{"organization:org-exemplo!", "repository:repo-demo!", "server:git-interno!"}},
+		{"[remote \"origin\"]\n\turl = https://bitbucket.org/org-exemplo/repo-demo\n", []string{"organization:org-exemplo!", "repository:repo-demo!"}},
 		// address without a scheme
-		{"conecte em db01.corp:5432 ou redis.vendas.svc.cluster.local", []string{"servidor:db01.corp!"}}, // the Kubernetes DNS is left to the Kubernetes reader
+		{"conecte em db01.corp:5432 ou redis.vendas.svc.cluster.local", []string{"server:db01.corp!"}}, // the Kubernetes DNS is left to the Kubernetes reader
 		// stays: public domain, documentation, localhost, code
 		{"veja https://github.com/golang/go/issues/123 e https://pkg.go.dev/net/http", nil},
 		{"http://localhost:8080/ e http://127.0.0.1:9000 e http://host:port/", nil},
@@ -137,21 +137,21 @@ func TestReaderAddresses(t *testing.T) {
 
 func TestReaderGitSCP(t *testing.T) {
 	checkReader(t, "git", findGitSCP, publicDev, []readerCase{
-		{"git clone git@github.com:org-exemplo/repo-demo.git", []string{"organizacao:org-exemplo!", "repositorio:repo-demo!"}},
-		{"url = git@gitlab.corp:org-exemplo/repo-demo", []string{"organizacao:org-exemplo!", "repositorio:repo-demo!", "servidor:gitlab.corp!"}},
+		{"git clone git@github.com:org-exemplo/repo-demo.git", []string{"organization:org-exemplo!", "repository:repo-demo!"}},
+		{"url = git@gitlab.corp:org-exemplo/repo-demo", []string{"organization:org-exemplo!", "repository:repo-demo!", "server:gitlab.corp!"}},
 		{"e-mail digit@x.com e git@host:22", nil},
 	})
 }
 
 func TestReaderPackages(t *testing.T) {
-	checkReader(t, "pacote", findPackages, publicDev, []readerCase{
-		{"module git.interno/org-exemplo/svc-pedidos\n\ngo 1.22\n", []string{"pacote:org-exemplo!", "pacote:svc-pedidos!", "servidor:git.interno!"}},
-		{"module go.empresa-ficticia.com.br/vendas/v2\n", []string{"pacote:vendas!"}},
+	checkReader(t, "package", findPackages, publicDev, []readerCase{
+		{"module git.interno/org-exemplo/svc-pedidos\n\ngo 1.22\n", []string{"package:org-exemplo!", "package:svc-pedidos!", "server:git.interno!"}},
+		{"module go.empresa-ficticia.com.br/vendas/v2\n", []string{"package:vendas!"}},
 		{"module github.com/org-exemplo/repo-demo\n", nil},
-		{"<groupId>br.com.exemplo01.vendas</groupId>", []string{"pacote:exemplo01!", "pacote:vendas!"}},
+		{"<groupId>br.com.exemplo01.vendas</groupId>", []string{"package:exemplo01!", "package:vendas!"}},
 		{"<groupId>org.springframework.boot</groupId><groupId>io.netty</groupId>", nil},
-		{"group = 'com.exemplo01.relatorio'\n", []string{"pacote:exemplo01!", "pacote:relatorio!"}},
-		{`{"name": "@org-exemplo/pacote-demo", "version": "1.0.0"}`, []string{"organizacao:org-exemplo!", "pacote:pacote-demo!"}},
+		{"group = 'com.exemplo01.relatorio'\n", []string{"package:exemplo01!", "package:relatorio!"}},
+		{`{"name": "@org-exemplo/pacote-demo", "version": "1.0.0"}`, []string{"organization:org-exemplo!", "package:pacote-demo!"}},
 		{`{"name": "@types/node"}`, nil},
 		{"the module system is described below\n", nil},
 	})
@@ -159,22 +159,22 @@ func TestReaderPackages(t *testing.T) {
 
 func TestReaderPaths(t *testing.T) {
 	checkReader(t, "caminho", findPaths, publicDev, []readerCase{
-		{"/home/joao_x/projetos/cliente_x9/main.go", []string{"pasta:cliente_x9", "usuario:joao_x!"}},
-		{"/Users/maria.s/Documents/rel_2026/", []string{"pasta:rel_2026", "usuario:maria.s!"}},
-		{`C:\Users\jsilva01\AppData\Local\proj_x\`, []string{"pasta:proj_x", "usuario:jsilva01!"}},
-		{`"C:\\Users\\jsilva01\\Desktop"`, []string{"usuario:jsilva01!"}},
+		{"/home/joao_x/projetos/cliente_x9/main.go", []string{"folder:cliente_x9", "user:joao_x!"}},
+		{"/Users/maria.s/Documents/rel_2026/", []string{"folder:rel_2026", "user:maria.s!"}},
+		{`C:\Users\jsilva01\AppData\Local\proj_x\`, []string{"folder:proj_x", "user:jsilva01!"}},
+		{`"C:\\Users\\jsilva01\\Desktop"`, []string{"user:jsilva01!"}},
 		{"/home/runner/work/x e /home/user/.config e /Users/Shared/x", nil},
 		{"/home/$USER/x e /home/<voce>/x", nil},
-		{"/home/ana/go/pkg/mod/github.com/x/y@v1.2.3/", []string{"usuario:ana!"}},
+		{"/home/ana/go/pkg/mod/github.com/x/y@v1.2.3/", []string{"user:ana!"}},
 	})
 }
 
 func TestReaderNetworkUsers(t *testing.T) {
 	checkReader(t, "usuário de rede", findNetworkUsers, publicDev, []readerCase{
-		{`entrou como CORPX\jsilva01 ontem`, []string{"usuario:jsilva01!"}},
-		{`"user": "CORPX\\svc_relatorio"`, []string{"usuario:svc_relatorio!"}},
-		{"ssh -i ~/.ssh/id -p 2222 svc_relatorio@db-exemplo-01 'ls'", []string{"servidor:db-exemplo-01!", "usuario:svc_relatorio!"}},
-		{"scp arquivo.csv joao_x@bastion-x1.interno:/tmp/", []string{"servidor:bastion-x1.interno!", "usuario:joao_x!"}},
+		{`entrou como CORPX\jsilva01 ontem`, []string{"user:jsilva01!"}},
+		{`"user": "CORPX\\svc_relatorio"`, []string{"user:svc_relatorio!"}},
+		{"ssh -i ~/.ssh/id -p 2222 svc_relatorio@db-exemplo-01 'ls'", []string{"server:db-exemplo-01!", "user:svc_relatorio!"}},
+		{"scp arquivo.csv joao_x@bastion-x1.interno:/tmp/", []string{"server:bastion-x1.interno!", "user:joao_x!"}},
 		{"ssh ubuntu@ec2-1-2-3-4.compute-1.amazonaws.com", nil},
 		{`NT AUTHORITY\SYSTEM e BUILTIN\Administrators e HKLM\SOFTWARE\Microsoft`, nil},
 		{`fmt.Println("ERRO\nfalhou") e "MAX\tvalor" e regex [A-Z]\w+`, nil},
@@ -185,23 +185,23 @@ func TestReaderNetworkUsers(t *testing.T) {
 func TestReaderCloud(t *testing.T) {
 	checkReader(t, "nuvem", findCloud, publicDev, []readerCase{
 		{"arn:aws:s3:::bkt-relatorios-demo/*", []string{"bucket:bkt-relatorios-demo!"}},
-		{"arn:aws:sqs:us-east-1:210987654321:fila-pedidos-x9", []string{"conta_nuvem:210987654321!", "fila:fila-pedidos-x9!"}},
-		{"arn:aws:dynamodb:sa-east-1:210987654321:table/tb_pedido_x9/stream/2026", []string{"conta_nuvem:210987654321!", "tabela:tb_pedido_x9!"}},
-		{"arn:aws:lambda:us-east-1:210987654321:function:fn-carga-x9:prod", []string{"conta_nuvem:210987654321!", "servico:fn-carga-x9!"}},
-		{"arn:aws:iam::210987654321:role/servico/role-etl-x9", []string{"conta_nuvem:210987654321!", "servico:role-etl-x9!"}},
-		{"arn:aws:iam::123456789012:user/svc-etl-x9 e arn:aws:iam::aws:policy/ReadOnlyAccess", []string{"conta_nuvem:123456789012!", "usuario:svc-etl-x9!"}},
+		{"arn:aws:sqs:us-east-1:210987654321:fila-pedidos-x9", []string{"cloud_account:210987654321!", "queue:fila-pedidos-x9!"}},
+		{"arn:aws:dynamodb:sa-east-1:210987654321:table/tb_pedido_x9/stream/2026", []string{"cloud_account:210987654321!", "table:tb_pedido_x9!"}},
+		{"arn:aws:lambda:us-east-1:210987654321:function:fn-carga-x9:prod", []string{"cloud_account:210987654321!", "service:fn-carga-x9!"}},
+		{"arn:aws:iam::210987654321:role/servico/role-etl-x9", []string{"cloud_account:210987654321!", "service:role-etl-x9!"}},
+		{"arn:aws:iam::123456789012:user/svc-etl-x9 e arn:aws:iam::aws:policy/ReadOnlyAccess", []string{"cloud_account:123456789012!", "user:svc-etl-x9!"}},
 		{"/subscriptions/1a2b3c4d-1111-2222-3333-abcdefabcdef/resourceGroups/rg-dados-x9/providers/Microsoft.Storage/storageAccounts/contaexemplo01",
-			[]string{"conta_nuvem:1a2b3c4d-1111-2222-3333-abcdefabcdef!", "conta_nuvem:contaexemplo01!", "namespace:rg-dados-x9!"}},
-		{"projects/proj-exemplo-01/topics/fila-pedidos-x9", []string{"conta_nuvem:proj-exemplo-01!", "fila:fila-pedidos-x9!"}},
-		{"projects/proj-exemplo-01/datasets/ds_vendas/tables/tb_pedido_x9", []string{"conta_nuvem:proj-exemplo-01!", "schema:ds_vendas!", "tabela:tb_pedido_x9!"}},
-		{"projects/proj-exemplo-01/locations/us-central1/functions/fn-carga", []string{"conta_nuvem:proj-exemplo-01!", "servico:fn-carga!"}},
-		{"projects/my-project/topics/my-topic e ~/projects/x/y/z", []string{"conta_nuvem:my-project!", "fila:my-topic!"}},
+			[]string{"cloud_account:1a2b3c4d-1111-2222-3333-abcdefabcdef!", "cloud_account:contaexemplo01!", "namespace:rg-dados-x9!"}},
+		{"projects/proj-exemplo-01/topics/fila-pedidos-x9", []string{"cloud_account:proj-exemplo-01!", "queue:fila-pedidos-x9!"}},
+		{"projects/proj-exemplo-01/datasets/ds_vendas/tables/tb_pedido_x9", []string{"cloud_account:proj-exemplo-01!", "schema:ds_vendas!", "table:tb_pedido_x9!"}},
+		{"projects/proj-exemplo-01/locations/us-central1/functions/fn-carga", []string{"cloud_account:proj-exemplo-01!", "service:fn-carga!"}},
+		{"projects/my-project/topics/my-topic e ~/projects/x/y/z", []string{"cloud_account:my-project!", "queue:my-topic!"}},
 	})
 }
 
 func TestReaderPublicIP(t *testing.T) {
 	checkReader(t, "ip-público", findPublicIP, nil, []readerCase{
-		{"servidor em 34.120.10.5 e 2600:1f18:abcd::12", []string{"servidor:2600:1f18:abcd::12!", "servidor:34.120.10.5!"}},
+		{"servidor em 34.120.10.5 e 2600:1f18:abcd::12", []string{"server:2600:1f18:abcd::12!", "server:34.120.10.5!"}},
 		{"10.0.0.1 192.168.1.1 127.0.0.1 8.8.8.8 1.1.1.1 192.0.2.10 ::1 fe80::1 2001:db8::1", nil},
 		{"versão 1.2.3.4.5, hora 12:30:45, mac aa:bb:cc:dd:ee:ff, slice x[1::2], std::vector", nil},
 	})
@@ -226,9 +226,9 @@ func TestReaderEmbeddedTerms(t *testing.T) {
 	ts := []string{"acmex"}
 	find := func(s string, add func(ObjFinding)) { findTerms(s, ts, add) }
 	checkReader(t, "termo-embutido", find, nil, []readerCase{
-		{"SELECT * FROM acmex_pedidos", []string{"tabela:acmex_pedidos!"}},
-		{"host: dbAcmexVendas01", []string{"servidor:dbAcmexVendas01!"}},
-		{"o job svc-acmex-carga falhou", []string{"servico:svc-acmex-carga!"}},
+		{"SELECT * FROM acmex_pedidos", []string{"table:acmex_pedidos!"}},
+		{"host: dbAcmexVendas01", []string{"server:dbAcmexVendas01!"}},
+		{"o job svc-acmex-carga falhou", []string{"service:svc-acmex-carga!"}},
 		{"a acmex e acmexvendas e macmex_x", nil}, // term alone (another detector) and a piece that is not whole
 	})
 	cfg := config.Default()

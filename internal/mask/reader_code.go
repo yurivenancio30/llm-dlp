@@ -423,7 +423,7 @@ func entFunc(name string) string {
 		}
 		p := string(w)
 		if queueVerbs[p] {
-			return "fila"
+			return "queue"
 		}
 		if e, ok := entPiece[p]; ok && !notFuncType[p] {
 			return e
@@ -518,7 +518,7 @@ func findCodeCall(s string, add func(ObjFinding)) {
 					}
 					switch {
 					case conn && len(levels) == 0 && followedByPort(s, e+1):
-						markValue(s, j+1, e, "servidor", "código-chamada", markedValue(s[j+1:e]), add)
+						markValue(s, j+1, e, "server", "código-chamada", markedValue(s[j+1:e]), add)
 					case ent != "":
 						markValue(s, j+1, e, ent, "código-chamada", markedValue(s[j+1:e]), add)
 					}

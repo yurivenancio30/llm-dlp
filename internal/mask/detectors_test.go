@@ -20,23 +20,23 @@ func TestDetects(t *testing.T) {
 		{"cliente " + cpf + " ativo", "cpf", cpf},
 		{"cpf: " + strings.NewReplacer(".", "", "-", "").Replace(cpf), "cpf", strings.NewReplacer(".", "", "-", "").Replace(cpf)},
 		{"empresa 11.222.333/0001-81", "cnpj", "11.222.333/0001-81"},
-		{"ligue (11) 98765-4321 amanhã", "telefone", "(11) 98765-4321"},
-		{"whatsapp: +55 11 98765-4321", "telefone", "+55 11 98765-4321"},
+		{"ligue (11) 98765-4321 amanhã", "phone", "(11) 98765-4321"},
+		{"whatsapp: +55 11 98765-4321", "phone", "+55 11 98765-4321"},
 		{"CEP 01310-100", "cep", "01310-100"},
-		{"cartão 4111 1111 1111 1111", "cartao", "4111 1111 1111 1111"},
+		{"cartão 4111 1111 1111 1111", "card", "4111 1111 1111 1111"},
 		{"RG: 12.345.678-9", "rg", "12.345.678-9"},
 		{"PIS " + pis, "pis", pis},
 		{"CNH " + cnh, "cnh", cnh},
-		{"agência 1234-5 conta 123456-7", "conta", "1234-5"},
+		{"agência 1234-5 conta 123456-7", "account", "1234-5"},
 		{"chave pix 123e4567-e89b-42d3-a456-426614174000", "pix", "123e4567-e89b-42d3-a456-426614174000"},
-		{"mora na Rua das Flores, 123 - centro", "endereco", "Rua das Flores, 123"},
-		{"data de nascimento: 12/03/1985", "nascimento", "12/03/1985"},
-		{"o owner é JOAO CARLOS SILVA", "nome", "JOAO CARLOS SILVA"},
-		{"falar com João Silva hoje", "nome", "João Silva"},
-		{"steward Ana Paula Souza", "nome", "Ana Paula Souza"},
+		{"mora na Rua das Flores, 123 - centro", "address", "Rua das Flores, 123"},
+		{"data de nascimento: 12/03/1985", "birthdate", "12/03/1985"},
+		{"o owner é JOAO CARLOS SILVA", "name", "JOAO CARLOS SILVA"},
+		{"falar com João Silva hoje", "name", "João Silva"},
+		{"steward Ana Paula Souza", "name", "Ana Paula Souza"},
 		{"usuario MAT123456 travou", "x:matricula", "MAT123456"},
 		{"o Projeto Fenix atrasou", "t:projeto", "Projeto Fenix"},
-		{"token=ghp_k3Jd9sLq2mXv8RtY7wPz4nBc6HfG1aE5uQiO", "segredo", "ghp_k3Jd9sLq2mXv8RtY7wPz4nBc6HfG1aE5uQiO"},
+		{"token=ghp_k3Jd9sLq2mXv8RtY7wPz4nBc6HfG1aE5uQiO", "secret", "ghp_k3Jd9sLq2mXv8RtY7wPz4nBc6HfG1aE5uQiO"},
 	}
 	for _, c := range cases {
 		foundIt := false
@@ -87,11 +87,11 @@ func TestIdempotentAndDeterministic(t *testing.T) {
 		t.Fatalf("mascarar de novo mudou o texto (pseudônimo re-detectado): %q -> %q", a, c)
 	}
 	// name and e-mail of the same person get the same identifier
-	if !strings.Contains(a, "Pessoa ") {
+	if !strings.Contains(a, "Person ") {
 		t.Fatalf("nome não mascarado: %q", a)
 	}
 	pid := a[strings.Index(a, "p.")+2 : strings.Index(a, "p.")+10]
-	if !strings.Contains(a, "Pessoa "+pid) {
+	if !strings.Contains(a, "Person "+pid) {
 		t.Errorf("nome e e-mail sem o mesmo id: %q", a)
 	}
 	// the same /24 subnet stays in the same fake subnet, with the same host
@@ -224,13 +224,13 @@ func TestExtraDetectors(t *testing.T) {
 func TestNameAnySpelling(t *testing.T) {
 	m := newTest(t)
 	for _, s := range []string{"falei com joão silva ontem", "o JOAO CARLOS SILVA saiu", "Joao Carlos Silva", "ana paula souza aprovou"} {
-		// the pseudonym follows the case of the name: Pessoa, PESSOA or pessoa
-		if out, _ := m.Mask(s); !strings.Contains(strings.ToLower(out), "pessoa ") {
+		// the pseudonym follows the case of the name: Person, PERSON or person
+		if out, _ := m.Mask(s); !strings.Contains(strings.ToLower(out), "person ") {
 			t.Errorf("nome não mascarado em %q: %q", s, out)
 		}
 	}
 	// common words that are not an imported name stay intact
-	if out, _ := m.Mask("a silva e souza são sobrenomes comuns"); strings.Contains(strings.ToLower(out), "pessoa ") {
+	if out, _ := m.Mask("a silva e souza são sobrenomes comuns"); strings.Contains(strings.ToLower(out), "person ") {
 		t.Errorf("falso positivo: %q", out)
 	}
 }

@@ -33,6 +33,10 @@ const urlReleases = "https://github.com/yurivenancio30/llm-dlp/releases"
 // firstInEnglish: the first version with the commands and the config.json fields in English.
 const firstInEnglish = "0.9.0"
 
+// firstWithEnglishTypes: the first version with the detector and object type names in English
+// (disabled_detectors, objects.mask...).
+const firstWithEnglishTypes = "0.10.0"
+
 var reExactVersion = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
 
 func update(args []string) error {
@@ -105,9 +109,9 @@ func update(args []string) error {
 	// (and stop masking what they ask for): the file goes back to the old names before it starts.
 	// Going forward, the new names come in only after the swap (until then, the running version may
 	// need to reread the file).
-	previous := minorVersion(vNew, firstInEnglish)
-	if previous {
-		if c, err := config.MigrateFile(true); err != nil {
+	previous, typesPrevious := minorVersion(vNew, firstInEnglish), minorVersion(vNew, firstWithEnglishTypes)
+	if previous || typesPrevious {
+		if c, err := config.MigrateFile(previous, typesPrevious); err != nil {
 			return fmt.Errorf("não consegui passar o config.json para os nomes da %s: %w", vNew, err)
 		} else if c != "" {
 			fmt.Printf("✓ config.json com os nomes de campo da %s (o anterior em %s)\n", vNew, c)
@@ -124,8 +128,8 @@ func update(args []string) error {
 		if bak != "" {
 			os.Rename(bak, destination)
 		}
-		if previous {
-			config.MigrateFile(false)
+		if previous || typesPrevious {
+			config.MigrateFile(false, false)
 		}
 	}
 	log := config.Path("llm-dlp.log")
@@ -177,7 +181,7 @@ func adjustNames(home, bin, v string) {
 			" as já abertas seguem com os de antes, que também funcionam)")
 	}
 	if !minorVersion(v, firstInEnglish) {
-		if c, err := config.MigrateFile(false); err != nil {
+		if c, err := config.MigrateFile(false, minorVersion(v, firstWithEnglishTypes)); err != nil {
 			fmt.Printf("! o config.json continua com os nomes antigos (%v); eles seguem valendo\n", err)
 		} else if c != "" {
 			fmt.Printf("✓ config.json com os nomes de campo em inglês (o anterior em %s)\n", c)

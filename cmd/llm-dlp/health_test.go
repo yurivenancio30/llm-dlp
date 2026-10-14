@@ -110,7 +110,7 @@ func TestReducedProtection(t *testing.T) {
 		"fail_closed":     func(c *config.Config) { c.FailClosed = false },
 		"ocr.mode":        func(c *config.Config) { c.OCR.Mode = "allow" },
 		"objects.enabled": func(c *config.Config) { c.Objects.Enabled = false },
-		"segredo, email":  func(c *config.Config) { c.DisabledDetectors = []string{"segredo", "email"} },
+		"secret, email":   func(c *config.Config) { c.DisabledDetectors = []string{"secret", "email"} },
 	}
 	for part, f := range cases {
 		c := config.Default()

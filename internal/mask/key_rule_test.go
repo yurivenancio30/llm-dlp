@@ -75,7 +75,7 @@ func TestObjectCaseComesFromKey(t *testing.T) {
 	}
 	letters, equalOnes := 0, 0
 	for _, name := range []string{"PedidoItem", "ClienteAtivo", "NotaFiscal", "ContaReceber", "ItemEstoque"} {
-		ps := m.pseudoObject("tabela", name)
+		ps := m.pseudoObject("table", name)
 		id := ps[strings.IndexByte(ps, '_')+1:]
 		h := sha256.Sum256([]byte(name))
 		for i := 0; i < len(id); i++ {

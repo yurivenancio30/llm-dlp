@@ -124,8 +124,8 @@ func TestK8sYAML(t *testing.T) {
 			"name: api", "image: nginx:1.27", "IfNotPresent", "ClusterIP", "Prefix", "protocol: TCP", "app.kubernetes.io/managed-by: Helm",
 			"key: chave-db", "name: DB_HOST", ":1.2\n", ".svc.cluster.local", "name: dados", "containerPort: 8080", "replicas: 3"})
 	sameStructure(t, k8sManifest, out)
-	for real, typ := range map[string]string{"svc-pedidos-x9": "obj.servico", "ns-financeiro-demo": "obj.namespace",
-		"sa-pedidos-leitor": "obj.usuario", "pvc-pedidos-demo": "obj.servico"} {
+	for real, typ := range map[string]string{"svc-pedidos-x9": "obj.service", "ns-financeiro-demo": "obj.namespace",
+		"sa-pedidos-leitor": "obj.user", "pvc-pedidos-demo": "obj.service"} {
 		if got := typeOf(m, k8sManifest, real); got != typ {
 			t.Errorf("%s: tipo %q, esperado %q", real, got, typ)
 		}
@@ -221,7 +221,7 @@ current-context: ctx-financeiro-demo
 	out := check(t, m, s, []string{"cl-financeiro-demo", "api.cl-demo.exemplo.interno", "ctx-financeiro-demo", "usr-deploy-demo", "ns-financeiro-demo", "eks-demo-x1", "123456789012"},
 		[]string{"kind: Config", "https://", ":6443", "arn:aws:eks:us-east-1:", ":cluster/", "current-context: "})
 	sameStructure(t, s, out)
-	if got := typeOf(m, s, "usr-deploy-demo"); got != "obj.usuario" {
+	if got := typeOf(m, s, "usr-deploy-demo"); got != "obj.user" {
 		t.Errorf("users[].name: tipo %q", got)
 	}
 }
@@ -324,12 +324,12 @@ resource "azurerm_mssql_server" "sql" {
 		t.Errorf("linhas mudaram")
 	}
 	for real, typ := range map[string]string{"bkt-relatorios-demo": "obj.bucket", "db-exemplo-01": "obj.database", "vendas_demo": "obj.database",
-		"sqlsrv-exemplo-01": "obj.servidor", "proj-relatorios-demo": "obj.conta_nuvem"} {
+		"sqlsrv-exemplo-01": "obj.server", "proj-relatorios-demo": "obj.cloud_account"} {
 		if got := typeOf(m, s, real); got != typ {
 			t.Errorf("%s: tipo %q, esperado %q", real, got, typ)
 		}
 	}
-	if got := typeOf(m, "resource \"aws_iam_role\" \"x\" {\n  account_id = \"123456789012\"\n}\n", "123456789012"); got != "obj.conta_nuvem" {
+	if got := typeOf(m, "resource \"aws_iam_role\" \"x\" {\n  account_id = \"123456789012\"\n}\n", "123456789012"); got != "obj.cloud_account" {
 		t.Errorf("account_id: tipo %q", got)
 	}
 }

@@ -166,7 +166,7 @@ func (ps *People) IsCode(p *Pseudo, v string) bool {
 	if r, ok := ps.codeCache.Load(v); ok {
 		return r.(bool)
 	}
-	r := ps.PID(p, "codigo", NormName(v)) != ""
+	r := ps.PID(p, "code", NormName(v)) != ""
 	if ps.nCodeCache.Add(1) > 200_000 {
 		ps.codeCache.Clear()
 		ps.nCodeCache.Store(0)
@@ -269,9 +269,9 @@ func (ps *People) PID(p *Pseudo, typ, normValue string) string {
 	switch typ {
 	case "email":
 		return ps.D.Emails[p.ID("email", normValue)]
-	case "nome":
+	case "name":
 		return ps.D.Names[p.ID("nome", normValue)]
-	case "codigo":
+	case "code":
 		return ps.D.Codes[p.ID("codigo", normValue)]
 	}
 	return ""
@@ -339,8 +339,8 @@ func (ps *People) FindNames(s string, p *Pseudo) []Finding {
 			if !ok {
 				continue
 			}
-			if ps.PID(p, "nome", NormName(s[ws[i].ini:ws[j].end])) != "" {
-				out = append(out, Finding{ws[i].ini, ws[j].end, "nome", s[ws[i].ini:ws[j].end]})
+			if ps.PID(p, "name", NormName(s[ws[i].ini:ws[j].end])) != "" {
+				out = append(out, Finding{ws[i].ini, ws[j].end, "name", s[ws[i].ini:ws[j].end]})
 				foundIt = n
 			}
 		}

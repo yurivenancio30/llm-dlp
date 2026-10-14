@@ -147,7 +147,7 @@ Em dois passos (OCR e trava) ele usa sudo: a sua senha será pedida nessa hora.`
 			}
 		}
 		if len(vs) > 0 {
-			cfg.Terms = append(cfg.Terms, config.Term{Label: "nome", Values: vs})
+			cfg.Terms = append(cfg.Terms, config.Term{Label: "name", Values: vs})
 			changed = true
 		}
 	}

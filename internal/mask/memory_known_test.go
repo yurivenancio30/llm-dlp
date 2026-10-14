@@ -17,12 +17,12 @@ func TestRoundTripWithoutContext(t *testing.T) {
 		{"cnh", "CNH " + genEleven("123456789", ValidCNH), genEleven("123456789", ValidCNH)},
 		{"pis", "PIS " + genEleven("1201234567", ValidPIS), genEleven("1201234567", ValidPIS)},
 		{"cep", "CEP 01310-100", "01310-100"},
-		{"conta", "conta corrente 123456-7", "123456-7"},
+		{"account", "conta corrente 123456-7", "123456-7"},
 		{"agencia", "agência 4321-0", "4321-0"},
 		{"pix", "chave pix 123e4567-e89b-42d3-a456-426614174000", "123e4567-e89b-42d3-a456-426614174000"},
-		{"nascimento", "data de nascimento: 12/03/1985", "12/03/1985"},
-		{"telefone", "celular 11 98765-4321", "11 98765-4321"},
-		{"cartao", "cartão 4111111111111111", "4111111111111111"},
+		{"birthdate", "data de nascimento: 12/03/1985", "12/03/1985"},
+		{"phone", "celular 11 98765-4321", "11 98765-4321"},
+		{"card", "cartão 4111111111111111", "4111111111111111"},
 		{"cpf", "cpf " + cpf, cpf},
 		{"senha", "password: Xk9mP2qL7vT4zR8w", "Xk9mP2qL7vT4zR8w"},
 	}
@@ -144,7 +144,7 @@ func TestScanEqualsNaiveSearch(t *testing.T) {
 	c := newKnown()
 	vals := []string{"Xk9$mQ2vLp7w", "12.345.678-9", "1234-5", "abcd", "abcdef", "Xk9$", "ção-ñ9"}
 	for _, v := range vals {
-		c.learnIt("segredo", v)
+		c.learnIt("secret", v)
 	}
 	text := "a Xk9$mQ2vLp7w b 12.345.678-9, (1234-5) xabcd abcdef abcd. 912.345.678-9 Xk9$ ção-ñ9 abc 1234-56"
 	naive := map[string]bool{}
@@ -179,7 +179,7 @@ func TestKnownHasCap(t *testing.T) {
 	first := "senha: Zq8wPrimeiroValor01"
 	m.Mask(first)
 	for i := 0; i < maxKnown+10; i++ {
-		m.known.learnIt("segredo", fmt.Sprintf("Lixo%08dabc", i))
+		m.known.learnIt("secret", fmt.Sprintf("Lixo%08dabc", i))
 	}
 	if n := len(m.known.reals); n > maxKnown {
 		t.Fatalf("RAM sem teto: %d valores", n)

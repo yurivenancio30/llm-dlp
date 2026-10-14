@@ -18,7 +18,7 @@ func TestSeenFromTwoProcessesKept(t *testing.T) {
 	b, _ := LoadSeen(p)
 	a.Mark("id-a", "cpf")
 	b.Mark("id-b", "email")
-	b.MarkObj("id-obj", "tabela", 20000)
+	b.MarkObj("id-obj", "table", 20000)
 	if err := a.SaveNow(); err != nil {
 		t.Fatal(err)
 	}

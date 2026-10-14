@@ -44,7 +44,7 @@ func build(t *testing.T, upstream http.HandlerFunc) (*httptest.Server, *httptest
 	return up, px
 }
 
-var rePseudo = regexp.MustCompile(`p\.[a-z2-7]{8}@d[a-z2-7]{4}\.invalid|2(?:4\d|5[0-5])\.\d+\.\d+\.\d+|h[a-z2-7]{8}\.invalid|CPF-[a-z2-7]{8}|[Pp]essoa [a-z2-7]{8}|PESSOA [A-Z2-7]{8}`)
+var rePseudo = regexp.MustCompile(`p\.[a-z2-7]{8}@d[a-z2-7]{4}\.invalid|2(?:4\d|5[0-5])\.\d+\.\d+\.\d+|h[a-z2-7]{8}\.invalid|CPF-[a-z2-7]{8}|[Pp]erson [a-z2-7]{8}|PERSON [A-Z2-7]{8}`)
 
 const thinkingReq = "raciocínio antigo, assinado, não pode mudar: pessoa.aaaaaaaa"
 
@@ -118,7 +118,7 @@ func TestStreamingEndToEnd(t *testing.T) {
 				u["host"] = p
 			case strings.HasPrefix(p, "CPF-"):
 				u["cpf"] = p
-			case strings.HasPrefix(strings.ToLower(p), "pessoa "):
+			case strings.HasPrefix(strings.ToLower(p), "person "):
 				u["nome"] = p
 			default:
 				u["ip"] = p

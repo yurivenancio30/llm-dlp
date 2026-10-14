@@ -222,7 +222,7 @@ func (m *Masker) alignedHeader(l string) []alignedColumn {
 			if len(name) > 48 || (len(name) <= 3 && name == strings.ToLower(name) && c.class == "") {
 				return 0
 			}
-			if c.class != "" && c.class != "nomesolto" {
+			if c.class != "" && c.class != "name_loose" {
 				sens++
 			}
 		}
@@ -239,8 +239,8 @@ func (m *Masker) alignedHeader(l string) []alignedColumn {
 		return nil
 	}
 	for i := range cols {
-		if cols[i].class == "nomesolto" {
-			cols[i].class = "nomecompleto"
+		if cols[i].class == "name_loose" {
+			cols[i].class = "name_full"
 		}
 	}
 	return cols
@@ -359,7 +359,7 @@ func (m *Masker) alignedTable(s string, ini int, numbered bool, add func(ini, en
 		var others []string // sensitive classes that are not names
 		for _, c := range cols {
 			switch c.class {
-			case "nome", "nomecompleto":
+			case "name", "name_full":
 				hasName = true
 			case "":
 			default:
@@ -404,7 +404,7 @@ func (m *Masker) alignedTable(s string, ini int, numbered bool, add func(ini, en
 					j = k
 				}
 				// only what looks like a person's name (first and last name capitalized)
-				markIt(s, l.ini+l.pos[i], l.ini+l.pos[j], "nomecompleto", add)
+				markIt(s, l.ini+l.pos[i], l.ini+l.pos[j], "name_full", add)
 			} else if !lettersOnly && classNum != "" && (i > 0 || cols[0].ini == 0) { // i > 0: not the line index
 				markOther(l.ini+l.pos[i], l.ini+l.pos[j])
 			}
@@ -517,7 +517,7 @@ func (m *Masker) header(line string) ([]string, byte) {
 			if b-a > 48 {
 				return nil, 0
 			}
-			if cs[i] = m.class(line[a:b]); cs[i] != "" && cs[i] != "nomesolto" {
+			if cs[i] = m.class(line[a:b]); cs[i] != "" && cs[i] != "name_loose" {
 				sens++
 			}
 		}
@@ -525,8 +525,8 @@ func (m *Masker) header(line string) ([]string, byte) {
 			return nil, 0
 		}
 		for i := range cs {
-			if cs[i] == "nomesolto" {
-				cs[i] = "nomecompleto"
+			if cs[i] == "name_loose" {
+				cs[i] = "name_full"
 			}
 		}
 		return cs, 'P'
@@ -572,7 +572,7 @@ func (m *Masker) header(line string) ([]string, byte) {
 		if len(cellText) > 48 || strings.Contains(cellText, ":") || strings.Contains(cellText, "//") {
 			return nil, 0
 		}
-		if cs[i] = m.class(cellText); cs[i] != "" && cs[i] != "nomesolto" {
+		if cs[i] = m.class(cellText); cs[i] != "" && cs[i] != "name_loose" {
 			sens++
 		}
 	}
@@ -580,8 +580,8 @@ func (m *Masker) header(line string) ([]string, byte) {
 		return nil, 0
 	}
 	for i := range cs { // "nome" alone, in a table with another person column, is a person's name
-		if cs[i] == "nomesolto" {
-			cs[i] = "nomecompleto"
+		if cs[i] == "name_loose" {
+			cs[i] = "name_full"
 		}
 	}
 	return cs, seps[best]
@@ -634,7 +634,7 @@ func isMarkdownSeparator(line string) bool {
 }
 
 // identifiesPerson: finding types that, in a table line, show the line belongs to a person.
-var identifiesPerson = map[string]bool{"cpf": true, "email": true, "telefone": true, "rg": true, "cnh": true, "pis": true, "nascimento": true}
+var identifiesPerson = map[string]bool{"cpf": true, "email": true, "phone": true, "rg": true, "cnh": true, "pis": true, "birthdate": true}
 
 // namesInLine: in a table line without a header (pasted in the chat, a piece of CSV) that already
 // has a detected CPF, e-mail or telephone, the cell that looks like a full name is the person's
@@ -675,8 +675,8 @@ func namesInLine(s string, findings []Finding) []Finding {
 		}
 		for _, c := range cellsOf(l, sep) {
 			a, b := trim(l, c[0], c[1])
-			if _, ok := fieldValue("nomecompleto", l[a:b]); ok && len(strings.Fields(l[a:b])) >= 2 {
-				out = append(out, Finding{ini + a, ini + b, "nome", l[a:b]})
+			if _, ok := fieldValue("name_full", l[a:b]); ok && len(strings.Fields(l[a:b])) >= 2 {
+				out = append(out, Finding{ini + a, ini + b, "name", l[a:b]})
 			}
 		}
 	}

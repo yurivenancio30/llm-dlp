@@ -37,7 +37,7 @@ import (
 // prefix (the usual one); objMask applies (on by default, can be turned off in objects.mask.object)
 // and objPropagates is false (it is not in defaultPropagates): the name is masked where it is
 // decided and by the conversation memory, but never learned.
-const genericEnt = "objeto"
+const genericEnt = "object"
 
 // conversationCmd: the state of Commands for the rules of this section.
 type conversationCmd struct {

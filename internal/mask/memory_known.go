@@ -23,9 +23,9 @@ import (
 //   - in RAM, the exact value (literal search, catches any format already seen);
 //   - on disk, only the hash with the key (to survive restarts without keeping the value).
 
-var contextual = map[string]bool{"segredo": true, "rg": true, "cnh": true, "pis": true, "cep": true, "conta": true,
-	"pix": true, "nascimento": true, "telefone": true, "cartao": true, "cpf": true, "cnpj": true,
-	"usuario": true, "doc": true}
+var contextual = map[string]bool{"secret": true, "rg": true, "cnh": true, "pis": true, "cep": true, "account": true,
+	"pix": true, "birthdate": true, "phone": true, "card": true, "cpf": true, "cnpj": true,
+	"user": true, "doc": true}
 
 // forEachCode calls fn for each "word" of s that can be a user or document code: from 3 to 40
 // letters, digits, "_", "." or "-", starting with a letter or digit.
@@ -58,13 +58,13 @@ func canonicalKey(typ, real string) string {
 		return canonObj(strings.TrimPrefix(typ, objTypePrefix), real)
 	}
 	switch typ {
-	case "segredo":
+	case "secret":
 		return "s:" + real
 	case "pix":
 		return "u:" + strings.ToLower(real)
-	case "usuario", "doc":
+	case "user", "doc":
 		return "c:" + strings.ToUpper(real)
-	case "nome":
+	case "name":
 		return "p:" + NormName(real)
 	}
 	return "n:" + canonNum(real)
@@ -359,7 +359,7 @@ func (m *Masker) findKnown(s string, longNum bool, add0 func(ini, end int, typ s
 	hasHash := m.seenSet != nil && !m.seenSet.IsEmpty()
 	c.mu.RLock()
 	hasCanon := len(c.canon) > 0
-	nSeg := c.nTypes["segredo"]
+	nSeg := c.nTypes["secret"]
 	c.mu.RUnlock()
 	if !hasHash && !hasCanon {
 		return
@@ -403,9 +403,9 @@ func (m *Masker) findKnown(s string, longNum bool, add0 func(ini, end int, typ s
 	}
 	// learned user codes and documents (in any case, and after a restart)
 	c.mu.RLock()
-	nCode := c.nTypes["usuario"] + c.nTypes["doc"]
+	nCode := c.nTypes["user"] + c.nTypes["doc"]
 	c.mu.RUnlock()
-	if nCode > 0 || (hasHash && (m.seenSet.Has("usuario") || m.seenSet.Has("doc"))) {
+	if nCode > 0 || (hasHash && (m.seenSet.Has("user") || m.seenSet.Has("doc"))) {
 		forEachCode(s, func(ini, end int) {
 			v := s[ini:end]
 			if !hasDigit(v) || len(v) < 5 {
@@ -417,7 +417,7 @@ func (m *Masker) findKnown(s string, longNum bool, add0 func(ini, end int, typ s
 		})
 	}
 	// secrets from before a restart: only the hash exists, so it tests each long "word"
-	if hasHash && (m.seenSet.Has("segredo") || nSeg > 0) {
+	if hasHash && (m.seenSet.Has("secret") || nSeg > 0) {
 		for _, ix := range reTokenSeg.FindAllStringIndex(s, -1) {
 			v := s[ix[0]:ix[1]]
 			c.mu.RLock()
@@ -467,12 +467,12 @@ func (m *Masker) findKnown(s string, longNum bool, add0 func(ini, end int, typ s
 
 // learnIt records a contextual value in RAM and (hash only) on disk.
 func (m *Masker) learnIt(typ, real string) {
-	if typ == "nome" {
+	if typ == "name" {
 		// A name found by the field label ("NOM_CLIENTE"): the person enters the registry, as in
 		// import-people, and starts being recognized anywhere and in any spelling.
-		if m.people != nil && len(strings.Fields(real)) >= 2 && len(real) <= 80 && m.people.PID(m.p, "nome", NormName(real)) == "" {
+		if m.people != nil && len(strings.Fields(real)) >= 2 && len(real) <= 80 && m.people.PID(m.p, "name", NormName(real)) == "" {
 			m.people.Import(m.p, real, "", "")
-			m.known.learnIt("nome", real) // makes the texts already memoized with this name be redone
+			m.known.learnIt("name", real) // makes the texts already memoized with this name be redone
 		}
 		return
 	}
@@ -481,11 +481,11 @@ func (m *Masker) learnIt(typ, real string) {
 	}
 	// a short code or one without a digit ("jsilva", "ana") is only masked together with the label:
 	// remembering it would make every equal word become sensitive data
-	if (typ == "usuario" || typ == "doc") && (len(real) < 5 || !hasDigit(real)) {
+	if (typ == "user" || typ == "doc") && (len(real) < 5 || !hasDigit(real)) {
 		return
 	}
 	if m.known.learnIt(typ, real) && m.seenSet != nil {
-		if typ == "segredo" {
+		if typ == "secret" {
 			m.seenSet.MarkSize(len(real))
 		}
 		m.seenSet.Mark(m.p.ID("visto", canonicalKey(typ, real)), typ)

@@ -102,7 +102,7 @@ func TestLabelWithSpellingCase(t *testing.T) {
 	if v := tab.Unmask("PROJETO-"+strings.ToUpper(id), false); v != "PROJETO FENIX" {
 		t.Errorf("variante em maiúsculas: %q", v)
 	}
-	if _, ok := fieldValue("nome", "projeto-"+id); ok {
+	if _, ok := fieldValue("name", "projeto-"+id); ok {
 		t.Errorf("o pseudônimo em minúsculas foi tratado como valor de campo")
 	}
 
@@ -139,10 +139,10 @@ func TestCollisionDoesNotUnmask(t *testing.T) {
 // same person, not a collision. The way back keeps the first spelling seen.
 func TestSamePersonNamesDoNotCollide(t *testing.T) {
 	tab := NewTable([]Entry{
-		{"Pessoa abcdefgh", "Maria Fernanda Silva", "nome"},
-		{"Pessoa abcdefgh", "Maria Silva", "nome"},
+		{"Person abcdefgh", "Maria Fernanda Silva", "name"},
+		{"Person abcdefgh", "Maria Silva", "name"},
 	})
-	if got := tab.Unmask("fale com Pessoa abcdefgh", false); got != "fale com Maria Fernanda Silva" || tab.Conflicts != 0 {
+	if got := tab.Unmask("fale com Person abcdefgh", false); got != "fale com Maria Fernanda Silva" || tab.Conflicts != 0 {
 		t.Errorf("%q, conflitos %d", got, tab.Conflicts)
 	}
 }

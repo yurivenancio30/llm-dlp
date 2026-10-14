@@ -115,7 +115,7 @@ func addColumn(s string, a, b int, add func(ObjFinding)) {
 	if v == "" || isDataType(v) || publicSQL(v) || outputLabels[strings.ToLower(v)] || keyAttribute[strings.ToLower(v)] || !reSimpleIdent.MatchString(strings.ReplaceAll(v, ".", "_")) {
 		return
 	}
-	add(ObjFinding{a, b, "coluna", "esquema", true})
+	add(ObjFinding{a, b, "column", "esquema", true})
 }
 
 // --------------------------------------------------------------------------------------- "name" by
@@ -125,10 +125,10 @@ func addColumn(s string, a, b int, add func(ObjFinding)) {
 // through the type word (entKey), singular or plural.
 
 // containers of names that are not a resource type word, but say what they hold
-var containerName = map[string]string{"columns": "coluna", "column": "coluna", "fields": "coluna", "field": "coluna",
-	"colunas": "coluna", "coluna": "coluna", "campos": "coluna", "models": "tabela", "model": "tabela",
-	"sources": "schema", "seeds": "tabela", "snapshots": "tabela", "views": "tabela", "view": "tabela",
-	"datasets": "schema", "tabelas": "tabela"}
+var containerName = map[string]string{"columns": "column", "column": "column", "fields": "column", "field": "column",
+	"colunas": "column", "coluna": "column", "campos": "column", "models": "table", "model": "table",
+	"sources": "schema", "seeds": "table", "snapshots": "table", "views": "table", "view": "table",
+	"datasets": "schema", "tabelas": "table"}
 
 func entContainer(k string) string {
 	if e, ok := containerName[strings.ToLower(k)]; ok {
@@ -181,18 +181,18 @@ func findNameByContext(s string, add func(ObjFinding)) {
 			// listing output (SHOW in JSON): the name beside the schema is a table; beside only the
 			// database, it is a schema
 			if ir := siblings[e.parent()]; ir["schema_name"] || ir["table_schema"] {
-				ent = "tabela"
+				ent = "table"
 			} else if ent == "" && (ir["database_name"] || ir["table_catalog"]) {
 				ent = "schema"
 			}
 		case "owner":
-			ent = "usuario"
+			ent = "user"
 		}
 		if ent == "" || seen[[2]int{e.vi, e.vf}] {
 			continue
 		}
 		seen[[2]int{e.vi, e.vf}] = true
-		if v := s[e.vi:e.vf]; ent == "coluna" {
+		if v := s[e.vi:e.vf]; ent == "column" {
 			addColumn(s, e.vi, e.vf, add)
 		} else if strings.Count(v, ".") > 0 && strings.Count(v, ".") <= 3 && reIdentCell.MatchString(v) {
 			addCellParts(s, e.vi, e.vf, ent, add) // "db.schema.tabela": nome qualificado

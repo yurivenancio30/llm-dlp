@@ -154,11 +154,11 @@ func (m *Masker) detectBase(s string) []Finding {
 		if j < 0 {
 			break
 		}
-		add(i+j, i+j+len(m.keyB64), "segredo")
+		add(i+j, i+j+len(m.keyB64), "secret")
 		i += j + len(m.keyB64)
 	}
 
-	if on("segredo") {
+	if on("secret") {
 		// gitleaks gets disproportionately slow on large texts (above ~128 KB the time grows faster
 		// than the size). So the text goes in windows, in parallel, with an overlap between them so
 		// a multi-line secret (PEM private key) is not cut in half. With a PEM block larger than
@@ -220,7 +220,7 @@ func (m *Masker) detectBase(s string) []Finding {
 					if j < 0 {
 						break
 					}
-					add(f.base+k+j, f.base+k+j+len(f.value), "segredo")
+					add(f.base+k+j, f.base+k+j+len(f.value), "secret")
 					k += j + len(f.value)
 					foundIt = true
 				}
@@ -236,16 +236,16 @@ func (m *Masker) detectBase(s string) []Finding {
 						for b < len(s) && isB64(s[b]) {
 							b++
 						}
-						add(a, b, "segredo")
+						add(a, b, "secret")
 					}
 				}
 			}
 		}
 	}
-	if on("segredo") {
+	if on("secret") {
 		m.findPasswords(s, lower, add)
 	}
-	if on("campo") {
+	if on("field") {
 		m.findFields(s, add)
 		if strings.Contains(lower, "insert into") {
 			m.findInsert(s, lower, add)
@@ -255,10 +255,10 @@ func (m *Masker) detectBase(s string) []Finding {
 		}
 	}
 	m.findExtras(s, lower, longNum, add)
-	if on("usuario") && m.people != nil && m.people.HasCodes() {
+	if on("user") && m.people != nil && m.people.HasCodes() {
 		forEachCode(s, func(ini, end int) {
 			if m.people.IsCode(m.p, s[ini:end]) {
-				add(ini, end, "usuario")
+				add(ini, end, "user")
 			}
 		})
 	}
@@ -340,7 +340,7 @@ func (m *Masker) detectBase(s string) []Finding {
 			}
 		}
 	}
-	if on("telefone") && longNum {
+	if on("phone") && longNum {
 		for _, ix := range reTel.FindAllStringIndex(s, -1) {
 			v := s[ix[0]:ix[1]]
 			if !digitEdge(s, ix[0], ix[1]) {
@@ -348,7 +348,7 @@ func (m *Masker) detectBase(s string) []Finding {
 			}
 			strong := strings.HasPrefix(v, "+55") || reDDD.MatchString(v) // "(11) 9...": parenthesis opened AND closed
 			if strong || (strings.ContainsAny(v, "- ") && anyContext(s, ix[0], "tel", "fone", "celular", "whatsapp", "contato", "cel")) {
-				add(ix[0], ix[1], "telefone")
+				add(ix[0], ix[1], "phone")
 			}
 		}
 	}
@@ -361,14 +361,14 @@ func (m *Masker) detectBase(s string) []Finding {
 			}
 		}
 	}
-	if on("cartao") && longNum {
+	if on("card") && longNum {
 		for _, ix := range reCard.FindAllStringIndex(s, -1) {
 			v := s[ix[0]:ix[1]]
 			if !digitEdge(s, ix[0], ix[1]) || !ValidLuhn(v) {
 				continue
 			}
 			if reGrouped.MatchString(v) || anyContext(s, ix[0], "cart", "card", "credito", "crédito", "debito", "débito") {
-				add(ix[0], ix[1], "cartao")
+				add(ix[0], ix[1], "card")
 			}
 		}
 	}
@@ -379,10 +379,10 @@ func (m *Masker) detectBase(s string) []Finding {
 			}
 		}
 	}
-	if on("conta") && has("ag", "conta", "c/c") {
+	if on("account") && has("ag", "conta", "c/c") {
 		for _, re := range []*regexp.Regexp{reAg, reAccount} {
 			for _, ix := range re.FindAllStringSubmatchIndex(s, -1) {
-				add(ix[2], ix[3], "conta")
+				add(ix[2], ix[3], "account")
 			}
 		}
 	}
@@ -393,17 +393,17 @@ func (m *Masker) detectBase(s string) []Finding {
 			}
 		}
 	}
-	if on("endereco") && has("rua", "r.", "av", "travessa", "tv.", "alameda", "al.", "rodovia", "rod.", "estrada", "praça", "praca", "largo") {
+	if on("address") && has("rua", "r.", "av", "travessa", "tv.", "alameda", "al.", "rodovia", "rod.", "estrada", "praça", "praca", "largo") {
 		for _, ix := range reEnd.FindAllStringIndex(s, -1) {
-			add(ix[0], ix[1], "endereco")
+			add(ix[0], ix[1], "address")
 		}
 	}
-	if on("nascimento") && has("nasc") {
+	if on("birthdate") && has("nasc") {
 		for _, ix := range reBirth.FindAllStringSubmatchIndex(s, -1) {
-			add(ix[2], ix[3], "nascimento")
+			add(ix[2], ix[3], "birthdate")
 		}
 	}
-	if on("nome") && m.people != nil {
+	if on("name") && m.people != nil {
 		for _, a := range m.people.FindNames(s, m.p) {
 			out = append(out, a)
 		}

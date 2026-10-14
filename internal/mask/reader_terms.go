@@ -87,7 +87,7 @@ func entPosition(s string, a int) string {
 		k--
 	}
 	if k >= 3 && s[k-3:k] == "://" || k > 0 && s[k-1] == '@' && k == a {
-		return "servidor"
+		return "server"
 	}
 	if k > 0 && (s[k-1] == ':' || s[k-1] == '=') {
 		e := k - 1
@@ -101,7 +101,7 @@ func entPosition(s string, a int) string {
 		if ent, _ := entKey(strings.TrimLeft(s[b:e], "-")); ent != "" {
 			return ent
 		}
-		return "servico"
+		return "service"
 	}
 	b := k
 	for b > 0 && k-b < 10 && letterD(s[b-1]) {
@@ -109,7 +109,7 @@ func entPosition(s string, a int) string {
 	}
 	switch strings.ToUpper(s[b:k]) {
 	case "FROM", "JOIN", "INTO", "UPDATE", "TABLE", "VIEW":
-		return "tabela"
+		return "table"
 	case "DATABASE", "USE":
 		return "database"
 	case "SCHEMA":
@@ -117,5 +117,5 @@ func entPosition(s string, a int) string {
 	case "PROCEDURE", "PROC", "CALL", "EXEC", "EXECUTE", "FUNCTION":
 		return "procedure"
 	}
-	return "servico"
+	return "service"
 }

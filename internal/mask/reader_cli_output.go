@@ -14,8 +14,8 @@ import (
 var reCLIHeader = regexp.MustCompile(`^[A-Z][A-Z0-9()/_.-]*(?: [A-Z][A-Z0-9()/_.-]*)?$`)
 
 // columns of interest -> type
-var cliColumns = map[string]string{"NAME": "servico", "NAMES": "servico", "NAMESPACE": "namespace", "IMAGE": "imagem",
-	"EXTERNAL-IP": "ip", "EXTERNAL IP": "ip", "PUBLIC-IP": "ip", "PUBLIC IP": "ip", "CONTAINER": "servico"}
+var cliColumns = map[string]string{"NAME": "service", "NAMES": "service", "NAMESPACE": "namespace", "IMAGE": "imagem",
+	"EXTERNAL-IP": "ip", "EXTERNAL IP": "ip", "PUBLIC-IP": "ip", "PUBLIC IP": "ip", "CONTAINER": "service"}
 
 type cliColumn struct {
 	ini int // position in the line (aligned) or index (tab)
@@ -55,7 +55,7 @@ func findCLITable(s string, add func(ObjFinding)) {
 			} else if nl-cmdNl <= 3 {
 				cols, tab = cliHeader(line)
 				for k := range cols {
-					if ns && cols[k].ent == "servico" {
+					if ns && cols[k].ent == "service" {
 						cols[k].ent = "namespace"
 					}
 				}
@@ -156,7 +156,7 @@ func cliLine2(s string, base int, l string, cols []cliColumn, tab bool, add func
 		case "ip":
 			for _, p := range strings.Split(v, ",") {
 				if isIPv4(p) {
-					add(ObjFinding{a, a + len(p), "servidor", "saída-cli", true})
+					add(ObjFinding{a, a + len(p), "server", "saída-cli", true})
 				}
 				a += len(p) + 1
 			}
@@ -188,14 +188,14 @@ func findInfraIP(s string, add func(ObjFinding)) {
 	if strings.Contains(s, "loadBalancer") {
 		for _, m := range reIPIngress.FindAllStringSubmatchIndex(s, -1) {
 			for _, n := range reIPItem.FindAllStringSubmatchIndex(s[m[2]:m[3]], -1) {
-				add(ObjFinding{m[2] + n[2], m[2] + n[3], "servidor", "ip-infra", true})
+				add(ObjFinding{m[2] + n[2], m[2] + n[3], "server", "ip-infra", true})
 			}
 		}
 	}
 	if strings.Contains(s, "ExternalIP") || strings.Contains(s, "InternalIP") {
 		for _, re := range []*regexp.Regexp{reIPInType, reIPInTypeAo} {
 			for _, m := range re.FindAllStringSubmatchIndex(s, -1) {
-				add(ObjFinding{m[2], m[3], "servidor", "ip-infra", true})
+				add(ObjFinding{m[2], m[3], "server", "ip-infra", true})
 			}
 		}
 	}

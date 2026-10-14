@@ -46,13 +46,13 @@ func TestLexicalKeyClue(t *testing.T) {
 		{`opts := Options{Namespace: "payments"}`, "payments", "namespace"},
 		{"metadata:\n  namespace: payments\n  name: web\n", "payments", "namespace"},
 		{"NAMESPACE=payments\n", "payments", "namespace"},
-		{`table_name = "pedidos"`, "pedidos", "tabela"},
+		{`table_name = "pedidos"`, "pedidos", "table"},
 		{`{"bucket": "billing", "region": "us-east-1"}`, "billing", "bucket"},
 		{`resource "aws_s3_bucket" "b" { bucket = "billing" }`, "billing", "bucket"},
-		{"queue = \"checkout\"\nretries = 3\n", "checkout", "fila"},
+		{"queue = \"checkout\"\nretries = 3\n", "checkout", "queue"},
 		// INI section: "key = value" with spaces counts inside the block of the header
-		{"[banco]\nhost = pgsrv-01\ntable_name = pedidos\n", "pedidos", "tabela"},
-		{"; config\n[fila]\n# comentário\nqueue = checkout\n", "checkout", "fila"},
+		{"[banco]\nhost = pgsrv-01\ntable_name = pedidos\n", "pedidos", "table"},
+		{"; config\n[fila]\n# comentário\nqueue = checkout\n", "checkout", "queue"},
 	} {
 		check(t, m, c.s, []string{c.name}, nil)
 		if !decided(m, c.s, c.name, c.ent, "") {
@@ -79,7 +79,7 @@ func TestLexicalAnchor(t *testing.T) {
 	// the anchor found in the same text
 	s := "db_host = \"pgsrv-01\"\nalvos = [\"pgsrv-01\", \"billing\", \"checkout\"]\n"
 	check(t, m, s, []string{"billing", "checkout"}, []string{"alvos"})
-	if !decided(m, s, "billing", "servidor", "léxica-âncora") {
+	if !decided(m, s, "billing", "server", "léxica-âncora") {
 		t.Errorf("billing: %+v", m.Decided(s, ""))
 	}
 	// the anchor learned before (another text), in a Go list and in a YAML list

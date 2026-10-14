@@ -523,7 +523,7 @@ func simulateSession(file string, cfg config.Config, m *mask.Masker, limitN, win
 		for _, t := range allTexts(msgs) {
 			if os.Getenv("LLM_DLP_DEPURAR") == "2" {
 				for _, a := range m.Detect(t) {
-					if a.Type == "usuario" || a.Type == "nome" {
+					if a.Type == "user" || a.Type == "name" {
 						i0 := max(0, a.Start-40)
 						for i0 < a.Start && t[i0]&0xC0 == 0x80 {
 							i0++

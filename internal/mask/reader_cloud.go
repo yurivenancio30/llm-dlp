@@ -50,7 +50,7 @@ func findAWSIDs(s string, add func(ObjFinding)) {
 				a, pfx = a-4, "tgw-attach"
 			}
 			if awsPrefixes[pfx] && (a == 0 || looseOne(s[a-1])) {
-				add(ObjFinding{a, j, "servico", "id-aws", true})
+				add(ObjFinding{a, j, "service", "id-aws", true})
 			}
 		}
 		k := strings.IndexByte(s[i+1:], '-')
@@ -103,7 +103,7 @@ func arnEm(s string, i int, add func(ObjFinding)) {
 	svc := s[cs[1]+1 : cs[2]]
 	account := s[cs[3]+1 : cs[4]]
 	if len(account) == 12 && strings.Trim(account, "0123456789") == "" && !publicDev(account) {
-		add(ObjFinding{cs[3] + 1, cs[4], "conta_nuvem", "arn", true})
+		add(ObjFinding{cs[3] + 1, cs[4], "cloud_account", "arn", true})
 	}
 	if account == "aws" {
 		return // AWS-managed resource (arn:aws:iam::aws:policy/...): public
@@ -136,17 +136,17 @@ func arnEm(s string, i int, add func(ObjFinding)) {
 	case "s3":
 		piece(ra, ra+cut(rec), "bucket")
 	case "sqs", "sns":
-		piece(ra, ra+cut(rec), "fila")
+		piece(ra, ra+cut(rec), "queue")
 	case "dynamodb":
 		if strings.HasPrefix(rec, "table/") {
 			a := ra + 6
-			piece(a, a+cut(s[a:rb]), "tabela")
+			piece(a, a+cut(s[a:rb]), "table")
 		}
 	default:
 		// type/name or type:name (the last piece is the name; "role/path/name")
 		k := cut(rec)
 		if k == len(rec) {
-			piece(ra, rb, "servico")
+			piece(ra, rb, "service")
 			return
 		}
 		typ := rec[:k]
@@ -158,9 +158,9 @@ func arnEm(s string, i int, add func(ObjFinding)) {
 				a += l + 1
 			}
 		}
-		ent := "servico"
+		ent := "service"
 		if svc == "iam" && typ == "user" {
-			ent = "usuario"
+			ent = "user"
 		}
 		piece(a, b, ent)
 	}
@@ -188,7 +188,7 @@ func findAzure(s string, add func(ObjFinding)) {
 		sgm := func(k int) string { return s[ps[k][0]:ps[k][1]] }
 		if len(ps) >= 2 {
 			if g := sgm(1); len(g) == 36 && strings.Count(g, "-") == 4 && !publicDev(g) {
-				add(ObjFinding{ps[1][0], ps[1][1], "conta_nuvem", "azure", true})
+				add(ObjFinding{ps[1][0], ps[1][1], "cloud_account", "azure", true})
 			}
 		}
 		k := 2
@@ -205,7 +205,7 @@ func findAzure(s string, add func(ObjFinding)) {
 				if v := sgm(t + 1); simpleName(v) && !publicDev(v) {
 					ent := entAzureType[strings.ToLower(sgm(t))]
 					if ent == "" {
-						ent = "servico"
+						ent = "service"
 					}
 					add(ObjFinding{ps[t+1][0], ps[t+1][1], ent, "azure", true})
 				}
@@ -220,12 +220,12 @@ func findAzure(s string, add func(ObjFinding)) {
 }
 
 // Azure resource type (the segment before the name) -> entity
-var entAzureType = map[string]string{"servers": "servidor", "flexibleservers": "servidor", "managedinstances": "servidor",
-	"databases": "database", "storageaccounts": "conta_nuvem", "containers": "bucket", "shares": "bucket",
-	"filesystems": "bucket", "queues": "fila", "topics": "fila", "subscriptions": "fila", "eventhubs": "fila",
-	"namespaces": "servidor", "managedclusters": "servidor", "virtualmachines": "servidor", "databaseaccounts": "servidor",
-	"registries": "servidor", "redis": "servidor", "sites": "servico", "vaults": "servico", "workspaces": "servico",
-	"factories": "servico", "accounts": "conta_nuvem", "tables": "tabela", "schemas": "schema"}
+var entAzureType = map[string]string{"servers": "server", "flexibleservers": "server", "managedinstances": "server",
+	"databases": "database", "storageaccounts": "cloud_account", "containers": "bucket", "shares": "bucket",
+	"filesystems": "bucket", "queues": "queue", "topics": "queue", "subscriptions": "queue", "eventhubs": "queue",
+	"namespaces": "server", "managedclusters": "server", "virtualmachines": "server", "databaseaccounts": "server",
+	"registries": "server", "redis": "server", "sites": "service", "vaults": "service", "workspaces": "service",
+	"factories": "service", "accounts": "cloud_account", "tables": "table", "schemas": "schema"}
 
 // Cloud URLs with a fixed structure:
 //
@@ -236,7 +236,7 @@ var entAzureType = map[string]string{"servers": "servidor", "flexibleservers": "
 // (https://learn.microsoft.com/azure/storage/common/storage-account-overview#storage-account-endpoints,
 // https://learn.microsoft.com/azure/service-bus-messaging/service-bus-dotnet-get-started-with-queues,
 // https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-queue-message-identifiers.html)
-var storageService = map[string]string{"blob": "bucket", "dfs": "bucket", "file": "bucket", "queue": "fila", "table": "tabela"}
+var storageService = map[string]string{"blob": "bucket", "dfs": "bucket", "file": "bucket", "queue": "queue", "table": "table"}
 
 func findCloudURLs(s string, add func(ObjFinding)) {
 	findCloudHosts(s, add)
@@ -256,7 +256,7 @@ func findCloudURLs(s string, add func(ObjFinding)) {
 				}
 				if ent, ok := storageService[svc]; ok && a < d && (a == 0 || !isAlnum(s[a-1])) {
 					if account := s[a:d]; !publicDev(account) {
-						add(ObjFinding{a, d, "conta_nuvem", "azure", true})
+						add(ObjFinding{a, d, "cloud_account", "azure", true})
 					}
 					e := i + len(".core.windows.net")
 					if e < len(s) && s[e] == '/' {
@@ -287,7 +287,7 @@ func findCloudURLs(s string, add func(ObjFinding)) {
 				a--
 			}
 			if a < i && !publicDev(s[a:i]) {
-				add(ObjFinding{a, i, "servidor", "azure", true})
+				add(ObjFinding{a, i, "server", "azure", true})
 			}
 			j := strings.Index(s[i+1:], ".servicebus.windows.net")
 			if j < 0 {
@@ -302,7 +302,7 @@ func findCloudURLs(s string, add func(ObjFinding)) {
 				b++
 			}
 			if b > a {
-				add(ObjFinding{a, b, "fila", "azure", true})
+				add(ObjFinding{a, b, "queue", "azure", true})
 			}
 		}
 	}
@@ -317,13 +317,13 @@ func findCloudURLs(s string, add func(ObjFinding)) {
 					b++
 				}
 				if b-a == 12 && b < len(s) && s[b] == '/' {
-					add(ObjFinding{a, b, "conta_nuvem", "aws", true})
+					add(ObjFinding{a, b, "cloud_account", "aws", true})
 					c := b + 1
 					for c < len(s) && (isAlnum(s[c]) || s[c] == '-' || s[c] == '_' || s[c] == '.') {
 						c++
 					}
 					if c > b+1 {
-						add(ObjFinding{b + 1, c, "fila", "aws", true})
+						add(ObjFinding{b + 1, c, "queue", "aws", true})
 					}
 				}
 			}
@@ -351,10 +351,10 @@ func findSnowflake(s string, add func(ObjFinding)) {
 		if d := strings.IndexByte(s[a:i], '.'); d >= 0 { // account.region
 			i2 := a + d
 			if i2 > a {
-				add(ObjFinding{a, i2, "conta_nuvem", "snowflake", true})
+				add(ObjFinding{a, i2, "cloud_account", "snowflake", true})
 			}
 		} else if a < i && !publicDev(s[a:i]) {
-			add(ObjFinding{a, i, "conta_nuvem", "snowflake", true})
+			add(ObjFinding{a, i, "cloud_account", "snowflake", true})
 		}
 		j := strings.Index(s[i+1:], ".snowflakecomputing.com")
 		if j < 0 {
@@ -364,7 +364,7 @@ func findSnowflake(s string, add func(ObjFinding)) {
 	}
 	for i := strings.Index(s, "app.snowflake.com/"); i >= 0; {
 		a := i + len("app.snowflake.com/")
-		for k, ent := range []string{"organizacao", "conta_nuvem"} {
+		for k, ent := range []string{"organization", "cloud_account"} {
 			b := a
 			for b < len(s) && (isAlnum(s[b]) || s[b] == '-' || s[b] == '_') {
 				b++
@@ -392,8 +392,8 @@ func urlPathEnd(s string, a int) int {
 
 // projects/<p>/(topics|subscriptions|datasets|buckets|instances|...)/<name> and
 // projects/<p>/locations/<l>/<type>/<name> (https://cloud.google.com/apis/design/resource_names)
-var entGCPType = map[string]string{"topics": "fila", "subscriptions": "fila", "datasets": "schema", "buckets": "bucket",
-	"tables": "tabela", "queues": "fila"}
+var entGCPType = map[string]string{"topics": "queue", "subscriptions": "queue", "datasets": "schema", "buckets": "bucket",
+	"tables": "table", "queues": "queue"}
 
 func findGCP(s string, add func(ObjFinding)) {
 	for i := strings.Index(s, "projects/"); i >= 0; {
@@ -446,12 +446,12 @@ func gcpIn(s string, ps [][2]int, add func(ObjFinding)) {
 		}
 	}
 	if !publicDev(p) {
-		add(ObjFinding{ps[1][0], ps[1][1], "conta_nuvem", "gcp", true})
+		add(ObjFinding{ps[1][0], ps[1][1], "cloud_account", "gcp", true})
 	}
 	for ; k+1 < len(ps); k += 2 {
 		ent, ok := entGCPType[sgm(k)]
 		if !ok {
-			ent = "servico"
+			ent = "service"
 		}
 		if v := sgm(k + 1); simpleName(v) && !publicDev(v) {
 			add(ObjFinding{ps[k+1][0], ps[k+1][1], ent, "gcp", true})

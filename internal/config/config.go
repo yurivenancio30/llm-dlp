@@ -52,15 +52,15 @@ type Config struct {
 	ExtraPatterns []ExtraPattern `json:"extra_patterns"`
 	Terms         []Term         `json:"terms"`
 
-	// Detectors the user wants to turn off (e.g. "endereco").
+	// Detectors the user wants to turn off (e.g. "address").
 	DisabledDetectors []string `json:"disabled_detectors"`
-	// Optional detectors the user wants to turn on. Today: "quase" (quasi-identifiers: sex, age,
+	// Optional detectors the user wants to turn on. Today: "quasi" (quasi-identifiers: sex, age,
 	// marital status, profession, nationality, income, latitude/longitude).
 	OptionalDetectors []string `json:"optional_detectors,omitempty"`
 
 	// Extra words to recognize field names (CSV header, JSON key...). Types: cpf, cnpj, rg, cnh,
-	// pis, doc, nascimento, telefone, cep, endereco, usuario, conta, cartao, sensivel, nome, quase;
-	// "pessoa" (whose field it is: "segurado") and "neutra" (a word that does not change what the
+	// pis, doc, birthdate, phone, cep, address, user, account, card, sensitive, name, quasi;
+	// "person" (whose field it is: "segurado") and "neutral" (a word that does not change what the
 	// field holds: "bco", "sis").
 	ExtraFields []ExtraField `json:"extra_fields,omitempty"`
 

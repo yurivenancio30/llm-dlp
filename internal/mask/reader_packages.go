@@ -85,14 +85,14 @@ func goModIn(s string, a int, add func(ObjFinding)) {
 			return
 		}
 		if internalHost(h) {
-			add(ObjFinding{a, a + len(sgms[0]), "servidor", "pacote", true})
+			add(ObjFinding{a, a + len(sgms[0]), "server", "package", true})
 		}
 		x += len(sgms[0]) + 1
 		sgms = sgms[1:]
 	}
 	for _, sg := range sgms {
 		if simpleName(sg) && !publicDev(sg) && !(len(sg) >= 2 && sg[0] == 'v' && strings.Trim(sg[1:], "0123456789") == "") {
-			add(ObjFinding{x, x + len(sg), "pacote", "pacote", true})
+			add(ObjFinding{x, x + len(sg), "package", "package", true})
 		}
 		x += len(sg) + 1
 	}
@@ -118,7 +118,7 @@ func groupIn(s string, a, b int, add func(ObjFinding)) {
 		tld := start && (publicTLDs[strings.ToLower(p)] || len(p) == 2)
 		start = tld
 		if !tld && len(p) >= 2 && reSimpleIdent.MatchString(p) && !publicDev(p) {
-			add(ObjFinding{x, x + len(p), "pacote", "pacote", true})
+			add(ObjFinding{x, x + len(p), "package", "package", true})
 		}
 		x += len(p) + 1
 	}
@@ -182,6 +182,6 @@ func npmIn(s string, p int, add func(ObjFinding)) {
 	if publicNpmScopes[strings.ToLower(v[:k])] {
 		return
 	}
-	add(ObjFinding{a, a + k, "organizacao", "pacote", true})
-	add(ObjFinding{a + k + 1, a + e, "pacote", "pacote", true})
+	add(ObjFinding{a, a + k, "organization", "package", true})
+	add(ObjFinding{a + k + 1, a + e, "package", "package", true})
 }

@@ -36,7 +36,7 @@ type memFilter struct {
 
 // columnOrIndex: the data model vocabulary, which the memory does not carry into prose nor into
 // another file (the same reason why vistos does not propagate columns).
-func columnOrIndex(ent string) bool { return ent == "coluna" || ent == "indice" }
+func columnOrIndex(ent string) bool { return ent == "column" || ent == "index" }
 
 func filterOf(hint string) memFilter {
 	_, ext := hintParts(hint)

@@ -165,7 +165,7 @@ func ValidTracking(s string) bool {
 func findTrackingCodes(s string, add func(ini, end int, typ string)) {
 	for _, ix := range reTracking.FindAllStringIndex(s, -1) {
 		if ValidTracking(s[ix[0]:ix[1]]) {
-			add(ix[0], ix[1], "rastreio")
+			add(ix[0], ix[1], "tracking")
 		}
 	}
 }
@@ -189,7 +189,7 @@ func ValidCertificateNumber(s string) bool {
 func findCertificates(s string, add func(ini, end int, typ string)) {
 	for _, ix := range reCertificate.FindAllStringIndex(s, -1) {
 		if ValidCertificateNumber(s[ix[0]:ix[1]]) {
-			add(ix[0], ix[1], "certidao")
+			add(ix[0], ix[1], "certificate")
 		}
 	}
 }
@@ -228,7 +228,7 @@ func findCID(s string, add func(ini, end int, typ string)) {
 			if c == "" || p+len(c) < len(s) && (isAlnum(s[p+len(c)]) || s[p+len(c)] == '_') {
 				break
 			}
-			add(p, p+len(c), "sensivel")
+			add(p, p+len(c), "sensitive")
 			p += len(c)
 			sep := reCIDSep.FindString(s[p:])
 			if sep == "" {

@@ -34,19 +34,19 @@ func TestPseudonymGolden(t *testing.T) {
 
 	// each type, directly
 	for _, c := range [][2]string{
-		{"segredo", "Xk8pq2vR9zLm4Tw7"}, {"email", "maria.souza@empresa-ficticia.com.br"},
+		{"secret", "Xk8pq2vR9zLm4Tw7"}, {"email", "maria.souza@empresa-ficticia.com.br"},
 		{"email", "joao.silva@empresa-ficticia.com.br"}, {"ip", "10.42.7.15"},
 		{"host", "db01.empresa-ficticia.com.br"}, {"host", "mysql.empresa-ficticia.com.br"},
 		{"cpf", "529.982.247-25"}, {"cnpj", "11.222.333/0001-81"}, {"cnpj", "12.ABC.345/01DE-35"},
-		{"pis", "120.5643.678-0"}, {"cnh", "02650306461"}, {"rg", "12.345.678-9"}, {"telefone", "(11) 98765-4321"},
-		{"cep", "01310-100"}, {"cartao", "4111 1111 1111 1111"}, {"conta", "12345-6"}, {"pix", "maria@pix.com.br"},
-		{"endereco", "Rua das Flores, 123"}, {"nascimento", "12/03/1985"}, {"nome", "João Carlos Silva"},
-		{"nome", "JOÃO SILVA"}, {"nome", "maria fernanda souza"}, {"nome", "Maria Fernanda Souza"},
-		{"usuario", "U1001"}, {"usuario", "jsilva"}, {"doc", "AB1234567"}, {"iban", "DE89370400440532013000"},
-		{"processo", "0001234-56.2024.8.26.0100"}, {"mac", "00:1a:2b:3c:4d:5e"},
+		{"pis", "120.5643.678-0"}, {"cnh", "02650306461"}, {"rg", "12.345.678-9"}, {"phone", "(11) 98765-4321"},
+		{"cep", "01310-100"}, {"card", "4111 1111 1111 1111"}, {"account", "12345-6"}, {"pix", "maria@pix.com.br"},
+		{"address", "Rua das Flores, 123"}, {"birthdate", "12/03/1985"}, {"name", "João Carlos Silva"},
+		{"name", "JOÃO SILVA"}, {"name", "maria fernanda souza"}, {"name", "Maria Fernanda Souza"},
+		{"user", "U1001"}, {"user", "jsilva"}, {"doc", "AB1234567"}, {"iban", "DE89370400440532013000"},
+		{"lawsuit", "0001234-56.2024.8.26.0100"}, {"mac", "00:1a:2b:3c:4d:5e"},
 		{"nfe", "35240111222333000181550010000012341000012345"}, {"boleto", "23790.12345 60000.123456 78901.234567 8 91230000010000"},
-		{"rastreio", "RR473124829BR"}, {"certidao", "104539 01 55 2013 1 00012 021 0000123-45"},
-		{"sensivel", "F32.1"}, {"sensivel", "evangélico"}, {"quase", "feminino"},
+		{"tracking", "RR473124829BR"}, {"certificate", "104539 01 55 2013 1 00012 021 0000123-45"},
+		{"sensitive", "F32.1"}, {"sensitive", "evangélico"}, {"quasi", "feminino"},
 		{"x:matricula", "MAT123456"}, {"t:projeto", "Projeto Fenix"}, {"t:projeto", "PROJETO FENIX"},
 	} {
 		add(c[0], c[1], m.Pseudonym(c[0], c[1]))

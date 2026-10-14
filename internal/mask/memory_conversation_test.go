@@ -181,7 +181,7 @@ func BenchmarkMemoryScan1MB(b *testing.B) {
 	m := newTest(b)
 	var decs []Decision
 	for i := 0; i < 2000; i++ {
-		decs = append(decs, Decision{Name: "nome" + strings.Repeat("x", i%7) + string(rune('a'+i%26)) + string(rune('a'+i/26%26)), Ent: []string{"namespace", "tabela"}[i%2]})
+		decs = append(decs, Decision{Name: "nome" + strings.Repeat("x", i%7) + string(rune('a'+i%26)) + string(rune('a'+i/26%26)), Ent: []string{"namespace", "table"}[i%2]})
 	}
 	mm := m.newMemory(decs)
 	line := "o servico nomexab respondeu em 12ms para Tabela NOMEXXBC; outra palavra comum aqui e ali\n"

@@ -64,7 +64,7 @@ func entryOf(entries []Entry, ps, real, typ string) []Entry {
 	entries = append(entries, Entry{ps, real, typ})
 	if typ == "email" { // the model sometimes cites only the domain: "dxxxx.invalid" goes back to the real domain
 		if i, j := strings.LastIndexByte(ps, '@'), strings.LastIndexByte(real, '@'); i >= 0 && j >= 0 {
-			entries = append(entries, Entry{ps[i+1:], real[j+1:], "dominio"})
+			entries = append(entries, Entry{ps[i+1:], real[j+1:], "domain"})
 		}
 	}
 	return entries
@@ -115,10 +115,10 @@ func (m *Masker) pseudonym(typ, real string) string {
 		// short format on purpose: measured, "pessoa.X@dom-YYYYYYYY.invalid" cost ~16% more tokens
 		// than the real e-mail; this one costs ~1.5% (the domain only needs to tell domains apart)
 		return "p." + pid + "@d" + m.p.ID("dominio", e[at+1:])[:4] + ".invalid"
-	case "nome":
+	case "name":
 		pid := ""
 		if m.people != nil {
-			pid = m.people.PID(m.p, "nome", NormName(real))
+			pid = m.people.PID(m.p, "name", NormName(real))
 		}
 		if pid == "" {
 			pid = m.p.ID("nome", NormName(real))
@@ -127,11 +127,11 @@ func (m *Masker) pseudonym(typ, real string) string {
 		// gives each spelling back as it was (see nameVariants)
 		switch nameCase(real) {
 		case 'A':
-			return "PESSOA " + strings.ToUpper(pid)
+			return "PERSON " + strings.ToUpper(pid)
 		case 'a':
-			return "pessoa " + pid
+			return "person " + pid
 		}
-		return "Pessoa " + pid
+		return "Person " + pid
 	case "ip":
 		return m.pseudoIP(real)
 	case "host":
@@ -143,31 +143,31 @@ func (m *Masker) pseudonym(typ, real string) string {
 			}
 		}
 		return "h" + m.p.ID("host", h) + ".invalid"
-	case "segredo":
-		return "SEGREDO-" + m.p.ID("segredo", real)
-	case "usuario":
+	case "secret":
+		return "SECRET-" + m.p.ID(hmacDomain(typ), real)
+	case "user":
 		// code of an imported person: the same id as their name and e-mail
 		pid := ""
 		if m.people != nil {
-			pid = m.people.PID(m.p, "codigo", NormName(real))
+			pid = m.people.PID(m.p, "code", NormName(real))
 		}
 		if pid == "" {
-			pid = m.p.ID("usuario", NormName(real))
+			pid = m.p.ID(hmacDomain(typ), NormName(real))
 		}
-		return pseudoLabel("USUARIO", pid, real)
+		return pseudoLabel("USER", pid, real)
 	}
 	if numericTypes[typ] {
 		if typ == "cnpj" && ValidAlphaCNPJ(real) { // the new format has letters: the digits alone are not enough
-			return "CNPJ-" + m.p.ID(typ, NormName(real))
+			return "CNPJ-" + m.p.ID(hmacDomain(typ), NormName(real))
 		}
-		return strings.ToUpper(typ) + "-" + m.p.ID(typ, canonNum(real))
+		return strings.ToUpper(typ) + "-" + m.p.ID(hmacDomain(typ), canonNum(real))
 	}
 	lbl := strings.TrimPrefix(strings.TrimPrefix(typ, "x:"), "t:")
-	return pseudoLabel(strings.ToUpper(lbl), m.p.ID(typ, NormName(real)), real)
+	return pseudoLabel(strings.ToUpper(lbl), m.p.ID(hmacDomain(typ), NormName(real)), real)
 }
 
 // numericTypes: the pseudonym comes only from the digits (canonNum).
-var numericTypes = setOf("cpf", "cnpj", "pis", "cnh", "telefone", "cep", "cartao", "rg", "conta")
+var numericTypes = setOf("cpf", "cnpj", "pis", "cnh", "phone", "cep", "card", "rg", "account")
 
 // pseudoWithCase: the type's pseudonym follows the case of the real spelling, and the return adds
 // its other cases (caseVariants): objects (pseudoObject) and labeled types whose key has no case
@@ -178,7 +178,7 @@ func pseudoWithCase(typ string) bool {
 		return true
 	}
 	switch typ {
-	case "email", "nome", "ip", "host", "segredo", "dominio":
+	case "email", "name", "ip", "host", "secret", "domain":
 		return false
 	}
 	return !numericTypes[typ]
@@ -344,9 +344,9 @@ func nameVariants(ps, real string) []Entry {
 	}
 	var out []Entry
 	for _, v := range []Entry{
-		{"PESSOA " + strings.ToUpper(pid), strings.ToUpper(real), "nome"},
-		{"pessoa " + pid, strings.ToLower(real), "nome"},
-		{"Pessoa " + pid, strings.Join(initials, " "), "nome"},
+		{"PERSON " + strings.ToUpper(pid), strings.ToUpper(real), "name"},
+		{"person " + pid, strings.ToLower(real), "name"},
+		{"Person " + pid, strings.Join(initials, " "), "name"},
 	} {
 		if v.Pseudo != ps {
 			out = append(out, v)

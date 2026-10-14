@@ -99,17 +99,17 @@ func NewMasker(cfg config.Config, key []byte, people *People, seenSet *Seen) (*M
 	m.readers = append(m.readers, Reader{Name: "traceback", Find: m.findTraceback, Public: publicDev})
 	// field name vocabulary: the default plus what the user added
 	m.vocab = defaultVocabulary()
-	m.vocab.almost = cfg.Optional("quase")
+	m.vocab.almost = cfg.Optional("quasi")
 	for _, ce := range cfg.ExtraFields {
 		for _, wd := range ce.Words {
 			for _, t := range labelTokens(wd) {
 				switch ce.Type {
-				case "pessoa":
+				case "person":
 					m.vocab.person[t] = true
-				case "neutra":
+				case "neutral":
 					m.vocab.neutral[t] = true
-				case "cpf", "cnpj", "rg", "cnh", "pis", "doc", "nascimento", "telefone", "cep", "endereco", "usuario", "conta", "cartao",
-					"sensivel", "nome", "quase":
+				case "cpf", "cnpj", "rg", "cnh", "pis", "doc", "birthdate", "phone", "cep", "address", "user", "account", "card",
+					"sensitive", "name", "quasi":
 					m.vocab.class[t] = ce.Type
 				default:
 					return nil, fmt.Errorf("campos_extras: tipo desconhecido %q", ce.Type)

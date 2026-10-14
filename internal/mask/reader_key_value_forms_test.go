@@ -70,8 +70,8 @@ func TestKeyValueForms(t *testing.T) {
 
 func TestEntNormalizedKey(t *testing.T) {
 	for k, e := range map[string]string{"dbname": "database", "dbName": "database", "db_name": "database", "database_name": "database",
-		"tableName": "tabela", "schemaname": "schema", "rolename": "usuario", "warehousename": "servico", "accountname": "conta_nuvem",
-		"HostName": "servidor", "fieldPath": "coluna", "column_name": "coluna", "COLUMN": "coluna", "role": "usuario", "serviceAccountName": "usuario"} {
+		"tableName": "table", "schemaname": "schema", "rolename": "user", "warehousename": "service", "accountname": "cloud_account",
+		"HostName": "server", "fieldPath": "column", "column_name": "column", "COLUMN": "column", "role": "user", "serviceAccountName": "user"} {
 		if g, strong := entKey(k); g != e || !strong {
 			t.Errorf("%s: %q forte=%v, esperado %q", k, g, strong, e)
 		}

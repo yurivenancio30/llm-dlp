@@ -183,7 +183,7 @@ func sqlHint(cmd string) *outputHint {
 		}
 	}
 	if reDescribe.MatchString(cmd) {
-		return &outputHint{names: map[string]string{"name": "coluna"}, name: "coluna", strong: true}
+		return &outputHint{names: map[string]string{"name": "column"}, name: "column", strong: true}
 	}
 	return nil
 }
@@ -429,17 +429,17 @@ func (c *Commands) rememberHeader(cmd, output string) {
 // container and orchestrator resource types (with the CLIs' own abbreviations) that the generic
 // type word does not cover; the rest comes from pluralEnt (tables, topics, buckets...)
 var listingResource = map[string]string{
-	"pod": "servico", "pods": "servico", "po": "servico", "deployment": "servico", "deployments": "servico",
-	"deploy": "servico", "statefulset": "servico", "statefulsets": "servico", "sts": "servico",
-	"daemonset": "servico", "daemonsets": "servico", "ds": "servico", "replicaset": "servico",
-	"replicasets": "servico", "rs": "servico", "job": "servico", "jobs": "servico", "cronjob": "servico",
-	"cronjobs": "servico", "cj": "servico", "svc": "servico", "services": "servico", "service": "servico",
-	"release": "servico", "releases": "servico", "container": "servico", "containers": "servico",
-	"ingress": "servico", "ingresses": "servico", "ing": "servico", "configmap": "servico",
-	"configmaps": "servico", "cm": "servico", "secret": "servico", "secrets": "servico",
-	"ns": "namespace", "namespaces": "namespace", "node": "servidor", "nodes": "servidor", "no": "servidor",
-	"instances": "servidor", "clusters": "servidor", "vm": "servidor", "vms": "servidor",
-	"apps": "servico", "functions": "servico", "groups": "servico", "repos": "repositorio",
+	"pod": "service", "pods": "service", "po": "service", "deployment": "service", "deployments": "service",
+	"deploy": "service", "statefulset": "service", "statefulsets": "service", "sts": "service",
+	"daemonset": "service", "daemonsets": "service", "ds": "service", "replicaset": "service",
+	"replicasets": "service", "rs": "service", "job": "service", "jobs": "service", "cronjob": "service",
+	"cronjobs": "service", "cj": "service", "svc": "service", "services": "service", "service": "service",
+	"release": "service", "releases": "service", "container": "service", "containers": "service",
+	"ingress": "service", "ingresses": "service", "ing": "service", "configmap": "service",
+	"configmaps": "service", "cm": "service", "secret": "service", "secrets": "service",
+	"ns": "namespace", "namespaces": "namespace", "node": "server", "nodes": "server", "no": "server",
+	"instances": "server", "clusters": "server", "vm": "server", "vms": "server",
+	"apps": "service", "functions": "service", "groups": "service", "repos": "repository",
 }
 
 // listing verbs (as a subcommand, never the program itself: "ls" and "ps" alone belong to the
@@ -464,7 +464,7 @@ func listingHint(cmd string) *outputHint {
 		if e, ok := listingResource[w]; ok {
 			return e
 		}
-		if e, ok := pluralEnt(w); ok && e != "coluna" {
+		if e, ok := pluralEnt(w); ok && e != "column" {
 			return e
 		}
 		return ""
@@ -476,7 +476,7 @@ func listingHint(cmd string) *outputHint {
 			return nameHint(e)
 		}
 		if pluralNoun(w) {
-			return identityHint("servico", w)
+			return identityHint("service", w)
 		}
 		return nil
 	}
@@ -504,7 +504,7 @@ func listingHint(cmd string) *outputHint {
 			}
 		}
 		if v == "ps" || v == "list" && i == 1 {
-			return nameHint("servico") // docker ps, helm list: containers and releases
+			return nameHint("service") // docker ps, helm list: containers and releases
 		}
 		return nil
 	}
@@ -673,7 +673,7 @@ func hintCell(s string, c cell, e string, strong bool, add func(ObjFinding)) {
 	ents := entQual(len(ps), e)
 	for k, p := range ps {
 		if p != "" && !publicHint(p) && reSimpleIdent.MatchString(p) {
-			add(ObjFinding{a, a + len(p), ents[k], "comando", strong && ents[k] != "coluna" && len(p) >= 5})
+			add(ObjFinding{a, a + len(p), ents[k], "comando", strong && ents[k] != "column" && len(p) >= 5})
 		}
 		a += len(p) + 1
 	}

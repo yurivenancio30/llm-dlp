@@ -17,17 +17,17 @@ import (
 
 // catalog header -> entity of the values in that column
 var catalogHdr = map[string]string{
-	"table_name": "tabela", "tablename": "tabela", "tabname": "tabela", "table": "tabela", "tabela": "tabela",
-	"view_name": "tabela", "object_name": "tabela", "objeto": "tabela", "object": "tabela", "tableid": "tabela",
+	"table_name": "table", "tablename": "table", "tabname": "table", "table": "table", "tabela": "table",
+	"view_name": "table", "object_name": "table", "objeto": "table", "object": "table", "tableid": "table",
 	"table_schema": "schema", "schema_name": "schema", "schemaname": "schema", "tabschema": "schema", "schema": "schema",
-	"routine_schema": "schema", "specific_schema": "schema", "constraint_schema": "schema", "owner": "usuario",
+	"routine_schema": "schema", "specific_schema": "schema", "constraint_schema": "schema", "owner": "user",
 	"table_catalog": "database", "catalog_name": "database", "database_name": "database", "database": "database",
 	"datname": "database", "banco": "database", "routine_catalog": "database",
-	"column_name": "coluna", "colname": "coluna", "coluna": "coluna", "column": "coluna", "field": "coluna",
+	"column_name": "column", "colname": "column", "coluna": "column", "column": "column", "field": "column",
 	"routine_name": "procedure", "specific_name": "procedure", "procedure_name": "procedure", "function_name": "procedure",
-	"index_name": "indice", "indname": "indice", "key_name": "indice", "constraint_name": "indice",
-	"server": "servidor", "servidor": "servidor", "server_name": "servidor", "host_name": "servidor", "hostname": "servidor",
-	"usename": "usuario", "rolname": "usuario", "grantee": "usuario", "user_name": "usuario", "username": "usuario",
+	"index_name": "index", "indname": "index", "key_name": "index", "constraint_name": "index",
+	"server": "server", "servidor": "server", "server_name": "server", "host_name": "server", "hostname": "server",
+	"usename": "user", "rolname": "user", "grantee": "user", "user_name": "user", "username": "user",
 }
 
 // the tools' own labels: never a user's column name
@@ -484,18 +484,18 @@ func classifyTableD(s string, cs []cell, rows [][]cell, title string, noHdr, str
 			continue
 		}
 		if m := reTablesIn.FindStringSubmatchIndex(h); m != nil { // MySQL: Tables_in_<banco>
-			ent[k] = "tabela"
+			ent[k] = "table"
 			add(ObjFinding{c.a + m[2], c.a + m[3], "database", "tabela-catálogo", true})
 			continue
 		}
 		if !noHdr && !outputLabels[v] && !publicSQL(v) && !strings.ContainsAny(h, " ().") && identifierShape(h) && (!strict || strings.ContainsAny(h, "_0123456789")) {
-			add(ObjFinding{c.a, c.b, "coluna", "cabeçalho", false})
+			add(ObjFinding{c.a, c.b, "column", "cabeçalho", false})
 		}
 	}
 	if name >= 0 {
 		switch {
 		case hasSchema: // psql \dt: Schema | Name | Type | Owner
-			ent[name] = "tabela"
+			ent[name] = "table"
 		case title != "": // aws --output table: the section title gives the type
 			ent[name] = title
 		case typ >= 0: // DESCRIBE: name | type, with data types in the type column
@@ -509,7 +509,7 @@ func classifyTableD(s string, cs []cell, rows [][]cell, title string, noHdr, str
 				}
 			}
 			if n > 0 && t*2 >= n {
-				ent[name] = "coluna"
+				ent[name] = "column"
 			}
 		}
 	}
@@ -651,7 +651,7 @@ func addCellParts(s string, a, b int, lastPos string, add func(ObjFinding)) {
 		if p != "" && !publicSQL(p) && reSimpleIdent.MatchString(p) {
 			// a short value (up to 4 characters: codes, acronyms) masks in place, but does not
 			// teach alone
-			add(ObjFinding{a, a + len(p), ents[k], "tabela-catálogo", ents[k] != "coluna" && len(p) >= 5})
+			add(ObjFinding{a, a + len(p), ents[k], "tabela-catálogo", ents[k] != "column" && len(p) >= 5})
 		}
 		a += len(p) + 1
 	}

@@ -72,34 +72,34 @@ var databaseSchemes = setOf("jdbc", "postgres", "postgresql", "mysql", "mariadb"
 
 // last piece of the key name (lowercase) -> entity
 var entPiece = map[string]string{
-	"host": "servidor", "hostname": "servidor", "server": "servidor", "servidor": "servidor", "endpoint": "servidor",
-	"address": "servidor", "addr": "servidor", "fqdn": "servidor", "broker": "servidor", "bootstrap": "servidor",
-	"bootstrapservers": "servidor", "servername": "servidor",
-	"cluster": "servidor", "instance": "servidor", "warehouse": "servico",
+	"host": "server", "hostname": "server", "server": "server", "servidor": "server", "endpoint": "server",
+	"address": "server", "addr": "server", "fqdn": "server", "broker": "server", "bootstrap": "server",
+	"bootstrapservers": "server", "servername": "server",
+	"cluster": "server", "instance": "server", "warehouse": "service",
 	"database": "database", "db": "database", "dbname": "database", "databasename": "database", "catalog": "database",
 	"schema": "schema", "dataset": "schema", "schemaname": "schema",
-	"table": "tabela", "tabela": "tabela", "collection": "tabela", "tablename": "tabela",
-	"user": "usuario", "username": "usuario", "usuario": "usuario", "login": "usuario", "principal": "usuario",
+	"table": "table", "tabela": "table", "collection": "table", "tablename": "table",
+	"user": "user", "username": "user", "usuario": "user", "login": "user", "principal": "user",
 	"namespace": "namespace",
-	"service":   "servico", "servico": "servico", "app": "servico", "application": "servico",
+	"service":   "service", "servico": "service", "app": "service", "application": "service",
 	"bucket": "bucket", "container": "bucket",
-	"queue": "fila", "topic": "fila", "fila": "fila", "topico": "fila", "exchange": "fila", "stream": "fila", "subject": "fila",
-	"group": "servico", "consumergroup": "servico",
-	"repo": "repositorio", "repository": "repositorio",
-	"org": "organizacao", "organization": "organizacao",
-	"account": "conta_nuvem", "tenant": "conta_nuvem", "subscription": "conta_nuvem", "projectid": "conta_nuvem",
-	"column": "coluna", "coluna": "coluna", "field": "coluna", "role": "usuario",
-	"procedure": "procedure", "routine": "procedure", "view": "tabela",
+	"queue": "queue", "topic": "queue", "fila": "queue", "topico": "queue", "exchange": "queue", "stream": "queue", "subject": "queue",
+	"group": "service", "consumergroup": "service",
+	"repo": "repository", "repository": "repository",
+	"org": "organization", "organization": "organization",
+	"account": "cloud_account", "tenant": "cloud_account", "subscription": "cloud_account", "projectid": "cloud_account",
+	"column": "column", "coluna": "column", "field": "column", "role": "user",
+	"procedure": "procedure", "routine": "procedure", "view": "table",
 }
 
 // "<x>_name": the piece before "name" gives the entity (db_name, table_name...)
-var entBeforeName = map[string]string{"db": "database", "database": "database", "table": "tabela", "schema": "schema",
-	"host": "servidor", "server": "servidor", "user": "usuario", "service": "servico", "bucket": "bucket", "queue": "fila",
-	"topic": "fila", "group": "servico", "namespace": "namespace", "cluster": "servidor", "collection": "tabela",
-	"stream": "fila", "subject": "fila", "exchange": "fila", "repo": "repositorio", "container": "bucket",
-	"column": "coluna", "field": "coluna", "role": "usuario", "warehouse": "servico", "account": "conta_nuvem", "owner": "usuario",
-	"view": "tabela", "procedure": "procedure", "function": "procedure", "index": "indice", "constraint": "indice", "catalog": "database",
-	"dataset": "schema", "project": "conta_nuvem"}
+var entBeforeName = map[string]string{"db": "database", "database": "database", "table": "table", "schema": "schema",
+	"host": "server", "server": "server", "user": "user", "service": "service", "bucket": "bucket", "queue": "queue",
+	"topic": "queue", "group": "service", "namespace": "namespace", "cluster": "server", "collection": "table",
+	"stream": "queue", "subject": "queue", "exchange": "queue", "repo": "repository", "container": "bucket",
+	"column": "column", "field": "column", "role": "user", "warehouse": "service", "account": "cloud_account", "owner": "user",
+	"view": "table", "procedure": "procedure", "function": "procedure", "index": "index", "constraint": "index", "catalog": "database",
+	"dataset": "schema", "project": "cloud_account"}
 
 // suffixes glued to a type word ("rolename", "warehousename", "fieldpath")
 var gluedSuffixes = []string{"names", "name", "nome", "path", "fqn"}
@@ -356,16 +356,16 @@ func vocabularyFinding(l Reader, o ObjFinding, v string, sw map[string]bool) boo
 	lv := strings.ToLower(v)
 	// a URL or domain piece alone: a generic TLD ("com" of docs.aws.amazon.com) and a URI scheme
 	// ("https" of https://...) are never a customer name
-	if genericTLDs[lv] || uriSchemes[lv] && (o.Ent == "schema" || o.Ent == "pasta" || o.Ent == "servidor" || o.Ent == "coluna") {
+	if genericTLDs[lv] || uriSchemes[lv] && (o.Ent == "schema" || o.Ent == "folder" || o.Ent == "server" || o.Ent == "column") {
 		return true
 	}
 	switch o.Ent {
-	case "usuario":
+	case "user":
 		return defaultRoles[lv]
-	case "conta_nuvem":
+	case "cloud_account":
 		return exampleNumber(v)
-	case "servico", "namespace", "fila":
-		return l.Name != "pacote" && publicGroup(v)
+	case "service", "namespace", "queue":
+		return l.Name != "package" && publicGroup(v)
 	}
 	return false
 }

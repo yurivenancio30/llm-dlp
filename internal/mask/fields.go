@@ -18,15 +18,15 @@ var commonUser = map[string]bool{"root": true, "admin": true, "administrator": t
 	"sys": true, "sysadmin": true, "guest": true, "nobody": true, "www-data": true, "default": true, "anonymous": true, "public": true, "git": true,
 	"docker": true, "oracle": true, "hadoop": true, "spark": true, "hive": true, "kafka": true, "jenkins": true, "claude": true, "assistant": true}
 
-var reReadyPseudo = regexp.MustCompile(`^(?:[A-Z:]+-[a-z2-7]{8}|[Pp]essoa [a-z2-7]{8}|PESSOA [A-Z2-7]{8}|\S+\.invalid)$`)
+var reReadyPseudo = regexp.MustCompile(`^(?:[A-Z:]+-[a-z2-7]{8}|(?:[Pp]erson|[Pp]essoa) [a-z2-7]{8}|(?:PERSON|PESSOA) [A-Z2-7]{8}|\S+\.invalid)$`)
 
 // markIt applies fieldValue to the piece s[start:end] and records the finding. In a name field,
 // "Fulano de Tal / Beltrana Souza" are two people: each part is a finding.
 func markIt(s string, ini, end int, class string, add func(ini, end int, typ string)) {
-	if class == "nomesolto" {
-		return // only counts in a table or record with another person field, where it becomes "nomecompleto" (see header and nameInRegistry)
+	if class == "name_loose" {
+		return // only counts in a table or record with another person field, where it becomes "name_full" (see header and nameInRegistry)
 	}
-	if (class == "nome" || class == "nomecompleto") && strings.ContainsAny(s[ini:end], "/;&") {
+	if (class == "name" || class == "name_full") && strings.ContainsAny(s[ini:end], "/;&") {
 		for p := ini; p < end; {
 			q := p
 			for q < end && s[q] != '/' && s[q] != ';' && s[q] != '&' {
@@ -68,11 +68,11 @@ func fieldValue(class, v string) (string, bool) {
 		}
 	}
 	switch class {
-	case "cartao", "conta":
+	case "card", "account":
 		return class, dig >= 4 && let <= 4
-	case "quase":
+	case "quasi":
 		return class, let+dig >= 1 && len(v) <= 60
-	case "cpf", "cnpj", "rg", "cnh", "pis", "telefone", "cep", "doc":
+	case "cpf", "cnpj", "rg", "cnh", "pis", "phone", "cep", "doc":
 		// a date or time is not a document, however many digits it has ("2026-10-03", "12:30:00"):
 		// without this, a date in one of these columns would be remembered and masked everywhere
 		if looksLikeDateTime(v) {
@@ -83,23 +83,23 @@ func fieldValue(class, v string) (string, bool) {
 		}
 		// number of digits of each document (with slack for cut leading zeros)
 		rng := map[string][2]int{"cpf": {9, 11}, "cnpj": {12, 14}, "rg": {5, 14}, "cnh": {9, 11}, "pis": {9, 11},
-			"telefone": {8, 13}, "cep": {7, 8}, "doc": {5, 20}}[class]
+			"phone": {8, 13}, "cep": {7, 8}, "doc": {5, 20}}[class]
 		if class == "cnpj" && let > 0 { // new CNPJ, with letters
 			return class, dig+let == 14 && dig >= 2
 		}
 		return class, dig >= rng[0] && dig <= rng[1] && let <= 3
-	case "nascimento":
+	case "birthdate":
 		return class, dig >= 6 && dig <= 14 && let <= 12
-	case "endereco":
+	case "address":
 		return class, let >= 4 && len(v) >= 6
-	case "usuario":
+	case "user":
 		// environment variables, query parameters (":user_id") and pieces of code do not count; nor
 		// do ownerless values ("stub-user", "my_user", "XXXXXXXXX", see vocab_dev.go)
 		return class, dig+let >= 2 && !commonUser[strings.ToLower(v)] && !strings.ContainsAny(v, " ()[]{}$<>:%") &&
 			!ownerless(v, nil)
-	case "sensivel":
+	case "sensitive":
 		return class, let+dig >= 1
-	case "nomecompleto":
+	case "name_full":
 		// first and last name, each starting with a capital ("Maria Lopes", "MARIA LOPES")
 		ps := strings.Fields(v)
 		if len(ps) < 2 {
@@ -110,8 +110,8 @@ func fieldValue(class, v string) (string, bool) {
 				return "", false
 			}
 		}
-		return fieldValue("nome", v)
-	case "nome":
+		return fieldValue("name", v)
+	case "name":
 		// a person's name: letters, spaces and little else (not "SVC_CARGA", "a.b:c", "x@y")
 		for _, c := range v {
 			if !unicode.IsLetter(c) && c != ' ' && c != '\'' && c != '-' && c != '.' {
@@ -138,7 +138,7 @@ func (m *Masker) findFields(s string, add func(ini, end int, typ string)) {
 			next = s[i+1]
 		}
 		class := m.classBefore(s, i)
-		if class == "nomesolto" {
+		if class == "name_loose" {
 			class = m.nameInRegistry(s, i) // "nome" alone: a person's only with another person field next to it
 		}
 		if class == "" {
@@ -179,7 +179,7 @@ func (m *Masker) findFields(s string, add func(ini, end int, typ string)) {
 				for p < end && s[p] != ' ' && s[p] != '\t' {
 					p++
 				}
-				if strings.HasPrefix(class, "nome") {
+				if strings.HasPrefix(class, "name") {
 					for q := p; q < end; {
 						for q < end && (s[q] == ' ' || s[q] == '\t') {
 							q++
@@ -198,7 +198,7 @@ func (m *Masker) findFields(s string, add func(ini, end int, typ string)) {
 			}
 		}
 		end = trimValue(s, ini, end)
-		if end > ini && (class == "quase" || !shortLettersOnly(s[ini:end])) && !defaultOrModel(s[ini:end]) {
+		if end > ini && (class == "quasi" || !shortLettersOnly(s[ini:end])) && !defaultOrModel(s[ini:end]) {
 			markIt(s, ini, end, class, add)
 		}
 	}
@@ -243,8 +243,8 @@ func (m *Masker) nameInRegistry(s string, i int) string {
 				c = m.class(s[k+2 : k+2+f])
 			}
 		}
-		if c != "" && c != "nomesolto" {
-			return "nomecompleto"
+		if c != "" && c != "name_loose" {
+			return "name_full"
 		}
 	}
 	return ""
@@ -458,8 +458,8 @@ func (m *Masker) findInsert(s, lower string, add func(ini, end int, typ string))
 		sens := 0
 		for _, col := range strings.Split(s[pos+a+1:pos+a+b], ",") {
 			c := m.class(strings.Trim(col, " \t\n\r`\"[]"))
-			if c == "nomesolto" {
-				c = "nomecompleto"
+			if c == "name_loose" {
+				c = "name_full"
 			}
 			if c != "" {
 				sens++
@@ -528,7 +528,7 @@ func (m *Masker) findXML(s string, add func(ini, end int, typ string)) {
 		}
 		label := s[pos : pos+f]
 		class := m.class(label)
-		if class == "nomesolto" {
+		if class == "name_loose" {
 			class = m.nameInRegistry(s, closes)
 		}
 		if class == "" {

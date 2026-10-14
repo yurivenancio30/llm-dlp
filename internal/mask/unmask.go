@@ -38,7 +38,7 @@ type Table struct {
 
 // reLeftover: the pseudonym shapes, in any case, that may be left over on the way back: label
 // ("CPF-x", "Sensivel-x"), person, object ("t_x"), e-mail and host (.invalid) and fake IP.
-var reLeftover = regexp.MustCompile(`[A-Za-z][A-Za-z:]*-[A-Za-z2-7]{8}|(?i:pessoa) [A-Za-z2-7]{8}|[A-Za-z]+_[A-Za-z2-7]{8}|[\w.+-]+\.invalid|\b2(?:4\d|5[0-5])\.\d{1,3}\.\d{1,3}\.\d{1,3}\b`)
+var reLeftover = regexp.MustCompile(`[A-Za-z][A-Za-z:]*-[A-Za-z2-7]{8}|(?i:person|pessoa) [A-Za-z2-7]{8}|[A-Za-z]+_[A-Za-z2-7]{8}|[\w.+-]+\.invalid|\b2(?:4\d|5[0-5])\.\d{1,3}\.\d{1,3}\.\d{1,3}\b`)
 
 const maxNotUndone = 20
 
@@ -113,14 +113,14 @@ func NewTable(entries []Entry) *Table {
 			// person pseudonym for two names a collision: the people registry gives the person's id
 			// to the full name and to first + last ("Maria Fernanda Silva" and "Maria Silva"), and
 			// both spellings are the same person.
-			if r != e.Real && e.Type != "nome" && !sameValue(e.Type, r, e.Real) {
+			if r != e.Real && e.Type != "name" && !sameValue(e.Type, r, e.Real) {
 				conflict[e.Pseudo] = true
 			}
 			continue
 		}
 		t.m[e.Pseudo] = e.Real
 		t.typ[e.Pseudo] = e.Type
-		if e.Type == "nome" || pseudoWithCase(e.Type) {
+		if e.Type == "name" || pseudoWithCase(e.Type) {
 			base = append(base, e)
 		}
 		if reFakeIP.MatchString(e.Pseudo) && strings.Count(e.Pseudo, ".") == 3 && strings.Count(e.Real, ".") == 3 {
@@ -139,7 +139,7 @@ func NewTable(entries []Entry) *Table {
 			continue
 		}
 		var vs []Entry
-		if e.Type == "nome" {
+		if e.Type == "name" {
 			vs = nameVariants(e.Pseudo, e.Real)
 		} else {
 			vs = caseVariants(e.Pseudo, e.Real, e.Type, t.m)
@@ -270,11 +270,11 @@ func sameValue(typ, a, b string) bool {
 		return normObj(ent, a) == normObj(ent, b)
 	}
 	switch typ {
-	case "segredo", "ip":
+	case "secret", "ip":
 		return false
-	case "email", "host", "pix", "dominio":
+	case "email", "host", "pix", "domain":
 		return strings.EqualFold(a, b)
-	case "cpf", "cnpj", "pis", "cnh", "telefone", "cep", "cartao", "rg", "conta":
+	case "cpf", "cnpj", "pis", "cnh", "phone", "cep", "card", "rg", "account":
 		return canonNum(a) == canonNum(b)
 	}
 	return NormName(a) == NormName(b)

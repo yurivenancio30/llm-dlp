@@ -88,9 +88,9 @@ func findAnsibleINI(s string, add func(ObjFinding)) {
 			}
 			switch key {
 			case "ansible_host":
-				addName(s, va, vb, "servidor", "ansible", true, add)
+				addName(s, va, vb, "server", "ansible", true, add)
 			case "ansible_user":
-				addName(s, va, vb, "usuario", "ansible", true, add)
+				addName(s, va, vb, "user", "ansible", true, add)
 			}
 		}
 	}
@@ -101,11 +101,11 @@ func addINIHostName(s string, a, b int, strong bool, add func(ObjFinding)) {
 	v := s[a:b]
 	if strings.ContainsAny(v, "[]") {
 		if reINIRange.MatchString(v) {
-			add(ObjFinding{a, b, "servidor", "ansible", strong})
+			add(ObjFinding{a, b, "server", "ansible", strong})
 		}
 		return
 	}
-	addName(s, a, b, "servidor", "ansible", strong, add)
+	addName(s, a, b, "server", "ansible", strong, add)
 }
 
 // ---------------------------------------------------------------------------------------

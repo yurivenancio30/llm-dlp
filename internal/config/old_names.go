@@ -37,13 +37,44 @@ var (
 	oldOCRModes = map[string]string{"mascarar": "mask", "bloquear": "block", "permitir": "allow"}
 )
 
+// OldTypeNames: the names of detectors, field types and object types up to 0.9 (in Portuguese) -> the
+// current ones. The old names are still read in config.json (disabled_detectors, optional_detectors,
+// extra_fields[].type, objects.mask and objects.propagate) and in the seen-values file. The HMAC
+// domain of each pseudonym stays the old name (see hmacDomain in internal/mask): renaming it would
+// change every pseudonym of the type.
+var OldTypeNames = map[string]string{
+	"segredo": "secret", "telefone": "phone", "cartao": "card", "conta": "account", "endereco": "address",
+	"nascimento": "birthdate", "nome": "name", "campo": "field", "usuario": "user", "processo": "lawsuit",
+	"rastreio": "tracking", "certidao": "certificate", "sensivel": "sensitive", "quase": "quasi",
+	"pessoa": "person", "neutra": "neutral", "dominio": "domain", "nomecompleto": "name_full",
+	"nomesolto": "name_loose", "servidor": "server", "tabela": "table", "coluna": "column", "indice": "index",
+	"servico": "service", "fila": "queue", "repositorio": "repository", "organizacao": "organization",
+	"pacote": "package", "pasta": "folder", "conta_nuvem": "cloud_account", "objeto": "object",
+}
+
+// NewTypeName: the current name of a type that may be written with its old name.
+func NewTypeName(t string) string {
+	if n, ok := OldTypeNames[t]; ok {
+		return n
+	}
+	return t
+}
+
+func inverse(n map[string]string) map[string]string {
+	inv := make(map[string]string, len(n))
+	for stale, newOne := range n {
+		inv[newOne] = stale
+	}
+	return inv
+}
+
 // Read interprets the content of a config.json (with the new or the old names) over c.
 func Read(b []byte, c *Config) error {
 	var m map[string]any
 	if err := json.Unmarshal(b, &m); err != nil {
 		return err
 	}
-	if migrateNames(m, false) {
+	if migrateNames(m, false, false) {
 		var err error
 		if b, err = json.Marshal(m); err != nil {
 			return err
@@ -52,18 +83,15 @@ func Read(b []byte, c *Config) error {
 	return json.Unmarshal(b, c)
 }
 
-// migrateNames swaps, in m, the old names for the new ones (or the new for the old, with toOld) and
-// says whether it swapped any. If both are there, the destination's stays.
-func migrateNames(m map[string]any, toOld bool) bool {
+// migrateNames swaps, in m, the old names for the new ones (or the new for the old: field names with
+// toOld, before 0.9.0; type names with typesOld, before 0.10.0) and says whether it swapped any. If
+// both are there, the destination's stays.
+func migrateNames(m map[string]any, toOld, typesOld bool) bool {
 	names := func(n map[string]string) map[string]string {
 		if !toOld {
 			return n
 		}
-		inv := make(map[string]string, len(n))
-		for stale, newOne := range n {
-			inv[newOne] = stale
-		}
-		return inv
+		return inverse(n)
 	}
 	// what is inside first, found by the new name: going to the old names, the outer name is still
 	// the new one; coming from them, it was already swapped
@@ -99,6 +127,7 @@ func migrateNames(m map[string]any, toOld bool) bool {
 			}
 		}
 	}
+	foundIt = migrateTypes(m, typesOld) || foundIt
 	if o, ok := m["objects"].(map[string]any); ok {
 		foundIt = rename(o, names(oldObjectFields)) || foundIt
 	}
@@ -122,10 +151,10 @@ func rename(m map[string]any, names map[string]string) bool {
 	return foundIt
 }
 
-// MigrateFile moves config.json to the new names (or to the old ones, with toOld), if there is
+// MigrateFile moves config.json to the new names (or to the old ones: see migrateNames), if there is
 // something to swap, keeping the previous one alongside (config.json.bak-DATE). Returns the path of
 // the copy ("" if there was nothing to swap). Fields this program does not know stay as they are.
-func MigrateFile(toOld bool) (string, error) {
+func MigrateFile(toOld, typesOld bool) (string, error) {
 	p := Path("config.json")
 	b, err := os.ReadFile(p)
 	if err != nil {
@@ -138,7 +167,7 @@ func MigrateFile(toOld bool) (string, error) {
 	if err := json.Unmarshal(b, &m); err != nil {
 		return "", err
 	}
-	if !migrateNames(m, toOld) {
+	if !migrateNames(m, toOld, typesOld) {
 		return "", nil
 	}
 	out, err := json.MarshalIndent(m, "", "  ")
@@ -154,4 +183,58 @@ func MigrateFile(toOld bool) (string, error) {
 		return "", err
 	}
 	return bak, os.Rename(tmp, p)
+}
+
+// migrateTypes swaps the type names in the fields that hold them (with the field names old or new):
+// to the current ones, or back to the old ones with toOld.
+func migrateTypes(m map[string]any, toOld bool) bool {
+	names := OldTypeNames
+	if toOld {
+		names = inverse(OldTypeNames)
+	}
+	foundIt := false
+	swap := func(v any) (any, bool) {
+		if s, ok := v.(string); ok {
+			if n, ok := names[s]; ok {
+				return n, true
+			}
+		}
+		return v, false
+	}
+	for _, f := range []string{"disabled_detectors", "optional_detectors", "detectores_desligados", "detectores_opcionais"} {
+		if l, ok := m[f].([]any); ok {
+			for i := range l {
+				var sw bool
+				if l[i], sw = swap(l[i]); sw {
+					foundIt = true
+				}
+			}
+		}
+	}
+	for _, f := range []string{"extra_fields", "campos_extras"} {
+		if l, ok := m[f].([]any); ok {
+			for _, x := range l {
+				if xm, ok := x.(map[string]any); ok {
+					for _, k := range []string{"type", "tipo"} {
+						if v, ok := xm[k]; ok {
+							var sw bool
+							if xm[k], sw = swap(v); sw {
+								foundIt = true
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	for _, f := range []string{"objects", "objetos"} {
+		if o, ok := m[f].(map[string]any); ok {
+			for _, k := range []string{"mask", "propagate", "mascarar", "propagar"} {
+				if om, ok := o[k].(map[string]any); ok {
+					foundIt = rename(om, names) || foundIt
+				}
+			}
+		}
+	}
+	return foundIt
 }

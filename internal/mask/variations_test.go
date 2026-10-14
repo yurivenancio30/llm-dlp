@@ -60,7 +60,7 @@ var varCases = []varCase{
 	{reader: "conexão", model: "postgresql://«3»@«1»:5432/«2»", punct: true, chars: []string{"srv-ped-01"}, several: " "},
 	{reader: "conexão", model: "urn:li:dataset:(urn:li:dataPlatform:mssql,«Q»,PROD)", parts: true, caseless: true, punct: true, several: " "},
 	// table (query result)
-	{reader: "tabela", model: "table_schema,table_name\n«1»,«2»\n«1»,«3»\n", spc: []string{"\t", ";", "|", " , "}, quoted: []string{`"`}, chars: varSQLNames},
+	{reader: "table", model: "table_schema,table_name\n«1»,«2»\n«1»,«3»\n", spc: []string{"\t", ";", "|", " , "}, quoted: []string{`"`}, chars: varSQLNames},
 	// chave-valor
 	{reader: "chave-valor", model: "database: «1»«c»\nschema: «2»\ntable: «3»\n", spc: varLineSpace, quoted: []string{`"`, "'"}, with: []string{"  # obs", " # obs: x"}, chars: varNames},
 	{reader: "chave-valor", model: "[banco]\nhost = «1»«c»\ndatabase = «2»\n", spc: varLineSpace, with: []string{" ; obs", " # obs"}, chars: []string{"srv-ped-01"}},
@@ -174,7 +174,7 @@ func build(c varCase, letterCase int, spc, quoted, with string, parts int, n1 st
 	}
 	if spc != " " && spc != "" {
 		mod = strings.ReplaceAll(mod, " ", spc)
-		if c.reader == "tabela" { // in the table, the column separator
+		if c.reader == "table" { // in the table, the column separator
 			mod = strings.ReplaceAll(c.model, ",", spc)
 		}
 	}
@@ -198,7 +198,7 @@ func build(c varCase, letterCase int, spc, quoted, with string, parts int, n1 st
 	if quoted != "" {
 		mod = reQuotedPlace.ReplaceAllString(mod, "$1")
 	}
-	byPart := c.reader == "sql" || c.reader == "tabela"
+	byPart := c.reader == "sql" || c.reader == "table"
 	var list []string
 	text := rePlace.ReplaceAllStringFunc(mod, func(l string) string {
 		k := l[2 : len(l)-2]

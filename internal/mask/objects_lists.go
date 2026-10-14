@@ -275,7 +275,7 @@ func homogeneousLists(s string, knownOne func(string) (string, bool), add func(O
 			a := c.a
 			for k, p := range ps {
 				if _, ok := knownOne(p); !ok && reSimpleIdent.MatchString(p) {
-					add(ObjFinding{a, a + len(p), ents[k], "lista", ents[k] != "coluna" && identifierShape(p)})
+					add(ObjFinding{a, a + len(p), ents[k], "lista", ents[k] != "column" && identifierShape(p)})
 				}
 				a += len(p) + 1
 			}
@@ -336,7 +336,7 @@ func knownQualified(s string, knownOne func(string) (string, bool), add func(Obj
 		if lastPos := strings.ToLower(s[ps[len(ps)-1][0]:ps[len(ps)-1][1]]); fileExtensions[lastPos] || publicTLDs[lastPos] {
 			continue
 		}
-		ents := entQual(len(ps), "tabela")
+		ents := entQual(len(ps), "table")
 		matched := false
 		var knows [3]bool
 		for k, p := range ps {

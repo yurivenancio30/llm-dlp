@@ -224,7 +224,7 @@ func findBiometricTemplate(s string, add func(ini, end int, typ string)) {
 		}
 		// the first 8 characters are the first 6 bytes of the record
 		if d, err := base64.StdEncoding.DecodeString(s[ini : ini+8]); err == nil && strings.HasPrefix(string(d), "FMR\x00") {
-			add(ini, end, "sensivel")
+			add(ini, end, "sensitive")
 		}
 	}
 }
@@ -247,14 +247,14 @@ func findSensitive(s, lower string, add func(ini, end int, typ string)) {
 		}
 		for _, ix := range rg.re.FindAllStringSubmatchIndex(s, -1) {
 			if ix[2] >= 0 && !letter(ix[3]) {
-				add(ix[2], ix[3], "sensivel")
+				add(ix[2], ix[3], "sensitive")
 			}
 		}
 	}
 	if strings.Contains(lower, "sindicato") {
 		for _, ix := range reUnion.FindAllStringSubmatchIndex(s, -1) {
 			if end := unionNameEnd(s, ix[3]); end > ix[3] {
-				add(ix[2], end, "sensivel")
+				add(ix[2], end, "sensitive")
 			}
 		}
 	}

@@ -96,7 +96,7 @@ func (r *logSummary) readIt(in io.Reader) {
 				f := strings.Fields(pair)
 				if len(f) == 2 {
 					k, _ := strconv.Atoi(f[1])
-					r.types[f[0]] += k
+					r.types[config.NewTypeName(f[0])] += k // a log up to 0.9 has the old names
 				}
 			}
 		}

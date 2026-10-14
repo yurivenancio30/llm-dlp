@@ -16,18 +16,18 @@ import (
 // on/off per type. The readers of each format deliver their findings through m.readers.
 
 // ObjectPrefixes: entity type -> pseudonym prefix.
-var ObjectPrefixes = map[string]string{"servidor": "HOST", "database": "DB", "schema": "SCH", "tabela": "T",
-	"coluna": "C", "procedure": "PROC", "indice": "IDX", "usuario": "USR", "namespace": "NS",
-	"servico": "SVC", "bucket": "BKT", "fila": "TOP",
-	"repositorio": "REPO", "organizacao": "ORG", "pacote": "PKG", "pasta": "DIR", "conta_nuvem": "ACC"}
+var ObjectPrefixes = map[string]string{"server": "HOST", "database": "DB", "schema": "SCH", "table": "T",
+	"column": "C", "procedure": "PROC", "index": "IDX", "user": "USR", "namespace": "NS",
+	"service": "SVC", "bucket": "BKT", "queue": "TOP",
+	"repository": "REPO", "organization": "ORG", "package": "PKG", "folder": "DIR", "cloud_account": "ACC"}
 
 // defaultPropagates: types that, once learned, are masked also outside the structural position.
 // Column and index are not: names like user_id and created_at exist in all code.
-var defaultPropagates = map[string]bool{"servidor": true, "database": true, "schema": true, "tabela": true,
-	"procedure": true, "usuario": true, "namespace": true, "servico": true, "bucket": true, "fila": true,
-	"repositorio": true, "organizacao": true, "pacote": true, "pasta": true, "conta_nuvem": true}
+var defaultPropagates = map[string]bool{"server": true, "database": true, "schema": true, "table": true,
+	"procedure": true, "user": true, "namespace": true, "service": true, "bucket": true, "queue": true,
+	"repository": true, "organization": true, "package": true, "folder": true, "cloud_account": true}
 
-const objTypePrefix = "obj." // the internal type of an object: "obj.tabela"
+const objTypePrefix = "obj." // the internal type of an object: "obj.table"
 
 func isObject(typ string) bool { return strings.HasPrefix(typ, objTypePrefix) }
 
@@ -72,8 +72,8 @@ func (m *Masker) objPropagates(ent string) bool {
 // dialect) and server (a DNS name is case-insensitive: "sqlprd01" and "SQLPRD01" are the same
 // machine). In the other types (path, bucket, queue...) the spelling counts as it is:
 // "/dados/Relatorios" and "/dados/relatorios" are two folders.
-var entSQL = map[string]bool{"database": true, "schema": true, "tabela": true, "coluna": true, "procedure": true,
-	"indice": true, "servidor": true}
+var entSQL = map[string]bool{"database": true, "schema": true, "table": true, "column": true, "procedure": true,
+	"index": true, "server": true}
 
 // unquoted: the name without the brackets, quotes or backticks around it.
 func unquoted(v string) string {
@@ -118,7 +118,7 @@ func (m *Masker) pseudoObject(ent, real string) string {
 	if pfx == "" {
 		pfx = "OBJ"
 	}
-	id := m.p.ID("objeto", ent+"\x00"+normObj(ent, real))
+	id := m.p.ID("objeto", hmacDomain(ent)+"\x00"+normObj(ent, real))
 	switch {
 	case strings.ToLower(real) == real:
 		pfx = strings.ToLower(pfx)
@@ -301,7 +301,7 @@ func (m *Masker) serversAsHost(out []Finding) {
 		return
 	}
 	for i, a := range out {
-		if a.Type != objTypePrefix+"servidor" {
+		if a.Type != objTypePrefix+"server" {
 			continue
 		}
 		h := strings.ToLower(a.Real)

@@ -11,14 +11,14 @@ import (
 
 // connection keys (case-insensitive, without spaces) -> entity
 var connectionKeys = map[string]string{
-	"server": "servidor", "datasource": "servidor", "address": "servidor", "addr": "servidor", "networkaddress": "servidor",
-	"host": "servidor", "hostname": "servidor", "hostaddr": "servidor", "failoverpartner": "servidor", "servername": "servidor",
-	"account":  "servidor",
+	"server": "server", "datasource": "server", "address": "server", "addr": "server", "networkaddress": "server",
+	"host": "server", "hostname": "server", "hostaddr": "server", "failoverpartner": "server", "servername": "server",
+	"account":  "server",
 	"database": "database", "databasename": "database", "initialcatalog": "database", "dbname": "database", "db": "database",
 	"catalog": "database", "project": "database", "projectid": "database",
 	"schema": "schema", "currentschema": "schema", "defaultdataset": "schema", "dataset": "schema",
-	"userid": "usuario", "uid": "usuario", "user": "usuario", "username": "usuario",
-	"warehouse": "servico", "role": "usuario", "servicename": "database", "sid": "database",
+	"userid": "user", "uid": "user", "user": "user", "username": "user",
+	"warehouse": "service", "role": "user", "servicename": "database", "sid": "database",
 }
 
 var (
@@ -63,7 +63,7 @@ func addParts(s string, a, b int, lastPos, rule string, add func(ObjFinding)) {
 // CHAR columns, as in DB2: "ABCD .TABELA").
 func addURNParts(s string, a, b int, add func(ObjFinding)) {
 	ps := strings.Split(s[a:b], ".")
-	ents := entQual(len(ps), "tabela")
+	ents := entQual(len(ps), "table")
 	for k, p := range ps {
 		q := strings.TrimRight(p, " ")
 		if q != "" && !strings.Contains(q, " ") && !publicConnection(q) && reSimpleIdent.MatchString(q) {
@@ -88,7 +88,7 @@ func addServer(s string, a, b int, rule string, add func(ObjFinding)) {
 	}
 	if i := strings.IndexByte(v, '\\'); i >= 0 {
 		if inst := v[i+1:]; inst != "" && !publicConnection(inst) {
-			add(ObjFinding{a + i + 1, a + len(v), "servidor", rule, true})
+			add(ObjFinding{a + i + 1, a + len(v), "server", rule, true})
 		}
 		v = v[:i]
 	}
@@ -99,7 +99,7 @@ func addServer(s string, a, b int, rule string, add func(ObjFinding)) {
 	if l := strings.ToLower(v); strings.HasSuffix(l, ".svc.cluster.local") || strings.HasSuffix(l, ".svc") {
 		return
 	}
-	add(ObjFinding{a, a + len(v), "servidor", rule, true})
+	add(ObjFinding{a, a + len(v), "server", rule, true})
 }
 
 func findConnections(s string, add func(ObjFinding)) {
@@ -140,7 +140,7 @@ func findConnections(s string, add func(ObjFinding)) {
 			if s[a] == '{' { // ODBC: {valor}
 				a, b = a+1, b-1
 			}
-			if ent == "servidor" {
+			if ent == "server" {
 				addServer(s, a, b, "conexão", add)
 			} else if !publicConnection(s[a:b]) && reSimpleIdent.MatchString(strings.ReplaceAll(s[a:b], ".", "_")) {
 				addParts(s, a, b, ent, "conexão", add)
@@ -166,7 +166,7 @@ func findConnections(s string, add func(ObjFinding)) {
 				}
 			}
 			if m[2] >= 0 && !publicConnection(s[m[2]:m[3]]) && !modelName(s[m[2]:m[3]]) {
-				add(ObjFinding{m[2], m[3], "usuario", "uri", true})
+				add(ObjFinding{m[2], m[3], "user", "uri", true})
 			}
 			// several hosts: h1:p1,h2:p2
 			a := m[4]
@@ -211,18 +211,18 @@ func findConnections(s string, add func(ObjFinding)) {
 			addURNParts(s, m[2], m[3], add)
 		}
 		for _, m := range reURNUser.FindAllStringSubmatchIndex(s, -1) {
-			add(ObjFinding{m[2], m[3], "usuario", "urn", true})
+			add(ObjFinding{m[2], m[3], "user", "urn", true})
 		}
 		for _, m := range reURNFlow.FindAllStringSubmatchIndex(s, -1) {
-			add(ObjFinding{m[2], m[3], "servico", "urn", true})
+			add(ObjFinding{m[2], m[3], "service", "urn", true})
 			if m[4] >= 0 {
-				add(ObjFinding{m[4], m[5], "servico", "urn", true})
+				add(ObjFinding{m[4], m[5], "service", "urn", true})
 			}
 		}
 		for _, u := range []struct {
 			re  *regexp.Regexp
 			ent string
-		}{{reURNInstance, "servidor"}, {reURNGroup, "usuario"}, {reURNDashboard, "servico"}, {reURNField, "coluna"}, {reURNApp, "servico"}} {
+		}{{reURNInstance, "server"}, {reURNGroup, "user"}, {reURNDashboard, "service"}, {reURNField, "column"}, {reURNApp, "service"}} {
 			for _, m := range u.re.FindAllStringSubmatchIndex(s, -1) {
 				if v := s[m[2]:m[3]]; !publicDev(v) {
 					add(ObjFinding{m[2], m[3], u.ent, "urn", true})
@@ -233,14 +233,14 @@ func findConnections(s string, add func(ObjFinding)) {
 	if strings.Contains(s, "{{") {
 		for _, m := range reDbtRef.FindAllStringSubmatchIndex(s, -1) {
 			if m[4] >= 0 { // ref('pacote', 'modelo')
-				add(ObjFinding{m[4], m[5], "tabela", "dbt", true})
+				add(ObjFinding{m[4], m[5], "table", "dbt", true})
 			} else {
-				add(ObjFinding{m[2], m[3], "tabela", "dbt", true})
+				add(ObjFinding{m[2], m[3], "table", "dbt", true})
 			}
 		}
 		for _, m := range reDbtSource.FindAllStringSubmatchIndex(s, -1) {
 			add(ObjFinding{m[2], m[3], "schema", "dbt", true})
-			add(ObjFinding{m[4], m[5], "tabela", "dbt", true})
+			add(ObjFinding{m[4], m[5], "table", "dbt", true})
 		}
 	}
 	if strings.Contains(s, "onect") || strings.Contains(s, "onnect") || strings.Contains(s, "onex") || strings.Contains(s, "ONNECT") || strings.Contains(s, "ONECT") {
@@ -249,7 +249,7 @@ func findConnections(s string, add func(ObjFinding)) {
 	if strings.Contains(s, "conn_id") {
 		for _, m := range reConnID.FindAllStringSubmatchIndex(s, -1) {
 			if !publicConnection(s[m[2]:m[3]]) {
-				add(ObjFinding{m[2], m[3], "servico", "airflow", true})
+				add(ObjFinding{m[2], m[3], "service", "airflow", true})
 			}
 		}
 	}
@@ -411,8 +411,8 @@ func findDatabaseAddress(s string, add func(ObjFinding)) {
 			add(ObjFinding{m[6], m[7], "database", "conexão", true})
 		}
 		if m[8] >= 0 {
-			if u := s[m[8]:m[9]]; resourceValue(u, "usuario") && !publicConnection(u) {
-				add(ObjFinding{m[8], m[9], "usuario", "conexão", true})
+			if u := s[m[8]:m[9]]; resourceValue(u, "user") && !publicConnection(u) {
+				add(ObjFinding{m[8], m[9], "user", "conexão", true})
 			}
 		}
 	}
@@ -429,7 +429,7 @@ func findDSN(s string, add func(ObjFinding)) {
 	if strings.Contains(s, "@tcp") || strings.Contains(s, "@unix(") {
 		for _, m := range reDSNGo.FindAllStringSubmatchIndex(s, -1) {
 			if !publicConnection(s[m[2]:m[3]]) {
-				add(ObjFinding{m[2], m[3], "usuario", "dsn", true})
+				add(ObjFinding{m[2], m[3], "user", "dsn", true})
 			}
 			if s[m[4]] != '/' { // unix(/path/socket) has no host
 				addServer(s, m[4], m[5], "dsn", add)
@@ -449,7 +449,7 @@ func findDSN(s string, add func(ObjFinding)) {
 	// in the next argument, is the user
 	for i := strings.IndexByte(s, ':'); i >= 0; {
 		if u, a, ok := userAfterDSN(s, i); ok {
-			add(ObjFinding{a, a + len(u), "usuario", "dsn", true})
+			add(ObjFinding{a, a + len(u), "user", "dsn", true})
 		}
 		j := strings.IndexByte(s[i+1:], ':')
 		if j < 0 {
@@ -491,7 +491,7 @@ func userAfterDSN(s string, i int) (string, int, bool) {
 		return "", 0, false
 	}
 	u := s[p+1 : p+1+f]
-	if !resourceValue(u, "usuario") || publicConnection(u) {
+	if !resourceValue(u, "user") || publicConnection(u) {
 		return "", 0, false
 	}
 	return u, p + 1, true

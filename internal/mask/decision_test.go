@@ -66,10 +66,10 @@ func TestContractReaderDecisions(t *testing.T) {
 	for _, d := range m.Decided(s, "") {
 		ents[d.Name] = d.Ent
 	}
-	if ents["t_lanc"] != "tabela" || ents["sch_fin"] != "schema" {
+	if ents["t_lanc"] != "table" || ents["sch_fin"] != "schema" {
 		t.Fatalf("decisões dos leitores: %v", ents)
 	}
-	if (Decision{Name: "T_LANC", Ent: "tabela"}).Key() != (Decision{Name: "t_lanc", Ent: "tabela"}).Key() {
+	if (Decision{Name: "T_LANC", Ent: "table"}).Key() != (Decision{Name: "t_lanc", Ent: "table"}).Key() {
 		t.Fatalf("chave de SQL deveria ser sem caixa")
 	}
 	if (Decision{Name: "Pagto", Ent: "bucket"}).Key() == (Decision{Name: "pagto", Ent: "bucket"}).Key() {

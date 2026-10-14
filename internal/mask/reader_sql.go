@@ -81,17 +81,17 @@ var (
 		ent string
 		has []string
 	}{
-		{regexp.MustCompile(`(?i)\b(?:FROM|JOIN|INTO|UPDATE|TABLE|VIEW|REFERENCES|USING|OVERWRITE)\s+(?:IF\s+(?:NOT\s+)?EXISTS\s+|ONLY\s+)?(` + reSQLQual + `)`), "tabela", nil},
+		{regexp.MustCompile(`(?i)\b(?:FROM|JOIN|INTO|UPDATE|TABLE|VIEW|REFERENCES|USING|OVERWRITE)\s+(?:IF\s+(?:NOT\s+)?EXISTS\s+|ONLY\s+)?(` + reSQLQual + `)`), "table", nil},
 		{regexp.MustCompile(`(?i)\b(?:PROCEDURE|PROC|FUNCTION|TRIGGER|PACKAGE(?:\s+BODY)?|EXEC|EXECUTE|CALL)\s+(?:IF\s+(?:NOT\s+)?EXISTS\s+)?(` + reSQLQual + `)`), "procedure", []string{"PROC", "FUNCTION", "TRIGGER", "PACKAGE", "EXEC", "CALL"}},
 		{regexp.MustCompile(`(?i)\b(?:USE|DATABASE)\s+(?:IF\s+(?:NOT\s+)?EXISTS\s+)?(` + reSQLQual + `)`), "database", []string{"USE", "DATABASE"}},
 		{regexp.MustCompile(`(?i)\bSCHEMA\s+(?:IF\s+(?:NOT\s+)?EXISTS\s+)?(` + reSQLQual + `)`), "schema", []string{"SCHEMA"}},
-		{regexp.MustCompile(`(?i)\bINDEX\s+(?:IF\s+(?:NOT\s+)?EXISTS\s+)?(` + reIdSQL + `)`), "indice", []string{"INDEX"}},
-		{regexp.MustCompile(`(?i)\bCONSTRAINT\s+(` + reIdSQL + `)`), "indice", []string{"CONSTRAINT"}},
-		{regexp.MustCompile(`(?i)\b(?:ROLE|USER)\s+(?:IF\s+(?:NOT\s+)?EXISTS\s+)?(` + reIdSQL + `)`), "usuario", []string{"ROLE", "USER"}},
-		{regexp.MustCompile(`(?i)\bWAREHOUSE\s*(?:=\s*)?(?:IF\s+(?:NOT\s+)?EXISTS\s+)?(` + reIdSQL + `)`), "servico", []string{"WAREHOUSE"}},
-		{regexp.MustCompile(`(?i)\b(?:` + reSchemaTypes + `|STAGE|STREAM|TASK|PIPE|SEQUENCE)\s+(?:IF\s+(?:NOT\s+)?EXISTS\s+)?(` + reSQLQual + `)`), "tabela",
+		{regexp.MustCompile(`(?i)\bINDEX\s+(?:IF\s+(?:NOT\s+)?EXISTS\s+)?(` + reIdSQL + `)`), "index", []string{"INDEX"}},
+		{regexp.MustCompile(`(?i)\bCONSTRAINT\s+(` + reIdSQL + `)`), "index", []string{"CONSTRAINT"}},
+		{regexp.MustCompile(`(?i)\b(?:ROLE|USER)\s+(?:IF\s+(?:NOT\s+)?EXISTS\s+)?(` + reIdSQL + `)`), "user", []string{"ROLE", "USER"}},
+		{regexp.MustCompile(`(?i)\bWAREHOUSE\s*(?:=\s*)?(?:IF\s+(?:NOT\s+)?EXISTS\s+)?(` + reIdSQL + `)`), "service", []string{"WAREHOUSE"}},
+		{regexp.MustCompile(`(?i)\b(?:` + reSchemaTypes + `|STAGE|STREAM|TASK|PIPE|SEQUENCE)\s+(?:IF\s+(?:NOT\s+)?EXISTS\s+)?(` + reSQLQual + `)`), "table",
 			[]string{"POLICY", "TAG", "FORMAT", "SECRET", "ALERT", "DYNAMIC", "NOTEBOOK", "STAGE", "STREAM", "TASK", "PIPE", "SEQUENCE"}},
-		{regexp.MustCompile(`(?i)(?:\bFROM|\bINTO|\bLIST|\bLS|\bREMOVE|\bRM|=)\s*'?@(` + reSQLQual + `)`), "tabela", []string{"@"}},
+		{regexp.MustCompile(`(?i)(?:\bFROM|\bINTO|\bLIST|\bLS|\bREMOVE|\bRM|=)\s*'?@(` + reSQLQual + `)`), "table", []string{"@"}},
 	}
 	reOnObjSQL = regexp.MustCompile(`(?i)\bON\s+(` + reSQLQual + `)\s*(?:\(|TO\b|FROM\b|;|$)`)
 	// DDL of any object type, by the grammar and not by a list of types: CREATE/ALTER/ DROP [OR
@@ -116,13 +116,13 @@ func hasAnyOf(s string, ps []string) bool {
 
 // entQual: the entities of each part of a qualified name a.b.c.d (last = that of the last one).
 func entQual(n int, lastPos string) []string {
-	above := []string{"schema", "database", "servidor"}
-	if lastPos == "coluna" {
-		above = []string{"tabela", "schema", "database"}
+	above := []string{"schema", "database", "server"}
+	if lastPos == "column" {
+		above = []string{"table", "schema", "database"}
 	} else if lastPos == "schema" {
-		above = []string{"database", "servidor"}
+		above = []string{"database", "server"}
 	} else if lastPos == "database" {
-		above = []string{"servidor"}
+		above = []string{"server"}
 	}
 	out := make([]string, n)
 	out[n-1] = lastPos
@@ -532,7 +532,7 @@ func sqlStatement(s string, base int, body, kw string, strong bool, add func(Obj
 				// type the rules do not know (NETWORK RULE, AGENT...): the body is properties (TYPE
 				// = IPV4, VALUE_LIST = (...)), not columns; only the object name is a name
 				ps := sqlParts(lit, m[2], m[3])
-				ents := entQual(len(ps), "tabela") // banco.schema.objeto
+				ents := entQual(len(ps), "table") // banco.schema.objeto
 				for k, p := range ps {
 					if v := strings.Trim(lit[p[0]:p[1]], "[]\"`"); len(v) > 1 && !publicSQL(v) {
 						ia, ib := stripQuote(lit, p[0], p[1])
@@ -541,7 +541,7 @@ func sqlStatement(s string, base int, body, kw string, strong bool, add func(Obj
 				}
 				return
 			}
-			markWhich(m[2], m[3], "tabela")
+			markWhich(m[2], m[3], "table")
 		}
 	}
 	up := strings.ToUpper(lit)
@@ -551,13 +551,13 @@ func sqlStatement(s string, base int, body, kw string, strong bool, add func(Obj
 		}
 		for _, m := range p.re.FindAllStringSubmatchIndex(lit, -1) {
 			markWhich(m[2], m[3], p.ent)
-			if p.ent == "tabela" { // FROM a, b, c
+			if p.ent == "table" { // FROM a, b, c
 				for k := m[3]; ; {
 					l := reSQLList.FindStringSubmatchIndex(lit[k:])
 					if l == nil {
 						break
 					}
-					markWhich(k+l[2], k+l[3], "tabela")
+					markWhich(k+l[2], k+l[3], "table")
 					k += l[3]
 				}
 			}
@@ -565,7 +565,7 @@ func sqlStatement(s string, base int, body, kw string, strong bool, add func(Obj
 	}
 	if kw == "CREATE" || kw == "GRANT" || kw == "REVOKE" || kw == "ALTER" {
 		for _, m := range reOnObjSQL.FindAllStringSubmatchIndex(lit, -1) {
-			markWhich(m[2], m[3], "tabela")
+			markWhich(m[2], m[3], "table")
 		}
 	}
 	for _, q := range sqlQualsIn(lit) {
@@ -584,12 +584,12 @@ func sqlStatement(s string, base int, body, kw string, strong bool, add func(Obj
 				if v[0] != '[' && v[0] != '"' && v[0] != '`' && len(ps) == 1 && b < len(lit) && lit[b] == '(' {
 					continue // function call
 				}
-				e = "coluna"
+				e = "column"
 				if k < len(ps)-1 { // qualifier of a column: table (or short alias, which stays)
 					if len(v) <= 3 && !objects[strings.ToLower(v)] {
 						continue
 					}
-					e = "tabela"
+					e = "table"
 				} else if len(ps) == 1 && len(v) <= 2 {
 					continue // alias curto (p, t1)
 				}
@@ -598,7 +598,7 @@ func sqlStatement(s string, base int, body, kw string, strong bool, add func(Obj
 			if ib <= ia {
 				continue
 			}
-			add(ObjFinding{base + ia, base + ib, e, "sql", strong && hasPos && e != "coluna"})
+			add(ObjFinding{base + ia, base + ib, e, "sql", strong && hasPos && e != "column"})
 		}
 	}
 }
@@ -609,9 +609,9 @@ func sqlStatement(s string, base int, body, kw string, strong bool, add func(Obj
 // to any database, without knowing the text of each message.
 var (
 	reBQError = regexp.MustCompile(`(?i)\b(table|dataset)\s+([A-Za-z][\w-]{2,62}):([A-Za-z_][\w$]*(?:\.[A-Za-z_][\w$]*)?)\b`)
-	entError  = map[string]string{"table": "tabela", "relation": "tabela", "object": "tabela", "view": "tabela", "column": "coluna",
-		"schema": "schema", "database": "database", "procedure": "procedure", "function": "procedure", "index": "indice",
-		"sequence": "tabela", "collection": "tabela", "dataset": "schema"}
+	entError  = map[string]string{"table": "table", "relation": "table", "object": "table", "view": "table", "column": "column",
+		"schema": "schema", "database": "database", "procedure": "procedure", "function": "procedure", "index": "index",
+		"sequence": "table", "collection": "table", "dataset": "schema"}
 )
 
 func findObjectError(s string, add func(ObjFinding)) {
@@ -680,8 +680,8 @@ func findObjectError(s string, add func(ObjFinding)) {
 }
 
 // Portuguese type words (without accents: the text is read in ASCII) that also cite an object
-var entTypePT = map[string]string{"tabela": "tabela", "objeto": "tabela", "esquema": "schema", "banco": "database",
-	"coluna": "coluna", "indice": "indice", "colecao": "tabela", "visao": "tabela"}
+var entTypePT = map[string]string{"tabela": "table", "objeto": "table", "esquema": "schema", "banco": "database",
+	"coluna": "column", "indice": "index", "colecao": "table", "visao": "table"}
 
 // findQualifiedType: qualified name WITHOUT quotes right after a type word, in any sentence
 // ("tabela fin.t_x: 1200 linhas", "Loading table a.b.c", "created sql table model fin.t_x").
@@ -746,7 +746,7 @@ func findQualifiedType(s string, add func(ObjFinding)) {
 			i = b
 			continue
 		}
-		strong := !middle && e != "coluna"
+		strong := !middle && e != "column"
 		ents := entQual(len(ps), e)
 		for k, v := range ps {
 			if !publicSQL(v) {
@@ -814,7 +814,7 @@ func errorIn(s string, a, b int, e string, add func(ObjFinding)) {
 	if publicSQL(s[a:b]) {
 		return
 	}
-	strong := e != "coluna" && errorLine(s, a)
+	strong := e != "column" && errorLine(s, a)
 	ps := strings.Split(s[a:b], ".")
 	ents := entQual(len(ps), e)
 	for k, p := range ps {
@@ -830,7 +830,7 @@ func findBQError(s string, add func(ObjFinding)) {
 		add(ObjFinding{m[4], m[5], "database", "erro", true})
 		a := m[6]
 		ps := strings.Split(s[m[6]:m[7]], ".")
-		ents := []string{"schema", "tabela"}
+		ents := []string{"schema", "table"}
 		for k, p := range ps {
 			add(ObjFinding{a, a + len(p), ents[k], "erro", true})
 			a += len(p) + 1

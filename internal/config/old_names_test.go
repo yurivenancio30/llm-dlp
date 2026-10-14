@@ -39,13 +39,13 @@ func expectedFromOld() Config {
 	c.HostRoles = []string{"mysql"}
 	c.ExtraPatterns = []ExtraPattern{{Label: "CONTRATO", Regex: "CT-[0-9]+"}}
 	c.Terms = []Term{{Label: "nome", Values: []string{"SGP", "Acme"}}}
-	c.DisabledDetectors, c.OptionalDetectors = []string{"endereco"}, []string{"quase"}
+	c.DisabledDetectors, c.OptionalDetectors = []string{"address"}, []string{"quasi"}
 	c.ExtraFields = []ExtraField{{Type: "cpf", Words: []string{"docto"}}}
 	c.DocumentsWithoutContext, c.FailClosed = false, false
 	c.OCR = OCR{Mode: "block", Tesseract: "t", PDFToText: "p", PDFToPPM: "q", Language: "eng", Env: map[string]string{},
 		MaxPages: 7, StrictPDF: true}
 	c.ToolsWithoutUnmask = []string{"WebFetch"}
-	c.Objects = Objects{Enabled: false, Mask: map[string]bool{"coluna": false}, Propagate: map[string]bool{"tabela": false},
+	c.Objects = Objects{Enabled: false, Mask: map[string]bool{"column": false}, Propagate: map[string]bool{"table": false},
 		PublicIP: true}
 	return c
 }
@@ -69,7 +69,7 @@ func TestMigrateFileRoundTrip(t *testing.T) {
 	p := Path("config.json")
 	os.WriteFile(p, []byte(oldConfig), 0o600)
 
-	bak, err := MigrateFile(false)
+	bak, err := MigrateFile(false, false)
 	if err != nil || bak == "" {
 		t.Fatalf("ida: bak=%q err=%v", bak, err)
 	}
@@ -86,11 +86,11 @@ func TestMigrateFileRoundTrip(t *testing.T) {
 	if err != nil || !reflect.DeepEqual(c, expectedFromOld()) {
 		t.Fatalf("depois da ida, lido diferente (err %v):\n%+v", err, c)
 	}
-	if bak2, _ := MigrateFile(false); bak2 != "" {
+	if bak2, _ := MigrateFile(false, false); bak2 != "" {
 		t.Errorf("segunda ida devia não ter o que trocar")
 	}
 
-	if _, err := MigrateFile(true); err != nil {
+	if _, err := MigrateFile(true, true); err != nil {
 		t.Fatal(err)
 	}
 	b, _ = os.ReadFile(p)
@@ -103,15 +103,61 @@ func TestMigrateFileRoundTrip(t *testing.T) {
 		OCR struct {
 			Mode string `json:"modo"`
 		} `json:"ocr"`
-		Objects struct {
-			Enabled *bool `json:"ligado"`
+		Disabled []string `json:"detectores_desligados"`
+		Objects  struct {
+			Enabled *bool           `json:"ligado"`
+			Mask    map[string]bool `json:"mascarar"`
 		} `json:"objetos"`
 	}
 	if err := json.Unmarshal(b, &old); err != nil {
 		t.Fatal(err)
 	}
 	if old.Port != 9999 || len(old.Domains) != 1 || len(old.Terms) != 1 || len(old.Terms[0].Values) != 2 ||
-		old.OCR.Mode != "bloquear" || old.Objects.Enabled == nil || *old.Objects.Enabled {
+		old.OCR.Mode != "bloquear" || old.Objects.Enabled == nil || *old.Objects.Enabled ||
+		!reflect.DeepEqual(old.Disabled, []string{"endereco"}) || !reflect.DeepEqual(old.Objects.Mask, map[string]bool{"coluna": false}) {
 		t.Errorf("a volta não deixou o arquivo como a 0.8.0 lê:\n%s", b)
+	}
+}
+
+// Going back to 0.9.x: the field names stay in English (0.9.0 already reads them) and only the type
+// names go back to Portuguese, which 0.9.x knows.
+func TestMigrateFileTypesOnly(t *testing.T) {
+	t.Setenv("LLM_DLP_HOME", t.TempDir())
+	p := Path("config.json")
+	os.WriteFile(p, []byte(`{"disabled_detectors": ["address", "secret"], "optional_detectors": ["quasi"],
+  "extra_fields": [{"type": "person", "words": ["cooperado"]}],
+  "objects": {"enabled": true, "mask": {"column": false}, "propagate": {"cloud_account": false}}}`), 0o600)
+	if _, err := MigrateFile(false, true); err != nil {
+		t.Fatal(err)
+	}
+	b, _ := os.ReadFile(p)
+	var m struct {
+		Disabled []string `json:"disabled_detectors"`
+		Optional []string `json:"optional_detectors"`
+		Extra    []struct {
+			Type string `json:"type"`
+		} `json:"extra_fields"`
+		Objects struct {
+			Mask      map[string]bool `json:"mask"`
+			Propagate map[string]bool `json:"propagate"`
+		} `json:"objects"`
+	}
+	if err := json.Unmarshal(b, &m); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(m.Disabled, []string{"endereco", "segredo"}) || !reflect.DeepEqual(m.Optional, []string{"quase"}) ||
+		len(m.Extra) != 1 || m.Extra[0].Type != "pessoa" ||
+		len(m.Objects.Mask) != 1 || len(m.Objects.Propagate) != 1 {
+		t.Fatalf("type names not back to 0.9.x's:\n%s", b)
+	}
+	if _, ok := m.Objects.Mask["coluna"]; !ok {
+		t.Fatalf("objects.mask not back to 0.9.x's:\n%s", b)
+	}
+	if _, ok := m.Objects.Propagate["conta_nuvem"]; !ok {
+		t.Fatalf("objects.propagate not back to 0.9.x's:\n%s", b)
+	}
+	c, err := Load()
+	if _, ok := c.Objects.Mask["column"]; err != nil || !ok || !reflect.DeepEqual(c.DisabledDetectors, []string{"address", "secret"}) {
+		t.Fatalf("read back with the current names (err %v): %+v", err, c)
 	}
 }

@@ -154,9 +154,9 @@ func TestCommandNegatives(t *testing.T) {
 func TestCommandHint(t *testing.T) {
 	cs := NewCommands()
 	for _, c := range []struct{ cmd, wants string }{
-		{`psql -c "select table_schema, table_name from information_schema.tables"`, "F|schema,tabela|table_name:tabela,table_schema:schema|"},
-		{`snow sql -q "SHOW TABLES IN SCHEMA fin"`, "F||name:tabela|tabela"},
-		{"kubectl get svc -A", "f||name:servico,names:servico|servico"},
+		{`psql -c "select table_schema, table_name from information_schema.tables"`, "F|schema,table|table_name:table,table_schema:schema|"},
+		{`snow sql -q "SHOW TABLES IN SCHEMA fin"`, "F||name:table|table"},
+		{"kubectl get svc -A", "f||name:service,names:service|service"},
 		{"aws s3api list-buckets --output table", "f||name:bucket,names:bucket|bucket"},
 		{"ls -la", ""},
 		{"ps aux", ""},
@@ -195,7 +195,7 @@ func TestQualifiedType(t *testing.T) {
 	// the type of each part
 	m := newTest(t)
 	s := "Loading table dwprd_fin.fin_contab.t_lanc_diario\n"
-	for real, wants := range map[string]string{"dwprd_fin": "obj.database", "fin_contab": "obj.schema", "t_lanc_diario": "obj.tabela"} {
+	for real, wants := range map[string]string{"dwprd_fin": "obj.database", "fin_contab": "obj.schema", "t_lanc_diario": "obj.table"} {
 		if tp := typeOf(m, s, real); tp != wants {
 			t.Errorf("%s: tipo %q, queria %q", real, tp, wants)
 		}
@@ -253,7 +253,7 @@ func TestHomogeneousList(t *testing.T) {
 	if out, _ := m.Mask("a t_razao_aux tem 3 linhas"); strings.Contains(out, "t_razao_aux") {
 		t.Errorf("item da lista não foi aprendido: %s", out)
 	}
-	if tp := typeOf(m, "t_razao_aux", "t_razao_aux"); tp != "obj.tabela" {
+	if tp := typeOf(m, "t_razao_aux", "t_razao_aux"); tp != "obj.table" {
 		t.Errorf("tipo %q", tp)
 	}
 }

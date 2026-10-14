@@ -9,15 +9,15 @@ import (
 
 func TestLabelClass(t *testing.T) {
 	cases := map[string]string{
-		"NOM_CLIENTE": "nome", "nomeCliente": "nome", "Nome da Mãe": "nome", "NOM_DATA_OWNER": "nome", "NOM_STEWARD": "nome",
-		"full_name": "nome", "nm_titular": "nome", "CPF": "cpf", "NUM_CPF_CLIENTE": "cpf", "nr_cnpj": "cnpj", "DT_NASCIMENTO": "nascimento",
-		"telefone_celular": "telefone", "COD_USU_DATA_OWNER": "usuario", "matricula": "usuario", "login": "usuario", "user_id": "usuario",
-		"religiao": "sensivel", "raca_cor": "sensivel", "orientacao_sexual": "sensivel", "tipo_sanguineo": "sensivel", "user_name": "usuario",
-		"id_cliente": "usuario", "nome_usuario": "usuario",
-		"titulo_eleitor": "doc", "passaporte": "doc", "placa": "doc", "endereco_residencial": "endereco", "CEP": "cep", "num_rg": "rg",
+		"NOM_CLIENTE": "name", "nomeCliente": "name", "Nome da Mãe": "name", "NOM_DATA_OWNER": "name", "NOM_STEWARD": "name",
+		"full_name": "name", "nm_titular": "name", "CPF": "cpf", "NUM_CPF_CLIENTE": "cpf", "nr_cnpj": "cnpj", "DT_NASCIMENTO": "birthdate",
+		"telefone_celular": "phone", "COD_USU_DATA_OWNER": "user", "matricula": "user", "login": "user", "user_id": "user",
+		"religiao": "sensitive", "raca_cor": "sensitive", "orientacao_sexual": "sensitive", "tipo_sanguineo": "sensitive", "user_name": "user",
+		"id_cliente": "user", "nome_usuario": "user",
+		"titulo_eleitor": "doc", "passaporte": "doc", "placa": "doc", "endereco_residencial": "address", "CEP": "cep", "num_rg": "rg",
 		// names of things and common fields: nothing
-		"NOM_SISTEMA": "", "table_name": "", "nome": "nomesolto", "name": "nomesolto", "Cliente": "nomecompleto", "CPF/CNPJ": "cpf", "NOM_CATEGORIA": "", "schema_name": "", "TABLE_NAME": "", "user": "",
-		"owner": "nomecompleto", "Data Steward": "nomecompleto", "nome_coluna": "", "tipo_usuario": "", "role_name": "", "file_name": "", "display_name": "", "hostname": "",
+		"NOM_SISTEMA": "", "table_name": "", "nome": "name_loose", "name": "name_loose", "Cliente": "name_full", "CPF/CNPJ": "cpf", "NOM_CATEGORIA": "", "schema_name": "", "TABLE_NAME": "", "user": "",
+		"owner": "name_full", "Data Steward": "name_full", "nome_coluna": "", "tipo_usuario": "", "role_name": "", "file_name": "", "display_name": "", "hostname": "",
 		"database_name": "", "status": "", "id": "", "tool_name": "", "model_name": "", "ip_address": "", "email_address": "",
 		"login_timeout": "", "usuario_erro_critico_pct": "", "user_message_id": "", "df_health": "", "saude": "", "diagnostico": "", "pai": "",
 		"cid": "", "cluster_health_check": "", "rds_username": "", "com o nome que o datahub usa": "", "cor": "", "titulo": "", "partido": "",
@@ -103,8 +103,8 @@ func TestImportedPersonCode(t *testing.T) {
 	if strings.Contains(out, "U1001") {
 		t.Fatalf("código importado passou: %s", out)
 	}
-	i := strings.Index(out, "USUARIO-")
-	if i < 0 || !strings.Contains(strings.ToLower(out), "pessoa "+out[i+8:i+16]) { // the name in uppercase: PESSOA ID
+	i := strings.Index(out, "USER-")
+	if i < 0 || !strings.Contains(strings.ToLower(out), "person "+out[i+5:i+13]) { // the name in uppercase: PERSON ID
 		t.Errorf("código e nome da mesma pessoa sem o mesmo id: %s", out)
 	}
 }
@@ -199,8 +199,8 @@ func TestGenericFormats(t *testing.T) {
 // optional.
 func TestExtraAndOptionalFields(t *testing.T) {
 	cfg := config.Default()
-	cfg.ExtraFields = []config.ExtraField{{Type: "usuario", Words: []string{"RE", "num_chapa_func"}}, {Type: "pessoa", Words: []string{"cooperado"}}}
-	cfg.OptionalDetectors = []string{"quase"}
+	cfg.ExtraFields = []config.ExtraField{{Type: "user", Words: []string{"RE", "num_chapa_func"}}, {Type: "person", Words: []string{"cooperado"}}}
+	cfg.OptionalDetectors = []string{"quasi"}
 	ps, _ := LoadPeople(t.TempDir() + "/p.json")
 	m, err := NewMasker(cfg, testKey, ps, nil)
 	if err != nil {
@@ -219,7 +219,7 @@ func TestExtraAndOptionalFields(t *testing.T) {
 		t.Error("tipo desconhecido em campos_extras deveria dar erro")
 	}
 	cols := m.DescribeFields("RE;NOME_COOPERADO;NOM_SISTEMA\n1;a;b\n")
-	if len(cols) != 3 || cols[0].Class != "usuario" || cols[1].Class != "nome" || cols[2].Class != "" {
+	if len(cols) != 3 || cols[0].Class != "user" || cols[1].Class != "name" || cols[2].Class != "" {
 		t.Errorf("DescreverCampos: %+v", cols)
 	}
 }

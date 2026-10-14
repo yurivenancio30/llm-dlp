@@ -25,7 +25,7 @@ func TestLogSummary(t *testing.T) {
 	}
 	r := newSummary(now.Add(-24 * time.Hour))
 	r.readIt(strings.NewReader(strings.Join(lines, "\n")))
-	if r.req != 3 || r.substs != 7 || r.collisions != 1 || r.types["cpf"] != 3 || r.types["tabela"] != 3 || r.ndResponses != 1 ||
+	if r.req != 3 || r.substs != 7 || r.collisions != 1 || r.types["cpf"] != 3 || r.types["table"] != 3 || r.ndResponses != 1 ||
 		len(r.pseudosNotUndone) != 2 || len(r.collided) != 1 || r.unmasked != 1 || r.refusedN != 1 || r.errs != 1 || r.status["529"] != 1 || r.apiErrors["overloaded_error"] != 1 {
 		t.Fatalf("resumo: %+v", r)
 	}
