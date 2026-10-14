@@ -16,9 +16,9 @@ import (
 
 // A linha de cada requisição no log diz quantos valores de cada tipo foram mascarados e quais
 // pseudônimos voltaram ao cliente sem virar o valor real. Nenhum valor real vai para o log.
-func TestLogPorTipoENaoDesfeitos(t *testing.T) {
-	cfg := config.Padrao()
-	m, err := mask.NovoMasker(cfg, []byte("0123456789abcdef0123456789abcdef"), nil, nil)
+func TestLogByTypeAndNotUndone(t *testing.T) {
+	cfg := config.Default()
+	m, err := mask.NewMasker(cfg, []byte("0123456789abcdef0123456789abcdef"), nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -32,18 +32,18 @@ func TestLogPorTipoENaoDesfeitos(t *testing.T) {
 			reCPF.FindString(string(b)) + ` usa 245.1.2.3"}]}`))
 	}))
 	cfg.Upstream = up.URL
-	lg := &logSeguro{}
-	px := httptest.NewServer(Novo(cfg, m, nil, log.New(lg, "", 0)))
+	lg := &safeLog{}
+	px := httptest.NewServer(New(cfg, m, nil, log.New(lg, "", 0)))
 	defer func() { up.Close(); px.Close() }()
-	corpo := `{"model":"x","max_tokens":10,"messages":[{"role":"user","content":"cpf 529.982.247-25 no 10.42.7.15"}]}`
-	resp, err := http.Post(px.URL+"/v1/messages", "application/json", bytes.NewReader([]byte(corpo)))
+	body := `{"model":"x","max_tokens":10,"messages":[{"role":"user","content":"cpf 529.982.247-25 no 10.42.7.15"}]}`
+	resp, err := http.Post(px.URL+"/v1/messages", "application/json", bytes.NewReader([]byte(body)))
 	if err != nil {
 		t.Fatal(err)
 	}
-	volta, _ := io.ReadAll(resp.Body)
+	back, _ := io.ReadAll(resp.Body)
 	resp.Body.Close()
-	if !strings.Contains(string(volta), "529.982.247-25") {
-		t.Fatalf("resposta: %s", volta)
+	if !strings.Contains(string(back), "529.982.247-25") {
+		t.Fatalf("resposta: %s", back)
 	}
 	l := lg.String()
 	if !strings.Contains(l, "| tipos: cpf 1, ip 1") || !strings.Contains(l, "| NÃO DESFEITOS 1: 245.1.2.3") ||

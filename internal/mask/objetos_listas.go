@@ -17,110 +17,110 @@ import (
 // E o nome qualificado em que uma parte já é conhecida: "fin.<x>" com fin aprendido como
 // schema faz de <x> uma tabela.
 
-const minLista = 3
+const minList = 3
 
 var (
 	// item de lista: identificador, talvez qualificado (sem espaço)
-	reItemLista    = `["'\x60]?[A-Za-z_][\w$#\-]*(?:\.[A-Za-z_][\w$#\-]*){0,2}["'\x60]?`
-	reLinhaItem    = regexp.MustCompile(`^[ \t]*(?:[-*•][ \t]+)?(` + reItemLista + `)[ \t]*[,;]?[ \t]*$`)
-	reLinhaContEsq = regexp.MustCompile(`^[ \t]*\d+[ \t]+(` + reItemLista + `)[ \t]*$`)
-	reLinhaContDir = regexp.MustCompile(`^[ \t]*(` + reItemLista + `)[ \t]{2,}\d+[ \t]*$`)
-	reLinhaDecor   = regexp.MustCompile(`^[ \t]*(={2,}|-{2,}|#{1,6}|\*{2,}|>{2,}|\[)[ \t]*(` + reItemLista + `)[ \t]*(?:={2,}|-{2,}|\*{2,}|\])?[ \t]*:?[ \t]*$`)
-	reItemInteiro  = regexp.MustCompile(`^` + reItemLista + `$`)
+	reListItem      = `["'\x60]?[A-Za-z_][\w$#\-]*(?:\.[A-Za-z_][\w$#\-]*){0,2}["'\x60]?`
+	reItemLine      = regexp.MustCompile(`^[ \t]*(?:[-*•][ \t]+)?(` + reListItem + `)[ \t]*[,;]?[ \t]*$`)
+	reLeftContLine  = regexp.MustCompile(`^[ \t]*\d+[ \t]+(` + reListItem + `)[ \t]*$`)
+	reRightContLine = regexp.MustCompile(`^[ \t]*(` + reListItem + `)[ \t]{2,}\d+[ \t]*$`)
+	reDecorLine     = regexp.MustCompile(`^[ \t]*(={2,}|-{2,}|#{1,6}|\*{2,}|>{2,}|\[)[ \t]*(` + reListItem + `)[ \t]*(?:={2,}|-{2,}|\*{2,}|\])?[ \t]*:?[ \t]*$`)
+	reWholeItem     = regexp.MustCompile(`^` + reListItem + `$`)
 )
 
-// itemLista: o nome de um item (sem aspas), nas posições de s.
-func itemLista(s string, a, b int) celula {
+// listItem: o nome de um item (sem aspas), nas posições de s.
+func listItem(s string, a, b int) cell {
 	for a < b && (s[a] == '"' || s[a] == '\'' || s[a] == '`') {
 		a++
 	}
 	for b > a && (s[b-1] == '"' || s[b-1] == '\'' || s[b-1] == '`') {
 		b--
 	}
-	return celula{a, b}
+	return cell{a, b}
 }
 
-// listasEm: os grupos de itens de s nas formas acima.
-func listasEm(s string) [][]celula {
-	var grupos [][]celula
-	var corrida []celula
-	forma := 0
-	fechar := func() {
-		if len(corrida) >= minLista {
-			grupos = append(grupos, corrida)
+// listsIn: os grupos de itens de s nas formas acima.
+func listsIn(s string) [][]cell {
+	var groups [][]cell
+	var race []cell
+	shape := 0
+	closeIt := func() {
+		if len(race) >= minList {
+			groups = append(groups, race)
 		}
-		corrida, forma = nil, 0
+		race, shape = nil, 0
 	}
-	decor := map[string][]celula{}
-	var ordemDecor []string
-	for _, l := range quebraLinhas(s) {
-		linha := s[l[0]:l[1]]
-		if len(linha) > 260 || palavras(linha) > 3 { // nenhuma das formas tem mais de 3 palavras
-			fechar()
+	decor := map[string][]cell{}
+	var decorOrder []string
+	for _, l := range wrapLines(s) {
+		line := s[l[0]:l[1]]
+		if len(line) > 260 || words(line) > 3 { // nenhuma das formas tem mais de 3 palavras
+			closeIt()
 			continue
 		}
-		if m := reLinhaDecor.FindStringSubmatchIndex(linha); m != nil {
-			k := linha[m[2]:m[3]]
+		if m := reDecorLine.FindStringSubmatchIndex(line); m != nil {
+			k := line[m[2]:m[3]]
 			if _, ok := decor[k]; !ok {
-				ordemDecor = append(ordemDecor, k)
+				decorOrder = append(decorOrder, k)
 			}
-			decor[k] = append(decor[k], itemLista(s, l[0]+m[4], l[0]+m[5]))
-			fechar()
+			decor[k] = append(decor[k], listItem(s, l[0]+m[4], l[0]+m[5]))
+			closeIt()
 			continue
 		}
 		f, a, b := 0, -1, -1
-		if m := reLinhaItem.FindStringSubmatchIndex(linha); m != nil {
+		if m := reItemLine.FindStringSubmatchIndex(line); m != nil {
 			f, a, b = 1, m[2], m[3]
-		} else if m := reLinhaContEsq.FindStringSubmatchIndex(linha); m != nil {
+		} else if m := reLeftContLine.FindStringSubmatchIndex(line); m != nil {
 			f, a, b = 2, m[2], m[3]
-		} else if m := reLinhaContDir.FindStringSubmatchIndex(linha); m != nil {
+		} else if m := reRightContLine.FindStringSubmatchIndex(line); m != nil {
 			f, a, b = 3, m[2], m[3]
 		}
-		if f == 0 || forma != 0 && f != forma {
-			fechar()
+		if f == 0 || shape != 0 && f != shape {
+			closeIt()
 		}
 		if f == 0 {
 			continue
 		}
-		forma = f
-		corrida = append(corrida, itemLista(s, l[0]+a, l[0]+b))
+		shape = f
+		race = append(race, listItem(s, l[0]+a, l[0]+b))
 	}
-	fechar()
-	for _, k := range ordemDecor {
-		if len(decor[k]) >= minLista {
-			grupos = append(grupos, decor[k])
+	closeIt()
+	for _, k := range decorOrder {
+		if len(decor[k]) >= minList {
+			groups = append(groups, decor[k])
 		}
 	}
 	if strings.IndexByte(s, ',') >= 0 {
-		for _, l := range quebraLinhas(s) {
-			if strings.Count(s[l[0]:l[1]], ",") >= minLista-1 {
-				grupos = append(grupos, listasVirgula(s, l[0], l[1])...)
+		for _, l := range wrapLines(s) {
+			if strings.Count(s[l[0]:l[1]], ",") >= minList-1 {
+				groups = append(groups, commaLists(s, l[0], l[1])...)
 			}
 		}
 	}
-	return grupos
+	return groups
 }
 
-// listasVirgula: as listas entre vírgulas da linha [a, b): itens inteiros entre as vírgulas; o
+// commaLists: as listas entre vírgulas da linha [a, b): itens inteiros entre as vírgulas; o
 // primeiro pode vir depois de um rótulo ("carregadas: a, b, c") e o último antes de um fecho.
-func listasVirgula(s string, a, b int) [][]celula {
-	var segs []celula
+func commaLists(s string, a, b int) [][]cell {
+	var sgms []cell
 	for i := a; i <= b; i++ {
 		if i == b || s[i] == ',' {
-			c := celula{a, i}
+			c := cell{a, i}
 			for c.a < c.b && (s[c.a] == ' ' || s[c.a] == '\t') {
 				c.a++
 			}
 			for c.b > c.a && (s[c.b-1] == ' ' || s[c.b-1] == '\t') {
 				c.b--
 			}
-			segs = append(segs, c)
+			sgms = append(sgms, c)
 			a = i + 1
 		}
 	}
-	inteiro := func(c celula) bool { return c.b > c.a && c.b-c.a <= 200 && reItemInteiro.MatchString(s[c.a:c.b]) }
-	borda := func(c celula, cauda bool) (celula, bool) { // a palavra do fim (ou do começo) do pedaço
-		if cauda {
+	whole := func(c cell) bool { return c.b > c.a && c.b-c.a <= 200 && reWholeItem.MatchString(s[c.a:c.b]) }
+	edge := func(c cell, tail bool) (cell, bool) { // a palavra do fim (ou do começo) do pedaço
+		if tail {
 			k := c.b
 			for k > c.a && !strings.ContainsRune(" \t[(:={", rune(s[k-1])) {
 				k--
@@ -133,27 +133,27 @@ func listasVirgula(s string, a, b int) [][]celula {
 			}
 			c.b = k
 		}
-		return c, inteiro(c)
+		return c, whole(c)
 	}
-	var out [][]celula
-	for i := 0; i+1 < len(segs); {
-		ini, ok := borda(segs[i], true)
-		if !ok || chamadaAntes(s, ini.a) {
+	var out [][]cell
+	for i := 0; i+1 < len(sgms); {
+		ini, ok := edge(sgms[i], true)
+		if !ok || callBefore(s, ini.a) {
 			i++
 			continue
 		}
-		g := []celula{itemLista(s, ini.a, ini.b)}
+		g := []cell{listItem(s, ini.a, ini.b)}
 		j := i + 1
-		for j < len(segs) && inteiro(segs[j]) {
-			g = append(g, itemLista(s, segs[j].a, segs[j].b))
+		for j < len(sgms) && whole(sgms[j]) {
+			g = append(g, listItem(s, sgms[j].a, sgms[j].b))
 			j++
 		}
-		if j < len(segs) {
-			if fim, ok := borda(segs[j], false); ok {
-				g = append(g, itemLista(s, fim.a, fim.b))
+		if j < len(sgms) {
+			if end, ok := edge(sgms[j], false); ok {
+				g = append(g, listItem(s, end.a, end.b))
 			}
 		}
-		if len(g) >= minLista {
+		if len(g) >= minList {
 			out = append(out, g)
 		}
 		i = j
@@ -162,120 +162,120 @@ func listasVirgula(s string, a, b int) [][]celula {
 }
 
 // palavras: quantas palavras separadas por espaço há em l (para de contar em 4).
-func palavras(l string) int {
-	n, dentro := 0, false
+func words(l string) int {
+	n, inside := 0, false
 	for i := 0; i < len(l) && n < 4; i++ {
 		b := l[i] == ' ' || l[i] == '\t'
-		if !b && !dentro {
+		if !b && !inside {
 			n++
 		}
-		dentro = !b
+		inside = !b
 	}
 	return n
 }
 
-// chamadaAntes: a lista que começa em i está entre os parênteses de uma chamada ("f(a, b").
-func chamadaAntes(s string, i int) bool {
+// callBefore: a lista que começa em i está entre os parênteses de uma chamada ("f(a, b").
+func callBefore(s string, i int) bool {
 	k := i - 1
 	for k >= 0 && (s[k] == ' ' || s[k] == '\t') {
 		k--
 	}
-	return k >= 1 && s[k] == '(' && (ehAlnum(s[k-1]) || s[k-1] == '_')
+	return k >= 1 && s[k] == '(' && (isAlnum(s[k-1]) || s[k-1] == '_')
 }
 
-// tipoConhecido: o tipo de v se é um nome aprendido (em RAM ou, só o hash, no vistos.json).
-func (m *Masker) tipoConhecido(v string) (string, bool) {
-	c := m.conh
+// knownType: o tipo de v se é um nome aprendido (em RAM ou, só o hash, no vistos.json).
+func (m *Masker) knownType(v string) (string, bool) {
+	c := m.known
 	c.mu.RLock()
 	tp, ok := c.canon["O:"+v]
 	if !ok {
 		tp, ok = c.canon["o:"+strings.ToLower(v)]
-		ok = ok && entSQL[strings.TrimPrefix(tp, prefTipoObj)]
+		ok = ok && entSQL[strings.TrimPrefix(tp, objTypePrefix)]
 	}
 	c.mu.RUnlock()
 	if ok {
-		ent := strings.TrimPrefix(tp, prefTipoObj)
-		return ent, ehObjeto(tp) && m.objPropaga(ent)
+		ent := strings.TrimPrefix(tp, objTypePrefix)
+		return ent, isObject(tp) && m.objPropagates(ent)
 	}
-	if m.vistos == nil || !m.vistos.TemObj() || !caraDeIdentificador(v) {
+	if m.seenSet == nil || !m.seenSet.HasObj() || !identifierShape(v) {
 		return "", false
 	}
-	ent, visto, ok := m.vistos.Obj(m.idObj("O:" + v))
+	ent, seen, ok := m.seenSet.Obj(m.objID("O:" + v))
 	if !ok {
-		ent, visto, ok = m.vistos.Obj(m.idObj("o:" + strings.ToLower(v)))
+		ent, seen, ok = m.seenSet.Obj(m.objID("o:" + strings.ToLower(v)))
 		ok = ok && entSQL[ent]
 	}
-	if !ok || hoje()-visto > validadeObj || !m.objPropaga(ent) {
+	if !ok || today()-seen > objValidity || !m.objPropagates(ent) {
 		return "", false
 	}
 	return ent, true
 }
 
-// publicoLista: o vocabulário que nunca vira item de lista.
-func publicoLista(v string) bool { return publicoSQL(v) || publicoDev(v) || publicoDevops(v) }
+// publicList: o vocabulário que nunca vira item de lista.
+func publicList(v string) bool { return publicSQL(v) || publicDev(v) || publicDevops(v) }
 
-// acharListas: as listas homogêneas e os nomes qualificados com uma parte conhecida (aprendida).
-func (m *Masker) acharListas(s string, aprende bool, add func(ini, fim int, tipo string)) {
-	if !m.cfg.Objetos.Ligado {
+// findLists: as listas homogêneas e os nomes qualificados com uma parte conhecida (aprendida).
+func (m *Masker) findLists(s string, learn bool, add func(ini, end int, typ string)) {
+	if !m.cfg.Objects.Enabled {
 		return
 	}
-	c := m.conh
+	c := m.known
 	c.mu.RLock()
 	nRAM := c.nObj
 	c.mu.RUnlock()
-	if nRAM == 0 && (m.vistos == nil || !m.vistos.TemObj()) {
+	if nRAM == 0 && (m.seenSet == nil || !m.seenSet.HasObj()) {
 		return
 	}
 	// só o que já foi APRENDIDO (com os freios: evidência forte ou duas regras), e não qualquer
 	// achado deste texto: um achado fraco errado puxaria a lista inteira junto
-	conhecido := m.tipoConhecido
-	m.rodarLeitor(Leitor{Nome: "lista", Publico: publicoLista, Achar: func(s string, add func(ObjAchado)) {
-		listasHomogeneas(s, conhecido, add)
-		qualificadosConhecidos(s, conhecido, add)
-	}}, s, aprende, add)
+	knownOne := m.knownType
+	m.runReader(Reader{Name: "lista", Public: publicList, Find: func(s string, add func(ObjFinding)) {
+		homogeneousLists(s, knownOne, add)
+		knownQualified(s, knownOne, add)
+	}}, s, learn, add)
 }
 
-// listasHomogeneas: em cada lista, o tipo da maioria conhecida vale para os itens que faltam.
-func listasHomogeneas(s string, conhecido func(string) (string, bool), add func(ObjAchado)) {
-	for _, g := range listasEm(s) {
+// homogeneousLists: em cada lista, o tipo da maioria conhecida vale para os itens que faltam.
+func homogeneousLists(s string, knownOne func(string) (string, bool), add func(ObjFinding)) {
+	for _, g := range listsIn(s) {
 		n := map[string]int{}
-		sabe := make([]bool, len(g))
+		knows := make([]bool, len(g))
 		for i, c := range g {
 			v := s[c.a:c.b]
 			if p := strings.LastIndexByte(v, '.'); p >= 0 {
 				v = v[p+1:]
 			}
-			if e, ok := conhecido(v); ok {
+			if e, ok := knownOne(v); ok {
 				n[e]++
-				sabe[i] = true
+				knows[i] = true
 			}
 		}
-		tipo, max := "", 0
+		typ, max := "", 0
 		for e, k := range n {
-			if k > max || k == max && e < tipo {
-				tipo, max = e, k
+			if k > max || k == max && e < typ {
+				typ, max = e, k
 			}
 		}
 		if max*2 < len(g) {
 			continue
 		}
 		for i, c := range g {
-			if sabe[i] {
+			if knows[i] {
 				continue
 			}
 			v := s[c.a:c.b]
-			if !caraDeIdentificador(v) || ehTipoDado(v) || ehPseudoObj(v) {
+			if !identifierShape(v) || isDataType(v) || isPseudoObj(v) {
 				continue
 			}
 			ps := strings.Split(v, ".")
-			if len(ps) > 1 && extensoesArquivo[strings.ToLower(ps[len(ps)-1])] {
+			if len(ps) > 1 && fileExtensions[strings.ToLower(ps[len(ps)-1])] {
 				continue // arquivo.csv
 			}
-			ents := entQual(len(ps), tipo)
+			ents := entQual(len(ps), typ)
 			a := c.a
 			for k, p := range ps {
-				if _, ok := conhecido(p); !ok && reIdentSimples.MatchString(p) {
-					add(ObjAchado{a, a + len(p), ents[k], "lista", ents[k] != "coluna" && caraDeIdentificador(p)})
+				if _, ok := knownOne(p); !ok && reSimpleIdent.MatchString(p) {
+					add(ObjFinding{a, a + len(p), ents[k], "lista", ents[k] != "coluna" && identifierShape(p)})
 				}
 				a += len(p) + 1
 			}
@@ -283,9 +283,9 @@ func listasHomogeneas(s string, conhecido func(string) (string, bool), add func(
 	}
 }
 
-// atribuiAtributo: o nome s[a:b] abre a linha e recebe uma atribuição ("mock.scalars.return_value
+// assignsAttribute: o nome s[a:b] abre a linha e recebe uma atribuição ("mock.scalars.return_value
 // = x", "self.cfg.schema = y"): é atributo de objeto no código, não nome de tabela.
-func atribuiAtributo(s string, a, b int) bool {
+func assignsAttribute(s string, a, b int) bool {
 	for k := a - 1; k >= 0 && s[k] != '\n'; k-- {
 		if s[k] != ' ' && s[k] != '\t' {
 			return false
@@ -297,13 +297,13 @@ func atribuiAtributo(s string, a, b int) bool {
 	return b+1 < len(s) && s[b] == '=' && s[b+1] != '='
 }
 
-// qualificadosConhecidos: "a.b" ou "a.b.c" em que uma parte é um schema ou banco conhecido na
+// knownQualified: "a.b" ou "a.b.c" em que uma parte é um schema ou banco conhecido na
 // posição em que fica num nome de tabela: as outras partes ganham o tipo da posição.
-func qualificadosConhecidos(s string, conhecido func(string) (string, bool), add func(ObjAchado)) {
+func knownQualified(s string, knownOne func(string) (string, bool), add func(ObjFinding)) {
 	if strings.IndexByte(s, '.') < 0 {
 		return
 	}
-	ident := func(c byte) bool { return ehAlnum(c) || c == '_' || c == '$' }
+	ident := func(c byte) bool { return isAlnum(c) || c == '_' || c == '$' }
 	for i := 0; i < len(s); {
 		c := s[i]
 		if !(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c == '_') || i > 0 && (ident(s[i-1]) || s[i-1] == '.' || s[i-1] == '/' || s[i-1] == '-') {
@@ -322,36 +322,36 @@ func qualificadosConhecidos(s string, conhecido func(string) (string, bool), add
 			}
 			ps = append(ps, [2]int{j, k})
 			j = k
-			if j+1 < len(s) && s[j] == '.' && (letraD(s[j+1]) || s[j+1] == '_') && len(ps) < 4 {
+			if j+1 < len(s) && s[j] == '.' && (letterD(s[j+1]) || s[j+1] == '_') && len(ps) < 4 {
 				j++
 				continue
 			}
 			break
 		}
 		i = max(j, i+1)
-		if len(ps) < 2 || len(ps) > 3 || j < len(s) && (s[j] == '(' || s[j] == '-' || s[j] == '/' || s[j] == '.' && j+1 < len(s) && ehAlnum(s[j+1])) {
+		if len(ps) < 2 || len(ps) > 3 || j < len(s) && (s[j] == '(' || s[j] == '-' || s[j] == '/' || s[j] == '.' && j+1 < len(s) && isAlnum(s[j+1])) {
 			continue
 		}
-		if ult := strings.ToLower(s[ps[len(ps)-1][0]:ps[len(ps)-1][1]]); extensoesArquivo[ult] || tldsPublicos[ult] {
+		if lastPos := strings.ToLower(s[ps[len(ps)-1][0]:ps[len(ps)-1][1]]); fileExtensions[lastPos] || publicTLDs[lastPos] {
 			continue
 		}
 		ents := entQual(len(ps), "tabela")
-		casa := false
-		var sabe [3]bool
+		matched := false
+		var knows [3]bool
 		for k, p := range ps {
-			if e, ok := conhecido(s[p[0]:p[1]]); ok {
-				sabe[k] = true
+			if e, ok := knownOne(s[p[0]:p[1]]); ok {
+				knows[k] = true
 				if (e == "schema" || e == "database") && e == ents[k] {
-					casa = true
+					matched = true
 				}
 			}
 		}
-		if !casa || atribuiAtributo(s, ps[0][0], j) {
+		if !matched || assignsAttribute(s, ps[0][0], j) {
 			continue
 		}
 		for k, p := range ps {
-			if v := s[p[0]:p[1]]; !sabe[k] && !ehPseudoObj(v) && len(v) >= 2 {
-				add(ObjAchado{p[0], p[1], ents[k], "qualificado", caraDeIdentificador(v)})
+			if v := s[p[0]:p[1]]; !knows[k] && !isPseudoObj(v) && len(v) >= 2 {
+				add(ObjFinding{p[0], p[1], ents[k], "qualificado", identifierShape(v)})
 			}
 		}
 	}

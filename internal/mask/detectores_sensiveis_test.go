@@ -8,12 +8,12 @@ import (
 
 // Dados sensíveis da LGPD (art. 5º, II) no meio do texto. Cada caso: o que tem de sumir; e as
 // frases em que a mesma palavra não fala de ninguém, que têm de ficar como estão.
-func TestSensiveisNoTexto(t *testing.T) {
-	m := novoTeste(t)
+func TestSensitiveInText(t *testing.T) {
+	m := newTest(t)
 	fmr := base64.StdEncoding.EncodeToString(append([]byte("FMR\x00 20\x00"), make([]byte, 30)...))
-	casos := []struct {
+	cases := []struct {
 		s    string
-		some []string
+		gone []string
 	}{
 		{"o paciente é evangélico e filiado ao PSOL desde 2019", []string{"evangélico", "PSOL"}},
 		{"ela se declara parda e é bissexual", []string{"parda", "bissexual"}},
@@ -27,15 +27,15 @@ func TestSensiveisNoTexto(t *testing.T) {
 		{"filiação partidária: PSOL", []string{"PSOL"}},
 		{"template " + fmr, []string{fmr[:12]}},
 	}
-	for _, c := range casos {
-		out, ents := m.Mascarar(c.s)
-		for _, x := range c.some {
+	for _, c := range cases {
+		out, ents := m.Mask(c.s)
+		for _, x := range c.gone {
 			if strings.Contains(out, x) {
 				t.Errorf("%q: ficou %q\n   saiu %q", c.s, x, out)
 			}
 		}
-		if volta := NovaTabela(ents).Desmascarar(out, false); volta != c.s {
-			t.Errorf("volta de %q:\n   %q", c.s, volta)
+		if back := NewTable(ents).Unmask(out, false); back != c.s {
+			t.Errorf("volta de %q:\n   %q", c.s, back)
 		}
 	}
 	for _, s := range []string{
@@ -44,21 +44,21 @@ func TestSensiveisNoTexto(t *testing.T) {
 		"o novo sistema e a rede nova", "o servidor amarelo no painel", "membro do time de dados",
 		"ssh-keygen -lf: fingerprint: SHA256:abc", "Rk1SA é só texto",
 	} {
-		if out, _ := m.Mascarar(s); out != s {
+		if out, _ := m.Mask(s); out != s {
 			t.Errorf("mascarou o que não é dado sensível: %q -> %q", s, out)
 		}
 	}
 }
 
-func TestRotulosSensiveis(t *testing.T) {
+func TestSensitiveLabels(t *testing.T) {
 	for _, r := range []string{"identidade_genero", "filiacao_partidaria", "opiniao_politica", "conviccao_religiosa",
 		"vida_sexual", "impressao_digital", "raca_cor", "Race", "comorbidades"} {
-		if c := classeRotulo(r); c != "sensivel" {
+		if c := labelClass(r); c != "sensivel" {
 			t.Errorf("%s: %q", r, c)
 		}
 	}
 	// filiação sozinha continua sendo o nome dos pais; identidade, o RG
-	if classeRotulo("filiacao") != "nome" || classeRotulo("identidade") != "rg" {
-		t.Errorf("filiacao %q, identidade %q", classeRotulo("filiacao"), classeRotulo("identidade"))
+	if labelClass("filiacao") != "nome" || labelClass("identidade") != "rg" {
+		t.Errorf("filiacao %q, identidade %q", labelClass("filiacao"), labelClass("identidade"))
 	}
 }

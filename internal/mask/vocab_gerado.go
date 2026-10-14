@@ -7,7 +7,7 @@ import (
 )
 
 // Referência pública derivada (ver docs/pt-BR/estruturas.md). Dois arquivos de dados
-// GERADOS por medição no material público da máquina (TestGerarRefPublica, em
+// GERADOS por medição no material público da máquina (TestGeneratePublicRef, em
 // vocab_gerar_test.go), nunca escritos à mão. O cabeçalho de cada um diz de onde, quando
 // e com que critério foi gerado.
 //
@@ -15,11 +15,11 @@ import (
 //     tipo em YAML/JSON/TOML/INI, opção --tipo, nome depois de FROM/JOIN/INTO/SCHEMA no SQL) em
 //     muitos projetos públicos distintos (default, public, dbo, api, app...). São genéricas
 //     demais para a memória da conversa: mascaradas onde uma regra as decidiu, nunca
-//     propagadas (Decisao.Generica, ehGenerica).
+//     propagadas (Decision.Generic, isGeneric).
 //   - imagens_oficiais.txt: as Imagens Oficiais do Docker (redis, postgres, nginx...), as
 //     pastas do repositório público docker-library/docs (uma por imagem, com content.md e
 //     metadata.json). Só uma imagem dessa lista, sem organização, prova que o serviço com o
-//     mesmo nome é o software (softwareDoTexto); imagem local ("image: api-x" com build:) não.
+//     mesmo nome é o software (textSoftware); imagem local ("image: api-x" com build:) não.
 //   - software_publico.txt e fornecedores.txt: nome e dono dos repositórios públicos populares
 //     do GitHub. Na regra de imagem, org/nome só fica em claro com as duas chaves: organização
 //     fornecedora e nome de software público.
@@ -29,40 +29,40 @@ import (
 //     esquema pede um tipo que só os dados usam: object, category, datetime64[ns], VARCHAR(n)).
 
 //go:embed dados/ref_publica.txt
-var refPublicaTxt string
+var publicRefTxt string
 
 //go:embed dados/tipos_linguagem.txt
-var tiposLinguagemTxt string
+var languageTypesTxt string
 
 //go:embed dados/imagens_oficiais.txt
-var imagensOficiaisTxt string
+var officialImagesTxt string
 
 //go:embed dados/software_publico.txt
-var softwarePublicoTxt string
+var publicSoftwareTxt string
 
 //go:embed dados/fornecedores.txt
-var fornecedoresTxt string
+var vendorsTxt string
 
-// softwarePublico e fornecedores: nome e dono dos repositórios populares do GitHub (medido;
-// normSoftware). Só valem juntos (caminhoPublico): sozinha, a lista de nomes inclui codinomes.
-var softwarePublico, fornecedores map[string]bool
+// publicSoftware e fornecedores: nome e dono dos repositórios populares do GitHub (medido;
+// normSoftware). Só valem juntos (publicPath): sozinha, a lista de nomes inclui codinomes.
+var publicSoftware, vendors map[string]bool
 
-// imagensOficiais: nomes das Imagens Oficiais do Docker (medido; minúsculas).
-var imagensOficiais map[string]bool
+// officialImages: nomes das Imagens Oficiais do Docker (medido; minúsculas).
+var officialImages map[string]bool
 
-// tiposLinguagem: tipos de dado que também são tipo de linguagem (medido; minúsculas).
-var tiposLinguagem map[string]bool
+// languageTypes: tipos de dado que também são tipo de linguagem (medido; minúsculas).
+var languageTypes map[string]bool
 
 func init() {
-	refPublica = lerListaGerada(refPublicaTxt)
-	tiposLinguagem = lerListaGerada(tiposLinguagemTxt)
-	imagensOficiais = lerListaGerada(imagensOficiaisTxt)
-	softwarePublico = lerListaGerada(softwarePublicoTxt)
-	fornecedores = lerListaGerada(fornecedoresTxt)
+	publicRef = readGeneratedList(publicRefTxt)
+	languageTypes = readGeneratedList(languageTypesTxt)
+	officialImages = readGeneratedList(officialImagesTxt)
+	publicSoftware = readGeneratedList(publicSoftwareTxt)
+	vendors = readGeneratedList(vendorsTxt)
 }
 
-// lerListaGerada: uma palavra por linha (minúsculas); "#" começa comentário (o cabeçalho).
-func lerListaGerada(txt string) map[string]bool {
+// readGeneratedList: uma palavra por linha (minúsculas); "#" começa comentário (o cabeçalho).
+func readGeneratedList(txt string) map[string]bool {
 	m := map[string]bool{}
 	for _, l := range strings.Split(txt, "\n") {
 		if l = strings.TrimSpace(l); l != "" && l[0] != '#' {
@@ -84,29 +84,29 @@ func normSoftware(v string) string {
 	}, v)
 }
 
-// orgPublica e nomePublico: as duas chaves da imagem pública (caminhoPublico, softwareDoTexto).
-func orgPublica(org string) bool {
-	return refPublica[strings.ToLower(org)] || fornecedores[normSoftware(org)]
+// publicOrg e publicName: as duas chaves da imagem pública (publicPath, textSoftware).
+func publicOrg(org string) bool {
+	return publicRef[strings.ToLower(org)] || vendors[normSoftware(org)]
 }
 
-// nomePublico: o nome inteiro é software público ou, pedaço a pedaço, cada pedaço é software,
+// publicName: o nome inteiro é software público ou, pedaço a pedaço, cada pedaço é software,
 // palavra da referência, papel, tipo ou versão, e pelo menos um é software (clickhouse-server,
 // statsd-exporter, node-chrome). Um pedaço desconhecido bloqueia (payments-api, cp-kafka).
-func nomePublico(nome string) bool {
-	l := strings.ToLower(nome)
-	if imagensOficiais[l] || refPublica[l] || softwarePublico[normSoftware(nome)] {
+func publicName(name string) bool {
+	l := strings.ToLower(name)
+	if officialImages[l] || publicRef[l] || publicSoftware[normSoftware(name)] {
 		return true
 	}
-	ps := pedacosValor(nome)
+	ps := valuePieces(name)
 	if len(ps) < 2 || len(ps) > 6 {
 		return false
 	}
 	sw := false
 	for _, p := range ps {
 		switch {
-		case imagensOficiais[p] || softwarePublico[p]:
+		case officialImages[p] || publicSoftware[p]:
 			sw = true
-		case ehDigito(p[0]) || len(p) <= 2 && p[0] == 'v' || refPublica[p] || vocabPapel[p] || vocabTipo[p]:
+		case isDigit(p[0]) || len(p) <= 2 && p[0] == 'v' || publicRef[p] || roleVocab[p] || typeVocab[p]:
 		default:
 			return false
 		}

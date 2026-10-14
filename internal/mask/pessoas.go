@@ -11,37 +11,37 @@ import (
 	"unicode"
 )
 
-// Pessoas: registro (só hashes) de nomes, e-mails e códigos de pessoas conhecidas.
+// People: registro (só hashes) de nomes, e-mails e códigos de pessoas conhecidas.
 
-// Pessoas guarda, SÓ COMO HASH (HMAC com a chave), os nomes, e-mails e códigos de
+// People guarda, SÓ COMO HASH (HMAC com a chave), os nomes, e-mails e códigos de
 // pessoas conhecidas e a qual pessoa cada um pertence. Serve para (1) achar um nome
 // solto no texto e (2) dar o mesmo identificador ao nome e ao e-mail da mesma pessoa.
 // Nenhum valor real fica no arquivo.
-type Pessoas struct {
-	path      string
-	mu        sync.RWMutex
-	sujo      bool
-	salvo     time.Time
-	codCache  sync.Map // palavra -> é código de alguém? (só em RAM)
-	nCodCache atomic.Int64
-	disco     impressaoArquivo // o arquivo como este processo o deixou (ver Vistos.disco)
-	D         struct {
-		Nomes   map[string]string `json:"nomes"`   // id(nome) -> pid
-		Emails  map[string]string `json:"emails"`  // id(email) -> pid
-		Codigos map[string]string `json:"codigos"` // id(código) -> pid
+type People struct {
+	path       string
+	mu         sync.RWMutex
+	dirty      bool
+	saved      time.Time
+	codeCache  sync.Map // palavra -> é código de alguém? (só em RAM)
+	nCodeCache atomic.Int64
+	disk       fileFingerprint // o arquivo como este processo o deixou (ver Seen.disco)
+	D          struct {
+		Names  map[string]string `json:"nomes"`   // id(nome) -> pid
+		Emails map[string]string `json:"emails"`  // id(email) -> pid
+		Codes  map[string]string `json:"codigos"` // id(código) -> pid
 		// id(primeiro nome): filtro barato para achar nomes em qualquer grafia
 		// ("joão silva", "JOAO SILVA") sem testar toda sequência de palavras do texto
-		Primeiros map[string]bool `json:"primeiros"`
+		FirstNames map[string]bool `json:"primeiros"`
 		// tamanhos dos códigos de usuário: filtro barato (só palavras desses tamanhos são
-		// conferidas). Vazio em registros antigos: aí todas são conferidas.
-		TamCodigos map[int]bool `json:"tam_codigos,omitempty"`
+		// conferidas). IsEmpty em registros antigos: aí todas são conferidas.
+		CodeLengths map[int]bool `json:"tam_codigos,omitempty"`
 	}
 }
 
-func CarregarPessoas(path string) (*Pessoas, error) {
-	ps := &Pessoas{path: path}
-	ps.D.Nomes, ps.D.Emails, ps.D.Codigos = map[string]string{}, map[string]string{}, map[string]string{}
-	ps.D.Primeiros = map[string]bool{}
+func LoadPeople(path string) (*People, error) {
+	ps := &People{path: path}
+	ps.D.Names, ps.D.Emails, ps.D.Codes = map[string]string{}, map[string]string{}, map[string]string{}
+	ps.D.FirstNames = map[string]bool{}
 	b, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
 		return ps, nil
@@ -52,151 +52,151 @@ func CarregarPessoas(path string) (*Pessoas, error) {
 	if err := json.Unmarshal(b, &ps.D); err != nil {
 		return nil, err
 	}
-	ps.disco = impressaoDe(path)
+	ps.disk = fingerprintOf(path)
 	return ps, nil
 }
 
-// Salvar grava o registro. Se outro processo gravou depois deste (o importar-pessoas com o
+// Save grava o registro. Se outro processo gravou depois deste (o importar-pessoas com o
 // proxy no ar; a versão nova durante a troca), junta antes o que só o outro tem: o registro só
 // cresce, e uma gravação não apaga a outra.
-func (ps *Pessoas) Salvar() error {
+func (ps *People) Save() error {
 	ps.mu.Lock()
-	ps.juntarDoDisco()
+	ps.mergeFromDisk()
 	b, _ := json.Marshal(ps.D)
 	ps.mu.Unlock()
-	imp, err := gravarTrocando(ps.path, b)
+	imp, err := writeSwapping(ps.path, b)
 	if err != nil {
 		return err
 	}
 	ps.mu.Lock()
-	ps.disco = imp
+	ps.disk = imp
 	ps.mu.Unlock()
 	return nil
 }
 
-// juntarDoDisco: com ps.mu travado. Um id que os dois têm fica com a pessoa deste processo.
-func (ps *Pessoas) juntarDoDisco() {
-	if impressaoDe(ps.path) == ps.disco {
+// mergeFromDisk: com ps.mu travado. Um id que os dois têm fica com a pessoa deste processo.
+func (ps *People) mergeFromDisk() {
+	if fingerprintOf(ps.path) == ps.disk {
 		return
 	}
 	b, err := os.ReadFile(ps.path)
 	if err != nil {
 		return
 	}
-	var outro Pessoas
-	if json.Unmarshal(b, &outro.D) != nil {
+	var other People
+	if json.Unmarshal(b, &other.D) != nil {
 		return
 	}
 	// sem tamanhos = registro antigo, que confere toda palavra: se um dos lados é assim, o
 	// resultado fica sem o filtro (conferir a mais nunca deixa um código passar)
-	semFiltro := len(ps.D.Codigos) > 0 && len(ps.D.TamCodigos) == 0 ||
-		len(outro.D.Codigos) > 0 && len(outro.D.TamCodigos) == 0
-	juntar := func(meu *map[string]string, dele map[string]string) {
-		for id, pid := range dele {
-			if *meu == nil {
-				*meu = map[string]string{}
+	noFilter := len(ps.D.Codes) > 0 && len(ps.D.CodeLengths) == 0 ||
+		len(other.D.Codes) > 0 && len(other.D.CodeLengths) == 0
+	join := func(mine *map[string]string, its map[string]string) {
+		for id, pid := range its {
+			if *mine == nil {
+				*mine = map[string]string{}
 			}
-			if _, ok := (*meu)[id]; !ok {
-				(*meu)[id] = pid
+			if _, ok := (*mine)[id]; !ok {
+				(*mine)[id] = pid
 			}
 		}
 	}
-	juntar(&ps.D.Nomes, outro.D.Nomes)
-	juntar(&ps.D.Emails, outro.D.Emails)
-	juntar(&ps.D.Codigos, outro.D.Codigos)
-	for id := range outro.D.Primeiros {
-		if ps.D.Primeiros == nil {
-			ps.D.Primeiros = map[string]bool{}
+	join(&ps.D.Names, other.D.Names)
+	join(&ps.D.Emails, other.D.Emails)
+	join(&ps.D.Codes, other.D.Codes)
+	for id := range other.D.FirstNames {
+		if ps.D.FirstNames == nil {
+			ps.D.FirstNames = map[string]bool{}
 		}
-		ps.D.Primeiros[id] = true
+		ps.D.FirstNames[id] = true
 	}
-	if semFiltro {
-		ps.D.TamCodigos = nil
+	if noFilter {
+		ps.D.CodeLengths = nil
 	} else {
-		for n := range outro.D.TamCodigos {
-			if ps.D.TamCodigos == nil {
-				ps.D.TamCodigos = map[int]bool{}
+		for n := range other.D.CodeLengths {
+			if ps.D.CodeLengths == nil {
+				ps.D.CodeLengths = map[int]bool{}
 			}
-			ps.D.TamCodigos[n] = true
+			ps.D.CodeLengths[n] = true
 		}
 	}
-	ps.codCache.Clear() // códigos novos: "não é código" guardado antes pode ter deixado de valer
-	ps.nCodCache.Store(0)
+	ps.codeCache.Clear() // códigos novos: "não é código" guardado antes pode ter deixado de valer
+	ps.nCodeCache.Store(0)
 }
 
-// SalvarAgora grava já o que estiver pendente, sem esperar o intervalo (na saída do proxy).
-func (ps *Pessoas) SalvarAgora() error {
+// SaveNow grava já o que estiver pendente, sem esperar o intervalo (na saída do proxy).
+func (ps *People) SaveNow() error {
 	ps.mu.Lock()
-	sujo := ps.sujo
-	ps.sujo = false
+	dirty := ps.dirty
+	ps.dirty = false
 	ps.mu.Unlock()
-	if !sujo {
+	if !dirty {
 		return nil
 	}
-	return ps.Salvar()
+	return ps.Save()
 }
 
-// SalvarSeSujo grava o registro se entrou alguém novo (no máximo uma vez a cada 5 s).
-func (ps *Pessoas) SalvarSeSujo() error {
+// SaveIfDirty grava o registro se entrou alguém novo (no máximo uma vez a cada 5 s).
+func (ps *People) SaveIfDirty() error {
 	ps.mu.Lock()
-	if !ps.sujo || time.Since(ps.salvo) < intervaloSalvar {
+	if !ps.dirty || time.Since(ps.saved) < saveInterval {
 		ps.mu.Unlock()
 		return nil
 	}
-	ps.sujo, ps.salvo = false, time.Now()
+	ps.dirty, ps.saved = false, time.Now()
 	ps.mu.Unlock()
-	return ps.Salvar()
+	return ps.Save()
 }
 
-// EhCodigo: v é o código de alguém do registro? Guarda a resposta por palavra (as mesmas
+// IsCode: v é o código de alguém do registro? Guarda a resposta por palavra (as mesmas
 // palavras se repetem muito, e a conta do hash é a parte cara).
-func (ps *Pessoas) EhCodigo(p *Pseudo, v string) bool {
+func (ps *People) IsCode(p *Pseudo, v string) bool {
 	// mesma regra da importação, para registros feitos antes dela: código curto ou sem dígito
 	// não é procurado no texto
-	if len(v) < 4 || !temDigito(v) {
+	if len(v) < 4 || !hasDigit(v) {
 		return false
 	}
 	ps.mu.RLock()
-	fora := len(ps.D.TamCodigos) > 0 && !ps.D.TamCodigos[len(v)]
+	outside := len(ps.D.CodeLengths) > 0 && !ps.D.CodeLengths[len(v)]
 	ps.mu.RUnlock()
-	if fora {
+	if outside {
 		return false
 	}
-	if r, ok := ps.codCache.Load(v); ok {
+	if r, ok := ps.codeCache.Load(v); ok {
 		return r.(bool)
 	}
-	r := ps.PID(p, "codigo", NormNome(v)) != ""
-	if ps.nCodCache.Add(1) > 200_000 {
-		ps.codCache.Clear()
-		ps.nCodCache.Store(0)
+	r := ps.PID(p, "codigo", NormName(v)) != ""
+	if ps.nCodeCache.Add(1) > 200_000 {
+		ps.codeCache.Clear()
+		ps.nCodeCache.Store(0)
 	}
-	ps.codCache.Store(v, r)
+	ps.codeCache.Store(v, r)
 	return r
 }
 
-func (ps *Pessoas) TemCodigos() bool {
+func (ps *People) HasCodes() bool {
 	ps.mu.RLock()
 	defer ps.mu.RUnlock()
-	return len(ps.D.Codigos) > 0
+	return len(ps.D.Codes) > 0
 }
 
-func (ps *Pessoas) Total() int {
+func (ps *People) Total() int {
 	ps.mu.RLock()
 	defer ps.mu.RUnlock()
-	return len(ps.D.Nomes)
+	return len(ps.D.Names)
 }
 
-// Importar registra uma pessoa. Valores vazios são ignorados. Nomes com uma palavra só
+// Import registra uma pessoa. Values vazios são ignorados. Names com uma palavra só
 // não entram na detecção (costumam ser times ou sistemas, não pessoas).
-func (ps *Pessoas) Importar(p *Pseudo, nome, email, codigo string) string {
-	nome, email, codigo = NormNome(nome), strings.ToLower(strings.TrimSpace(email)), NormNome(codigo)
+func (ps *People) Import(p *Pseudo, name, email, codeValue string) string {
+	name, email, codeValue = NormName(name), strings.ToLower(strings.TrimSpace(email)), NormName(codeValue)
 	// código curto ou sem dígito ("TBD", "N/A", "SIM") não identifica ninguém e, procurado no
 	// texto, mascararia palavras comuns
-	if len(codigo) < 4 || !temDigito(codigo) {
-		codigo = ""
+	if len(codeValue) < 4 || !hasDigit(codeValue) {
+		codeValue = ""
 	}
-	if codigo != "" {
-		ps.codCache.Clear()
+	if codeValue != "" {
+		ps.codeCache.Clear()
 	}
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
@@ -210,34 +210,34 @@ func (ps *Pessoas) Importar(p *Pseudo, nome, email, codigo string) string {
 			id string
 		}{ps.D.Emails, p.ID("email", email)})
 	}
-	if codigo != "" {
-		if ps.D.TamCodigos == nil && len(ps.D.Codigos) == 0 {
-			ps.D.TamCodigos = map[int]bool{}
+	if codeValue != "" {
+		if ps.D.CodeLengths == nil && len(ps.D.Codes) == 0 {
+			ps.D.CodeLengths = map[int]bool{}
 		}
-		if ps.D.TamCodigos != nil && !ps.D.TamCodigos[len(codigo)] {
-			ps.D.TamCodigos[len(codigo)], ps.sujo = true, true
+		if ps.D.CodeLengths != nil && !ps.D.CodeLengths[len(codeValue)] {
+			ps.D.CodeLengths[len(codeValue)], ps.dirty = true, true
 		}
 		ids = append(ids, struct {
 			m  map[string]string
 			id string
-		}{ps.D.Codigos, p.ID("codigo", codigo)})
+		}{ps.D.Codes, p.ID("codigo", codeValue)})
 	}
-	var variantes []string
-	if partes := strings.Fields(nome); len(partes) >= 2 {
-		variantes = append(variantes, nome)
-		if len(partes) >= 3 {
-			variantes = append(variantes, partes[0]+" "+partes[len(partes)-1])
+	var variants []string
+	if parts := strings.Fields(name); len(parts) >= 2 {
+		variants = append(variants, name)
+		if len(parts) >= 3 {
+			variants = append(variants, parts[0]+" "+parts[len(parts)-1])
 		}
 	}
-	for _, v := range variantes {
+	for _, v := range variants {
 		ids = append(ids, struct {
 			m  map[string]string
 			id string
-		}{ps.D.Nomes, p.ID("nome", v)})
-		if ps.D.Primeiros == nil {
-			ps.D.Primeiros = map[string]bool{}
+		}{ps.D.Names, p.ID("nome", v)})
+		if ps.D.FirstNames == nil {
+			ps.D.FirstNames = map[string]bool{}
 		}
-		ps.D.Primeiros[p.ID("primeiro", strings.Fields(v)[0])] = true
+		ps.D.FirstNames[p.ID("primeiro", strings.Fields(v)[0])] = true
 	}
 	if len(ids) == 0 {
 		return ""
@@ -255,82 +255,82 @@ func (ps *Pessoas) Importar(p *Pseudo, nome, email, codigo string) string {
 	for _, x := range ids {
 		if _, ok := x.m[x.id]; !ok {
 			x.m[x.id] = pid
-			ps.sujo = true
+			ps.dirty = true
 		}
 	}
 	return pid
 }
 
 // PID devolve o identificador da pessoa dona do valor, ou "" se desconhecida.
-func (ps *Pessoas) PID(p *Pseudo, tipo, valorNorm string) string {
+func (ps *People) PID(p *Pseudo, typ, normValue string) string {
 	ps.mu.RLock()
 	defer ps.mu.RUnlock()
-	switch tipo {
+	switch typ {
 	case "email":
-		return ps.D.Emails[p.ID("email", valorNorm)]
+		return ps.D.Emails[p.ID("email", normValue)]
 	case "nome":
-		return ps.D.Nomes[p.ID("nome", valorNorm)]
+		return ps.D.Names[p.ID("nome", normValue)]
 	case "codigo":
-		return ps.D.Codigos[p.ID("codigo", valorNorm)]
+		return ps.D.Codes[p.ID("codigo", normValue)]
 	}
 	return ""
 }
 
-var conectores = map[string]bool{"da": true, "de": true, "do": true, "das": true, "dos": true, "e": true}
+var connectors = map[string]bool{"da": true, "de": true, "do": true, "das": true, "dos": true, "e": true}
 
-type palavra struct {
-	ini, fim int
-	maiusc   bool
-	conector bool
+type word struct {
+	ini, end  int
+	upperCase bool
+	connector bool
 }
 
-// AcharNomes procura sequências de 2 a 6 palavras com cara de nome ("João da Silva",
+// FindNames procura sequências de 2 a 6 palavras com cara de nome ("João da Silva",
 // "JOAO SILVA") e confere o hash de cada uma no registro.
-func (ps *Pessoas) AcharNomes(s string, p *Pseudo) []Achado {
+func (ps *People) FindNames(s string, p *Pseudo) []Finding {
 	if ps.Total() == 0 {
 		return nil
 	}
-	var ws []palavra
+	var ws []word
 	ini := -1
 	for i, r := range s + " " {
-		letra := unicode.IsLetter(r) || ((r == '\'' || r == '-') && ini >= 0)
-		if letra && ini < 0 {
+		letter := unicode.IsLetter(r) || ((r == '\'' || r == '-') && ini >= 0)
+		if letter && ini < 0 {
 			ini = i
-		} else if !letra && ini >= 0 {
+		} else if !letter && ini >= 0 {
 			w := s[ini:i]
 			r0 := []rune(w)[0]
-			ws = append(ws, palavra{ini, i, unicode.IsUpper(r0), conectores[w]})
+			ws = append(ws, word{ini, i, unicode.IsUpper(r0), connectors[w]})
 			ini = -1
 		}
 	}
 	ps.mu.RLock()
-	porPrimeiro := len(ps.D.Primeiros) > 0
+	byFirst := len(ps.D.FirstNames) > 0
 	ps.mu.RUnlock()
-	inicio := func(i int) bool {
-		if !porPrimeiro { // registro antigo, sem o filtro: só sequências com iniciais maiúsculas
-			return ws[i].maiusc
+	start := func(i int) bool {
+		if !byFirst { // registro antigo, sem o filtro: só sequências com iniciais maiúsculas
+			return ws[i].upperCase
 		}
-		if ws[i].fim-ws[i].ini < 2 {
+		if ws[i].end-ws[i].ini < 2 {
 			return false
 		}
 		ps.mu.RLock()
 		defer ps.mu.RUnlock()
-		return ps.D.Primeiros[p.ID("primeiro", NormNome(s[ws[i].ini:ws[i].fim]))]
+		return ps.D.FirstNames[p.ID("primeiro", NormName(s[ws[i].ini:ws[i].end]))]
 	}
-	var out []Achado
+	var out []Finding
 	for i := 0; i < len(ws); i++ {
-		if !inicio(i) {
+		if !start(i) {
 			continue
 		}
-		achou := 0
-		for n := 6; n >= 2 && achou == 0; n-- {
+		foundIt := 0
+		for n := 6; n >= 2 && foundIt == 0; n-- {
 			j := i + n - 1
-			if j >= len(ws) || (!porPrimeiro && !ws[j].maiusc) || !mesmaLinha(s, ws, i, j) {
+			if j >= len(ws) || (!byFirst && !ws[j].upperCase) || !sameLine(s, ws, i, j) {
 				continue
 			}
 			ok := true
-			for k := i + 1; k < j && !porPrimeiro; k++ {
-				if !ws[k].maiusc && !ws[k].conector {
+			for k := i + 1; k < j && !byFirst; k++ {
+				if !ws[k].upperCase && !ws[k].connector {
 					ok = false
 					break
 				}
@@ -338,22 +338,22 @@ func (ps *Pessoas) AcharNomes(s string, p *Pseudo) []Achado {
 			if !ok {
 				continue
 			}
-			if ps.PID(p, "nome", NormNome(s[ws[i].ini:ws[j].fim])) != "" {
-				out = append(out, Achado{ws[i].ini, ws[j].fim, "nome", s[ws[i].ini:ws[j].fim]})
-				achou = n
+			if ps.PID(p, "nome", NormName(s[ws[i].ini:ws[j].end])) != "" {
+				out = append(out, Finding{ws[i].ini, ws[j].end, "nome", s[ws[i].ini:ws[j].end]})
+				foundIt = n
 			}
 		}
-		if achou > 0 {
-			i += achou - 1
+		if foundIt > 0 {
+			i += foundIt - 1
 		}
 	}
 	return out
 }
 
-// mesmaLinha: entre as palavras i..j só há espaços simples (não quebra linha nem pontuação).
-func mesmaLinha(s string, ws []palavra, i, j int) bool {
+// sameLine: entre as palavras i..j só há espaços simples (não quebra linha nem pontuação).
+func sameLine(s string, ws []word, i, j int) bool {
 	for k := i; k < j; k++ {
-		gap := s[ws[k].fim:ws[k+1].ini]
+		gap := s[ws[k].end:ws[k+1].ini]
 		if strings.TrimLeft(gap, " \t") != "" {
 			return false
 		}

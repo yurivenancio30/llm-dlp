@@ -7,8 +7,8 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/config"
 )
 
-func TestClasseRotulo(t *testing.T) {
-	casos := map[string]string{
+func TestLabelClass(t *testing.T) {
+	cases := map[string]string{
 		"NOM_CLIENTE": "nome", "nomeCliente": "nome", "Nome da Mãe": "nome", "NOM_DATA_OWNER": "nome", "NOM_STEWARD": "nome",
 		"full_name": "nome", "nm_titular": "nome", "CPF": "cpf", "NUM_CPF_CLIENTE": "cpf", "nr_cnpj": "cnpj", "DT_NASCIMENTO": "nascimento",
 		"telefone_celular": "telefone", "COD_USU_DATA_OWNER": "usuario", "matricula": "usuario", "login": "usuario", "user_id": "usuario",
@@ -22,16 +22,16 @@ func TestClasseRotulo(t *testing.T) {
 		"login_timeout": "", "usuario_erro_critico_pct": "", "user_message_id": "", "df_health": "", "saude": "", "diagnostico": "", "pai": "",
 		"cid": "", "cluster_health_check": "", "rds_username": "", "com o nome que o datahub usa": "", "cor": "", "titulo": "", "partido": "",
 	}
-	for r, quer := range casos {
-		if got := classeRotulo(r); got != quer {
-			t.Errorf("classeRotulo(%q) = %q, queria %q", r, got, quer)
+	for r, wants := range cases {
+		if got := labelClass(r); got != wants {
+			t.Errorf("classeRotulo(%q) = %q, queria %q", r, got, wants)
 		}
 	}
 }
 
-func TestCamposRotulados(t *testing.T) {
-	cpfSem := strings.NewReplacer(".", "", "-", "").Replace(gerarCPF("529982247"))
-	pega := map[string][]string{
+func TestLabeledFields(t *testing.T) {
+	cpfWithout := strings.NewReplacer(".", "", "-", "").Replace(genCPF("529982247"))
+	takes := map[string][]string{
 		`{"NOM_CLIENTE": "Maria Aparecida Lopes", "VL_SALDO": 100}`: {"Maria Aparecida Lopes"},
 		"nome_mae: Francisca Pereira Lima\nstatus: ativo":           {"Francisca Pereira Lima"},
 		"COD_USU_DATA_OWNER=B123456":                                {"B123456"},
@@ -39,7 +39,7 @@ func TestCamposRotulados(t *testing.T) {
 		"religiao: catolica":                                        {"catolica"},
 		"tipo_sanguineo: O+":                                        {"O+"},
 		"titulo_eleitor: 1234 5678 9012":                            {"1234 5678 9012"},
-		"NOM_CLIENTE,NUM_CPF,VL_SALDO\nMaria Aparecida Lopes," + cpfSem + ",10.50\n": {"Maria Aparecida Lopes", cpfSem},
+		"NOM_CLIENTE,NUM_CPF,VL_SALDO\nMaria Aparecida Lopes," + cpfWithout + ",10.50\n": {"Maria Aparecida Lopes", cpfWithout},
 		"NOM_SISTEMA;COD_USU_OWNER;NOM_OWNER\nSISTEMA_X;B123456;Carlos Eduardo Nunes\nSISTEMA_Y;C654321;Paula Regina Dias\n": {
 			"B123456", "Carlos Eduardo Nunes", "C654321", "Paula Regina Dias"},
 		"| NOM_CLIENTE | DT_NASCIMENTO | PRODUTO |\n|---|---|---|\n| Jose Antonio Reis | 1980-05-17 | CDB |\n": {"Jose Antonio Reis", "1980-05-17"},
@@ -48,18 +48,18 @@ func TestCamposRotulados(t *testing.T) {
 		"Nom_tabela;Owner\nTB_X;Carlos Eduardo Nunes\n":                                                        {"Carlos Eduardo Nunes"},
 		"placa de rede aa:bb:cc:dd:ee:ff ok":                                                                   {"aa:bb:cc:dd:ee:ff"},
 	}
-	for texto, reais := range pega {
-		out, _ := novoTeste(t).Mascarar(texto)
-		for _, r := range reais {
+	for text, reals := range takes {
+		out, _ := newTest(t).Mask(text)
+		for _, r := range reals {
 			if strings.Contains(out, r) {
-				t.Errorf("passou %q em %q -> %q", r, texto, out)
+				t.Errorf("passou %q em %q -> %q", r, text, out)
 			}
 		}
 	}
-	// o que NÃO é sensível fica como está (valores, nomes de sistema). Nomes de coluna de
+	// o que NÃO é sensível fica como está (valores, nomes de sistema). Names de coluna de
 	// cabeçalho, schema/tabela de catálogo e "table_name" são nomes de recursos e são
-	// mascarados de propósito (ver TestDesenhoMascaraRecursos).
-	fica := map[string][]string{
+	// mascarados de propósito (ver TestLayoutMasksResources).
+	stays := map[string][]string{
 		"NOM_SISTEMA;COD_USU_OWNER;NOM_OWNER\nSISTEMA_X;B123456;Carlos Eduardo Nunes\n": {"SISTEMA_X"},
 		"NOM_CLIENTE,NUM_CPF,VL_SALDO\nMaria Aparecida Lopes,52998224725,10.50\n":       {"10.50"},
 		"TABLE_SCHEMA,TABLE_NAME,ROW_COUNT\nGOLD,TB_CLIENTE,1500\n":                     {"1500"},
@@ -67,39 +67,39 @@ func TestCamposRotulados(t *testing.T) {
 		"name,owner\nTAG_X,SYSADMIN\nTAG_Y,ACCOUNTADMIN\n":                              {"SYSADMIN", "ACCOUNTADMIN"},
 		"usuario: postgres\nlogin = admin":                                              {"postgres", "admin"},
 	}
-	for texto, ficam := range fica {
-		out, _ := novoTeste(t).Mascarar(texto)
-		for _, r := range ficam {
+	for text, stayOnes := range stays {
+		out, _ := newTest(t).Mask(text)
+		for _, r := range stayOnes {
 			if !strings.Contains(out, r) {
-				t.Errorf("mascarou %q sem precisar em %q -> %q", r, texto, out)
+				t.Errorf("mascarou %q sem precisar em %q -> %q", r, text, out)
 			}
 		}
 	}
 }
 
-// Nome achado pelo rótulo entra no registro: depois é reconhecido solto, em outra grafia,
+// Name achado pelo rótulo entra no registro: depois é reconhecido solto, em outra grafia,
 // e a ida e volta devolve o que foi escrito.
-func TestNomeDeCampoViraPessoaConhecida(t *testing.T) {
-	m := novoTeste(t)
-	m.Mascarar("NOM_CLIENTE;SALDO\nMaria Aparecida Lopes;10\n")
-	out, ents := m.Mascarar("falei com a MARIA APARECIDA LOPES e com Maria Aparecida Lopes ontem")
+func TestFieldNameBecomesKnownPerson(t *testing.T) {
+	m := newTest(t)
+	m.Mask("NOM_CLIENTE;SALDO\nMaria Aparecida Lopes;10\n")
+	out, ents := m.Mask("falei com a MARIA APARECIDA LOPES e com Maria Aparecida Lopes ontem")
 	if strings.Contains(strings.ToLower(out), "aparecida") {
 		t.Fatalf("nome aprendido pelo campo passou solto: %s", out)
 	}
-	if volta := NovaTabela(ents).Desmascarar(out, false); !strings.Contains(volta, "MARIA APARECIDA LOPES") {
-		t.Fatalf("duas grafias do mesmo nome não voltaram: %s", volta)
+	if back := NewTable(ents).Unmask(out, false); !strings.Contains(back, "MARIA APARECIDA LOPES") {
+		t.Fatalf("duas grafias do mesmo nome não voltaram: %s", back)
 	}
 	// código aprendido pelo campo: reconhecido solto, em qualquer caixa
-	m.Mascarar("COD_USU_OWNER=B123456")
-	if out, _ := m.Mascarar("o usuário b123456 e B123456 travaram"); strings.Contains(strings.ToUpper(out), "B123456") {
+	m.Mask("COD_USU_OWNER=B123456")
+	if out, _ := m.Mask("o usuário b123456 e B123456 travaram"); strings.Contains(strings.ToUpper(out), "B123456") {
 		t.Fatalf("código aprendido passou solto: %s", out)
 	}
 }
 
 // Código de usuário de pessoa importada: reconhecido em qualquer lugar, com o mesmo id do nome.
-func TestCodigoDePessoaImportada(t *testing.T) {
-	m := novoTeste(t) // importa "João Carlos Silva" com o código U1001
-	out, _ := m.Mascarar("o usuário U1001 (JOAO CARLOS SILVA) abriu o chamado")
+func TestImportedPersonCode(t *testing.T) {
+	m := newTest(t) // importa "João Carlos Silva" com o código U1001
+	out, _ := m.Mask("o usuário U1001 (JOAO CARLOS SILVA) abriu o chamado")
 	if strings.Contains(out, "U1001") {
 		t.Fatalf("código importado passou: %s", out)
 	}
@@ -112,11 +112,11 @@ func TestCodigoDePessoaImportada(t *testing.T) {
 // O detector por nome de campo tem que valer para qualquer origem: vários formatos de
 // arquivo e várias convenções de nome (português, inglês, camelCase, abreviações). Todos os
 // dados aqui são fictícios.
-func TestFormatosGenericos(t *testing.T) {
-	cpf := strings.NewReplacer(".", "", "-", "").Replace(gerarCPF("529982247"))
-	casos := []struct {
-		nome, texto string
-		reais       []string
+func TestGenericFormats(t *testing.T) {
+	cpf := strings.NewReplacer(".", "", "-", "").Replace(genCPF("529982247"))
+	cases := []struct {
+		name, text string
+		reals      []string
 	}{
 		{"CSV com vírgula", "id,nome_cliente,cpf,saldo\n1,Maria Aparecida Lopes," + cpf + ",10.5\n2,Jose Antonio Reis," + cpf + ",7\n", []string{"Maria Aparecida Lopes", "Jose Antonio Reis", cpf}},
 		{"CSV com aspas", "\"Customer Name\",\"Phone Number\",\"Plan\"\n\"Rita de Cassia Melo\",\"31999998888\",\"gold\"\n", []string{"Rita de Cassia Melo", "31999998888"}},
@@ -133,7 +133,7 @@ func TestFormatosGenericos(t *testing.T) {
 		{"XML", "<cliente><nomeCliente>Aline Barros Teles</nomeCliente><cpf>" + cpf + "</cpf><produto>CDB</produto></cliente>", []string{"Aline Barros Teles", cpf}},
 		{"coluna 'nome' numa tabela de pessoas", "nome;cpf;cidade\nFabio Augusto Leme;" + cpf + ";Belo Horizonte\n", []string{"Fabio Augusto Leme", cpf}},
 		{"dois responsáveis na célula", "sistema,responsavel\nSIS_A,Carlos Eduardo Nunes / Paula Regina Dias\n", []string{"Carlos Eduardo Nunes", "Paula Regina Dias"}},
-		{"planilha impressa pelo pandas (print(df))", comoPandas([]string{"nome_cliente", "cpf", "saldo"}, [][]string{
+		{"planilha impressa pelo pandas (print(df))", asPandas([]string{"nome_cliente", "cpf", "saldo"}, [][]string{
 			{"Maria Aparecida Lopes", cpf, "10.50"}, {"José Antônio Reis", cpf, "7.00"}, {"Ana Lúcia Prado", cpf, "130.25"}}),
 			[]string{"Maria Aparecida Lopes", "José Antônio Reis", "Ana Lúcia Prado", cpf}},
 		{"planilha em colunas alinhadas à esquerda", "NOME_CLIENTE           NUM_CPF      PRODUTO\nMaria Aparecida Lopes  " + cpf + "  CDB\nJosé Antônio Reis      " + cpf + "  LCI\n", []string{"Maria Aparecida Lopes", "José Antônio Reis", cpf}},
@@ -143,10 +143,10 @@ func TestFormatosGenericos(t *testing.T) {
 		{"arquivo lido pelo Claude Code (número da linha antes de cada linha)", "1\tNOM_CLIENTE;NUM_CPF;PRODUTO\n2\tMaria Aparecida Lopes;" + cpf + ";CDB\n3\tJosé Antônio Reis;" + cpf + ";LCI\n", []string{"Maria Aparecida Lopes", "José Antônio Reis", cpf}},
 		{"idem, com seta e alinhado", "     1→NOM_CLIENTE,NUM_CPF\n     2→Maria Aparecida Lopes," + cpf + "\n", []string{"Maria Aparecida Lopes", cpf}},
 		{"idem, TSV", "1\tNOM_CLIENTE\tNUM_CPF\n2\tMaria Aparecida Lopes\t" + cpf + "\n", []string{"Maria Aparecida Lopes", cpf}},
-		{"idem, planilha impressa", numerar(comoPandas([]string{"nome_cliente", "cpf", "saldo"}, [][]string{{"Maria Aparecida Lopes", cpf, "10.50"}, {"José Antônio Reis", cpf, "7.00"}, {"Ana Lúcia Prado", cpf, "1.25"}})), []string{"Maria Aparecida Lopes", "José Antônio Reis", "Ana Lúcia Prado", cpf}},
+		{"idem, planilha impressa", numberLines(asPandas([]string{"nome_cliente", "cpf", "saldo"}, [][]string{{"Maria Aparecida Lopes", cpf, "10.50"}, {"José Antônio Reis", cpf, "7.00"}, {"Ana Lúcia Prado", cpf, "1.25"}})), []string{"Maria Aparecida Lopes", "José Antônio Reis", "Ana Lúcia Prado", cpf}},
 		{"TSV em que a primeira coluna é um número (não é número de linha)", "id\tnome_cliente\tcpf\n1\tMaria Aparecida Lopes\t" + cpf + "\n2\tJosé Antônio Reis\t" + cpf + "\n", []string{"Maria Aparecida Lopes", "José Antônio Reis", cpf}},
 		{"SQL INSERT lido pelo Claude Code (número de linha)", "1\t-- dump\n2\tINSERT INTO clientes (id, nome_cliente, num_cpf, dt_nascimento) VALUES\n3\t(1, 'Maria Aparecida Lopes', '" + cpf + "', '1998-04-13'),\n4\t(2, 'Jose Antonio Reis', '" + cpf + "', '1984-08-17');\n", []string{"Maria Aparecida Lopes", "Jose Antonio Reis", cpf, "1998-04-13", "1984-08-17"}},
-		{"linhas coladas sem cabeçalho, com CPF", "Maria Aparecida Lopes | " + gerarCPF("529982247") + " | maria.3@gmail.com\nJose Antonio Reis | " + gerarCPF("529982247") + " | jose.4@gmail.com\n", []string{"Maria Aparecida Lopes", "Jose Antonio Reis"}},
+		{"linhas coladas sem cabeçalho, com CPF", "Maria Aparecida Lopes | " + genCPF("529982247") + " | maria.3@gmail.com\nJose Antonio Reis | " + genCPF("529982247") + " | jose.4@gmail.com\n", []string{"Maria Aparecida Lopes", "Jose Antonio Reis"}},
 		{"dado pessoal sensível em tabela", "paciente\ttipo_sanguineo\tdeficiencia\nMarcos Vinicius Paz\tAB-\tauditiva\n", []string{"Marcos Vinicius Paz", "AB-", "auditiva"}},
 		// "nome" sozinho num registro chave-valor com outro campo de pessoa, como na tabela
 		{"campo 'nome' em JSON com cpf no mesmo registro", "{\n  \"nome\": \"Fabio Augusto Leme\",\n  \"cpf\": \"" + cpf + "\"\n}", []string{"Fabio Augusto Leme", cpf}},
@@ -155,16 +155,16 @@ func TestFormatosGenericos(t *testing.T) {
 		{"idem, XML com um campo por linha", "<cliente>\n  <nome>Fabio Augusto Leme</nome>\n  <cpf>" + cpf + "</cpf>\n</cliente>", []string{"Fabio Augusto Leme", cpf}},
 		{"idem, YAML", "cliente:\n  nome: Fabio Augusto Leme\n  telefone: (31) 98888-7777\n", []string{"Fabio Augusto Leme", "(31) 98888-7777"}},
 	}
-	for _, c := range casos {
-		out, _ := novoTeste(t).Mascarar(c.texto)
-		for _, r := range c.reais {
+	for _, c := range cases {
+		out, _ := newTest(t).Mask(c.text)
+		for _, r := range c.reals {
 			if strings.Contains(out, r) {
-				t.Errorf("%s: passou %q\n   %q", c.nome, r, out)
+				t.Errorf("%s: passou %q\n   %q", c.name, r, out)
 			}
 		}
 	}
 	// O que não é dado de pessoa fica como está, em qualquer formato.
-	intactos := []string{
+	intact := []string{
 		"name,type,size\nreport.pdf,file,1024\nimages,dir,4096\n",
 		`{"name": "build", "steps": [{"name": "Run tests", "run": "go test ./..."}]}`,
 		"name: Deploy to Production\non: push\njobs:\n  build:\n    name: Build and Test\n",
@@ -189,50 +189,50 @@ func TestFormatosGenericos(t *testing.T) {
 		"('id', 'produto')\n(1, 'CDB')\n",
 		"total  used  free\n  16G    8G    8G\n",
 	}
-	for _, s := range intactos {
-		if out, ents := novoTeste(t).Mascarar(s); len(ents) > 0 {
+	for _, s := range intact {
+		if out, ents := newTest(t).Mask(s); len(ents) > 0 {
 			t.Errorf("mascarou sem precisar:\n   %q\n-> %q", s, out)
 		}
 	}
 }
 
 // O vocabulário de nomes de campo é extensível pelo config, e os quase identificadores são opcionais.
-func TestCamposExtrasEOpcionais(t *testing.T) {
-	cfg := config.Padrao()
-	cfg.CamposExtras = []config.CampoExtra{{Tipo: "usuario", Palavras: []string{"RE", "num_chapa_func"}}, {Tipo: "pessoa", Palavras: []string{"cooperado"}}}
-	cfg.DetectoresOpcionais = []string{"quase"}
-	ps, _ := CarregarPessoas(t.TempDir() + "/p.json")
-	m, err := NovoMasker(cfg, chaveTeste, ps, nil)
+func TestExtraAndOptionalFields(t *testing.T) {
+	cfg := config.Default()
+	cfg.ExtraFields = []config.ExtraField{{Type: "usuario", Words: []string{"RE", "num_chapa_func"}}, {Type: "pessoa", Words: []string{"cooperado"}}}
+	cfg.OptionalDetectors = []string{"quase"}
+	ps, _ := LoadPeople(t.TempDir() + "/p.json")
+	m, err := NewMasker(cfg, testKey, ps, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	out, _ := m.Mascarar("RE;NOME_COOPERADO;SEXO;IDADE\n778899;Livia Duarte Pinho;F;34\n")
+	out, _ := m.Mask("RE;NOME_COOPERADO;SEXO;IDADE\n778899;Livia Duarte Pinho;F;34\n")
 	for _, r := range []string{"778899", "Livia Duarte Pinho", ";F;", ";34"} {
 		if strings.Contains(out, r) {
 			t.Errorf("com campos_extras e quase ligado, passou %q: %q", r, out)
 		}
 	}
-	if out, _ := novoTeste(t).Mascarar("RE;NOME_COOPERADO\n778899;Livia Duarte Pinho\n"); !strings.Contains(out, "778899") {
+	if out, _ := newTest(t).Mask("RE;NOME_COOPERADO\n778899;Livia Duarte Pinho\n"); !strings.Contains(out, "778899") {
 		t.Errorf("sem campos_extras não deveria reconhecer: %q", out)
 	}
-	if _, err := NovoMasker(config.Config{CamposExtras: []config.CampoExtra{{Tipo: "xpto", Palavras: []string{"a"}}}}, chaveTeste, nil, nil); err == nil {
+	if _, err := NewMasker(config.Config{ExtraFields: []config.ExtraField{{Type: "xpto", Words: []string{"a"}}}}, testKey, nil, nil); err == nil {
 		t.Error("tipo desconhecido em campos_extras deveria dar erro")
 	}
-	cols := m.DescreverCampos("RE;NOME_COOPERADO;NOM_SISTEMA\n1;a;b\n")
-	if len(cols) != 3 || cols[0].Classe != "usuario" || cols[1].Classe != "nome" || cols[2].Classe != "" {
+	cols := m.DescribeFields("RE;NOME_COOPERADO;NOM_SISTEMA\n1;a;b\n")
+	if len(cols) != 3 || cols[0].Class != "usuario" || cols[1].Class != "nome" || cols[2].Class != "" {
 		t.Errorf("DescreverCampos: %+v", cols)
 	}
 }
 
 // Item 3 (revisão externa): nomes de coluna de documento genéricos.
-func TestRotulosDeDocumento(t *testing.T) {
+func TestDocumentLabels(t *testing.T) {
 	for _, r := range []string{"document", "documento", "userDocument", "user_document", "num_documento", "tax_id", "taxpayer", "taxpayer_id", "nr_documento_cliente", "CPF_CNPJ"} {
-		if classeRotulo(r) == "" {
+		if labelClass(r) == "" {
 			t.Errorf("%q deveria ser reconhecido como documento", r)
 		}
 	}
 	for _, r := range []string{"document_type", "tipo_documento", "documento_url"} {
-		if c := classeRotulo(r); c != "" {
+		if c := labelClass(r); c != "" {
 			t.Errorf("%q não guarda o número do documento, mas virou %q", r, c)
 		}
 	}
@@ -241,7 +241,7 @@ func TestRotulosDeDocumento(t *testing.T) {
 // O desenho mascara nomes de recursos (tabela, coluna de cabeçalho, schema de catálogo) de
 // propósito. Nesses textos, o que sai mascarado tem que ser só pseudônimo de objeto: nenhum
 // detector de dado pessoal pode disparar.
-func TestDesenhoMascaraRecursos(t *testing.T) {
+func TestLayoutMasksResources(t *testing.T) {
 	for _, s := range []string{
 		"table_name;row_count\nTB_CLIENTE;1500\nTB_CONTA;90\n",
 		"INSERT INTO produtos (id, nome_produto, preco) VALUES (1, 'CDB Liquidez Diaria', 10.5);",
@@ -254,13 +254,13 @@ func TestDesenhoMascaraRecursos(t *testing.T) {
 		"SELECT * FROM vendas WHERE id = 12345678901 AND ts > '2026-10-02 18:35:00'",
 		"bank_name,bank_code\nBanco X,341\n",
 	} {
-		_, ents := novoTeste(t).Mascarar(s)
+		_, ents := newTest(t).Mask(s)
 		obj := 0
 		for _, e := range ents {
-			if strings.HasPrefix(e.Tipo, "obj.") {
+			if strings.HasPrefix(e.Type, "obj.") {
 				obj++
 			} else {
-				t.Errorf("detector de dado pessoal disparou (%s) em %q", e.Tipo, s)
+				t.Errorf("detector de dado pessoal disparou (%s) em %q", e.Type, s)
 			}
 		}
 		if obj == 0 {

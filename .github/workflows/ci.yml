@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 jobs:
-  testes:
+  tests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,13 +18,13 @@ jobs:
           go-version-file: go.mod
       - name: gofmt
         run: test -z "$(gofmt -l cmd internal)" || { gofmt -l cmd internal; exit 1; }
-      - name: vet e testes
+      - name: vet and tests
         run: make test
-      - name: compila
+      - name: build
         run: make build && ./bin/llm-dlp version
       - name: install.sh
         run: sh -n install.sh && shellcheck install.sh scripts/*.sh
-      - name: configuração da release
+      - name: release configuration
         uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser

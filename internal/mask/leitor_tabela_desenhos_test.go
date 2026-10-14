@@ -5,9 +5,9 @@ import "testing"
 // O leitor de tabela em qualquer desenho. Os nomes de ferramenta são só de onde a forma
 // foi copiada; a regra lê a forma.
 
-var nomesTabela = []string{"fin_contab", "lanc_diario", "plano_contas", "vl_lancto", "cd_conta"}
+var tableNames = []string{"fin_contab", "lanc_diario", "plano_contas", "vl_lancto", "cd_conta"}
 
-var desenhosTabela = []struct{ nome, texto string }{
+var tableLayouts = []struct{ name, text string }{
 	{"pandas print(df)", `  table_schema    table_name column_name
 0   fin_contab   lanc_diario   vl_lancto
 1   fin_contab  plano_contas    cd_conta
@@ -96,22 +96,22 @@ CD_CONTA  | VARCHAR(20)   | COLUMN | Y
 `},
 }
 
-func TestTabelaDesenhos(t *testing.T) {
-	for _, d := range desenhosTabela {
-		for _, tr := range transportes {
-			m := novoTeste(t)
-			txt := tr.f(d.texto)
-			ok, tot := conferirMascarado(t, m, d.nome+"/"+tr.nome, txt, append(nomesTabela, "VL_LANCTO", "CD_CONTA"))
+func TestTableLayouts(t *testing.T) {
+	for _, d := range tableLayouts {
+		for _, tr := range transports {
+			m := newTest(t)
+			txt := tr.f(d.text)
+			ok, tot := checkMasked(t, m, d.name+"/"+tr.name, txt, append(tableNames, "VL_LANCTO", "CD_CONTA"))
 			if ok != tot {
-				out, _ := m.Mascarar(txt)
-				t.Errorf("%s / %s: %d/%d\n%s", d.nome, tr.nome, ok, tot, out)
+				out, _ := m.Mask(txt)
+				t.Errorf("%s / %s: %d/%d\n%s", d.name, tr.name, ok, tot, out)
 			}
 		}
 	}
 }
 
-func TestTabelaListagens(t *testing.T) {
-	casos := []struct{ nome, texto string }{
+func TestTableListings(t *testing.T) {
+	cases := []struct{ name, text string }{
 		{"kubectl get -A", `NAMESPACE        NAME                                READY   STATUS    RESTARTS   AGE
 ns-financeiro    svc-cobranca-lote-7d9f8c6b5-x2x9k   1/1     Running   0          2d
 ns-financeiro    svc-conciliacao-6c8d7b9f4-k8j2m     1/1     Running   3          5d
@@ -132,19 +132,19 @@ ns-financeiro    svc-conciliacao-6c8d7b9f4-k8j2m     1/1     Running   3        
 		{"aws text", "BUCKETS\t2024-01-01T00:00:00.000Z\tbkt-relat-fin\nBUCKETS\t2024-02-01T00:00:00.000Z\tbkt-notas-fisc\n"},
 	}
 	// a coluna NAME sem tipo no cabeçalho fica para o tipo dado pelo comando (chamada_comando.go)
-	nomes := []string{"ns-financeiro", "bkt-relat-fin", "bkt-notas-fisc"}
-	for _, c := range casos {
-		m := novoTeste(t)
-		ok, tot := conferirMascarado(t, m, c.nome, c.texto, nomes)
+	names := []string{"ns-financeiro", "bkt-relat-fin", "bkt-notas-fisc"}
+	for _, c := range cases {
+		m := newTest(t)
+		ok, tot := checkMasked(t, m, c.name, c.text, names)
 		if ok != tot {
-			out, _ := m.Mascarar(c.texto)
-			t.Errorf("%s: %d/%d\n%s", c.nome, ok, tot, out)
+			out, _ := m.Mask(c.text)
+			t.Errorf("%s: %d/%d\n%s", c.name, ok, tot, out)
 		}
 	}
 }
 
 // negativos: nada mascarado
-var negativosTabela = []struct{ nome, texto string }{
+var tableNegatives = []struct{ name, text string }{
 	{"ls -l", `total 16
 drwxr-xr-x 2 root root 4096 Oct  5 10:11 bin
 -rw-r--r-- 1 root root  220 Oct  5 10:11 notas_reuniao.txt
@@ -183,28 +183,28 @@ quando o cache_local ainda estava ligado
 `},
 }
 
-func TestTabelaNegativos(t *testing.T) {
-	for _, c := range negativosTabela {
-		for _, tr := range transportes {
-			m := novoTeste(t)
-			m.cfg.DominiosInternos = nil
-			m.cfg.Termos = nil
-			txt := tr.f(c.texto)
-			if out, _ := m.Mascarar(txt); out != txt {
-				t.Errorf("%s / %s: mascarou\n%s", c.nome, tr.nome, out)
+func TestTableNegatives(t *testing.T) {
+	for _, c := range tableNegatives {
+		for _, tr := range transports {
+			m := newTest(t)
+			m.cfg.InternalDomains = nil
+			m.cfg.Terms = nil
+			txt := tr.f(c.text)
+			if out, _ := m.Mask(txt); out != txt {
+				t.Errorf("%s / %s: mascarou\n%s", c.name, tr.name, out)
 			}
 		}
 	}
 }
 
-func TestEhTipoDado(t *testing.T) {
+func TestIsDataType(t *testing.T) {
 	for _, v := range []string{"varchar(20)", "NUMBER(12,2)", "datetime64[ns]", "<chr>", "Int64", "string", "i64", "StringType()", "decimal(10,2)"} {
-		if !ehTipoDado(v) {
+		if !isDataType(v) {
 			t.Errorf("%q deveria ser tipo de dado", v)
 		}
 	}
 	for _, v := range []string{"lanc_diario", "fin_contab", "Running", "ClusterIP"} {
-		if ehTipoDado(v) {
+		if isDataType(v) {
 			t.Errorf("%q não é tipo de dado", v)
 		}
 	}

@@ -18,69 +18,69 @@ import (
 
 // Ida: mascara o corpo da requisição (formato da API da Anthropic).
 
-// mascararCorpo mascara o JSON da requisição. Corpo que não é JSON não sai (falha fechada).
+// maskBody mascara o JSON da requisição. Corpo que não é JSON não sai (falha fechada).
 // Devolve também o lote dos textos, para congelar depois que a requisição sair.
 //
 // formato: "anthropic" (/v1/messages); "gemini", "codeassist", "openai" ou "responses" (vista na
 // forma da Anthropic por uma ponte: ver gemini.go, openai.go e responses.go); ou outro (modo
 // genérico: todo texto é mascarado).
-func (p *Proxy) mascararCorpo(formato, tipo string, corpo []byte) ([]byte, []mask.Entrada, *mask.Lote, error) {
-	dec := json.NewDecoder(bytes.NewReader(corpo))
+func (p *Proxy) maskBody(format, typ string, body []byte) ([]byte, []mask.Entry, *mask.Batch, error) {
+	dec := json.NewDecoder(bytes.NewReader(body))
 	dec.UseNumber()
 	var original any
 	if err := dec.Decode(&original); err != nil {
-		return nil, nil, nil, fmt.Errorf("corpo não é JSON (%s)", tipo)
+		return nil, nil, nil, fmt.Errorf("corpo não é JSON (%s)", typ)
 	}
-	anthropic := formato == "anthropic"
-	v, voltar := original, func() {}
+	anthropic := format == "anthropic"
+	v, goBack := original, func() {}
 	// outro formato com leitor próprio: a requisição é vista na forma da Anthropic (ponte)
-	ponte := map[string]func(any) (map[string]any, func(), bool){"gemini": ponteGemini, "openai": ponteOpenAI,
-		"codeassist": ponteCodeAssist, "responses": ponteResponses}[formato]
-	comPonte := false
-	if ponte != nil {
-		if a, f, ok := ponte(original); ok {
-			v, voltar, anthropic, comPonte = a, f, true, true
+	bridge := map[string]func(any) (map[string]any, func(), bool){"gemini": geminiBridge, "openai": openAIBridge,
+		"codeassist": codeAssistBridge, "responses": responsesBridge}[format]
+	withBridge := false
+	if bridge != nil {
+		if a, f, ok := bridge(original); ok {
+			v, goBack, anthropic, withBridge = a, f, true, true
 		}
 	}
-	lote := p.m.NovoLote()
+	batch := p.m.NewBatch()
 	// 1ª passada: só junta os textos (os mesmos que a montagem vai mascarar) e os mascara
 	// antes, em paralelo quando são muitos. Assim, todo valor aprendido nesta requisição já
 	// vale quando ela é montada, e a requisição seguinte não muda nada do que esta enviou.
-	col := &coleta{}
-	wc := walker{cfg: p.cfg, m: p.m, col: col, lote: lote, pos: &posicao{}, ponte: comPonte}
+	col := &collection{}
+	wc := walker{cfg: p.cfg, m: p.m, col: col, batch: batch, pos: &position{}, bridge: withBridge}
 	if anthropic {
-		wc.requisicaoAnthropic(v)
+		wc.anthropicRequest(v)
 	} else {
-		wc.pos.bloco = depois(mask.Posicao{}, v)
-		wc.generico(v)
+		wc.pos.block = after(mask.Position{}, v)
+		wc.generic(v)
 	}
-	lote.Aquecer(col.itens)
+	batch.Warm(col.items)
 	if anthropic {
 		// anterioridade (anterioridade.go), com o que cada saída de ferramenta decidiu (já no memo)
-		lote.UsarPublicos(publicosDoModelo(v, p.m, lote.DecididosPorTexto(col.itens)))
+		batch.UsePublic(modelPublics(v, p.m, batch.DecidedByText(col.items)))
 	}
 	// memória da conversa: os nomes decididos em todos os textos valem para os textos ainda
 	// não enviados (ver mask/memoria_conversa.go)
-	lote.Memoria(col.itens, col.extras)
+	batch.Memory(col.items, col.extras)
 
 	// 2ª passada: monta, em ordem
-	var ents []mask.Entrada
-	var errMidia error
+	var ents []mask.Entry
+	var errMedia error
 	// as posições já foram calculadas na 1ª passada (os blocos ainda estavam intactos)
-	w := walker{cfg: p.cfg, m: p.m, lote: lote, md: p.midia, ents: &ents, err: &errMidia, pos: &posicao{seq: wc.pos.seq}, ponte: comPonte}
+	w := walker{cfg: p.cfg, m: p.m, batch: batch, md: p.media, ents: &ents, err: &errMedia, pos: &position{seq: wc.pos.seq}, bridge: withBridge}
 	if anthropic {
-		v = w.requisicaoAnthropic(v)
+		v = w.anthropicRequest(v)
 	} else {
 		// fora de /v1/messages não há conversa: congela só o reenvio do corpo inteiro igual
-		w.pos.bloco = depois(mask.Posicao{}, v)
-		v = w.generico(v)
+		w.pos.block = after(mask.Position{}, v)
+		v = w.generic(v)
 	}
-	if errMidia != nil {
+	if errMedia != nil {
 		// imagem/PDF que não deu para verificar nunca sai, mesmo com falhar_fechado=false
-		return nil, nil, nil, erroObrigatorio{errMidia}
+		return nil, nil, nil, requiredError{errMedia}
 	}
-	if comPonte {
-		voltar() // o que foi mascarado na forma da Anthropic volta para a requisição original
+	if withBridge {
+		goBack() // o que foi mascarado na forma da Anthropic volta para a requisição original
 	} else {
 		original = v
 	}
@@ -90,49 +90,49 @@ func (p *Proxy) mascararCorpo(formato, tipo string, corpo []byte) ([]byte, []mas
 	if err := enc.Encode(original); err != nil {
 		return nil, nil, nil, err
 	}
-	return bytes.TrimRight(buf.Bytes(), "\n"), ents, lote, nil
+	return bytes.TrimRight(buf.Bytes(), "\n"), ents, batch, nil
 }
 
 // coleta: os textos que a montagem vai mascarar, com a posição e a origem de cada um, e as
 // decisões dos trechos traduzidos dos textos do assistente que voltam como a API os mandou.
-type coleta struct {
-	itens  []mask.ItemLote
-	extras []mask.Decisao
+type collection struct {
+	items  []mask.BatchItem
+	extras []mask.Decision
 }
 
 // posicao: onde o walker está na conversa. Cada bloco (ferramenta, bloco do system, bloco
 // de mensagem) encadeia o hash do anterior, na ordem em que a API monta o cache: tools,
 // system, messages. Os textos de um bloco têm a posição de tudo o que vem antes dele. Assim
-// o congelamento (ver mask.Lote) vale só para o reenvio exato daquele ponto da conversa.
+// o congelamento (ver mask.Batch) vale só para o reenvio exato daquele ponto da conversa.
 //
 // A posição de um texto é o hash do seu bloco (que cobre tudo o que vem antes e o bloco
 // inteiro) mais a ordem do texto dentro do bloco, num percurso em ordem fixa. Assim o texto
 // de um bloco que já saiu é reconhecido sem calcular o hash dele de novo.
-type posicao struct {
-	atual mask.Posicao
+type position struct {
+	current mask.Position
 	// seq: a posição depois de cada bloco, na ordem; a 1ª passada calcula, a 2ª reaproveita
-	seq []mask.Posicao
+	seq []mask.Position
 	i   int
 	// bloco e n: o bloco atual e quantos textos dele já foram vistos
-	bloco mask.Posicao
+	block mask.Position
 	n     uint64
 }
 
-// doTexto: a posição do próximo texto do bloco atual.
-func (p *posicao) doTexto() mask.Posicao {
+// ofText: a posição do próximo texto do bloco atual.
+func (p *position) ofText() mask.Position {
 	var b [40]byte
-	copy(b[:], p.bloco[:])
+	copy(b[:], p.block[:])
 	binary.LittleEndian.PutUint64(b[32:], p.n)
 	p.n++
 	return sha256.Sum256(b[:])
 }
 
 // depois: a posição seguinte a um bloco (calculada antes de o bloco ser mascarado).
-func depois(ant mask.Posicao, v any) mask.Posicao {
+func after(prev mask.Position, v any) mask.Position {
 	h := sha256.New()
-	h.Write(ant[:])
+	h.Write(prev[:])
 	hashJSON(h, v)
-	var out mask.Posicao
+	var out mask.Position
 	copy(out[:], h.Sum(nil))
 	return out
 }
@@ -141,7 +141,7 @@ func depois(ant mask.Posicao, v any) mask.Posicao {
 // marcador de cache muda de lugar a cada mensagem e não faz parte do conteúdo).
 func hashJSON(h hash.Hash, v any) {
 	var n [8]byte
-	escrever := func(tag byte, s string) {
+	writeIt := func(tag byte, s string) {
 		binary.LittleEndian.PutUint64(n[:], uint64(len(s)))
 		h.Write([]byte{tag})
 		h.Write(n[:])
@@ -149,11 +149,11 @@ func hashJSON(h hash.Hash, v any) {
 	}
 	switch x := v.(type) {
 	case string:
-		escrever('s', x)
+		writeIt('s', x)
 	case json.Number:
-		escrever('n', string(x))
+		writeIt('n', string(x))
 	case bool:
-		escrever('b', fmt.Sprint(x))
+		writeIt('b', fmt.Sprint(x))
 	case nil:
 		h.Write([]byte{'z'})
 	case []any:
@@ -172,41 +172,41 @@ func hashJSON(h hash.Hash, v any) {
 		sort.Strings(ks)
 		h.Write([]byte{'{'})
 		for _, k := range ks {
-			escrever('k', k)
+			writeIt('k', k)
 			hashJSON(h, x[k])
 		}
 		h.Write([]byte{'}'})
 	default:
-		escrever('?', fmt.Sprint(x))
+		writeIt('?', fmt.Sprint(x))
 	}
 }
 
 // unidade: processa v como um bloco da conversa, com a posição encadeada. Só os blocos de
 // primeiro nível encadeiam: o conteúdo de um tool_result é parte do bloco dele.
-func (w walker) unidade(v any, f func(w walker)) {
-	if w.dentro {
+func (w walker) unit(v any, f func(w walker)) {
+	if w.inside {
 		f(w)
 		return
 	}
-	var prox mask.Posicao
+	var next mask.Position
 	if w.col != nil || w.pos.i >= len(w.pos.seq) {
-		prox = depois(w.pos.atual, v)
+		next = after(w.pos.current, v)
 		if w.col != nil {
-			w.pos.seq = append(w.pos.seq, prox)
+			w.pos.seq = append(w.pos.seq, next)
 		}
 	} else {
-		prox = w.pos.seq[w.pos.i]
+		next = w.pos.seq[w.pos.i]
 	}
 	w.pos.i++
-	w.pos.bloco, w.pos.n = prox, 0
-	w.dentro = true
+	w.pos.block, w.pos.n = next, 0
+	w.inside = true
 	f(w)
-	w.pos.atual = prox
+	w.pos.current = next
 }
 
 // chaves: as chaves de um objeto JSON em ordem (a de um mapa em Go é aleatória, e a ordem
 // dos textos de um bloco faz parte da posição de cada um).
-func chaves(x map[string]any) []string {
+func keys(x map[string]any) []string {
 	ks := make([]string, 0, len(x))
 	for k := range x {
 		ks = append(ks, k)
@@ -220,55 +220,55 @@ func chaves(x map[string]any) []string {
 type walker struct {
 	cfg config.Config
 	// ponte: a requisição veio de outro formato (Gemini, OpenAI) e é vista na forma da Anthropic.
-	// Só liga o que é desses formatos (chavesIntocaveisPonte, ferramentasWebPonte).
-	ponte bool
-	m     *mask.Masker // só para as palavras traduzidas de um tool_use (dicasDosComandos)
-	lote  *mask.Lote
-	md    *Midia
-	ents  *[]mask.Entrada
-	err   *error // primeiro erro ao tratar mídia (a requisição inteira é recusada)
+	// Só liga o que é desses formatos (bridgeUntouchableKeys, bridgeWebTools).
+	bridge bool
+	m      *mask.Masker // só para as palavras traduzidas de um tool_use (commandHints)
+	batch  *mask.Batch
+	md     *Media
+	ents   *[]mask.Entry
+	err    *error // primeiro erro ao tratar mídia (a requisição inteira é recusada)
 	// col != nil: só junta os textos, sem mudar nada (1ª passada)
-	col *coleta
-	// idsWeb: tool_use_id das chamadas de WebFetch/WebSearch desta conversa
-	idsWeb map[string]bool
-	// daWeb: o texto atual veio da internet (mascara, mas não aprende)
-	daWeb bool
-	// dicas: tool_use_id -> o que o comando da chamada diz do resultado (mask.Comandos.Dica)
-	dicas map[string]string
-	// dicasUso: tool_use id -> o que se sabe da entrada da chamada (eco, palavras traduzidas)
-	dicasUso map[string]string
+	col *collection
+	// webIDSet: tool_use_id das chamadas de WebFetch/WebSearch desta conversa
+	webIDSet map[string]bool
+	// fromWeb: o texto atual veio da internet (mascara, mas não aprende)
+	fromWeb bool
+	// dicas: tool_use_id -> o que o comando da chamada diz do resultado (mask.Commands.Hint)
+	hints map[string]string
+	// usageHints: tool_use id -> o que se sabe da entrada da chamada (eco, palavras traduzidas)
+	usageHints map[string]string
 	// dica: a do resultado atual
-	dica string
-	pos  *posicao
+	hint string
+	pos  *position
 	// dentro: já dentro de um bloco (não encadeia de novo)
-	dentro bool
+	inside bool
 	// assist: mensagem do assistente (texto e entrada de ferramenta escritos pelo modelo)
 	assist bool
 	// mensagem: dentro do conteúdo de uma mensagem (fora de um resultado de ferramenta)
-	mensagem bool
+	message bool
 	// prosa: texto da mensagem, do usuário ou do assistente (não entrada nem saída de ferramenta),
 	// e texto do cliente
-	prosa bool
+	prose bool
 	// cliente: system ou definição de ferramenta, o texto que o Claude Code escreve (instruções,
 	// descrições, schema). É mascarado como os outros, mas a palavra comum que a conversa
 	// aprendeu como nome fica como palavra (como na prosa): "billing" é tabela no dado e palavra
 	// na instrução.
-	cliente bool
-	// fixo: bloco de texto do system, onde o texto fixo do cliente (textoFixoDoCliente) passa
+	client bool
+	// fixo: bloco de texto do system, onde o texto fixo do cliente (clientFixedText) passa
 	// intacto
-	fixo bool
+	fixed bool
 }
 
 // midia trata um bloco de imagem/PDF; devolve os blocos que o substituem.
-func (w walker) midia(b map[string]any) []any {
+func (w walker) media(b map[string]any) []any {
 	if w.col != nil {
 		return []any{b}
 	}
 	if w.md == nil {
-		*w.err = errSemMidia
+		*w.err = errNoMedia
 		return nil
 	}
-	blocos, ents, err := w.md.Processar(b)
+	blocks, ents, err := w.md.Process(b)
 	if err != nil {
 		if *w.err == nil {
 			*w.err = err
@@ -276,71 +276,71 @@ func (w walker) midia(b map[string]any) []any {
 		return nil
 	}
 	*w.ents = append(*w.ents, ents...)
-	return blocos
+	return blocks
 }
 
-var errSemMidia = errorString("tratamento de imagens/PDF não configurado")
+var errNoMedia = errorString("tratamento de imagens/PDF não configurado")
 
 type errorString string
 
 func (e errorString) Error() string { return string(e) }
 
-func ehBase64(b map[string]any) bool {
+func isBase64(b map[string]any) bool {
 	src, _ := b["source"].(map[string]any)
 	return src != nil && src["type"] == "base64"
 }
 
 func (w walker) s(v string) string {
-	if w.assist && !w.daWeb {
-		return w.escrito(v)
+	if w.assist && !w.fromWeb {
+		return w.written(v)
 	}
-	if w.fixo && textoFixoDoCliente(v) {
-		w.pos.doTexto() // não é dado nem fonte de decisão
+	if w.fixed && clientFixedText(v) {
+		w.pos.ofText() // não é dado nem fonte de decisão
 		return v
 	}
-	if f, _ := mask.SepararFonte(w.dica); w.col != nil && f == mask.FonteSistema {
-		w.pos.doTexto() // catálogo de sistema: não é fonte de decisão (mask/memoria_rastreamento.go)
+	if f, _ := mask.SplitSource(w.hint); w.col != nil && f == mask.SystemSource {
+		w.pos.ofText() // catálogo de sistema: não é fonte de decisão (mask/memoria_rastreamento.go)
 		return v
 	}
 	if w.col != nil {
-		w.col.itens = append(w.col.itens, mask.ItemLote{S: v, DaWeb: w.daWeb, Pos: w.pos.doTexto(), Dica: w.dica})
+		w.col.items = append(w.col.items, mask.BatchItem{S: v, FromWeb: w.fromWeb, Pos: w.pos.ofText(), Hint: w.hint})
 		return v
 	}
-	mascarar := w.lote.MascararDica
-	if w.prosa {
-		mascarar = w.lote.MascararDicaProsa
+	maskIt := w.batch.MaskHint
+	if w.prose {
+		maskIt = w.batch.MaskHintProse
 	}
-	out, e := mascarar(v, w.daWeb, w.pos.doTexto(), w.dica)
+	out, e := maskIt(v, w.fromWeb, w.pos.ofText(), w.hint)
 	*w.ents = append(*w.ents, e...)
 	return out
 }
 
 // escrito: texto do assistente. Se o proxy o desmascarou (quem escreveu), volta como a API o
 // mandou; as palavras traduzidas entram na memória da conversa.
-func (w walker) escrito(v string) string {
+func (w walker) written(v string) string {
 	if w.col != nil {
-		if d, ok := w.lote.Escrito(v); ok {
-			w.pos.doTexto()
+		if d, ok := w.batch.Written(v); ok {
+			w.pos.ofText()
 			w.col.extras = append(w.col.extras, d...)
 			return v
 		}
-		if !w.daWeb {
-			w.pos.doTexto() // o texto do assistente não é fonte de decisão (mask/memoria_rastreamento.go)
+		if !w.fromWeb {
+			w.pos.ofText() // o texto do assistente não é fonte de decisão (mask/memoria_rastreamento.go)
 			return v
 		}
-		w.col.itens = append(w.col.itens, mask.ItemLote{S: v, DaWeb: w.daWeb, Pos: w.pos.doTexto(), Dica: w.dica})
+		w.col.items = append(w.col.items, mask.BatchItem{S: v, FromWeb: w.fromWeb, Pos: w.pos.ofText(), Hint: w.hint})
 		return v
 	}
-	mascarar := w.lote.MascararEscrito
-	if w.prosa {
-		mascarar = w.lote.MascararProsa
+	maskIt := w.batch.MaskWritten
+	if w.prose {
+		maskIt = w.batch.MaskProse
 	}
-	out, e := mascarar(v, w.daWeb, w.pos.doTexto(), w.dica)
+	out, e := maskIt(v, w.fromWeb, w.pos.ofText(), w.hint)
 	*w.ents = append(*w.ents, e...)
 	return out
 }
 
-// Texto fixo do cliente: os dois blocos do system com que o Claude Code se identifica à API. A
+// Text fixo do cliente: os dois blocos do system com que o Claude Code se identifica à API. A
 // API só aceita a requisição como do Claude Code com eles intactos; com uma palavra trocada, ela
 // responde 429 a toda mensagem da conversa. Não levam dado do usuário, e só passam com prova:
 //
@@ -350,55 +350,55 @@ func (w walker) escrito(v string) string {
 //
 // O mesmo texto com qualquer coisa a mais é um texto como os outros.
 var (
-	reCabecalhoCliente = regexp.MustCompile(`^x-anthropic-billing-header:( ?[a-z][a-z0-9_]{1,23}=[A-Za-z0-9._-]{1,64};)+ ?$`)
-	frasesDoCliente    = map[string]bool{
+	reClientHeader  = regexp.MustCompile(`^x-anthropic-billing-header:( ?[a-z][a-z0-9_]{1,23}=[A-Za-z0-9._-]{1,64};)+ ?$`)
+	clientSentences = map[string]bool{
 		"You are Claude Code, Anthropic's official CLI for Claude.":                                      true,
 		"You are Claude Code, Anthropic's official CLI for Claude, running within the Claude Agent SDK.": true,
 		"You are a Claude agent, built on Anthropic's Claude Agent SDK.":                                 true,
 	}
 )
 
-func textoFixoDoCliente(v string) bool {
-	return frasesDoCliente[v] || len(v) <= 400 && reCabecalhoCliente.MatchString(v)
+func clientFixedText(v string) bool {
+	return clientSentences[v] || len(v) <= 400 && reClientHeader.MatchString(v)
 }
 
 // web: as ferramentas da lista ferramentas_sem_desmascarar (WebFetch, WebSearch) trazem
 // conteúdo da internet. Um exemplo de documentação (a senha de exemplo numa URL) não é
 // segredo do usuário: é mascarado onde aparece, mas não é lembrado. Os conectores do
 // claude.ai (mcp__claude_ai_*) ficam de fora: trazem dado do próprio usuário.
-func (w walker) web(nome string) bool {
-	if w.ponte && ferramentasWebPonte[nome] {
+func (w walker) web(name string) bool {
+	if w.bridge && bridgeWebTools[name] {
 		return true
 	}
-	for _, f := range w.cfg.FerramentasSemDesmascarar {
-		if f == nome {
+	for _, f := range w.cfg.ToolsWithoutUnmask {
+		if f == name {
 			return true
 		}
 	}
 	return false
 }
 
-// idsDaWeb junta os ids das chamadas de ferramentas da web feitas na conversa e das leituras de
+// webIDs junta os ids das chamadas de ferramentas da web feitas na conversa e das leituras de
 // arquivo de dependência pública: o resultado delas é mascarado, mas não ensina.
-func (w walker) idsDaWeb(msgs []any) map[string]bool {
+func (w walker) webIDs(msgs []any) map[string]bool {
 	ids := map[string]bool{}
 	for _, mm := range msgs {
 		msg, _ := mm.(map[string]any)
-		blocos, _ := msg["content"].([]any)
-		for _, b := range blocos {
+		blocks, _ := msg["content"].([]any)
+		for _, b := range blocks {
 			bl, _ := b.(map[string]any)
 			if bl == nil || bl["type"] != "tool_use" {
 				continue
 			}
 			id, _ := bl["id"].(string)
-			if nome, _ := bl["name"].(string); w.web(nome) && id != "" {
+			if name, _ := bl["name"].(string); w.web(name) && id != "" {
 				ids[id] = true
 			}
 			// arquivo lido de uma dependência pública (site-packages/pandas/..., node_modules/
 			// express/...): código do fornecedor, mascarado mas sem ensinar a memória (como a web)
 			if in, _ := bl["input"].(map[string]any); in != nil && id != "" && w.m != nil {
 				for _, k := range []string{"file_path", "path", "notebook_path"} {
-					if p, _ := in[k].(string); p != "" && w.m.CaminhoTerceiro(p) {
+					if p, _ := in[k].(string); p != "" && w.m.ThirdPartyPath(p) {
 						ids[id] = true
 					}
 				}
@@ -408,48 +408,48 @@ func (w walker) idsDaWeb(msgs []any) map[string]bool {
 	return ids
 }
 
-// dicasDosComandos: para cada resultado de ferramenta, o que o comando da chamada (o tool_use
+// commandHints: para cada resultado de ferramenta, o que o comando da chamada (o tool_use
 // do mesmo id) diz dele: as colunas de um SELECT, o tipo pedido numa listagem, a coluna de um
 // arquivo cujo cabeçalho já passou, as palavras do programa (ver mask/chamada_comando.go e
 // mask/chamada.go). E, para cada tool_use, o que se sabe da entrada (eco de uma saída anterior,
 // palavras que o proxy traduziu de um pseudônimo). Calculado em ordem, antes de mascarar (a
 // entrada do tool_use ainda é a original), e igual nas duas passadas.
-func dicasDosComandos(msgs []any, m *mask.Masker) (dicas, dicasUso map[string]string) {
-	cs := mask.NovosComandos()
+func commandHints(msgs []any, m *mask.Masker) (hints, usageHints map[string]string) {
+	cs := mask.NewCommands()
 	cmds := map[string]string{}
-	chs := map[string]*mask.Chamada{}
-	dicas, dicasUso = map[string]string{}, map[string]string{}
-	blocosDe := func(mm any) (string, []any) {
+	chs := map[string]*mask.Call{}
+	hints, usageHints = map[string]string{}, map[string]string{}
+	blocksOf := func(mm any) (string, []any) {
 		msg, _ := mm.(map[string]any)
-		papel, _ := msg["role"].(string)
+		hostRole, _ := msg["role"].(string)
 		if t, ok := msg["content"].(string); ok {
-			return papel, []any{map[string]any{"type": "text", "text": t}}
+			return hostRole, []any{map[string]any{"type": "text", "text": t}}
 		}
-		blocos, _ := msg["content"].([]any)
-		return papel, blocos
+		blocks, _ := msg["content"].([]any)
+		return hostRole, blocks
 	}
 	// os argumentos de todas as chamadas (o eco procura só por eles nas saídas)
-	escritos := map[string]string{} // arquivo que a conversa escreveu -> as fontes que ele cita
+	writtenSet := map[string]string{} // arquivo que a conversa escreveu -> as fontes que ele cita
 	for _, mm := range msgs {
-		_, blocos := blocosDe(mm)
-		for _, b := range blocos {
+		_, blocks := blocksOf(mm)
+		for _, b := range blocks {
 			if bl, _ := b.(map[string]any); bl != nil && bl["type"] == "tool_use" {
 				if id, _ := bl["id"].(string); id != "" {
-					cmds[id] = comandoDe(bl["input"])
-					cs.Argumentos(cmds[id])
+					cmds[id] = commandOf(bl["input"])
+					cs.ArgumentText(cmds[id])
 					if in, _ := bl["input"].(map[string]any); in != nil && m != nil {
 						if c, ok := in["command"].(string); ok {
-							m.RegistrarComando(c) // o programa rodado prova software (mask/memoria_software.go)
+							m.RecordCommand(c) // o programa rodado prova software (mask/memoria_software.go)
 						}
 					}
 				}
-				anotarEscrito(escritos, bl["input"])
+				noteWritten(writtenSet, bl["input"])
 			}
 		}
 	}
 	for _, mm := range msgs {
-		papel, blocos := blocosDe(mm)
-		for _, b := range blocos {
+		hostRole, blocks := blocksOf(mm)
+		for _, b := range blocks {
 			bl, _ := b.(map[string]any)
 			if bl == nil {
 				continue
@@ -457,48 +457,48 @@ func dicasDosComandos(msgs []any, m *mask.Masker) (dicas, dicasUso map[string]st
 			id, _ := bl["id"].(string)
 			switch bl["type"] {
 			case "text":
-				if papel == "user" {
+				if hostRole == "user" {
 					if t, ok := bl["text"].(string); ok {
-						cs.Usuario(semLembretes(t))
+						cs.User(noReminders(t))
 					}
 				}
 			case "tool_use":
 				if id != "" {
-					ch := cs.Uso(cmds[id], traduzidasEm(m, bl["input"]))
+					ch := cs.Usage(cmds[id], translatedIn(m, bl["input"]))
 					chs[id] = ch
-					if e := ch.ExtUso(); e != "" {
-						dicasUso[id] = mask.ComExtensao("", e)
+					if e := ch.UsageExt(); e != "" {
+						usageHints[id] = mask.WithExtension("", e)
 					}
 				}
 			case "tool_result":
 				rid, _ := bl["tool_use_id"].(string)
-				saida := textoDe(bl["content"])
+				output := textOf(bl["content"])
 				d := ""
 				if cmd := cmds[rid]; cmd != "" {
-					d = cs.Dica(cmd, saida)
+					d = cs.Hint(cmd, output)
 				}
-				d = mask.ComExtensao(d, cs.Resultado(chs[rid], saida))
+				d = mask.WithExtension(d, cs.Result(chs[rid], output))
 				if cmd := cmds[rid]; cmd != "" {
-					d = mask.ComFonte(fonteCom(escritos, cmd), d) // a fonte do resultado
-					if mask.AlvoDeSistema(cmd) {
-						d = mask.ComFonte(mask.FonteSistema, "")
+					d = mask.WithSource(sourceWith(writtenSet, cmd), d) // a fonte do resultado
+					if mask.SystemTarget(cmd) {
+						d = mask.WithSource(mask.SystemSource, "")
 					}
 				}
 				if d != "" {
-					dicas[rid] = d
+					hints[rid] = d
 				}
 			}
 		}
-		if papel == "assistant" {
-			cs.FimTurno()
+		if hostRole == "assistant" {
+			cs.EndTurn()
 		}
 	}
-	return dicas, dicasUso
+	return hints, usageHints
 }
 
-// semLembretes: o texto do usuário sem os blocos <system-reminder> que o Claude Code acrescenta
+// noReminders: o texto do usuário sem os blocos <system-reminder> que o Claude Code acrescenta
 // (não são o pedido do usuário).
-func semLembretes(t string) string {
+func noReminders(t string) string {
 	const ab, fe = "<system-reminder>", "</system-reminder>"
 	if !strings.Contains(t, ab) {
 		return t
@@ -519,24 +519,24 @@ func semLembretes(t string) string {
 	}
 }
 
-// traduzidasEm: as palavras que o proxy traduziu de um pseudônimo nas strings da entrada de um
-// tool_use (ver mask.Masker.RegistrarResposta).
-func traduzidasEm(m *mask.Masker, v any) []mask.PalavraTraduzida {
+// translatedIn: as palavras que o proxy traduziu de um pseudônimo nas strings da entrada de um
+// tool_use (ver mask.Masker.RecordResponse).
+func translatedIn(m *mask.Masker, v any) []mask.TranslatedWord {
 	if m == nil {
 		return nil
 	}
-	var out []mask.PalavraTraduzida
+	var out []mask.TranslatedWord
 	var f func(v any)
 	f = func(v any) {
 		switch x := v.(type) {
 		case string:
-			out = append(out, m.PalavrasTraduzidas(x)...)
+			out = append(out, m.TranslatedWords(x)...)
 		case []any:
 			for _, e := range x {
 				f(e)
 			}
 		case map[string]any:
-			for _, k := range chaves(x) {
+			for _, k := range keys(x) {
 				f(x[k])
 			}
 		}
@@ -545,15 +545,15 @@ func traduzidasEm(m *mask.Masker, v any) []mask.PalavraTraduzida {
 	return out
 }
 
-// comandoDe: o texto da entrada de uma ferramenta que diz o que ela faz (o comando do shell,
+// commandOf: o texto da entrada de uma ferramenta que diz o que ela faz (o comando do shell,
 // a consulta, o caminho). A descrição livre fica de fora.
-func comandoDe(v any) string {
+func commandOf(v any) string {
 	in, _ := v.(map[string]any)
 	if c, ok := in["command"].(string); ok {
 		return c
 	}
 	var b strings.Builder
-	for _, k := range chaves(in) {
+	for _, k := range keys(in) {
 		if s, ok := in[k].(string); ok && k != "description" && len(s) <= 4<<10 {
 			b.WriteString(s)
 			b.WriteByte('\n')
@@ -562,8 +562,8 @@ func comandoDe(v any) string {
 	return b.String()
 }
 
-// textoDe: o texto de um conteúdo de tool_result (string ou blocos de texto).
-func textoDe(v any) string {
+// textOf: o texto de um conteúdo de tool_result (string ou blocos de texto).
+func textOf(v any) string {
 	switch c := v.(type) {
 	case string:
 		return c
@@ -583,32 +583,32 @@ func textoDe(v any) string {
 }
 
 // Chaves que nunca carregam dado do usuário (ou que não podem mudar).
-var chavesIntocaveis = map[string]bool{"type": true, "id": true, "tool_use_id": true, "signature": true,
+var untouchableKeys = map[string]bool{"type": true, "id": true, "tool_use_id": true, "signature": true,
 	"media_type": true, "cache_control": true, "model": true, "role": true, "stop_reason": true,
 	"stop_sequence": true, "citations": false}
 
-// chavesIntocaveisPonte: as de chavesIntocaveis e, só nas requisições vistas por uma ponte
+// bridgeUntouchableKeys: as de untouchableKeys e, só nas requisições vistas por uma ponte
 // (Gemini, OpenAI), as que esses formatos têm a mais: a assinatura do raciocínio, o tipo do
 // arquivo e o formato de um schema. Nunca valem para a API da Anthropic: lá um campo "format"
 // numa entrada de ferramenta continua sendo mascarado.
-var chavesIntocaveisPonte = map[string]bool{"thoughtSignature": true, "thought_signature": true,
+var bridgeUntouchableKeys = map[string]bool{"thoughtSignature": true, "thought_signature": true,
 	"mimeType": true, "mime_type": true, "format": true}
 
-// ferramentasWebPonte: os nomes que o Gemini CLI, o opencode e o Copilot dão às ferramentas de
+// bridgeWebTools: os nomes que o Gemini CLI, o opencode e o Copilot dão às ferramentas de
 // busca e leitura na internet (as do Claude Code estão em ferramentas_sem_desmascarar). Só valem
 // nas requisições vistas por uma ponte.
-var ferramentasWebPonte = map[string]bool{"web_fetch": true, "google_web_search": true, "webfetch": true, "websearch": true}
+var bridgeWebTools = map[string]bool{"web_fetch": true, "google_web_search": true, "webfetch": true, "websearch": true}
 
-func (w walker) intocavel(k string) bool {
-	return chavesIntocaveis[k] || w.ponte && chavesIntocaveisPonte[k]
+func (w walker) untouchable(k string) bool {
+	return untouchableKeys[k] || w.bridge && bridgeUntouchableKeys[k]
 }
 
-// requisicaoAnthropic: /v1/messages e /v1/messages/count_tokens.
+// anthropicRequest: /v1/messages e /v1/messages/count_tokens.
 
-func (w walker) requisicaoAnthropic(v any) any {
+func (w walker) anthropicRequest(v any) any {
 	req, ok := v.(map[string]any)
 	if !ok {
-		return w.generico(v)
+		return w.generic(v)
 	}
 	// ordem fixa (a de um mapa em Go é aleatória): a mesma em que a API monta o cache
 	ks := make([]string, 0, len(req))
@@ -627,20 +627,20 @@ func (w walker) requisicaoAnthropic(v any) any {
 		switch k {
 		case "system":
 			ws := w
-			ws.cliente, ws.fixo = true, true
-			req[k] = ws.conteudo(val)
+			ws.client, ws.fixed = true, true
+			req[k] = ws.content(val)
 		case "messages":
 			if msgs, ok := val.([]any); ok {
-				w.idsWeb = w.idsDaWeb(msgs)
-				w.dicas, w.dicasUso = dicasDosComandos(msgs, w.m)
+				w.webIDSet = w.webIDs(msgs)
+				w.hints, w.usageHints = commandHints(msgs, w.m)
 				for _, mm := range msgs {
 					if msg, ok := mm.(map[string]any); ok {
 						// quem fala também faz parte da posição
-						w.pos.atual = depois(w.pos.atual, msg["role"])
+						w.pos.current = after(w.pos.current, msg["role"])
 						wm := w
 						wm.assist = msg["role"] == "assistant"
-						wm.mensagem = true
-						msg["content"] = wm.conteudo(msg["content"])
+						wm.message = true
+						msg["content"] = wm.content(msg["content"])
 					}
 				}
 			}
@@ -649,11 +649,11 @@ func (w walker) requisicaoAnthropic(v any) any {
 			if ts, ok := val.([]any); ok {
 				for _, t := range ts {
 					if tm, ok := t.(map[string]any); ok {
-						w.unidade(tm, func(w walker) {
-							w.cliente, w.prosa = true, true
-							for _, tk := range chaves(tm) {
+						w.unit(tm, func(w walker) {
+							w.client, w.prose = true, true
+							for _, tk := range keys(tm) {
 								if tk != "name" && tk != "type" {
-									tm[tk] = w.generico(tm[tk])
+									tm[tk] = w.generic(tm[tk])
 								}
 							}
 						})
@@ -666,19 +666,19 @@ func (w walker) requisicaoAnthropic(v any) any {
 			// parâmetros e identificadores: não carregam dado do usuário e não podem mudar
 		default:
 			// campo que não conheço: mascara por precaução (falha para o lado seguro)
-			w.unidade(val, func(w walker) { req[k] = w.generico(val) })
+			w.unit(val, func(w walker) { req[k] = w.generic(val) })
 		}
 	}
 	return req
 }
 
 // conteudo: string ou lista de blocos.
-func (w walker) conteudo(v any) any {
+func (w walker) content(v any) any {
 	switch c := v.(type) {
 	case string:
 		var out string
-		w.unidade(c, func(w walker) {
-			w.prosa = w.mensagem || w.cliente
+		w.unit(c, func(w walker) {
+			w.prose = w.message || w.client
 			out = w.s(c)
 		})
 		return out
@@ -691,12 +691,12 @@ func (w walker) conteudo(v any) any {
 				out = append(out, b)
 				continue
 			}
-			w.unidade(bl, func(w walker) {
-				if (bl["type"] == "image" || bl["type"] == "document") && ehBase64(bl) {
-					out = append(out, w.midia(bl)...)
+			w.unit(bl, func(w walker) {
+				if (bl["type"] == "image" || bl["type"] == "document") && isBase64(bl) {
+					out = append(out, w.media(bl)...)
 					return
 				}
-				out = append(out, w.bloco(bl))
+				out = append(out, w.block(bl))
 			})
 		}
 		return out
@@ -704,7 +704,7 @@ func (w walker) conteudo(v any) any {
 	return v
 }
 
-func (w walker) bloco(b map[string]any) map[string]any {
+func (w walker) block(b map[string]any) map[string]any {
 	switch b["type"] {
 	case "thinking", "redacted_thinking":
 		// assinado pela API: qualquer mudança invalida a conversa. O modelo só viu
@@ -717,27 +717,27 @@ func (w walker) bloco(b map[string]any) map[string]any {
 		return b // gerados do lado da API
 	case "text":
 		if s, ok := b["text"].(string); ok {
-			w.prosa = w.mensagem || w.cliente
+			w.prose = w.message || w.client
 			b["text"] = w.s(s)
 		}
 		return b
 	case "tool_use":
 		// a entrada de WebFetch/WebSearch é escrita pelo modelo a partir do que leu na web
-		if nome, _ := b["name"].(string); w.web(nome) {
-			w.daWeb = true
+		if name, _ := b["name"].(string); w.web(name) {
+			w.fromWeb = true
 		}
 		id, _ := b["id"].(string)
-		w.dica = w.dicasUso[id]
-		b["input"] = w.tudo(b["input"])
+		w.hint = w.usageHints[id]
+		b["input"] = w.all(b["input"])
 		return b
 	case "tool_result":
 		id, _ := b["tool_use_id"].(string)
-		if w.idsWeb[id] {
-			w.daWeb = true
+		if w.webIDSet[id] {
+			w.fromWeb = true
 		}
-		w.dica = w.dicas[id]
-		w.mensagem = false // saída de ferramenta: dado, não prosa
-		b["content"] = w.conteudo(b["content"])
+		w.hint = w.hints[id]
+		w.message = false // saída de ferramenta: dado, não prosa
+		b["content"] = w.content(b["content"])
 		return b
 	case "document":
 		if src, ok := b["source"].(map[string]any); ok {
@@ -747,7 +747,7 @@ func (w walker) bloco(b map[string]any) map[string]any {
 					src["data"] = w.s(s)
 				}
 			case "content":
-				src["content"] = w.conteudo(src["content"])
+				src["content"] = w.content(src["content"])
 			}
 		}
 		for _, k := range []string{"title", "context"} {
@@ -758,77 +758,77 @@ func (w walker) bloco(b map[string]any) map[string]any {
 		return b
 	}
 	// tipo desconhecido: mascara toda string fora das chaves intocáveis
-	return w.generico(b).(map[string]any)
+	return w.generic(b).(map[string]any)
 }
 
 // tudo mascara todas as strings (entrada de ferramenta: comando, caminho, conteúdo...).
-func (w walker) tudo(v any) any {
+func (w walker) all(v any) any {
 	switch x := v.(type) {
 	case string:
 		return w.s(x)
 	case []any:
 		for i := range x {
-			x[i] = w.tudo(x[i])
+			x[i] = w.all(x[i])
 		}
 	case map[string]any:
-		for _, k := range chaves(x) {
-			x[k] = w.tudo(x[k])
+		for _, k := range keys(x) {
+			x[k] = w.all(x[k])
 		}
 	}
 	return v
 }
 
 // generico mascara strings de qualquer JSON, exceto chaves intocáveis e blocos de raciocínio.
-func (w walker) generico(v any) any {
+func (w walker) generic(v any) any {
 	switch x := v.(type) {
 	case string:
 		return w.s(x)
 	case []any:
 		for i := range x {
-			x[i] = w.generico(x[i])
+			x[i] = w.generic(x[i])
 		}
 	case map[string]any:
 		if t, _ := x["type"].(string); t == "thinking" || t == "redacted_thinking" || t == "image" {
 			return x
 		}
-		for _, k := range chaves(x) {
-			if !w.intocavel(k) && k != "data" {
-				x[k] = w.generico(x[k])
+		for _, k := range keys(x) {
+			if !w.untouchable(k) && k != "data" {
+				x[k] = w.generic(x[k])
 			}
 		}
 	}
 	return v
 }
 
-// anotarEscrito: um arquivo que a conversa escreveu (Write, Edit) cita as fontes que lê; rodá-lo
+// noteWritten: um arquivo que a conversa escreveu (Write, Edit) cita as fontes que lê; rodá-lo
 // depois tem essas fontes também ("python3 gerar_tags.py" lê o catalogo.csv que o script cita).
-func anotarEscrito(escritos map[string]string, v any) {
+func noteWritten(writtenSet map[string]string, v any) {
 	in, _ := v.(map[string]any)
 	p, _ := in["file_path"].(string)
 	if p == "" {
 		return
 	}
-	var corpo string
+	var body string
 	for _, k := range []string{"content", "new_string"} {
 		if c, ok := in[k].(string); ok {
-			corpo += c + "\n"
+			body += c + "\n"
 		}
 	}
-	if corpo == "" {
+	if body == "" {
 		return
 	}
-	nome := strings.ToLower(p[strings.LastIndexAny(p, "/\\")+1:])
-	if f := mask.FonteDoComando(corpo); f != "" && !strings.HasPrefix(f, "cmd:") {
-		escritos[nome] = f
+	name := strings.ToLower(p[strings.LastIndexAny(p, "/\\")+1:])
+	if f := mask.CommandSource(body); f != "" && !strings.HasPrefix(f, "cmd:") {
+		writtenSet[name] = f
 	}
 }
 
-// fonteCom: a fonte do comando, com as fontes herdadas dos arquivos que a conversa escreveu.
-func fonteCom(escritos map[string]string, cmd string) string {
-	f := mask.FonteDoComando(cmd)
+// sourceWith: a fonte do comando, com as fontes herdadas dos arquivos que a conversa escreveu.
+func sourceWith(writtenSet map[string]string, cmd string) string {
+	f := mask.CommandSource(cmd)
 	var extra []string
 	for _, x := range strings.Split(f, ",") {
-		if e := escritos[x]; e != "" {
+		if e := writtenSet[x]; e != "" {
 			extra = append(extra, e)
 		}
 	}

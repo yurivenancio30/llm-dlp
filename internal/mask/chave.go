@@ -18,8 +18,8 @@ import (
 
 var b32 = base32.StdEncoding.WithPadding(base32.NoPadding)
 
-// Chave carrega a chave de 256 bits de path, criando uma nova (0600) se não existir.
-func Chave(path string) ([]byte, error) {
+// Key carrega a chave de 256 bits de path, criando uma nova (0600) se não existir.
+func Key(path string) ([]byte, error) {
 	b, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
 		k := make([]byte, 32)
@@ -51,7 +51,7 @@ func Chave(path string) ([]byte, error) {
 		}
 		if err := os.Link(tmp.Name(), path); err != nil {
 			if errors.Is(err, os.ErrExist) {
-				return Chave(path) // outro processo venceu: usa a chave dele
+				return Key(path) // outro processo venceu: usa a chave dele
 			}
 			return nil, err
 		}
@@ -69,25 +69,25 @@ func Chave(path string) ([]byte, error) {
 
 // Pseudo gera identificadores curtos e estáveis a partir da chave.
 type Pseudo struct {
-	chave []byte
-	mu    sync.RWMutex
-	ids   map[string]string // IDs já calculados (só em RAM): as mesmas palavras se repetem muito
+	key []byte
+	mu  sync.RWMutex
+	ids map[string]string // IDs já calculados (só em RAM): as mesmas palavras se repetem muito
 }
 
 const idsMax = 100_000 // passou disso, recomeça (limita a RAM)
 
-func NovoPseudo(chave []byte) *Pseudo { return &Pseudo{chave: chave, ids: map[string]string{}} }
+func NewPseudo(key []byte) *Pseudo { return &Pseudo{key: key, ids: map[string]string{}} }
 
 // ID devolve 8 caracteres base32 (40 bits) de HMAC(chave, tipo || valor normalizado).
-func (p *Pseudo) ID(tipo, valorNorm string) string {
-	k := tipo + "\x00" + valorNorm
+func (p *Pseudo) ID(typ, normValue string) string {
+	k := typ + "\x00" + normValue
 	p.mu.RLock()
 	id, ok := p.ids[k]
 	p.mu.RUnlock()
 	if ok {
 		return id
 	}
-	id = strings.ToLower(p.raw(tipo, valorNorm, 5))
+	id = strings.ToLower(p.raw(typ, normValue, 5))
 	p.mu.Lock()
 	if len(p.ids) >= idsMax || p.ids == nil {
 		p.ids = map[string]string{}
@@ -98,14 +98,14 @@ func (p *Pseudo) ID(tipo, valorNorm string) string {
 }
 
 // Bits devolve n bytes do HMAC, para derivar números (ex.: prefixo de IP falso).
-func (p *Pseudo) Bits(tipo, valorNorm string, n int) []byte {
-	m := hmac.New(sha256.New, p.chave)
-	m.Write([]byte(tipo))
+func (p *Pseudo) Bits(typ, normValue string, n int) []byte {
+	m := hmac.New(sha256.New, p.key)
+	m.Write([]byte(typ))
 	m.Write([]byte{0})
-	m.Write([]byte(valorNorm))
+	m.Write([]byte(normValue))
 	return m.Sum(nil)[:n]
 }
 
-func (p *Pseudo) raw(tipo, valorNorm string, n int) string {
-	return b32.EncodeToString(p.Bits(tipo, valorNorm, n))
+func (p *Pseudo) raw(typ, normValue string, n int) string {
+	return b32.EncodeToString(p.Bits(typ, normValue, n))
 }

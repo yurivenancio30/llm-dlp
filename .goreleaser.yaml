@@ -1,6 +1,6 @@
-# Como os binários de uma versão são montados (GoReleaser). Quem roda é o GitHub, em
-# .github/workflows/release.yml, ao receber a tag vX.Y.Z; "make dist" faz o mesmo na sua máquina,
-# sem publicar. Ver docs/versioning.md (em português: docs/pt-BR/versoes.md).
+# How the binaries of a version are built (GoReleaser). GitHub runs it, in
+# .github/workflows/release.yml, on the tag vX.Y.Z; "make dist" does the same on your machine,
+# without publishing. See docs/versioning.md (in Portuguese: docs/pt-BR/versioning.md).
 version: 2
 
 project_name: llm-dlp
@@ -9,7 +9,7 @@ builds:
   - id: llm-dlp
     main: ./cmd/llm-dlp
     binary: llm-dlp
-    # CGO_ENABLED=0: binário estático, roda em qualquer Linux (glibc ou musl/Alpine)
+    # CGO_ENABLED=0: static binary, runs on any Linux (glibc or musl/Alpine)
     env:
       - CGO_ENABLED=0
     goos:
@@ -19,16 +19,16 @@ builds:
       - arm64
     flags:
       - -trimpath
-    # o commit vai dentro do binário ("llm-dlp version"); a versão é a de internal/versao/versao.go
+    # the commit goes inside the binary ("llm-dlp version"); the version is the one in internal/version/version.go
     ldflags:
-      - -s -w -X github.com/yurivenancio30/llm-dlp/internal/versao.Commit={{ .ShortCommit }}
+      - -s -w -X github.com/yurivenancio30/llm-dlp/internal/version.Commit={{ .ShortCommit }}
     mod_timestamp: "{{ .CommitTimestamp }}"
 
 archives:
   - id: llm-dlp
     formats:
       - tar.gz
-    # llm-dlp_0.2.1_linux_amd64.tar.gz (o install.sh monta este nome)
+    # llm-dlp_0.2.1_linux_amd64.tar.gz (install.sh builds this name)
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
       - LICENSE
@@ -42,10 +42,10 @@ checksum:
 snapshot:
   version_template: "{{ .Version }}-next"
 
-# As notas da release são a seção da versão no CHANGELOG.md, que o workflow passa com
-# --release-notes (scripts/notas-da-versao.sh). O passo "changelog" do GoReleaser é quem lê esse
-# arquivo: com "disable: true" ele é pulado e a release sai com as notas vazias (aconteceu na
-# 0.2.1 e na 0.3.0). Sem --release-notes, ele listaria os commits.
+# The release notes are the version's section of CHANGELOG.md, which the workflow passes with
+# --release-notes (scripts/release-notes.sh). GoReleaser's "changelog" step is what reads that
+# file: with "disable: true" it is skipped and the release goes out with empty notes (it happened
+# in 0.2.1 and 0.3.0). Without --release-notes, it would list the commits.
 changelog:
   use: git
 

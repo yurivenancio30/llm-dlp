@@ -15,56 +15,56 @@ import (
 // Trilha B (mask/chamada.go): o proxy liga a mensagem do usuário, o tool_use e o tool_result
 // em ordem, e a dica de cada um leva o que se sabe da chamada.
 
-func montarComMasker(t *testing.T, corpos *[][]byte) (*httptest.Server, *mask.Masker) {
+func buildWithMasker(t *testing.T, bodies *[][]byte) (*httptest.Server, *mask.Masker) {
 	t.Helper()
 	dir := t.TempDir()
-	cfg := config.Padrao()
-	vs, err := mask.CarregarVistos(dir + "/vistos.json")
+	cfg := config.Default()
+	vs, err := mask.LoadSeen(dir + "/vistos.json")
 	if err != nil {
 		t.Fatal(err)
 	}
-	m, err := mask.NovoMasker(cfg, []byte("0123456789abcdef0123456789abcdef"), nil, vs)
+	m, err := mask.NewMasker(cfg, []byte("0123456789abcdef0123456789abcdef"), nil, vs)
 	if err != nil {
 		t.Fatal(err)
 	}
 	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		b, _ := io.ReadAll(r.Body)
-		*corpos = append(*corpos, b)
+		*bodies = append(*bodies, b)
 		w.Header().Set("content-type", "application/json")
 		w.Write([]byte(`{"type":"message","role":"assistant","content":[{"type":"text","text":"ok"}]}`))
 	}))
 	cfg.Upstream = up.URL
-	px := httptest.NewServer(Novo(cfg, m, vs, log.New(io.Discard, "", 0)))
+	px := httptest.NewServer(New(cfg, m, vs, log.New(io.Discard, "", 0)))
 	t.Cleanup(func() { up.Close(); px.Close() })
 	return px, m
 }
 
-func chamadaBash(id, cmd string) map[string]any {
+func bashCall(id, cmd string) map[string]any {
 	return map[string]any{"type": "tool_use", "id": id, "name": "Bash", "input": map[string]any{"command": cmd}}
 }
 
-func resultado(id, saida string) map[string]any {
-	return map[string]any{"type": "tool_result", "tool_use_id": id, "content": []any{map[string]any{"type": "text", "text": saida}}}
+func result(id, output string) map[string]any {
+	return map[string]any{"type": "tool_result", "tool_use_id": id, "content": []any{map[string]any{"type": "text", "text": output}}}
 }
 
-func TestProxyInventarioEEco(t *testing.T) {
-	var corpos [][]byte
-	px, m := montarComMasker(t, &corpos)
-	ps := m.Pseudonimo("obj.namespace", "cobranca")
-	tab := mask.NovaTabela([]mask.Entrada{{Pseudo: ps, Real: "cobranca", Tipo: "obj.namespace"}})
-	cmdLogs := m.RegistrarResposta("kubectl logs -n "+ps+" deploy/web --tail 5", tab)
-	enviar(t, px, []any{
+func TestProxyInventoryAndEcho(t *testing.T) {
+	var bodies [][]byte
+	px, m := buildWithMasker(t, &bodies)
+	ps := m.Pseudonym("obj.namespace", "cobranca")
+	tab := mask.NewTable([]mask.Entry{{Pseudo: ps, Real: "cobranca", Type: "obj.namespace"}})
+	cmdLogs := m.RecordResponse("kubectl logs -n "+ps+" deploy/web --tail 5", tab)
+	send(t, px, []any{
 		msg("user", "<system-reminder>lembrete qualquer</system-reminder>lista os namespaces do cluster"),
-		msg("assistant", []any{chamadaBash("c1", "kubectl get ns")}),
-		msg("user", []any{resultado("c1", "NAME         STATUS   AGE\npagamentos   Active   12d\ncobranca     Active   40d\nvitrine      Active   3d\n")}),
-		msg("assistant", []any{chamadaBash("c2", "curl -s https://h.exemplo/api/ambientes/vitrine")}),
-		msg("user", []any{resultado("c2", `{"ok": true}`)}),
-		msg("assistant", []any{chamadaBash("c3", cmdLogs)}),
-		msg("user", []any{resultado("c3", "conectado ao cobranca\npronto\n")}),
-		msg("assistant", []any{chamadaBash("c4", "ls")}),
-		msg("user", []any{resultado("c4", "docs\ninternal\nscripts\n")}),
+		msg("assistant", []any{bashCall("c1", "kubectl get ns")}),
+		msg("user", []any{result("c1", "NAME         STATUS   AGE\npagamentos   Active   12d\ncobranca     Active   40d\nvitrine      Active   3d\n")}),
+		msg("assistant", []any{bashCall("c2", "curl -s https://h.exemplo/api/ambientes/vitrine")}),
+		msg("user", []any{result("c2", `{"ok": true}`)}),
+		msg("assistant", []any{bashCall("c3", cmdLogs)}),
+		msg("user", []any{result("c3", "conectado ao cobranca\npronto\n")}),
+		msg("assistant", []any{bashCall("c4", "ls")}),
+		msg("user", []any{result("c4", "docs\ninternal\nscripts\n")}),
 	})
-	r := mensagens(t, corpos[0])
+	r := messages(t, bodies[0])
 	for _, n := range []string{"pagamentos", "cobranca", "vitrine"} {
 		if strings.Contains(r[2], n) {
 			t.Errorf("%s em claro no inventário", n)

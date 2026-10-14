@@ -9,7 +9,7 @@ import (
 // SQL embutido em código (string, concatenação, heredoc) de várias linguagens, com código
 // depois da string: o SQL é lido (nomes inventados do cliente mascarados) e o código depois
 // da string não é lido como SQL (chaves e nomes da linguagem ficam).
-var casosSQLHospedeiro = []struct{ nome, src string }{
+var hostSQLCases = []struct{ name, src string }{
 	{"python aspas triplas em outra linha", "cur.execute(\n    \"\"\"\n    SELECT p.col_valor_hx, p.col_data_hx\n    FROM sch_vendas_hx.tb_pedido_hx p\n    WHERE p.col_valor_hx > 10\n    \"\"\")\nfor row in cur.fetchall():\n    item = {}\n    item['urn'] = f\"urn:li:dataset:({row['payload']})\"\n"},
 	{"python f-string na linha", "cur.execute(f\"SELECT col_valor_hx FROM sch_vendas_hx.tb_pedido_hx WHERE id = {x}\")\nitem['urn'] = row['payload']\n"},
 	{"python concatenação implícita", "sql = (\"SELECT col_valor_hx \"\n       \"FROM sch_vendas_hx.tb_pedido_hx \"\n       \"WHERE col_data_hx > :d\")\nitem['urn'] = row['payload']\n"},
@@ -29,21 +29,21 @@ var casosSQLHospedeiro = []struct{ nome, src string }{
 	{"linguagem desconhecida", "qry := \"SELECT col_valor_hx FROM sch_vendas_hx.tb_pedido_hx\" ~>\nout{urn} <~ in{payload}\n"},
 }
 
-func TestSQLEmbutidoEmCodigo(t *testing.T) {
-	m := novoTeste(t)
+func TestSQLEmbeddedInCode(t *testing.T) {
+	m := newTest(t)
 	reTok := func(w string) *regexp.Regexp {
 		return regexp.MustCompile(`(^|[^A-Za-z0-9_])` + regexp.QuoteMeta(w) + `($|[^A-Za-z0-9_])`)
 	}
-	for _, c := range casosSQLHospedeiro {
-		out, _ := m.Mascarar(c.src)
+	for _, c := range hostSQLCases {
+		out, _ := m.Mask(c.src)
 		for _, n := range []string{"tb_pedido_hx", "sch_vendas_hx", "col_valor_hx"} {
 			if reTok(n).MatchString(out) {
-				t.Errorf("%s: %s (do SQL) em claro:\n%s", c.nome, n, out)
+				t.Errorf("%s: %s (do SQL) em claro:\n%s", c.name, n, out)
 			}
 		}
 		for _, p := range []string{"urn", "payload"} {
 			if len(reTok(p).FindAllString(out, -1)) < len(reTok(p).FindAllString(c.src, -1)) {
-				t.Errorf("%s: %s (do código depois da string) lido como nome:\n%s", c.nome, p, out)
+				t.Errorf("%s: %s (do código depois da string) lido como nome:\n%s", c.name, p, out)
 			}
 		}
 	}
@@ -51,9 +51,9 @@ func TestSQLEmbutidoEmCodigo(t *testing.T) {
 
 // Uma string que fecha na linha de cima não é abertura: o SQL solto que vem depois continua
 // sendo lido inteiro (as linhas de continuação também).
-func TestSQLDepoisDeStringFechada(t *testing.T) {
-	m := novoTeste(t)
-	out, _ := m.Mascarar("x = \"abc\"\nSELECT col_valor_hx FROM sch_vendas_hx.tb_pedido_hx\nWHERE col_data_hx > 1\n")
+func TestSQLAfterClosedString(t *testing.T) {
+	m := newTest(t)
+	out, _ := m.Mask("x = \"abc\"\nSELECT col_valor_hx FROM sch_vendas_hx.tb_pedido_hx\nWHERE col_data_hx > 1\n")
 	for _, n := range []string{"tb_pedido_hx", "col_data_hx"} {
 		if strings.Contains(out, n) {
 			t.Errorf("%s em claro: o SQL depois de uma string fechada deixou de ser lido:\n%s", n, out)
@@ -63,7 +63,7 @@ func TestSQLDepoisDeStringFechada(t *testing.T) {
 
 // Outros formatos (CSV, JSON, YAML, esquema, conexão, linha de comando) em string de código,
 // seguidos de código: os nomes do cliente (_hx, -hx) são mascarados e o código depois não.
-var casosEmbutidos = []struct{ nome, src string }{
+var embeddedCases = []struct{ name, src string }{
 	{"csv em aspas triplas", "dados = \"\"\"tabela,coluna,tipo\ntb_pedido_hx,col_valor_hx,NUMBER\ntb_cliente_hx,col_doc_hx,VARCHAR\n\"\"\"\nfor linha in dados.splitlines():\n    item['urn'] = row['payload']\n"},
 	{"json em string java", "String body = \"{\\\"database\\\": \\\"dw_vendas_hx\\\", \\\"schema\\\": \\\"sch_vendas_hx\\\", \\\"table\\\": \\\"tb_pedido_hx\\\"}\";\nitem.put(\"urn\", rs.getString(\"payload\"));\n"},
 	{"conexao em python", "engine = create_engine(\"postgresql://svc_carga_hx@db-vendas-hx.interno:5432/dw_vendas_hx\")\nitem['urn'] = row['payload']\n"},
@@ -74,22 +74,22 @@ var casosEmbutidos = []struct{ nome, src string }{
 	{"kubectl em ProcessBuilder java", "Process p = new ProcessBuilder(\"kubectl\", \"-n\", \"ns-vendas-hx\", \"get\", \"pods\").start();\nitem.put(\"urn\", rs.getString(\"payload\"));\n"},
 }
 
-func TestFormatosEmbutidosEmCodigo(t *testing.T) {
-	m := novoTeste(t)
+func TestFormatsEmbeddedInCode(t *testing.T) {
+	m := newTest(t)
 	reTok := func(w string) *regexp.Regexp {
 		return regexp.MustCompile(`(^|[^A-Za-z0-9_])` + regexp.QuoteMeta(w) + `($|[^A-Za-z0-9_])`)
 	}
 	reHx := regexp.MustCompile(`[A-Za-z0-9_.-]*_hx\b|[A-Za-z0-9-]*-hx\b`)
-	for _, c := range casosEmbutidos {
-		out, _ := m.Mascarar(c.src)
+	for _, c := range embeddedCases {
+		out, _ := m.Mask(c.src)
 		for _, n := range reHx.FindAllString(c.src, -1) {
 			if reTok(n).MatchString(out) {
-				t.Errorf("%s: %s em claro:\n%s", c.nome, n, out)
+				t.Errorf("%s: %s em claro:\n%s", c.name, n, out)
 			}
 		}
 		for _, p := range []string{"urn", "payload"} {
 			if len(reTok(p).FindAllString(out, -1)) < len(reTok(p).FindAllString(c.src, -1)) {
-				t.Errorf("%s: %s (do código depois da string) lido como nome:\n%s", c.nome, p, out)
+				t.Errorf("%s: %s (do código depois da string) lido como nome:\n%s", c.name, p, out)
 			}
 		}
 	}

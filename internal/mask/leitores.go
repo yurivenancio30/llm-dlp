@@ -9,68 +9,68 @@ import (
 // Registro de todos os leitores de estrutura: os fixos e os que dependem da configuração.
 // Para acrescentar um formato, escreva o leitor no arquivo da família e registre-o aqui.
 
-// leitoresDe: todos os leitores para esta configuração (os fixos, depois os da configuração).
-func leitoresDe(cfg config.Config) []Leitor {
-	return append(leitoresPadrao(), leitoresConfig(cfg)...)
+// readersOf: todos os leitores para esta configuração (os fixos, depois os da configuração).
+func readersOf(cfg config.Config) []Reader {
+	return append(defaultReaders(), configReaders(cfg)...)
 }
 
-// LeitoresPadrao: os leitores fixos (para ferramentas de medição).
-func LeitoresPadrao() []Leitor { return leitoresPadrao() }
+// DefaultReaders: os leitores fixos (para ferramentas de medição).
+func DefaultReaders() []Reader { return defaultReaders() }
 
-// leitoresPadrao: os leitores de estrutura que vêm ligados.
-func leitoresPadrao() []Leitor {
-	return []Leitor{
-		{Nome: "sql", Achar: acharSQL, Publico: publicoSQL},
-		{Nome: "erro", Achar: acharErroObjeto, Publico: publicoSQL},
-		{Nome: "conexão", Achar: acharConexoes, Publico: publicoConexao},
-		{Nome: "tabela", Achar: acharTabelasObj, Publico: publicoSQL},
-		{Nome: "esquema", Achar: acharEsquema, Publico: publicoSQL},
-		{Nome: "nome-contexto", Achar: acharNomePorContexto, Publico: publicoDev},
-		{Nome: "devops-yaml", Achar: acharDevopsEstruturado, Publico: publicoDevops},
-		{Nome: "terraform", Achar: acharTerraform, Publico: publicoDevops},
-		{Nome: "ansible-ini", Achar: acharAnsibleINI, Publico: publicoDevops},
-		{Nome: "bicep", Achar: acharBicep, Publico: publicoDevops},
-		{Nome: "jenkins", Achar: acharJenkins, Publico: publicoDevops},
-		{Nome: "k8s-dns", Achar: acharDNSK8s, Publico: publicoDevops},
-		{Nome: "imagem", Achar: acharImagens, Publico: publicoDevops},
-		{Nome: "saída-cli", Achar: acharTabelaCLI, Publico: publicoDevops},
-		{Nome: "ip-infra", Achar: acharIPInfra},
-		{Nome: "chave-valor", Achar: acharChaveValor, Publico: publicoDev},
-		{Nome: "endereço", Achar: acharEnderecos, Publico: publicoDev},
-		{Nome: "git", Achar: acharGitSCP, Publico: publicoDev},
-		{Nome: "pacote", Achar: acharPacotes, Publico: publicoDev},
-		{Nome: "caminho", Achar: acharCaminhos, Publico: publicoDev},
-		{Nome: "usuário de rede", Achar: acharUsuariosRede, Publico: publicoDev},
-		{Nome: "nuvem", Achar: acharNuvem, Publico: publicoDev},
-		{Nome: "código-nome", Achar: acharCodigoNome, Publico: publicoDev},
-		{Nome: "código-chamada", Achar: acharCodigoChamada, Publico: publicoDev},
-		{Nome: "linha-de-comando", Achar: acharCLI, Publico: publicoDev},
-		{Nome: "caminho-sistema", Achar: acharCaminhosFora, Publico: publicoDev},
-		{Nome: "url-nuvem", Achar: acharURLsNuvem, Publico: publicoDev},
-		{Nome: "dsn", Achar: acharDSN, Publico: publicoConexao},
-		{Nome: "env-lista", Achar: acharEnvLista, Publico: publicoDev},
-		{Nome: "placeholder", Achar: acharPlaceholder, Publico: publicoDev},
-		{Nome: "ip-interno", Achar: acharIPInterno},
+// defaultReaders: os leitores de estrutura que vêm ligados.
+func defaultReaders() []Reader {
+	return []Reader{
+		{Name: "sql", Find: findSQL, Public: publicSQL},
+		{Name: "erro", Find: findObjectError, Public: publicSQL},
+		{Name: "conexão", Find: findConnections, Public: publicConnection},
+		{Name: "tabela", Find: findTablesObj, Public: publicSQL},
+		{Name: "esquema", Find: findSchema, Public: publicSQL},
+		{Name: "nome-contexto", Find: findNameByContext, Public: publicDev},
+		{Name: "devops-yaml", Find: findStructuredDevops, Public: publicDevops},
+		{Name: "terraform", Find: findTerraform, Public: publicDevops},
+		{Name: "ansible-ini", Find: findAnsibleINI, Public: publicDevops},
+		{Name: "bicep", Find: findBicep, Public: publicDevops},
+		{Name: "jenkins", Find: findJenkins, Public: publicDevops},
+		{Name: "k8s-dns", Find: findK8sDNS, Public: publicDevops},
+		{Name: "imagem", Find: findImages, Public: publicDevops},
+		{Name: "saída-cli", Find: findCLITable, Public: publicDevops},
+		{Name: "ip-infra", Find: findInfraIP},
+		{Name: "chave-valor", Find: findKeyValue, Public: publicDev},
+		{Name: "endereço", Find: findAddresses, Public: publicDev},
+		{Name: "git", Find: findGitSCP, Public: publicDev},
+		{Name: "pacote", Find: findPackages, Public: publicDev},
+		{Name: "caminho", Find: findPaths, Public: publicDev},
+		{Name: "usuário de rede", Find: findNetworkUsers, Public: publicDev},
+		{Name: "nuvem", Find: findCloud, Public: publicDev},
+		{Name: "código-nome", Find: findCodeName, Public: publicDev},
+		{Name: "código-chamada", Find: findCodeCall, Public: publicDev},
+		{Name: "linha-de-comando", Find: findCLI, Public: publicDev},
+		{Name: "caminho-sistema", Find: findPathsOutside, Public: publicDev},
+		{Name: "url-nuvem", Find: findCloudURLs, Public: publicDev},
+		{Name: "dsn", Find: findDSN, Public: publicConnection},
+		{Name: "env-lista", Find: findEnvList, Public: publicDev},
+		{Name: "placeholder", Find: findPlaceholder, Public: publicDev},
+		{Name: "ip-interno", Find: findInternalIP},
 	}
 }
 
-// leitoresConfig: os leitores ligados conforme a configuração (IP público, termos).
-func leitoresConfig(cfg config.Config) []Leitor {
-	var ls []Leitor
-	if cfg.Objetos.IPPublico {
-		ls = append(ls, Leitor{Nome: "ip-público", Achar: acharIPPublico})
+// configReaders: os leitores ligados conforme a configuração (IP público, termos).
+func configReaders(cfg config.Config) []Reader {
+	var ls []Reader
+	if cfg.Objects.PublicIP {
+		ls = append(ls, Reader{Name: "ip-público", Find: findPublicIP})
 	}
 	var ts []string
-	for _, t := range cfg.Termos {
-		for _, v := range t.Valores {
-			n := normTermo(v)
+	for _, t := range cfg.Terms {
+		for _, v := range t.Values {
+			n := normTerm(v)
 			if len(n) >= 3 && !strings.ContainsAny(v, " \t") {
 				ts = append(ts, n)
 			}
 		}
 	}
 	if len(ts) > 0 {
-		ls = append(ls, Leitor{Nome: "termo-embutido", Achar: func(s string, add func(ObjAchado)) { acharTermos(s, ts, add) }})
+		ls = append(ls, Reader{Name: "termo-embutido", Find: func(s string, add func(ObjFinding)) { findTerms(s, ts, add) }})
 	}
 	return ls
 }

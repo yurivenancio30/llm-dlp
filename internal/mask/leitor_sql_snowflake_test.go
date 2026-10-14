@@ -4,11 +4,11 @@ import "testing"
 
 // O mesmo conjunto de nomes do Snowflake em todas as formas.
 
-var nomesSnow = []string{"acme-erpfin", "papel_fin_leitura", "wh_fin_carga", "pol_mascara_cpf", "stg_notas_fin", "tsk_carga_fin"}
+var snowNames = []string{"acme-erpfin", "papel_fin_leitura", "wh_fin_carga", "pol_mascara_cpf", "stg_notas_fin", "tsk_carga_fin"}
 
-var casosSnow = []struct {
-	nome, texto string
-	nomes       []string
+var snowCases = []struct {
+	name, text string
+	names      []string
 }{
 	{"connections.toml", "[connections.fin]\naccount = \"acme-erpfin\"\nuser = \"svc_carga_fin\"\nrole = \"papel_fin_leitura\"\nwarehouse = \"wh_fin_carga\"\n",
 		[]string{"acme-erpfin", "svc_carga_fin", "papel_fin_leitura", "wh_fin_carga"}},
@@ -47,26 +47,26 @@ COPY INTO erp_fin.fin_contab.lanc_diario FROM @erp_fin.fin_contab.stg_notas_fin;
 	{"URN DB2", "urn:li:dataset:(urn:li:dataPlatform:db2,FINDB   .LANCDIARIO,PROD)\n", []string{"FINDB", "LANCDIARIO"}},
 }
 
-func TestSnowflakeFormas(t *testing.T) {
-	for _, c := range casosSnow {
-		for _, tr := range transportes {
-			m := novoTeste(t)
-			txt := tr.f(c.texto)
-			if ok, tot := conferirMascarado(t, m, c.nome+"/"+tr.nome, txt, c.nomes); ok != tot {
-				out, _ := m.Mascarar(txt)
-				t.Errorf("%s / %s: %d/%d\n%s", c.nome, tr.nome, ok, tot, out)
+func TestSnowflakeForms(t *testing.T) {
+	for _, c := range snowCases {
+		for _, tr := range transports {
+			m := newTest(t)
+			txt := tr.f(c.text)
+			if ok, tot := checkMasked(t, m, c.name+"/"+tr.name, txt, c.names); ok != tot {
+				out, _ := m.Mask(txt)
+				t.Errorf("%s / %s: %d/%d\n%s", c.name, tr.name, ok, tot, out)
 			}
 		}
 	}
 }
 
 // depois de aprendidos, os nomes são mascarados soltos no texto
-func TestSnowflakeSolto(t *testing.T) {
-	m := novoTeste(t)
-	m.Mascarar("SNOWFLAKE_ACCOUNT=acme-erpfin\nSNOWFLAKE_ROLE=papel_fin_leitura\nSNOWFLAKE_WAREHOUSE=wh_fin_carga\n")
+func TestSnowflakeLoose(t *testing.T) {
+	m := newTest(t)
+	m.Mask("SNOWFLAKE_ACCOUNT=acme-erpfin\nSNOWFLAKE_ROLE=papel_fin_leitura\nSNOWFLAKE_WAREHOUSE=wh_fin_carga\n")
 	txt := "a conta acme-erpfin usa o papel papel_fin_leitura no wh_fin_carga"
-	if ok, tot := conferirMascarado(t, m, "solto", txt, []string{"acme-erpfin", "papel_fin_leitura", "wh_fin_carga"}); ok != tot {
-		out, _ := m.Mascarar(txt)
+	if ok, tot := checkMasked(t, m, "solto", txt, []string{"acme-erpfin", "papel_fin_leitura", "wh_fin_carga"}); ok != tot {
+		out, _ := m.Mask(txt)
 		t.Errorf("solto: %d/%d: %s", ok, tot, out)
 	}
 }

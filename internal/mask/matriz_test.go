@@ -13,7 +13,7 @@ import (
 // termos). Meta: pelo menos 90% das ocorrências mascaradas.
 
 // os nomes (todos fictícios)
-var matrizNomes = []string{
+var matrixNames = []string{
 	"pgsrv-vendas-01",       // servidor
 	"vendas_prd",            // banco
 	"tb_pedidos_x9",         // tabela
@@ -33,7 +33,7 @@ var matrizNomes = []string{
 	"fin.notas.emitidas",
 }
 
-var matrizCasos = []struct{ nome, texto string }{
+var matrixCases = []struct{ name, text string }{
 	{"Python", `DB_HOST = "pgsrv-vendas-01"
 DATABASE = "vendas_prd"
 conn = psycopg2.connect(host="pgsrv-vendas-01", dbname="vendas_prd", user="svc_relatorio_x9")
@@ -230,49 +230,49 @@ kafka.topic=fin.notas.emitidas
 `},
 }
 
-// matrizCobertura devolve, por caso, quantas ocorrências dos nomes havia e quantas sobraram.
-func matrizCobertura(t *testing.T) (map[string][2]int, map[string]int) {
-	cob := map[string][2]int{}
-	sobra := map[string]int{}
-	for _, c := range matrizCasos {
-		m := novoTeste(t)
-		m.cfg.DominiosInternos = nil
-		m.cfg.Termos = nil
-		out, _ := m.Mascarar(c.texto)
+// matrixCoverage devolve, por caso, quantas ocorrências dos nomes havia e quantas sobraram.
+func matrixCoverage(t *testing.T) (map[string][2]int, map[string]int) {
+	cov := map[string][2]int{}
+	leftover := map[string]int{}
+	for _, c := range matrixCases {
+		m := newTest(t)
+		m.cfg.InternalDomains = nil
+		m.cfg.Terms = nil
+		out, _ := m.Mask(c.text)
 		tot, ok := 0, 0
-		for _, n := range matrizNomes {
-			a, b := strings.Count(c.texto, n), strings.Count(out, n)
+		for _, n := range matrixNames {
+			a, b := strings.Count(c.text, n), strings.Count(out, n)
 			tot += a
 			ok += a - b
 			if b > 0 {
-				sobra[c.nome+": "+n] += b
+				leftover[c.name+": "+n] += b
 			}
 		}
-		cob[c.nome] = [2]int{ok, tot}
+		cov[c.name] = [2]int{ok, tot}
 	}
-	return cob, sobra
+	return cov, leftover
 }
 
-func TestMatrizCobertura(t *testing.T) {
-	cob, sobra := matrizCobertura(t)
+func TestMatrixCoverage(t *testing.T) {
+	cov, leftover := matrixCoverage(t)
 	ok, tot := 0, 0
-	nomes := make([]string, 0, len(cob))
-	for k := range cob {
-		nomes = append(nomes, k)
+	names := make([]string, 0, len(cov))
+	for k := range cov {
+		names = append(names, k)
 	}
-	sort.Strings(nomes)
-	var linhas []string
-	for _, k := range nomes {
-		c := cob[k]
+	sort.Strings(names)
+	var lines []string
+	for _, k := range names {
+		c := cov[k]
 		ok += c[0]
 		tot += c[1]
-		linhas = append(linhas, fmt.Sprintf("%-12s %3d/%-3d %5.1f%%", k, c[0], c[1], 100*float64(c[0])/float64(c[1])))
+		lines = append(lines, fmt.Sprintf("%-12s %3d/%-3d %5.1f%%", k, c[0], c[1], 100*float64(c[0])/float64(c[1])))
 	}
 	pct := 100 * float64(ok) / float64(tot)
-	t.Logf("cobertura por caso:\n%s\nTOTAL %d/%d = %.1f%%", strings.Join(linhas, "\n"), ok, tot, pct)
+	t.Logf("cobertura por caso:\n%s\nTOTAL %d/%d = %.1f%%", strings.Join(lines, "\n"), ok, tot, pct)
 	if testing.Verbose() {
 		var ss []string
-		for k, v := range sobra {
+		for k, v := range leftover {
 			ss = append(ss, fmt.Sprintf("%s (%d)", k, v))
 		}
 		sort.Strings(ss)

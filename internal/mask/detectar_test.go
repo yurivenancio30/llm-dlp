@@ -12,32 +12,32 @@ import (
 
 // Testes do exame de texto grande em pedaços: cada dado em todas as posições de corte.
 
-// Texto grande é examinado em pedaços (ver detectarGrande). Estes testes garantem que cortar
+// Text grande é examinado em pedaços (ver detectLarge). Estes testes garantem que cortar
 // não deixa nada passar: cada tipo de dado é colocado em TODAS as posições em relação aos
 // cortes, e o resultado tem que ser idêntico ao do exame do texto inteiro.
 
-// tamanhosDeTeste encolhe os pedaços para o teste poder varrer todas as posições depressa.
-func tamanhosDeTeste(t *testing.T, min, pedaco, margem int) {
-	a, b, c := grandeMin, pedacoGrande, margemGrande
-	grandeMin, pedacoGrande, margemGrande = min, pedaco, margem
-	t.Cleanup(func() { grandeMin, pedacoGrande, margemGrande = a, b, c })
+// testSizes encolhe os pedaços para o teste poder varrer todas as posições depressa.
+func testSizes(t *testing.T, min, piece, margin int) {
+	a, b, c := largeMin, largePiece, largeMargin
+	largeMin, largePiece, largeMargin = min, piece, margin
+	t.Cleanup(func() { largeMin, largePiece, largeMargin = a, b, c })
 }
 
-type casoCorte struct{ texto, real string }
+type cutCase struct{ text, real string }
 
-func casosDeCorte() []casoCorte {
-	cpf := gerarCPF("529982247")
-	cpfSem := strings.NewReplacer(".", "", "-", "").Replace(cpf)
-	pis := gerarOnze("1201234567", PISValido)
-	cnh := gerarOnze("123456789", CNHValida)
-	pemCurto := "-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA7bq2Xk9mQ2vLp7wZt4nBc6HfG1aE5uQiOk3Jd9sLq2mXv8Rt\nQ2vLp7wZt4nBc6HfG1aE5uQiOk3Jd9sLq2mXv8RtMIIEpAIBAAKCAQEA7bq2Xk9m\n-----END RSA PRIVATE KEY-----"
-	pemLongo := "-----BEGIN RSA PRIVATE KEY-----\n" + strings.Repeat("MIIEpAIBAAKCAQEA7bq2Xk9mQ2vLp7wZt4nBc6HfG1aE5uQiOk3Jd9sLq2mXv8Rt\n", 9) + "-----END RSA PRIVATE KEY-----"
-	return []casoCorte{
+func cutCases() []cutCase {
+	cpf := genCPF("529982247")
+	cpfWithout := strings.NewReplacer(".", "", "-", "").Replace(cpf)
+	pis := genEleven("1201234567", ValidPIS)
+	cnh := genEleven("123456789", ValidCNH)
+	shortPEM := "-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA7bq2Xk9mQ2vLp7wZt4nBc6HfG1aE5uQiOk3Jd9sLq2mXv8Rt\nQ2vLp7wZt4nBc6HfG1aE5uQiOk3Jd9sLq2mXv8RtMIIEpAIBAAKCAQEA7bq2Xk9m\n-----END RSA PRIVATE KEY-----"
+	longPEM := "-----BEGIN RSA PRIVATE KEY-----\n" + strings.Repeat("MIIEpAIBAAKCAQEA7bq2Xk9mQ2vLp7wZt4nBc6HfG1aE5uQiOk3Jd9sLq2mXv8Rt\n", 9) + "-----END RSA PRIVATE KEY-----"
+	return []cutCase{
 		{"owner: joao.silva@empresa-ficticia.com.br ok", "joao.silva@empresa-ficticia.com.br"},
 		{"conectando em 10.42.7.15:3306", "10.42.7.15"},
 		{"host mysql-dh.empresa-ficticia.intra caiu", "mysql-dh.empresa-ficticia.intra"},
 		{"cliente " + cpf + " ativo", cpf},
-		{"cpf: " + cpfSem, cpfSem},
+		{"cpf: " + cpfWithout, cpfWithout},
 		{"empresa 11.222.333/0001-81 ok", "11.222.333/0001-81"},
 		{"ligue (11) 98765-4321 amanhã", "98765-4321"},
 		{"whatsapp: +55 11 98765-4321 ok", "98765-4321"},
@@ -64,78 +64,78 @@ func casosDeCorte() []casoCorte {
 		{"sshpass -p 'Ficticia@2024' ssh x", "Ficticia@2024"},
 		{"clientSecret: aB3~xY9.kL2-mN8qR5tU1wZ4 ok", "aB3~xY9.kL2-mN8qR5tU1wZ4"},
 		{"segredo em base64: " + "cGFzc3dvcmQ6IGdocF9rM0pkOXNMcTJtWHY4UnRZN3dQejRuQmM2SGZHMWFFNXVRaU8=" + " ok", "cGFzc3dvcmQ6IGdocF9rM0pkOXNMcTJtWHY4UnRZN3dQejRuQmM2SGZHMWFFNXVRaU8="},
-		{pemCurto, "MIIEpAIBAAKCAQEA7bq2Xk9mQ2vLp7wZt4nBc6HfG1aE5uQiOk3Jd9sLq2mXv8Rt"},
-		{pemLongo, "MIIEpAIBAAKCAQEA7bq2Xk9mQ2vLp7wZt4nBc6HfG1aE5uQiOk3Jd9sLq2mXv8Rt"},
+		{shortPEM, "MIIEpAIBAAKCAQEA7bq2Xk9mQ2vLp7wZt4nBc6HfG1aE5uQiOk3Jd9sLq2mXv8Rt"},
+		{longPEM, "MIIEpAIBAAKCAQEA7bq2Xk9mQ2vLp7wZt4nBc6HfG1aE5uQiOk3Jd9sLq2mXv8Rt"},
 	}
 }
 
-func (m *Masker) zerarMemoria() {
-	m.conh = novosConhecidos()
+func (m *Masker) resetMemory() {
+	m.known = newKnown()
 	m.mu.Lock()
-	m.memo, m.velho, m.bytes = map[[32]byte]resultado{}, nil, 0
+	m.memo, m.stale, m.bytes = map[[32]byte]result{}, nil, 0
 	m.mu.Unlock()
 }
 
 // compara o exame em pedaços com o do texto inteiro; devolve "" se igual. Com exigir, o
 // valor real também não pode aparecer no resultado.
-func compararCorte(m *Masker, s, real string, exigir bool) string {
-	m.zerarMemoria()
-	quer, _ := m.aplicar(s, m.detectarInteiro(s))
-	m.zerarMemoria()
-	got, _ := m.aplicar(s, m.Detectar(s))
-	if strings.Contains(got, real) && (exigir || !strings.Contains(quer, real)) {
+func compareCut(m *Masker, s, real string, require bool) string {
+	m.resetMemory()
+	wants, _ := m.apply(s, m.detectWhole(s))
+	m.resetMemory()
+	got, _ := m.apply(s, m.Detect(s))
+	if strings.Contains(got, real) && (require || !strings.Contains(wants, real)) {
 		return "VAZOU " + real
 	}
-	if got != quer {
+	if got != wants {
 		i := 0
-		for i < len(got) && i < len(quer) && got[i] == quer[i] {
+		for i < len(got) && i < len(wants) && got[i] == wants[i] {
 			i++
 		}
-		a, b := max(0, i-50), min(len(quer), i+70)
-		return fmt.Sprintf("difere em %d\n inteiro: %q\n pedaços: %q", i, quer[a:b], got[a:min(len(got), b)])
+		a, b := max(0, i-50), min(len(wants), i+70)
+		return fmt.Sprintf("difere em %d\n inteiro: %q\n pedaços: %q", i, wants[a:b], got[a:min(len(got), b)])
 	}
 	return ""
 }
 
-func varrerCortes(t *testing.T, casos []casoCorte, exigir bool, passo, total int, montar func(c casoCorte, enchimento string, pos int) string) {
-	enchimentos := []string{"linha comum de log, tudo ok\n", "palavra solta ", "x"}
-	type tarefa struct {
-		c   casoCorte
+func scanCuts(t *testing.T, cases []cutCase, require bool, step, total int, build func(c cutCase, padding string, pos int) string) {
+	paddings := []string{"linha comum de log, tudo ok\n", "palavra solta ", "x"}
+	type task struct {
+		c   cutCase
 		e   string
 		pos int
 	}
-	fila := make(chan tarefa, 256)
-	var erros atomic.Int64
+	queue := make(chan task, 256)
+	var errs atomic.Int64
 	var n atomic.Int64
 	var wg sync.WaitGroup
 	// os Maskers são criados um por vez: a criação do detector do gitleaks não pode ser
 	// feita em paralelo (o uso, depois de criado, pode)
 	ms := make([]*Masker, runtime.GOMAXPROCS(0))
 	for i := range ms {
-		ms[i] = novoTeste(t)
+		ms[i] = newTest(t)
 	}
 	for _, m := range ms {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for tf := range fila {
+			for tf := range queue {
 				n.Add(1)
-				if msg := compararCorte(m, montar(tf.c, tf.e, tf.pos), tf.c.real, exigir); msg != "" && erros.Add(1) <= 12 {
-					t.Errorf("caso %.40q, enchimento %q, posição %d: %s", tf.c.texto, tf.e, tf.pos, msg)
+				if msg := compareCut(m, build(tf.c, tf.e, tf.pos), tf.c.real, require); msg != "" && errs.Add(1) <= 12 {
+					t.Errorf("caso %.40q, enchimento %q, posição %d: %s", tf.c.text, tf.e, tf.pos, msg)
 				}
 			}
 		}()
 	}
-	for _, c := range casos {
-		for _, e := range enchimentos {
-			for pos := 0; pos < total; pos += passo {
-				fila <- tarefa{c, e, pos}
+	for _, c := range cases {
+		for _, e := range paddings {
+			for pos := 0; pos < total; pos += step {
+				queue <- task{c, e, pos}
 			}
 		}
 	}
-	close(fila)
+	close(queue)
 	wg.Wait()
-	t.Logf("%d textos comparados, %d diferenças", n.Load(), erros.Load())
+	t.Logf("%d textos comparados, %d diferenças", n.Load(), errs.Load())
 }
 
 // sep: o que separa o dado do enchimento. Com enchimento sem quebra de linha o separador é
@@ -148,7 +148,7 @@ func sep(e string) string {
 	return " "
 }
 
-func encher(e string, n int) string {
+func fill(e string, n int) string {
 	if n <= 0 {
 		return ""
 	}
@@ -156,30 +156,30 @@ func encher(e string, n int) string {
 }
 
 // O dado sensível desliza byte a byte por dois cortes inteiros.
-func TestCortesTodasAsPosicoes(t *testing.T) {
-	tamanhosDeTeste(t, 1000, 600, 200)
-	passo := 31 // amostra, para a suíte normal ser rápida; com LLM_DLP_ESTRESSE=1, byte a byte
+func TestCutsAllPositions(t *testing.T) {
+	testSizes(t, 1000, 600, 200)
+	step := 31 // amostra, para a suíte normal ser rápida; com LLM_DLP_ESTRESSE=1, byte a byte
 	if os.Getenv("LLM_DLP_ESTRESSE") != "" {
-		passo = 1
+		step = 1
 	}
-	varrerCortes(t, casosDeCorte(), true, passo, 1500, func(c casoCorte, e string, pos int) string {
-		return encher(e, pos) + sep(e) + c.texto + sep(e) + encher(e, 2400-pos)
+	scanCuts(t, cutCases(), true, step, 1500, func(c cutCase, e string, pos int) string {
+		return fill(e, pos) + sep(e) + c.text + sep(e) + fill(e, 2400-pos)
 	})
 }
 
 // O valor é ensinado (com a palavra-chave) numa ponta do texto e aparece solto em todas as
 // posições: tem que ser mascarado nos dois lugares, como no exame do texto inteiro.
-func TestCortesValorConhecidoSolto(t *testing.T) {
-	tamanhosDeTeste(t, 1000, 600, 200)
-	passo := 53
+func TestCutsLooseKnownValue(t *testing.T) {
+	testSizes(t, 1000, 600, 200)
+	step := 53
 	if os.Getenv("LLM_DLP_ESTRESSE") != "" {
-		passo = 3
+		step = 3
 	}
 	// valores que são lembrados (os que dependem da palavra ao lado), na grafia aprendida
-	cpfSem := strings.NewReplacer(".", "", "-", "").Replace(gerarCPF("529982247"))
-	casos := []casoCorte{
+	cpfWithout := strings.NewReplacer(".", "", "-", "").Replace(genCPF("529982247"))
+	cases := []cutCase{
 		{"RG: 12.345.678-9 ok", "12.345.678-9"},
-		{"cpf: " + cpfSem + " ok", cpfSem},
+		{"cpf: " + cpfWithout + " ok", cpfWithout},
 		{"CEP 01310-100 ok", "01310-100"},
 		{"ligue (11) 98765-4321 amanhã", "(11) 98765-4321"},
 		{"chave pix 123e4567-e89b-42d3-a456-426614174000 ok", "123e4567-e89b-42d3-a456-426614174000"},
@@ -190,28 +190,28 @@ func TestCortesValorConhecidoSolto(t *testing.T) {
 		{"mysql://app:Ficticia2024x@db1:3306/base ok", "Ficticia2024x"},
 		{"clientSecret: aB3~xY9.kL2-mN8qR5tU1wZ4 ok", "aB3~xY9.kL2-mN8qR5tU1wZ4"},
 	}
-	for _, ensinaNoFim := range []bool{false, true} {
-		varrerCortes(t, casos, true, passo, 1500, func(c casoCorte, e string, pos int) string {
-			solto := encher(e, pos) + " " + c.real + " " + encher(e, 2400-pos)
-			if ensinaNoFim {
-				return solto + sep(e) + c.texto + sep(e)
+	for _, teachesAtEnd := range []bool{false, true} {
+		scanCuts(t, cases, true, step, 1500, func(c cutCase, e string, pos int) string {
+			looseOne := fill(e, pos) + " " + c.real + " " + fill(e, 2400-pos)
+			if teachesAtEnd {
+				return looseOne + sep(e) + c.text + sep(e)
 			}
-			return c.texto + sep(e) + solto
+			return c.text + sep(e) + looseOne
 		})
 	}
 }
 
 // Com os tamanhos reais (pedaços de 48 KB, margem de 8 KB), por amostragem de posições.
-func TestCortesTamanhoReal(t *testing.T) {
+func TestCutsRealSize(t *testing.T) {
 	if os.Getenv("LLM_DLP_ESTRESSE") == "" {
 		t.Skip("lento (minutos): defina LLM_DLP_ESTRESSE=1 para rodar")
 	}
-	passo := 211
-	chave4096 := "-----BEGIN RSA PRIVATE KEY-----\n" + strings.Repeat("MIIEpAIBAAKCAQEA7bq2Xk9mQ2vLp7wZt4nBc6HfG1aE5uQiOk3Jd9sLq2mXv8Rt\n", 50) + "-----END RSA PRIVATE KEY-----"
-	chave16k := "-----BEGIN RSA PRIVATE KEY-----\n" + strings.Repeat("MIIEpAIBAAKCAQEA7bq2Xk9mQ2vLp7wZt4nBc6HfG1aE5uQiOk3Jd9sLq2mXv8Rt\n", 200) + "-----END RSA PRIVATE KEY-----"
-	casos := []casoCorte{
-		{chave4096, "MIIEpAIBAAKCAQEA7bq2Xk9mQ2vLp7wZt4nBc6HfG1aE5uQiOk3Jd9sLq2mXv8Rt"},
-		{chave16k, "MIIEpAIBAAKCAQEA7bq2Xk9mQ2vLp7wZt4nBc6HfG1aE5uQiOk3Jd9sLq2mXv8Rt"}, // maior que a margem
+	step := 211
+	key4096 := "-----BEGIN RSA PRIVATE KEY-----\n" + strings.Repeat("MIIEpAIBAAKCAQEA7bq2Xk9mQ2vLp7wZt4nBc6HfG1aE5uQiOk3Jd9sLq2mXv8Rt\n", 50) + "-----END RSA PRIVATE KEY-----"
+	key16k := "-----BEGIN RSA PRIVATE KEY-----\n" + strings.Repeat("MIIEpAIBAAKCAQEA7bq2Xk9mQ2vLp7wZt4nBc6HfG1aE5uQiOk3Jd9sLq2mXv8Rt\n", 200) + "-----END RSA PRIVATE KEY-----"
+	cases := []cutCase{
+		{key4096, "MIIEpAIBAAKCAQEA7bq2Xk9mQ2vLp7wZt4nBc6HfG1aE5uQiOk3Jd9sLq2mXv8Rt"},
+		{key16k, "MIIEpAIBAAKCAQEA7bq2Xk9mQ2vLp7wZt4nBc6HfG1aE5uQiOk3Jd9sLq2mXv8Rt"}, // maior que a margem
 		{"DB_PASSWORD=Ficticia@2024 ok", "Ficticia@2024"},
 		{"RG: 12.345.678-9 ok", "12.345.678-9"},
 		{"password=" + strings.Repeat("Zq9!", 5000) + " ok", strings.Repeat("Zq9!", 50)}, // valor de 20 KB: maior que a margem
@@ -219,18 +219,18 @@ func TestCortesTamanhoReal(t *testing.T) {
 		{"token=" + strings.Repeat("ghp_k3Jd9sLq2mXv8RtY7wPz4nBc6HfG1aE5uQiO.", 400) + " ok", "ghp_k3Jd9sLq2mXv8RtY7wPz4nBc6HfG1aE5uQiO"},
 		{"mysql://app:" + strings.Repeat("Zq9!", 5000) + "@db1:3306/base ok", strings.Repeat("Zq9!", 50)},
 	}
-	m := novoTeste(t)
+	m := newTest(t)
 	n := 0
-	for _, c := range casos {
+	for _, c := range cases {
 		for _, e := range []string{"linha comum de log, tudo ok\n", "x"} {
-			for pos := pedacoGrande - len(c.texto) - 300; pos < pedacoGrande+600; pos += passo {
+			for pos := largePiece - len(c.text) - 300; pos < largePiece+600; pos += step {
 				if pos < 0 {
 					continue
 				}
-				s := encher(e, pos) + sep(e) + c.texto + sep(e) + encher(e, grandeMin+pedacoGrande-pos)
+				s := fill(e, pos) + sep(e) + c.text + sep(e) + fill(e, largeMin+largePiece-pos)
 				n++
-				if msg := compararCorte(m, s, c.real, true); msg != "" {
-					t.Fatalf("caso %.30q, enchimento %q, posição %d: %s", c.texto, e, pos, msg)
+				if msg := compareCut(m, s, c.real, true); msg != "" {
+					t.Fatalf("caso %.30q, enchimento %q, posição %d: %s", c.text, e, pos, msg)
 				}
 			}
 		}
@@ -239,14 +239,14 @@ func TestCortesTamanhoReal(t *testing.T) {
 }
 
 // O teste acima só vale se ele pegar um corte malfeito. Sem margem, tem que acusar diferença.
-func TestCortesSemMargemFalha(t *testing.T) {
-	tamanhosDeTeste(t, 1000, 600, 0)
-	m := novoTeste(t)
+func TestCutsWithoutMarginFail(t *testing.T) {
+	testSizes(t, 1000, 600, 0)
+	m := newTest(t)
 	dif := 0
-	for _, c := range casosDeCorte()[:26] {
+	for _, c := range cutCases()[:26] {
 		for pos := 540; pos < 610; pos += 2 {
-			s := encher("x", pos) + " " + c.texto + " " + encher("x", 2400-pos)
-			if compararCorte(m, s, c.real, true) != "" {
+			s := fill("x", pos) + " " + c.text + " " + fill("x", 2400-pos)
+			if compareCut(m, s, c.real, true) != "" {
 				dif++
 			}
 		}
@@ -257,26 +257,26 @@ func TestCortesSemMargemFalha(t *testing.T) {
 	}
 }
 
-// Texto grande é examinado em pedaços paralelos. O resultado tem que ser o mesmo do exame
+// Text grande é examinado em pedaços paralelos. O resultado tem que ser o mesmo do exame
 // do texto inteiro de uma vez, inclusive para o que fica em cima de um corte.
-func TestGrandeIgualAoInteiro(t *testing.T) {
-	inteiro := func(m *Masker, s string) string {
-		txt, _ := m.aplicar(s, m.detectarInteiro(s))
+func TestLargeEqualsWhole(t *testing.T) {
+	whole := func(m *Masker, s string) string {
+		txt, _ := m.apply(s, m.detectWhole(s))
 		return txt
 	}
 	pem := "-----BEGIN RSA PRIVATE KEY-----\n" + strings.Repeat("MIIEpAIBAAKCAQEA7bq2Xk9mQ2vLp7wZt4nBc6HfG1aE5uQiOk3Jd9sLq2mXv8Rt\n", 48) + "-----END RSA PRIVATE KEY-----\n"
-	casos := map[string]func() string{
+	cases := map[string]func() string{
 		"variado": func() string {
 			var b strings.Builder
 			for i := 0; b.Len() < 600<<10; i++ {
-				b.WriteString(textoVariado(i))
+				b.WriteString(variedText(i))
 			}
 			return b.String()
 		},
 		"chave privada em cima de cada corte": func() string {
 			var b strings.Builder
 			for b.Len() < 400<<10 {
-				b.WriteString(strings.Repeat("linha comum de log, status=200 ok\n", (pedacoGrande-len(pem)/2-b.Len()%pedacoGrande)/34+1))
+				b.WriteString(strings.Repeat("linha comum de log, status=200 ok\n", (largePiece-len(pem)/2-b.Len()%largePiece)/34+1))
 				b.WriteString(pem)
 			}
 			return b.String()
@@ -288,29 +288,29 @@ func TestGrandeIgualAoInteiro(t *testing.T) {
 		"sem quebra de linha, com acentos": func() string {
 			var b strings.Builder
 			for i := 0; b.Len() < 300<<10; i++ {
-				fmt.Fprintf(&b, "ação %d é ótima; contato fulano%d@empresa-ficticia.com.br, cpf %s, senha: Çé%06d!x; ", i, i, gerarCPF(fmt.Sprintf("%09d", 100000000+i)), i)
+				fmt.Fprintf(&b, "ação %d é ótima; contato fulano%d@empresa-ficticia.com.br, cpf %s, senha: Çé%06d!x; ", i, i, genCPF(fmt.Sprintf("%09d", 100000000+i)), i)
 			}
 			return b.String()
 		},
 	}
-	for nome, gera := range casos {
-		s := gera()
-		if len(s) <= grandeMin {
-			t.Fatalf("%s: texto pequeno demais para o teste (%d)", nome, len(s))
+	for name, generates := range cases {
+		s := generates()
+		if len(s) <= largeMin {
+			t.Fatalf("%s: texto pequeno demais para o teste (%d)", name, len(s))
 		}
-		quer := inteiro(novoTeste(t), s)
-		got, _ := novoTeste(t).Mascarar(s)
-		if got != quer {
+		wants := whole(newTest(t), s)
+		got, _ := newTest(t).Mask(s)
+		if got != wants {
 			i := 0
-			for i < len(got) && i < len(quer) && got[i] == quer[i] {
+			for i < len(got) && i < len(wants) && got[i] == wants[i] {
 				i++
 			}
-			a, b := max(0, i-60), min(len(quer), i+60)
-			t.Errorf("%s: difere na posição %d de %d\n inteiro: %q\n pedaços: %q", nome, i, len(s), quer[a:b], got[a:min(len(got), b)])
+			a, b := max(0, i-60), min(len(wants), i+60)
+			t.Errorf("%s: difere na posição %d de %d\n inteiro: %q\n pedaços: %q", name, i, len(s), wants[a:b], got[a:min(len(got), b)])
 		}
 		for _, real := range []string{"Ficticia@2024", "12.345.678-9", "MIIEpAIBAAKCAQEA7bq2Xk9mQ2vLp7wZt4nBc6"} {
 			if strings.Contains(s, real) && strings.Contains(got, real) {
-				t.Errorf("%s: %q passou", nome, real)
+				t.Errorf("%s: %q passou", name, real)
 			}
 		}
 	}

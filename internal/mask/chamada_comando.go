@@ -11,7 +11,7 @@ import (
 // shell). O proxy vê a chamada de ferramenta (tool_use) e o resultado (tool_result) do mesmo id:
 // o comando tipa as colunas do resultado. Nenhum leitor pode fazer isso, porque um leitor só vê
 // o próprio texto; a dica entra como evidência no leitor de tabela que já existe
-// (classificarTabelaD) e, para a saída sem cabeçalho (psql -At, cut, uniq -c), numa leitura por
+// (classifyTableD) e, para a saída sem cabeçalho (psql -At, cut, uniq -c), numa leitura por
 // linha com o mesmo número de células em todas as linhas.
 //
 // Três formas, nenhuma por ferramenta:
@@ -24,15 +24,15 @@ import (
 //     tipo pedido diz o tipo da coluna NAME. É evidência fraca: mascara no lugar e só ensina
 //     com uma segunda regra.
 
-// dicaSaida: o que o comando diz das colunas da saída.
-type dicaSaida struct {
-	cols  []string          // tipo de cada coluna, em ordem ("" = sem tipo); vazio = posição desconhecida
-	nomes map[string]string // nome da coluna no cabeçalho (minúsculo) -> tipo
-	name  string            // tipo da coluna NAME/NAMES sem tipo próprio
-	forte bool              // posição inequívoca (SQL, cabeçalho de arquivo): ensina sozinho
+// outputHint: o que o comando diz das colunas da saída.
+type outputHint struct {
+	cols   []string          // tipo de cada coluna, em ordem ("" = sem tipo); vazio = posição desconhecida
+	names  map[string]string // nome da coluna no cabeçalho (minúsculo) -> tipo
+	name   string            // tipo da coluna NAME/NAMES sem tipo próprio
+	strong bool              // posição inequívoca (SQL, cabeçalho de arquivo): ensina sozinho
 }
 
-func (d *dicaSaida) vazia() bool {
+func (d *outputHint) empty() bool {
 	if d == nil {
 		return true
 	}
@@ -41,23 +41,23 @@ func (d *dicaSaida) vazia() bool {
 			return false
 		}
 	}
-	return len(d.nomes) == 0 && d.name == ""
+	return len(d.names) == 0 && d.name == ""
 }
 
 // codificar: a dica como texto (vai junto do texto na chave da memória de resultados).
-func (d *dicaSaida) codificar() string {
-	if d.vazia() {
+func (d *outputHint) encode() string {
+	if d.empty() {
 		return ""
 	}
 	var b strings.Builder
-	if d.forte {
+	if d.strong {
 		b.WriteString("F")
 	} else {
 		b.WriteString("f")
 	}
 	b.WriteString("|" + strings.Join(d.cols, ",") + "|")
-	ks := make([]string, 0, len(d.nomes))
-	for k := range d.nomes {
+	ks := make([]string, 0, len(d.names))
+	for k := range d.names {
 		ks = append(ks, k)
 	}
 	sort.Strings(ks)
@@ -65,51 +65,51 @@ func (d *dicaSaida) codificar() string {
 		if i > 0 {
 			b.WriteByte(',')
 		}
-		b.WriteString(k + ":" + d.nomes[k])
+		b.WriteString(k + ":" + d.names[k])
 	}
 	b.WriteString("|" + d.name)
 	return b.String()
 }
 
 // sepExt separa, na dica, a parte do leitor de tabela (codificar) da extensão que os decisores
-// leem (TextoCtx.Ext).
+// leem (TextCtx.Ext).
 const sepExt = "\x1e"
 
-// partesDica: a dica do leitor de tabela e a extensão.
-func partesDica(s string) (tabela, ext string) {
+// hintParts: a dica do leitor de tabela e a extensão.
+func hintParts(s string) (table, ext string) {
 	t, e, _ := strings.Cut(s, sepExt)
 	return t, e
 }
 
-// lerDica: o inverso de codificar (nil se vazia ou inválida). A extensão (depois de sepExt) é
+// readHint: o inverso de codificar (nil se vazia ou inválida). A extensão (depois de sepExt) é
 // ignorada aqui.
-func lerDica(s string) *dicaSaida {
-	s, _ = partesDica(s)
+func readHint(s string) *outputHint {
+	s, _ = hintParts(s)
 	ps := strings.Split(s, "|")
 	if len(ps) != 4 {
 		return nil
 	}
-	d := &dicaSaida{forte: ps[0] == "F", name: ps[3], nomes: map[string]string{}}
+	d := &outputHint{strong: ps[0] == "F", name: ps[3], names: map[string]string{}}
 	if ps[1] != "" {
 		d.cols = strings.Split(ps[1], ",")
 	}
 	if ps[2] != "" {
 		for _, kv := range strings.Split(ps[2], ",") {
 			if k, v, ok := strings.Cut(kv, ":"); ok {
-				d.nomes[k] = v
+				d.names[k] = v
 			}
 		}
 	}
-	if d.vazia() {
+	if d.empty() {
 		return nil
 	}
 	return d
 }
 
 // tipo: o tipo da coluna k (de n) cujo cabeçalho é h.
-func (d *dicaSaida) tipo(h string, k, n int) string {
+func (d *outputHint) typ(h string, k, n int) string {
 	l := strings.ToLower(h)
-	if t, ok := d.nomes[l]; ok {
+	if t, ok := d.names[l]; ok {
 		return t
 	}
 	if n > 0 && len(d.cols) == n && d.cols[k] != "" {
@@ -121,35 +121,35 @@ func (d *dicaSaida) tipo(h string, k, n int) string {
 	return ""
 }
 
-// Comandos: os comandos de uma conversa, em ordem (o proxy cria um por requisição). Guarda o
+// Commands: os comandos de uma conversa, em ordem (o proxy cria um por requisição). Guarda o
 // cabeçalho dos arquivos lidos, para a extração de coluna por posição.
-type Comandos struct {
-	cabs map[string][]string // caminho (e nome do arquivo) -> células do cabeçalho
-	cv   conversaCmd         // proveniência, eco e tipo pedido (chamada.go)
+type Commands struct {
+	hdrs map[string][]string // caminho (e nome do arquivo) -> células do cabeçalho
+	cv   conversationCmd     // proveniência, eco e tipo pedido (chamada.go)
 }
 
-func NovosComandos() *Comandos { return &Comandos{cabs: map[string][]string{}} }
+func NewCommands() *Commands { return &Commands{hdrs: map[string][]string{}} }
 
-// Dica: o que o comando diz da saída (texto vazio: nada). saida é o resultado do comando: se
+// Hint: o que o comando diz da saída (texto vazio: nada). saida é o resultado do comando: se
 // ele mostra o começo de um arquivo com cabeçalho, o cabeçalho fica lembrado para os comandos
 // seguintes.
-func (c *Comandos) Dica(cmd, saida string) string {
+func (c *Commands) Hint(cmd, output string) string {
 	if len(cmd) > 8<<10 {
 		cmd = cmd[:8<<10]
 	}
-	d := c.dica(cmd)
-	c.lembrarCabecalho(cmd, saida)
-	return d.codificar()
+	d := c.hint(cmd)
+	c.rememberHeader(cmd, output)
+	return d.encode()
 }
 
-func (c *Comandos) dica(cmd string) *dicaSaida {
-	if d := dicaSQL(cmd); d != nil {
+func (c *Commands) hint(cmd string) *outputHint {
+	if d := sqlHint(cmd); d != nil {
 		return d
 	}
-	if d := c.dicaColuna(cmd); d != nil {
+	if d := c.columnHint(cmd); d != nil {
 		return d
 	}
-	return dicaListagem(cmd)
+	return listingHint(cmd)
 }
 
 // ---- SQL no comando --------------------------------------------------------------------
@@ -159,56 +159,56 @@ var (
 	reShow       = regexp.MustCompile(`(?i)\bshow\s+(?:terse\s+|full\s+)?([a-z]+)\b`)
 	reDescribe   = regexp.MustCompile(`(?i)\b(?:describe|desc)\s+(?:table\s+|view\s+)?[\w$."\x60\[\]]+`)
 	reItemAlias  = regexp.MustCompile(`(?is)^(.*?\S)\s+(?:as\s+)?([A-Za-z_][\w$]*|"[^"]+")$`)
-	reColSimples = regexp.MustCompile(`^(?:[\w$]+|"[^"]+"|\x60[^\x60]+\x60|\[[^\]]+\])(?:\.(?:[\w$]+|"[^"]+"|\x60[^\x60]+\x60|\[[^\]]+\]))*$`)
+	reSimpleCol  = regexp.MustCompile(`^(?:[\w$]+|"[^"]+"|\x60[^\x60]+\x60|\[[^\]]+\])(?:\.(?:[\w$]+|"[^"]+"|\x60[^\x60]+\x60|\[[^\]]+\]))*$`)
 )
 
-// dicaSQL: a dica de uma instrução SQL no comando (a última SELECT, ou SHOW/DESCRIBE).
-func dicaSQL(cmd string) *dicaSaida {
-	if !temAlgum(strings.ToLower(cmd), []string{"select", "show", "desc"}) {
+// sqlHint: a dica de uma instrução SQL no comando (a última SELECT, ou SHOW/DESCRIBE).
+func sqlHint(cmd string) *outputHint {
+	if !hasAny(strings.ToLower(cmd), []string{"select", "show", "desc"}) {
 		return nil
 	}
 	ms := reSelectFrom.FindAllStringSubmatchIndex(cmd, -1)
 	if len(ms) > 0 {
 		m := ms[len(ms)-1]
-		if d := dicaSelect(cmd[m[2]:m[3]], cmd[m[4]:m[5]]); d != nil {
+		if d := selectHint(cmd[m[2]:m[3]], cmd[m[4]:m[5]]); d != nil {
 			return d
 		}
 	}
-	if alvoDeSistema(cmd) {
+	if systemTarget(cmd) {
 		return nil // descreve ou lista um catálogo de sistema: a estrutura listada é pública
 	}
 	if m := reShow.FindStringSubmatch(cmd); m != nil {
-		if e, ok := entPlural(m[1]); ok {
-			return &dicaSaida{nomes: map[string]string{"name": e}, name: e, forte: true}
+		if e, ok := pluralEnt(m[1]); ok {
+			return &outputHint{names: map[string]string{"name": e}, name: e, strong: true}
 		}
 	}
 	if reDescribe.MatchString(cmd) {
-		return &dicaSaida{nomes: map[string]string{"name": "coluna"}, name: "coluna", forte: true}
+		return &outputHint{names: map[string]string{"name": "coluna"}, name: "coluna", strong: true}
 	}
 	return nil
 }
 
-// entPlural: a entidade de uma palavra de tipo no plural ou no singular ("tables", "schemas").
-func entPlural(w string) (string, bool) {
+// pluralEnt: a entidade de uma palavra de tipo no plural ou no singular ("tables", "schemas").
+func pluralEnt(w string) (string, bool) {
 	l := strings.ToLower(w)
-	if !pluralTipo[l] && entPedaco[l] == "" {
+	if !pluralType[l] && entPiece[l] == "" {
 		return "", false
 	}
-	e, forte := entChave(l)
-	return e, forte && e != ""
+	e, strong := entKey(l)
+	return e, strong && e != ""
 }
 
-// dicaSelect: lista do SELECT e o objeto do FROM.
-func dicaSelect(lista, from string) *dicaSaida {
-	itens := dividirLista(lista)
-	if len(itens) == 0 || len(itens) > 60 {
+// selectHint: lista do SELECT e o objeto do FROM.
+func selectHint(list, from string) *outputHint {
+	items := splitList(list)
+	if len(items) == 0 || len(items) > 60 {
 		return nil
 	}
 	fps := strings.Split(from, ".")
-	catalogo := semCitacao(fps[len(fps)-1])
-	d := &dicaSaida{nomes: map[string]string{}, forte: true}
-	posicional := true
-	for k, it := range itens {
+	catalog := unquoted(fps[len(fps)-1])
+	d := &outputHint{names: map[string]string{}, strong: true}
+	positional := true
+	for k, it := range items {
 		it = strings.TrimSpace(it)
 		if k == 0 { // DISTINCT, TOP n
 			for _, p := range []*regexp.Regexp{reDistinct, reTop} {
@@ -218,45 +218,45 @@ func dicaSelect(lista, from string) *dicaSaida {
 			}
 		}
 		if it == "*" || strings.HasSuffix(it, ".*") {
-			posicional = false
+			positional = false
 			continue
 		}
 		expr, alias := it, ""
-		if !reColSimples.MatchString(it) {
-			if m := reItemAlias.FindStringSubmatch(it); m != nil && !publicoSQL(m[2]) {
-				expr, alias = m[1], semCitacao(m[2])
+		if !reSimpleCol.MatchString(it) {
+			if m := reItemAlias.FindStringSubmatch(it); m != nil && !publicSQL(m[2]) {
+				expr, alias = m[1], unquoted(m[2])
 			}
 		}
 		base := ""
-		if reColSimples.MatchString(expr) {
+		if reSimpleCol.MatchString(expr) {
 			ps := strings.Split(expr, ".")
-			base = semCitacao(ps[len(ps)-1])
+			base = unquoted(ps[len(ps)-1])
 		}
 		e := ""
 		if base != "" {
-			if t, ok := entCabecalho(base); ok {
+			if t, ok := entHeader(base); ok {
 				e = t
 			} else if l := strings.ToLower(base); l == "name" || l == "nome" {
-				e, _ = entPlural(catalogo)
+				e, _ = pluralEnt(catalog)
 			}
 		}
 		if e == "" && alias != "" {
-			e, _ = entCabecalho(alias)
+			e, _ = entHeader(alias)
 		}
 		d.cols = append(d.cols, e)
 		if e == "" {
 			continue
 		}
 		for _, n := range []string{alias, base} {
-			if n != "" && reIdentSimples.MatchString(n) {
-				d.nomes[strings.ToLower(n)] = e
+			if n != "" && reSimpleIdent.MatchString(n) {
+				d.names[strings.ToLower(n)] = e
 			}
 		}
 	}
-	if !posicional {
+	if !positional {
 		d.cols = nil
 	}
-	if d.vazia() {
+	if d.empty() {
 		return nil
 	}
 	return d
@@ -267,10 +267,10 @@ var (
 	reTop      = regexp.MustCompile(`(?i)^top\s+\(?\d+\)?\s+`)
 )
 
-// dividirLista: os itens de uma lista separada por vírgulas, fora de parênteses e aspas.
-func dividirLista(s string) []string {
+// splitList: os itens de uma lista separada por vírgulas, fora de parênteses e aspas.
+func splitList(s string) []string {
 	var out []string
-	prof, a := 0, 0
+	depth, a := 0, 0
 	var q byte
 	for i := 0; i < len(s); i++ {
 		c := s[i]
@@ -282,10 +282,10 @@ func dividirLista(s string) []string {
 		case c == '\'' || c == '"' || c == '`':
 			q = c
 		case c == '(' || c == '[':
-			prof++
+			depth++
 		case c == ')' || c == ']':
-			prof--
-		case c == ',' && prof == 0:
+			depth--
+		case c == ',' && depth == 0:
 			out = append(out, s[a:i])
 			a = i + 1
 		}
@@ -298,109 +298,109 @@ func dividirLista(s string) []string {
 var (
 	reCut      = regexp.MustCompile(`\bcut\b(?:'[^'\n]*'|"[^"\n]*"|[^|;&\n'"])*`)
 	reCutDelim = regexp.MustCompile(`(?:-d\s*|--delimiter=)(?:'([^']{1,4})'|"([^"]{1,4})"|(\S))`)
-	reCutCampo = regexp.MustCompile(`(?:-f\s*|--fields=)([\d,\-]+)`)
+	reCutField = regexp.MustCompile(`(?:-f\s*|--fields=)([\d,\-]+)`)
 	reAwk      = regexp.MustCompile(`\b[gnm]?awk\b(?:\s+-F\s*(?:'[^'\n]*'|"[^"\n]*"|\S+))?[^{|\n]*?\{\s*print\s+(\$\d+(?:\s*,\s*\$\d+){0,9})\s*;?\s*\}`)
-	reCaminho  = regexp.MustCompile(`[\w~./\-]*[\w\-]\.[A-Za-z][\w]{0,5}\b`)
+	rePath     = regexp.MustCompile(`[\w~./\-]*[\w\-]\.[A-Za-z][\w]{0,5}\b`)
 )
 
-// dicaColuna: cut -fN / awk '{print $N}' sobre um arquivo de cabeçalho conhecido.
-func (c *Comandos) dicaColuna(cmd string) *dicaSaida {
-	if len(c.cabs) == 0 || !strings.Contains(cmd, "cut") && !strings.Contains(cmd, "awk") {
+// columnHint: cut -fN / awk '{print $N}' sobre um arquivo de cabeçalho conhecido.
+func (c *Commands) columnHint(cmd string) *outputHint {
+	if len(c.hdrs) == 0 || !strings.Contains(cmd, "cut") && !strings.Contains(cmd, "awk") {
 		return nil
 	}
-	cab := c.cabecalhoCitado(cmd)
-	if cab == nil {
+	hdr := c.quotedHeader(cmd)
+	if hdr == nil {
 		return nil
 	}
-	var campos []int
+	var fields []int
 	if m := reCut.FindString(cmd); m != "" {
-		if f := reCutCampo.FindStringSubmatch(m); f != nil {
+		if f := reCutField.FindStringSubmatch(m); f != nil {
 			for _, p := range strings.Split(f[1], ",") {
-				a, b, faixa := strings.Cut(p, "-")
+				a, b, rng := strings.Cut(p, "-")
 				i, err := strconv.Atoi(a)
 				if err != nil || i < 1 {
 					continue
 				}
 				j := i
-				if faixa {
+				if rng {
 					if j, err = strconv.Atoi(b); err != nil {
-						j = len(cab)
+						j = len(hdr)
 					}
 				}
-				for ; i <= j && i <= len(cab) && len(campos) < 20; i++ {
-					campos = append(campos, i)
+				for ; i <= j && i <= len(hdr) && len(fields) < 20; i++ {
+					fields = append(fields, i)
 				}
 			}
 		}
 	} else if m := reAwk.FindStringSubmatch(cmd); m != nil {
 		for _, p := range strings.Split(m[1], ",") {
 			if i, err := strconv.Atoi(strings.TrimPrefix(strings.TrimSpace(p), "$")); err == nil && i >= 1 {
-				campos = append(campos, i)
+				fields = append(fields, i)
 			}
 		}
 	}
-	if len(campos) == 0 {
+	if len(fields) == 0 {
 		return nil
 	}
-	d := &dicaSaida{nomes: map[string]string{}, forte: true}
-	for _, i := range campos {
+	d := &outputHint{names: map[string]string{}, strong: true}
+	for _, i := range fields {
 		e := ""
-		if i <= len(cab) {
-			e, _ = entCabecalho(cab[i-1])
+		if i <= len(hdr) {
+			e, _ = entHeader(hdr[i-1])
 			if e != "" {
-				d.nomes[strings.ToLower(cab[i-1])] = e
+				d.names[strings.ToLower(hdr[i-1])] = e
 			}
 		}
 		d.cols = append(d.cols, e)
 	}
-	if d.vazia() {
+	if d.empty() {
 		return nil
 	}
 	return d
 }
 
-// cabecalhoCitado: o cabeçalho de um arquivo conhecido citado no comando.
-func (c *Comandos) cabecalhoCitado(cmd string) []string {
-	for _, p := range reCaminho.FindAllString(cmd, 20) {
-		if cab, ok := c.cabs[p]; ok {
-			return cab
+// quotedHeader: o cabeçalho de um arquivo conhecido citado no comando.
+func (c *Commands) quotedHeader(cmd string) []string {
+	for _, p := range rePath.FindAllString(cmd, 20) {
+		if hdr, ok := c.hdrs[p]; ok {
+			return hdr
 		}
-		if cab, ok := c.cabs[nomeArquivo(p)]; ok {
-			return cab
+		if hdr, ok := c.hdrs[fileNameOf(p)]; ok {
+			return hdr
 		}
 	}
 	return nil
 }
 
-func nomeArquivo(p string) string {
+func fileNameOf(p string) string {
 	if i := strings.LastIndexByte(p, '/'); i >= 0 {
 		return p[i+1:]
 	}
 	return p
 }
 
-// lembrarCabecalho: a saída começa com o cabeçalho de um arquivo citado no comando ("a,b,c"
+// rememberHeader: a saída começa com o cabeçalho de um arquivo citado no comando ("a,b,c"
 // com cada célula um identificador)? Fica lembrado pelo caminho e pelo nome do arquivo.
-func (c *Comandos) lembrarCabecalho(cmd, saida string) {
-	ps := reCaminho.FindAllString(cmd, 4)
-	if len(ps) == 0 || saida == "" {
+func (c *Commands) rememberHeader(cmd, output string) {
+	ps := rePath.FindAllString(cmd, 4)
+	if len(ps) == 0 || output == "" {
 		return
 	}
-	if len(saida) > 4096 {
-		saida = saida[:4096]
+	if len(output) > 4096 {
+		output = output[:4096]
 	}
-	if n, ok := normalizar(saida); ok {
-		saida = n.t
+	if n, ok := normalize(output); ok {
+		output = n.t
 	}
-	linha := ""
-	for _, l := range strings.Split(saida, "\n") {
+	line := ""
+	for _, l := range strings.Split(output, "\n") {
 		if l = strings.TrimSpace(strings.TrimPrefix(l, "\ufeff")); l != "" {
-			linha = l
+			line = l
 			break
 		}
 	}
 	for _, sep := range []string{",", "\t", ";", "|"} {
-		cs := strings.Split(linha, sep)
+		cs := strings.Split(line, sep)
 		if len(cs) < 2 {
 			continue
 		}
@@ -408,7 +408,7 @@ func (c *Comandos) lembrarCabecalho(cmd, saida string) {
 		for i, v := range cs {
 			v = strings.Trim(strings.TrimSpace(v), `"`)
 			cs[i] = v
-			if !reCelulaIdent.MatchString(v) {
+			if !reIdentCell.MatchString(v) {
 				ok = false
 				break
 			}
@@ -417,8 +417,8 @@ func (c *Comandos) lembrarCabecalho(cmd, saida string) {
 			return
 		}
 		for _, p := range ps {
-			c.cabs[p] = cs
-			c.cabs[nomeArquivo(p)] = cs
+			c.hdrs[p] = cs
+			c.hdrs[fileNameOf(p)] = cs
 		}
 		return
 	}
@@ -427,8 +427,8 @@ func (c *Comandos) lembrarCabecalho(cmd, saida string) {
 // ---- listagem de recurso ---------------------------------------------------------------
 
 // tipos de recurso de contêiner e de orquestrador (com as abreviações das próprias CLIs) que a
-// palavra de tipo genérica não cobre; o resto vem de entPlural (tables, topics, buckets...)
-var recursoListagem = map[string]string{
+// palavra de tipo genérica não cobre; o resto vem de pluralEnt (tables, topics, buckets...)
+var listingResource = map[string]string{
 	"pod": "servico", "pods": "servico", "po": "servico", "deployment": "servico", "deployments": "servico",
 	"deploy": "servico", "statefulset": "servico", "statefulsets": "servico", "sts": "servico",
 	"daemonset": "servico", "daemonsets": "servico", "ds": "servico", "replicaset": "servico",
@@ -443,39 +443,39 @@ var recursoListagem = map[string]string{
 }
 
 // verbos de listagem (como subcomando, nunca o próprio programa: "ls" e "ps" sozinhos são do shell)
-var verbosListagem = conj("get", "list", "ls", "ps")
+var listingVerbs = setOf("get", "list", "ls", "ps")
 
-// dicaListagem: <cli> get|list|ls <tipo>, <cli> <tipo> list|ls, <cli> list-<tipo>, <cli> ps.
-func dicaListagem(cmd string) *dicaSaida {
-	seg := cmd
-	if i := strings.IndexAny(seg, "|;&\n"); i >= 0 {
-		seg = seg[:i]
+// listingHint: <cli> get|list|ls <tipo>, <cli> <tipo> list|ls, <cli> list-<tipo>, <cli> ps.
+func listingHint(cmd string) *outputHint {
+	sgm := cmd
+	if i := strings.IndexAny(sgm, "|;&\n"); i >= 0 {
+		sgm = sgm[:i]
 	}
-	ts := strings.Fields(seg)
+	ts := strings.Fields(sgm)
 	if len(ts) < 2 || len(ts) > 30 {
 		return nil
 	}
-	tipoDe := func(w string) string {
+	typeOf := func(w string) string {
 		w = strings.ToLower(strings.Trim(w, `"'`))
 		if i := strings.IndexAny(w, "/,."); i > 0 {
 			w = w[:i]
 		}
-		if e, ok := recursoListagem[w]; ok {
+		if e, ok := listingResource[w]; ok {
 			return e
 		}
-		if e, ok := entPlural(w); ok && e != "coluna" {
+		if e, ok := pluralEnt(w); ok && e != "coluna" {
 			return e
 		}
 		return ""
 	}
 	// o tipo listado: o do vocabulário ou, para qualquer outro substantivo no plural ("dags",
 	// "projects", "pipelines"), objeto nomeado (servico)
-	dicaDe := func(w string) *dicaSaida {
-		if e := tipoDe(w); e != "" {
-			return dicaNome(e)
+	hintOf := func(w string) *outputHint {
+		if e := typeOf(w); e != "" {
+			return nameHint(e)
 		}
-		if substantivoPlural(w) {
-			return dicaIdentidade("servico", w)
+		if pluralNoun(w) {
+			return identityHint("servico", w)
 		}
 		return nil
 	}
@@ -483,44 +483,44 @@ func dicaListagem(cmd string) *dicaSaida {
 		v := strings.ToLower(ts[i])
 		if strings.HasPrefix(v, "list-") {
 			ps := strings.Split(v[5:], "-")
-			return dicaDe(ps[len(ps)-1])
+			return hintOf(ps[len(ps)-1])
 		}
-		if !verbosListagem[v] {
+		if !listingVerbs[v] {
 			continue
 		}
 		for j := i + 1; j < len(ts); j++ {
 			if strings.HasPrefix(ts[j], "-") {
 				continue
 			}
-			if d := dicaDe(ts[j]); d != nil {
+			if d := hintOf(ts[j]); d != nil {
 				return d
 			}
 			break
 		}
 		if i >= 2 {
-			if d := dicaDe(ts[i-1]); d != nil {
+			if d := hintOf(ts[i-1]); d != nil {
 				return d
 			}
 		}
 		if v == "ps" || v == "list" && i == 1 {
-			return dicaNome("servico") // docker ps, helm list: contêineres e releases
+			return nameHint("servico") // docker ps, helm list: contêineres e releases
 		}
 		return nil
 	}
 	return nil
 }
 
-func dicaNome(e string) *dicaSaida {
-	return &dicaSaida{nomes: map[string]string{"name": e, "names": e}, name: e}
+func nameHint(e string) *outputHint {
+	return &outputHint{names: map[string]string{"name": e, "names": e}, name: e}
 }
 
-// dicaIdentidade: a listagem de um tipo fora do vocabulário tipa só a coluna de identidade
+// identityHint: a listagem de um tipo fora do vocabulário tipa só a coluna de identidade
 // composta, o tipo no singular com _id ou _name (dags -> dag_id, projects -> project_id,
 // clusters -> cluster_name). NAME ou o tipo sozinho não: "UNIT" de systemctl list-units não diz
 // que o valor é nome de alguém.
-func dicaIdentidade(e, tipo string) *dicaSaida {
-	d := &dicaSaida{nomes: map[string]string{}}
-	t := strings.ToLower(strings.Trim(tipo, `"'`))
+func identityHint(e, typ string) *outputHint {
+	d := &outputHint{names: map[string]string{}}
+	t := strings.ToLower(strings.Trim(typ, `"'`))
 	switch {
 	case strings.HasSuffix(t, "ies"):
 		t = t[:len(t)-3] + "y"
@@ -531,14 +531,14 @@ func dicaIdentidade(e, tipo string) *dicaSaida {
 	}
 	if len(t) >= 2 {
 		for _, suf := range []string{"_id", "_name", "id", "name", "-id", "-name"} {
-			d.nomes[t+suf] = e
+			d.names[t+suf] = e
 		}
 	}
 	return d
 }
 
-// substantivoPlural: uma palavra em minúsculas terminada em "s" (não "ss"): o tipo listado.
-func substantivoPlural(w string) bool {
+// pluralNoun: uma palavra em minúsculas terminada em "s" (não "ss"): o tipo listado.
+func pluralNoun(w string) bool {
 	w = strings.Trim(w, `"'`)
 	if len(w) < 4 || w[len(w)-1] != 's' || w[len(w)-2] == 's' {
 		return false
@@ -553,31 +553,31 @@ func substantivoPlural(w string) bool {
 
 // ---- a dica aplicada -------------------------------------------------------------------
 
-// publicoDica: o vocabulário dos formatos em que a dica aparece.
-func publicoDica(v string) bool { return publicoSQL(v) || publicoDevops(v) }
+// publicHint: o vocabulário dos formatos em que a dica aparece.
+func publicHint(v string) bool { return publicSQL(v) || publicDevops(v) }
 
-// acharComDica: as colunas tipadas pela dica, na tabela com cabeçalho (o leitor de tabela, em
+// findWithHint: as colunas tipadas pela dica, na tabela com cabeçalho (o leitor de tabela, em
 // modo dica) e na saída sem cabeçalho (uma linha por registro, o mesmo número de células).
-func acharComDica(s string, d *dicaSaida, add func(ObjAchado)) {
-	acharTabelasD(s, d, add)
+func findWithHint(s string, d *outputHint, add func(ObjFinding)) {
+	findTablesD(s, d, add)
 	if len(d.cols) > 0 {
-		linhasDica(s, d, add)
+		hintLines(s, d, add)
 	}
 }
 
 var (
-	reContagem = regexp.MustCompile(`^\s*\d+\s+\S`)
-	reRodape   = regexp.MustCompile(`^\(\d+ (?:rows?|linhas?|registros?)(?: affected| afetad[oa]s?)?\)$`)
+	reCount  = regexp.MustCompile(`^\s*\d+\s+\S`)
+	reFooter = regexp.MustCompile(`^\(\d+ (?:rows?|linhas?|registros?)(?: affected| afetad[oa]s?)?\)$`)
 )
 
-// linhasDica: saída sem cabeçalho (psql -At, cut, awk, sort | uniq -c): toda linha tem o mesmo
+// hintLines: saída sem cabeçalho (psql -At, cut, awk, sort | uniq -c): toda linha tem o mesmo
 // número de células que a dica tem de colunas. Uma linha fora da forma desfaz tudo.
-func linhasDica(s string, d *dicaSaida, add func(ObjAchado)) {
+func hintLines(s string, d *outputHint, add func(ObjFinding)) {
 	n := len(d.cols)
-	type lin struct{ a, b int }
-	var ls []lin
-	contagem := true
-	for _, l := range quebraLinhas(s) {
+	type lineV struct{ a, b int }
+	var ls []lineV
+	counting := true
+	for _, l := range wrapLines(s) {
 		a, b := l[0], l[1]
 		for a < b && (s[a] == ' ' || s[a] == '\t') {
 			a++
@@ -585,11 +585,11 @@ func linhasDica(s string, d *dicaSaida, add func(ObjAchado)) {
 		for b > a && (s[b-1] == ' ' || s[b-1] == '\t') {
 			b--
 		}
-		if a == b || reRodape.MatchString(s[a:b]) {
+		if a == b || reFooter.MatchString(s[a:b]) {
 			continue
 		}
-		ls = append(ls, lin{a, b})
-		contagem = contagem && reContagem.MatchString(s[a:b])
+		ls = append(ls, lineV{a, b})
+		counting = counting && reCount.MatchString(s[a:b])
 		if len(ls) > 20000 {
 			return
 		}
@@ -597,7 +597,7 @@ func linhasDica(s string, d *dicaSaida, add func(ObjAchado)) {
 	if len(ls) == 0 {
 		return
 	}
-	if contagem && n == 1 { // sort | uniq -c: "   12 valor"
+	if counting && n == 1 { // sort | uniq -c: "   12 valor"
 		for i, l := range ls {
 			k := l.a
 			for k < l.b && s[k] >= '0' && s[k] <= '9' {
@@ -614,7 +614,7 @@ func linhasDica(s string, d *dicaSaida, add func(ObjAchado)) {
 		for _, c := range []byte{'|', '\t', ',', ';'} {
 			ok := true
 			for _, l := range ls {
-				if contaFora(s[l.a:l.b], c) != n-1 {
+				if countOutside(s[l.a:l.b], c) != n-1 {
 					ok = false
 					break
 				}
@@ -625,106 +625,106 @@ func linhasDica(s string, d *dicaSaida, add func(ObjAchado)) {
 			}
 		}
 	}
-	var cels [][]celula
+	var cells [][]cell
 	for _, l := range ls {
-		var cs []celula
+		var cs []cell
 		switch {
 		case sep != 0:
-			cs = celulasObj(s, l.a, l.b, sep, nil)
+			cs = objCells(s, l.a, l.b, sep, nil)
 		default:
-			cs = tokensLinha(s, l.a, l.b)
+			cs = lineTokens(s, l.a, l.b)
 		}
 		if len(cs) != n {
 			return
 		}
-		cels = append(cels, cs)
+		cells = append(cells, cs)
 	}
-	for _, cs := range cels {
-		cab := true // a linha do cabeçalho (cut -f2 arquivo.csv imprime o cabeçalho)
+	for _, cs := range cells {
+		hdr := true // a linha do cabeçalho (cut -f2 arquivo.csv imprime o cabeçalho)
 		for k, c := range cs {
-			if d.tipo(s[c.a:c.b], k, 0) == "" || d.nomes[strings.ToLower(s[c.a:c.b])] == "" {
-				cab = false
+			if d.typ(s[c.a:c.b], k, 0) == "" || d.names[strings.ToLower(s[c.a:c.b])] == "" {
+				hdr = false
 			}
 		}
-		if cab {
+		if hdr {
 			continue
 		}
 		for k, c := range cs {
 			if e := d.cols[k]; e != "" {
-				celulaDica(s, c, e, d.forte, add)
+				hintCell(s, c, e, d.strong, add)
 			}
 		}
 	}
 }
 
-// celulaDica: o valor de uma coluna tipada pela dica (os freios da célula de catálogo).
-func celulaDica(s string, c celula, e string, forte bool, add func(ObjAchado)) {
+// hintCell: o valor de uma coluna tipada pela dica (os freios da célula de catálogo).
+func hintCell(s string, c cell, e string, strong bool, add func(ObjFinding)) {
 	if c.a < 0 || c.b <= c.a {
 		return
 	}
 	v := strings.Trim(s[c.a:c.b], `"'`)
 	a := c.a + strings.Index(s[c.a:c.b], v)
-	if v == "" || !reCelulaIdent.MatchString(v) || strings.EqualFold(v, "null") || strings.EqualFold(v, "none") ||
-		ehTipoDado(v) || strings.Trim(v, ".-") == "" || !forte && !caraDeIdentificador(v) {
+	if v == "" || !reIdentCell.MatchString(v) || strings.EqualFold(v, "null") || strings.EqualFold(v, "none") ||
+		isDataType(v) || strings.Trim(v, ".-") == "" || !strong && !identifierShape(v) {
 		return
 	}
 	ps := strings.Split(v, ".")
 	ents := entQual(len(ps), e)
 	for k, p := range ps {
-		if p != "" && !publicoDica(p) && reIdentSimples.MatchString(p) {
-			add(ObjAchado{a, a + len(p), ents[k], "comando", forte && ents[k] != "coluna" && len(p) >= 5})
+		if p != "" && !publicHint(p) && reSimpleIdent.MatchString(p) {
+			add(ObjFinding{a, a + len(p), ents[k], "comando", strong && ents[k] != "coluna" && len(p) >= 5})
 		}
 		a += len(p) + 1
 	}
 }
 
-// catalogosSistema: namespaces que são de sistema em toda instalação (os nomes de dentro deles
+// systemCatalogs: namespaces que são de sistema em toda instalação (os nomes de dentro deles
 // são documentação pública). public e dbo ficam de fora: guardam os objetos do cliente.
-var catalogosSistema = conj("information_schema", "pg_catalog", "pg_toast", "performance_schema", "sys",
+var systemCatalogs = setOf("information_schema", "pg_catalog", "pg_toast", "performance_schema", "sys",
 	"sysibm", "syscat", "sysstat", "snowflake", "account_usage", "organization_usage", "data_sharing_usage",
 	"readers_account_usage", "master", "msdb", "mysql")
 
-var reAlvoDescShow = regexp.MustCompile(`(?i)\b(?:describe|desc)\s+(?:table\s+|view\s+)?([\w$."]+)|\bshow\b[^;\n]*?\bin\s+(?:account\s+|database\s+|schema\s+)?([\w$."]+)`)
+var reDescShowTarget = regexp.MustCompile(`(?i)\b(?:describe|desc)\s+(?:table\s+|view\s+)?([\w$."]+)|\bshow\b[^;\n]*?\bin\s+(?:account\s+|database\s+|schema\s+)?([\w$."]+)`)
 
-// alvoDeSistema: o comando descreve (DESC) ou lista (SHOW ... IN) um objeto que está num
+// systemTarget: o comando descreve (DESC) ou lista (SHOW ... IN) um objeto que está num
 // catálogo de sistema (SNOWFLAKE.ACCOUNT_USAGE.TAG_REFERENCES, information_schema.columns).
 // Só quando TODAS as instruções do comando são isso: um DESC de sistema junto com um SELECT (ou
 // um SHOW sem IN, um DESC de tabela do cliente) no mesmo comando traz dado do cliente na saída.
-func alvoDeSistema(cmd string) bool {
-	sis := false
+func systemTarget(cmd string) bool {
+	sysName := false
 	for _, inst := range strings.Split(cmd, ";") {
-		ms := reAlvoDescShow.FindAllStringSubmatchIndex(inst, -1)
-		resto := inst
+		ms := reDescShowTarget.FindAllStringSubmatchIndex(inst, -1)
+		rest := inst
 		for k := len(ms) - 1; k >= 0; k-- {
 			m := ms[k]
-			alvo := ""
+			target := ""
 			for _, g := range [][2]int{{m[2], m[3]}, {m[4], m[5]}} {
 				if g[0] >= 0 {
-					alvo += inst[g[0]:g[1]]
+					target += inst[g[0]:g[1]]
 				}
 			}
-			if !objetoDeSistema(alvo) {
+			if !systemObject(target) {
 				return false
 			}
-			resto = resto[:m[0]] + resto[m[1]:]
+			rest = rest[:m[0]] + rest[m[1]:]
 		}
-		if reInstrucaoSQL.MatchString(resto) {
+		if reSQLStatement.MatchString(rest) {
 			return false // outra instrução no mesmo trecho (SELECT, SHOW sem IN...)
 		}
-		sis = sis || len(ms) > 0
+		sysName = sysName || len(ms) > 0
 	}
-	return sis
+	return sysName
 }
 
-// objetoDeSistema: alguma parte do nome qualificado é um catálogo de sistema.
-func objetoDeSistema(alvo string) bool {
-	for _, p := range strings.Split(alvo, ".") {
-		if catalogosSistema[strings.ToLower(strings.Trim(p, `"`))] {
+// systemObject: alguma parte do nome qualificado é um catálogo de sistema.
+func systemObject(target string) bool {
+	for _, p := range strings.Split(target, ".") {
+		if systemCatalogs[strings.ToLower(strings.Trim(p, `"`))] {
 			return true
 		}
 	}
 	return false
 }
 
-// reInstrucaoSQL: palavra que começa uma instrução que lê ou muda dado.
-var reInstrucaoSQL = regexp.MustCompile(`(?i)\b(?:select|with|insert|update|delete|merge|copy|call|execute|show|desc|describe|list|get|put|values)\b`)
+// reSQLStatement: palavra que começa uma instrução que lê ou muda dado.
+var reSQLStatement = regexp.MustCompile(`(?i)\b(?:select|with|insert|update|delete|merge|copy|call|execute|show|desc|describe|list|get|put|values)\b`)

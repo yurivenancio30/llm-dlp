@@ -5,19 +5,19 @@ import (
 	"strings"
 )
 
-// Tabela de saída de ferramenta de linha de comando (kubectl get, oc get, docker ps, helm list,
+// Table de saída de ferramenta de linha de comando (kubectl get, oc get, docker ps, helm list,
 // crictl ps...): cabeçalho em MAIÚSCULAS com colunas separadas por 2+ espaços ou tab, e as
 // linhas alinhadas no começo de cada coluna. A coluna diz o que o valor é: NAME/NAMES é o nome
 // do objeto, NAMESPACE o namespace, IMAGE a imagem, EXTERNAL-IP o IP público da infraestrutura.
 // Nada de ferramenta específica: só a forma do cabeçalho.
 
-var reCabecalhoCLI = regexp.MustCompile(`^[A-Z][A-Z0-9()/_.-]*(?: [A-Z][A-Z0-9()/_.-]*)?$`)
+var reCLIHeader = regexp.MustCompile(`^[A-Z][A-Z0-9()/_.-]*(?: [A-Z][A-Z0-9()/_.-]*)?$`)
 
 // colunas que interessam -> tipo
-var colunasCLI = map[string]string{"NAME": "servico", "NAMES": "servico", "NAMESPACE": "namespace", "IMAGE": "imagem",
+var cliColumns = map[string]string{"NAME": "servico", "NAMES": "servico", "NAMESPACE": "namespace", "IMAGE": "imagem",
 	"EXTERNAL-IP": "ip", "EXTERNAL IP": "ip", "PUBLIC-IP": "ip", "PUBLIC IP": "ip", "CONTAINER": "servico"}
 
-type colunaCLI struct {
+type cliColumn struct {
 	ini int // posição na linha (alinhado) ou índice (tab)
 	ent string
 }
@@ -25,16 +25,16 @@ type colunaCLI struct {
 // a linha de comando que gerou a tabela, logo acima dela no mesmo texto (terminal colado,
 // README, doc). Sem ela a tabela não é tipada aqui: a saída de ferramenta sem o comando à vista
 // fica com a dica do comando (ver chamada_comando.go), e "NAME STATUS AGE" solto pode ser qualquer coisa.
-var reComandoCLI = regexp.MustCompile(`\b(?:kubectl|oc|docker|podman|nerdctl|crictl|helm|minikube|kind|k3s|microk8s|eksctl|az|gcloud|aws)[ \t]+[a-z]`)
+var reCLICommand = regexp.MustCompile(`\b(?:kubectl|oc|docker|podman|nerdctl|crictl|helm|minikube|kind|k3s|microk8s|eksctl|az|gcloud|aws)[ \t]+[a-z]`)
 
 // get ns: a coluna NAME é o namespace
-var reComandoNS = regexp.MustCompile(`\bget[ \t]+(?:ns|namespaces?)\b`)
+var reNSCommand = regexp.MustCompile(`\bget[ \t]+(?:ns|namespaces?)\b`)
 
-func acharTabelaCLI(s string, add func(ObjAchado)) {
-	if !strings.Contains(s, "NAME") || !reComandoCLI.MatchString(s) {
+func findCLITable(s string, add func(ObjFinding)) {
+	if !strings.Contains(s, "NAME") || !reCLICommand.MatchString(s) {
 		return
 	}
-	var cols []colunaCLI
+	var cols []cliColumn
 	tab := false
 	nl, cmdNl, ns := 0, -10, false
 	for a := 0; a < len(s); {
@@ -44,16 +44,16 @@ func acharTabelaCLI(s string, add func(ObjAchado)) {
 		} else {
 			b += a
 		}
-		linha := strings.TrimRight(s[a:b], "\r")
+		line := strings.TrimRight(s[a:b], "\r")
 		nl++
 		switch {
-		case strings.TrimSpace(linha) == "":
+		case strings.TrimSpace(line) == "":
 			cols = nil
 		case cols == nil:
-			if reComandoCLI.MatchString(linha) {
-				cmdNl, ns = nl, reComandoNS.MatchString(linha)
+			if reCLICommand.MatchString(line) {
+				cmdNl, ns = nl, reNSCommand.MatchString(line)
 			} else if nl-cmdNl <= 3 {
-				cols, tab = cabecalhoCLI(linha)
+				cols, tab = cliHeader(line)
 				for k := range cols {
 					if ns && cols[k].ent == "servico" {
 						cols[k].ent = "namespace"
@@ -61,22 +61,22 @@ func acharTabelaCLI(s string, add func(ObjAchado)) {
 				}
 			}
 		default:
-			linhaCLI2(s, a, linha, cols, tab, add)
+			cliLine2(s, a, line, cols, tab, add)
 		}
 		a = b + 1
 	}
 }
 
-// cabecalhoCLI: as colunas de interesse, se a linha é um cabeçalho de tabela de saída.
-func cabecalhoCLI(l string) ([]colunaCLI, bool) {
+// cliHeader: as colunas de interesse, se a linha é um cabeçalho de tabela de saída.
+func cliHeader(l string) ([]cliColumn, bool) {
 	tab := strings.Contains(l, "\t")
-	var nomes []string
-	var inis []int
+	var names []string
+	var starts []int
 	if tab {
 		for _, p := range strings.Split(l, "\t") {
 			if t := strings.TrimSpace(p); t != "" {
-				nomes = append(nomes, t)
-				inis = append(inis, len(nomes)-1)
+				names = append(names, t)
+				starts = append(starts, len(names)-1)
 			}
 		}
 	} else {
@@ -91,39 +91,39 @@ func cabecalhoCLI(l string) ([]colunaCLI, bool) {
 			for j < len(l) && !(l[j] == ' ' && (j+1 >= len(l) || l[j+1] == ' ')) {
 				j++
 			}
-			nomes = append(nomes, l[i:j])
-			inis = append(inis, i)
+			names = append(names, l[i:j])
+			starts = append(starts, i)
 			i = j
 		}
 	}
-	if len(nomes) < 3 {
+	if len(names) < 3 {
 		return nil, false
 	}
-	var cols []colunaCLI
-	temNome := false
-	for k, n := range nomes {
-		if !reCabecalhoCLI.MatchString(n) {
+	var cols []cliColumn
+	hasName := false
+	for k, n := range names {
+		if !reCLIHeader.MatchString(n) {
 			return nil, false
 		}
-		if e, ok := colunasCLI[n]; ok {
-			cols = append(cols, colunaCLI{inis[k], e})
-			temNome = temNome || n == "NAME" || n == "NAMES" || n == "NAMESPACE"
+		if e, ok := cliColumns[n]; ok {
+			cols = append(cols, cliColumn{starts[k], e})
+			hasName = hasName || n == "NAME" || n == "NAMES" || n == "NAMESPACE"
 		}
 	}
-	if !temNome {
+	if !hasName {
 		return nil, false
 	}
 	return cols, tab
 }
 
-func linhaCLI2(s string, base int, l string, cols []colunaCLI, tab bool, add func(ObjAchado)) {
-	var campos [][2]int // início e fim de cada campo na linha
+func cliLine2(s string, base int, l string, cols []cliColumn, tab bool, add func(ObjFinding)) {
+	var fields [][2]int // início e fim de cada campo na linha
 	if tab {
 		k := 0
 		for _, p := range strings.Split(l, "\t") {
 			if t := strings.TrimSpace(p); t != "" {
 				i := k + strings.Index(p, t)
-				campos = append(campos, [2]int{i, i + len(t)})
+				fields = append(fields, [2]int{i, i + len(t)})
 			}
 			k += len(p) + 1
 		}
@@ -131,10 +131,10 @@ func linhaCLI2(s string, base int, l string, cols []colunaCLI, tab bool, add fun
 	for _, c := range cols {
 		var i, j int
 		if tab {
-			if c.ini >= len(campos) {
+			if c.ini >= len(fields) {
 				continue
 			}
-			i, j = campos[c.ini][0], campos[c.ini][1]
+			i, j = fields[c.ini][0], fields[c.ini][1]
 		} else {
 			i = c.ini
 			if i >= len(l) || l[i] == ' ' || i > 0 && l[i-1] != ' ' {
@@ -152,11 +152,11 @@ func linhaCLI2(s string, base int, l string, cols []colunaCLI, tab bool, add fun
 		a, b := base+i, base+j
 		switch c.ent {
 		case "imagem":
-			addImagem(s, a, b, "saída-cli", add)
+			addImage(s, a, b, "saída-cli", add)
 		case "ip":
 			for _, p := range strings.Split(v, ",") {
-				if ehIPv4(p) {
-					add(ObjAchado{a, a + len(p), "servidor", "saída-cli", true})
+				if isIPv4(p) {
+					add(ObjFinding{a, a + len(p), "servidor", "saída-cli", true})
 				}
 				a += len(p) + 1
 			}
@@ -167,7 +167,7 @@ func linhaCLI2(s string, base int, l string, cols []colunaCLI, tab bool, add fun
 				if k := strings.LastIndexByte(p0, '/'); k >= 0 {
 					x, p = a+k+1, p0[k+1:]
 				}
-				addNome(s, x, x+len(p), c.ent, "saída-cli", true, add)
+				addName(s, x, x+len(p), c.ent, "saída-cli", true, add)
 				a += len(p0) + 1
 			}
 		}
@@ -180,22 +180,22 @@ func linhaCLI2(s string, base int, l string, cols []colunaCLI, tab bool, add fun
 var (
 	reIPIngress  = regexp.MustCompile(`(?s)loadBalancer:\s*\n\s*ingress:\s*\n((?:[ \t]*-?[ \t]*(?:ip|hostname):[ \t]*\S+[ \t]*\n?)+)`)
 	reIPItem     = regexp.MustCompile(`\bip:[ \t]*(\d{1,3}(?:\.\d{1,3}){3})\b`)
-	reIPNoTipo   = regexp.MustCompile(`"type"\s*:\s*"(?:ExternalIP|InternalIP)"\s*,\s*"address"\s*:\s*"(\d{1,3}(?:\.\d{1,3}){3})"`)
-	reIPNoTipoAo = regexp.MustCompile(`"address"\s*:\s*"(\d{1,3}(?:\.\d{1,3}){3})"\s*,\s*"type"\s*:\s*"(?:ExternalIP|InternalIP)"`)
+	reIPInType   = regexp.MustCompile(`"type"\s*:\s*"(?:ExternalIP|InternalIP)"\s*,\s*"address"\s*:\s*"(\d{1,3}(?:\.\d{1,3}){3})"`)
+	reIPInTypeAo = regexp.MustCompile(`"address"\s*:\s*"(\d{1,3}(?:\.\d{1,3}){3})"\s*,\s*"type"\s*:\s*"(?:ExternalIP|InternalIP)"`)
 )
 
-func acharIPInfra(s string, add func(ObjAchado)) {
+func findInfraIP(s string, add func(ObjFinding)) {
 	if strings.Contains(s, "loadBalancer") {
 		for _, m := range reIPIngress.FindAllStringSubmatchIndex(s, -1) {
 			for _, n := range reIPItem.FindAllStringSubmatchIndex(s[m[2]:m[3]], -1) {
-				add(ObjAchado{m[2] + n[2], m[2] + n[3], "servidor", "ip-infra", true})
+				add(ObjFinding{m[2] + n[2], m[2] + n[3], "servidor", "ip-infra", true})
 			}
 		}
 	}
 	if strings.Contains(s, "ExternalIP") || strings.Contains(s, "InternalIP") {
-		for _, re := range []*regexp.Regexp{reIPNoTipo, reIPNoTipoAo} {
+		for _, re := range []*regexp.Regexp{reIPInType, reIPInTypeAo} {
 			for _, m := range re.FindAllStringSubmatchIndex(s, -1) {
-				add(ObjAchado{m[2], m[3], "servidor", "ip-infra", true})
+				add(ObjFinding{m[2], m[3], "servidor", "ip-infra", true})
 			}
 		}
 	}

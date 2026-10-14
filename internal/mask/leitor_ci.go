@@ -7,22 +7,22 @@ import (
 
 // Pipelines de CI: runners, ambientes e o Jenkinsfile (ver docs/pt-BR/estruturas.md, Pipelines de CI).
 
-// regraCI: GitHub Actions, GitLab CI, Azure Pipelines.
-func regraCI(s string, ents []yEnt, e *yEnt, v string, filho func(int, string) *yEnt, add func(ObjAchado)) {
-	k := e.chave()
+// ciRule: GitHub Actions, GitLab CI, Azure Pipelines.
+func ciRule(s string, ents []yEnt, e *yEnt, v string, child func(int, string) *yEnt, add func(ObjFinding)) {
+	k := e.key()
 	n := len(e.path)
-	ant := ""
+	prev := ""
 	if n >= 2 {
-		ant = e.path[n-2]
+		prev = e.path[n-2]
 	}
-	ant2 := ""
+	prev2 := ""
 	if n >= 3 {
-		ant2 = e.path[n-3]
+		prev2 = e.path[n-3]
 	}
-	runner := func() { addNome(s, e.vi, e.vf, "servidor", "ci", false, add) }
+	runner := func() { addName(s, e.vi, e.vf, "servidor", "ci", false, add) }
 	job := func(id int) bool {
 		for _, x := range []string{"runs-on", "script", "steps", "strategy", "deployment", "stage"} {
-			if filho(id, x) != nil {
+			if child(id, x) != nil {
 				return true
 			}
 		}
@@ -32,25 +32,25 @@ func regraCI(s string, ents []yEnt, e *yEnt, v string, filho func(int, string) *
 		return
 	}
 	switch {
-	case k == "image" || k == "container" && n >= 2 || k == "name" && ant == "image" || k == "image" && ant == "container":
-		addImagem(s, e.vi, e.vf, "imagem", add)
-	case k == "-" && ant == "services" || k == "name" && ant == "-" && ant2 == "services":
-		addImagem(s, e.vi, e.vf, "imagem", add)
-	case k == "runs-on" || k == "-" && ant == "runs-on" || ant == "runs-on" && (k == "group" || k == "labels") || k == "-" && ant == "labels" && ant2 == "runs-on":
+	case k == "image" || k == "container" && n >= 2 || k == "name" && prev == "image" || k == "image" && prev == "container":
+		addImage(s, e.vi, e.vf, "imagem", add)
+	case k == "-" && prev == "services" || k == "name" && prev == "-" && prev2 == "services":
+		addImage(s, e.vi, e.vf, "imagem", add)
+	case k == "runs-on" || k == "-" && prev == "runs-on" || prev == "runs-on" && (k == "group" || k == "labels") || k == "-" && prev == "labels" && prev2 == "runs-on":
 		runner()
-	case k == "-" && ant == "tags" && n == 3 && e.path[0] != "-" && job(e.ids[0]):
+	case k == "-" && prev == "tags" && n == 3 && e.path[0] != "-" && job(e.ids[0]):
 		runner()
-	case k == "pool" || k == "name" && ant == "pool":
+	case k == "pool" || k == "name" && prev == "pool":
 		runner()
-	case k == "environment" && job(e.pai()):
-		addNome(s, e.vi, e.vf, "servico", "ci", false, add)
-	case k == "name" && ant == "environment":
-		dono := e.root // o contêiner que tem a chave environment
+	case k == "environment" && job(e.parent()):
+		addName(s, e.vi, e.vf, "servico", "ci", false, add)
+	case k == "name" && prev == "environment":
+		owner := e.root // o contêiner que tem a chave environment
 		if n >= 3 {
-			dono = e.ids[n-3]
+			owner = e.ids[n-3]
 		}
-		if job(dono) {
-			addNome(s, e.vi, e.vf, "servico", "ci", false, add)
+		if job(owner) {
+			addName(s, e.vi, e.vf, "servico", "ci", false, add)
 		}
 	}
 }
@@ -64,7 +64,7 @@ var (
 	reJkImage = regexp.MustCompile(`\bimage[ \t]+['"]([^'"\s]+)['"]|\bdocker\.image\([ \t]*['"]([^'"\s]+)['"]`)
 )
 
-func acharJenkins(s string, add func(ObjAchado)) {
+func findJenkins(s string, add func(ObjFinding)) {
 	if strings.IndexByte(s, '{') < 0 && strings.IndexByte(s, '(') < 0 {
 		return
 	}
@@ -73,17 +73,17 @@ func acharJenkins(s string, add func(ObjAchado)) {
 	}
 	for _, re := range []*regexp.Regexp{reJkLabel, reJkNode} {
 		for _, m := range re.FindAllStringSubmatchIndex(s, -1) {
-			addNome(s, m[2], m[3], "servidor", "jenkins", false, add)
+			addName(s, m[2], m[3], "servidor", "jenkins", false, add)
 		}
 	}
 	for _, m := range reJkImage.FindAllStringSubmatchIndex(s, -1) {
 		if m[2] >= 0 {
-			addImagem(s, m[2], m[3], "imagem", add)
+			addImage(s, m[2], m[3], "imagem", add)
 		} else {
-			addImagem(s, m[4], m[5], "imagem", add)
+			addImage(s, m[4], m[5], "imagem", add)
 		}
 	}
 }
 
 // ---------------------------------------------------------------------------------------
-// Nome DNS de serviço do Kubernetes: <svc>.<ns>.svc.cluster.local
+// Name DNS de serviço do Kubernetes: <svc>.<ns>.svc.cluster.local

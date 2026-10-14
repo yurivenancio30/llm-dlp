@@ -7,13 +7,13 @@ import (
 
 // Fuzz: a normalização mantém o mapa coerente e a ida e volta pelos leitores
 // devolve o texto byte a byte, com qualquer transporte em volta.
-// go test ./internal/mask -run '^$' -fuzz FuzzNormalizar -fuzztime 60s
-// go test ./internal/mask -run '^$' -fuzz FuzzIdaVolta -fuzztime 60s
+// go test ./internal/mask -run '^$' -fuzz FuzzNormalize -fuzztime 60s
+// go test ./internal/mask -run '^$' -fuzz FuzzRoundTrip -fuzztime 60s
 
-func sementesFuzz(f *testing.F) {
-	for _, c := range conteudosMatriz[:3] {
-		for _, d := range desenhosMatriz[:12] {
-			for _, tr := range transportes {
+func fuzzSeeds(f *testing.F) {
+	for _, c := range matrixContents[:3] {
+		for _, d := range matrixLayouts[:12] {
+			for _, tr := range transports {
 				f.Add(tr.f(d.f(c.cols, c.rows)))
 			}
 		}
@@ -22,10 +22,10 @@ func sementesFuzz(f *testing.F) {
 	f.Add("  1→a.py:2:x\n+@@ -1 +1 @@\n> > ```\n")
 }
 
-func FuzzNormalizar(f *testing.F) {
-	sementesFuzz(f)
+func FuzzNormalize(f *testing.F) {
+	fuzzSeeds(f)
 	f.Fuzz(func(t *testing.T, s string) {
-		n, ok := normalizar(s)
+		n, ok := normalize(s)
 		if !ok {
 			return
 		}
@@ -46,43 +46,43 @@ func FuzzNormalizar(f *testing.F) {
 	})
 }
 
-func FuzzIdaVolta(f *testing.F) {
-	sementesFuzz(f)
-	m := novoTeste(&testing.T{})
+func FuzzRoundTrip(f *testing.F) {
+	fuzzSeeds(f)
+	m := newTest(&testing.T{})
 	f.Fuzz(func(t *testing.T, s string) {
 		if len(s) > 4096 || !strings.ContainsAny(s, "\n,=:|") {
 			return
 		}
-		out, ents := m.Mascarar(s)
-		if volta := NovaTabela(ents).Desmascarar(out, false); volta != s {
-			t.Fatalf("a volta não reproduz o original:\n%q\n%q", s, volta)
+		out, ents := m.Mask(s)
+		if back := NewTable(ents).Unmask(out, false); back != s {
+			t.Fatalf("a volta não reproduz o original:\n%q\n%q", s, back)
 		}
 	})
 }
 
 // a varredura manual do leitor de SQL faz o mesmo que as regex que substituiu
-func FuzzVarreduraSQL(f *testing.F) {
+func FuzzSQLScan(f *testing.F) {
 	for _, s := range []string{"SELECT a.b, [x y].\"z\" FROM `db.t` GROUP  BY c ORDER\nBY d", "café.ação_1 $x #y 1abc", "[]\"\"``[a", "group by groupby ORDERBY"} {
 		f.Add(s)
 	}
-	sementesFuzz(f)
+	fuzzSeeds(f)
 	f.Fuzz(func(t *testing.T, s string) {
 		if len(s) > 2000 {
 			return
 		}
-		eq := func(nome string, a [][]int, b [][2]int) {
+		eq := func(name string, a [][]int, b [][2]int) {
 			if len(a) != len(b) {
-				t.Fatalf("%s: %d contra %d em %q", nome, len(a), len(b), s)
+				t.Fatalf("%s: %d contra %d em %q", name, len(a), len(b), s)
 			}
 			for i := range a {
 				if a[i][0] != b[i][0] || a[i][1] != b[i][1] {
-					t.Fatalf("%s: %v contra %v em %q", nome, a[i], b[i], s)
+					t.Fatalf("%s: %v contra %v em %q", name, a[i], b[i], s)
 				}
 			}
 		}
-		eq("partes", reParteSQL.FindAllStringIndex(s, -1), partesSQLEm(s))
-		eq("qualificados", reQualTok.FindAllStringIndex(s, -1), qualsSQLEm(s))
-		if a, b := len(reClausulasSQL.FindAllStringIndex(s, 4)), contarClausulas(s, 4); a != b {
+		eq("partes", reSQLPart.FindAllStringIndex(s, -1), sqlPartsIn(s))
+		eq("qualificados", reQualTok.FindAllStringIndex(s, -1), sqlQualsIn(s))
+		if a, b := len(reSQLClauses.FindAllStringIndex(s, 4)), countClauses(s, 4); a != b {
 			t.Fatalf("cláusulas: %d contra %d em %q", a, b, s)
 		}
 	})

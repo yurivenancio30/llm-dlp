@@ -9,7 +9,7 @@ import (
 
 // Validadores de dígito verificador (CPF, CNPJ, PIS, CNH, cartão, título, CNS, RENAVAM, IBAN).
 
-func soDigitos(s string) string {
+func digitsOnly(s string) string {
 	var b strings.Builder
 	for _, r := range s {
 		if r >= '0' && r <= '9' {
@@ -19,7 +19,7 @@ func soDigitos(s string) string {
 	return b.String()
 }
 
-func digitos(s string) []int {
+func digits(s string) []int {
 	d := make([]int, 0, len(s))
 	for _, r := range s {
 		d = append(d, int(r-'0'))
@@ -27,7 +27,7 @@ func digitos(s string) []int {
 	return d
 }
 
-func todosIguais(d []int) bool {
+func allEqual(d []int) bool {
 	for _, x := range d[1:] {
 		if x != d[0] {
 			return false
@@ -36,36 +36,36 @@ func todosIguais(d []int) bool {
 	return true
 }
 
-func CPFValido(s string) bool {
-	d := digitos(soDigitos(s))
-	if len(d) != 11 || todosIguais(d) {
+func ValidCPF(s string) bool {
+	d := digits(digitsOnly(s))
+	if len(d) != 11 || allEqual(d) {
 		return false
 	}
 	for _, i := range []int{9, 10} {
-		soma := 0
+		sum := 0
 		for k := 0; k < i; k++ {
-			soma += d[k] * (i + 1 - k)
+			sum += d[k] * (i + 1 - k)
 		}
-		if (soma*10%11)%10 != d[i] {
+		if (sum*10%11)%10 != d[i] {
 			return false
 		}
 	}
 	return true
 }
 
-func CNPJValido(s string) bool {
-	d := digitos(soDigitos(s))
+func ValidCNPJ(s string) bool {
+	d := digits(digitsOnly(s))
 	// o número de ordem (posições 9 a 12) começa em 0001, a matriz: 0000 não é um CNPJ real
-	if len(d) != 14 || todosIguais(d) || (d[8] == 0 && d[9] == 0 && d[10] == 0 && d[11] == 0) {
+	if len(d) != 14 || allEqual(d) || (d[8] == 0 && d[9] == 0 && d[10] == 0 && d[11] == 0) {
 		return false
 	}
-	pesos := [][]int{{5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2}, {6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2}}
+	weights := [][]int{{5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2}, {6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2}}
 	for j, n := range []int{12, 13} {
-		soma := 0
+		sum := 0
 		for k := 0; k < n; k++ {
-			soma += d[k] * pesos[j][k]
+			sum += d[k] * weights[j][k]
 		}
-		r := soma % 11
+		r := sum % 11
 		dv := 0
 		if r >= 2 {
 			dv = 11 - r
@@ -77,44 +77,44 @@ func CNPJValido(s string) bool {
 	return true
 }
 
-// PISValido valida PIS/PASEP/NIS (11 dígitos).
-func PISValido(s string) bool {
-	d := digitos(soDigitos(s))
-	if len(d) != 11 || todosIguais(d) {
+// ValidPIS valida PIS/PASEP/NIS (11 dígitos).
+func ValidPIS(s string) bool {
+	d := digits(digitsOnly(s))
+	if len(d) != 11 || allEqual(d) {
 		return false
 	}
-	pesos := []int{3, 2, 9, 8, 7, 6, 5, 4, 3, 2}
-	soma := 0
-	for k, p := range pesos {
-		soma += d[k] * p
+	weights := []int{3, 2, 9, 8, 7, 6, 5, 4, 3, 2}
+	sum := 0
+	for k, p := range weights {
+		sum += d[k] * p
 	}
-	r := 11 - soma%11
+	r := 11 - sum%11
 	if r >= 10 {
 		r = 0
 	}
 	return r == d[10]
 }
 
-// CNHValida valida o número de registro da CNH (11 dígitos).
-func CNHValida(s string) bool {
-	d := digitos(soDigitos(s))
-	if len(d) != 11 || todosIguais(d) {
+// ValidCNH valida o número de registro da CNH (11 dígitos).
+func ValidCNH(s string) bool {
+	d := digits(digitsOnly(s))
+	if len(d) != 11 || allEqual(d) {
 		return false
 	}
-	soma, desc := 0, 0
+	sum, desc := 0, 0
 	for k := 0; k < 9; k++ {
-		soma += d[k] * (9 - k)
+		sum += d[k] * (9 - k)
 	}
-	dv1 := soma % 11
+	dv1 := sum % 11
 	if dv1 >= 10 {
 		dv1, desc = 0, 2
 	}
-	soma = 0
+	sum = 0
 	for k := 0; k < 9; k++ {
-		soma += d[k] * (1 + k)
+		sum += d[k] * (1 + k)
 	}
 	// mesmo algoritmo da validate-docbr: resto menos o desconto, corrigido para 0..10
-	dv2 := soma%11 - desc
+	dv2 := sum%11 - desc
 	if dv2 < 0 {
 		dv2 += 11
 	}
@@ -124,13 +124,13 @@ func CNHValida(s string) bool {
 	return dv1 == d[9] && dv2 == d[10]
 }
 
-// LuhnValido valida números de cartão (13 a 19 dígitos).
-func LuhnValido(s string) bool {
-	d := digitos(soDigitos(s))
-	if len(d) < 13 || len(d) > 19 || todosIguais(d) {
+// ValidLuhn valida números de cartão (13 a 19 dígitos).
+func ValidLuhn(s string) bool {
+	d := digits(digitsOnly(s))
+	if len(d) < 13 || len(d) > 19 || allEqual(d) {
 		return false
 	}
-	soma := 0
+	sum := 0
 	for i := len(d) - 1; i >= 0; i-- {
 		x := d[i]
 		if (len(d)-1-i)%2 == 1 {
@@ -139,28 +139,28 @@ func LuhnValido(s string) bool {
 				x -= 9
 			}
 		}
-		soma += x
+		sum += x
 	}
-	return soma%10 == 0
+	return sum%10 == 0
 }
 
-// NormNome: maiúsculas, sem acento, espaços colapsados ("João  da Silva" -> "JOAO DA SILVA").
-func NormNome(s string) string {
+// NormName: maiúsculas, sem acento, espaços colapsados ("João  da Silva" -> "JOAO DA SILVA").
+func NormName(s string) string {
 	t := norm.NFD.String(s)
 	var b strings.Builder
-	espaco := false
+	space := false
 	for _, r := range t {
 		if unicode.Is(unicode.Mn, r) {
 			continue
 		}
 		if unicode.IsSpace(r) {
-			espaco = true
+			space = true
 			continue
 		}
-		if espaco && b.Len() > 0 {
+		if space && b.Len() > 0 {
 			b.WriteByte(' ')
 		}
-		espaco = false
+		space = false
 		b.WriteRune(unicode.ToUpper(r))
 	}
 	return b.String()
@@ -171,21 +171,21 @@ func NormNome(s string) string {
 // Luhn para IMEI). A lista de tipos veio do que as ferramentas de mercado cobrem (Amazon
 // Macie, Microsoft Presidio, Google Cloud DLP) e nós não cobríamos.
 
-// TituloValido: título de eleitor (12 dígitos, os dois últimos verificadores).
-func TituloValido(s string) bool {
-	d := digitos(soDigitos(s))
-	if len(d) != 12 || todosIguais(d) {
+// ValidVoterID: título de eleitor (12 dígitos, os dois últimos verificadores).
+func ValidVoterID(s string) bool {
+	d := digits(digitsOnly(s))
+	if len(d) != 12 || allEqual(d) {
 		return false
 	}
 	uf := d[8]*10 + d[9]
 	if uf < 1 || uf > 28 {
 		return false
 	}
-	soma := 0
+	sum := 0
 	for i := 0; i < 8; i++ {
-		soma += d[i] * (i + 2)
+		sum += d[i] * (i + 2)
 	}
-	dv1 := soma % 11
+	dv1 := sum % 11
 	if dv1 == 10 {
 		dv1 = 0
 	} else if dv1 == 0 && (uf == 1 || uf == 2) {
@@ -200,70 +200,70 @@ func TituloValido(s string) bool {
 	return d[10] == dv1 && d[11] == dv2
 }
 
-// CNSValido: Cartão Nacional de Saúde (15 dígitos; soma ponderada múltipla de 11).
-func CNSValido(s string) bool {
-	d := digitos(soDigitos(s))
-	if len(d) != 15 || todosIguais(d) || !(d[0] == 1 || d[0] == 2 || d[0] >= 7) {
+// ValidCNS: Cartão Nacional de Saúde (15 dígitos; soma ponderada múltipla de 11).
+func ValidCNS(s string) bool {
+	d := digits(digitsOnly(s))
+	if len(d) != 15 || allEqual(d) || !(d[0] == 1 || d[0] == 2 || d[0] >= 7) {
 		return false
 	}
-	soma := 0
+	sum := 0
 	for i, v := range d {
-		soma += v * (15 - i)
+		sum += v * (15 - i)
 	}
-	return soma%11 == 0
+	return sum%11 == 0
 }
 
-// RenavamValido: 11 dígitos, o último verificador.
-func RenavamValido(s string) bool {
-	t := soDigitos(s)
+// ValidRenavam: 11 dígitos, o último verificador.
+func ValidRenavam(s string) bool {
+	t := digitsOnly(s)
 	for len(t) < 11 && len(t) >= 9 {
 		t = "0" + t // registros antigos têm 9 ou 10 dígitos
 	}
-	d := digitos(t)
-	if len(d) != 11 || todosIguais(d) {
+	d := digits(t)
+	if len(d) != 11 || allEqual(d) {
 		return false
 	}
-	pesos := []int{3, 2, 9, 8, 7, 6, 5, 4, 3, 2}
-	soma := 0
-	for i, p := range pesos {
-		soma += d[i] * p
+	weights := []int{3, 2, 9, 8, 7, 6, 5, 4, 3, 2}
+	sum := 0
+	for i, p := range weights {
+		sum += d[i] * p
 	}
-	dv := soma * 10 % 11
+	dv := sum * 10 % 11
 	if dv == 10 {
 		dv = 0
 	}
 	return dv == d[10]
 }
 
-// CNPJAlfaValido: CNPJ no formato novo, com letras nas 12 primeiras posições (vigente a
+// ValidAlphaCNPJ: CNPJ no formato novo, com letras nas 12 primeiras posições (vigente a
 // partir de julho de 2026). A conta é a mesma do CNPJ numérico, com cada caractere valendo
 // o seu código ASCII menos 48.
-func CNPJAlfaValido(s string) bool {
+func ValidAlphaCNPJ(s string) bool {
 	var v []int
-	letras := false
+	letters := false
 	for _, c := range strings.ToUpper(s) {
 		switch {
 		case c >= '0' && c <= '9':
 			v = append(v, int(c-'0'))
 		case c >= 'A' && c <= 'Z':
 			v = append(v, int(c-'0'))
-			letras = true
+			letters = true
 		case c == '.' || c == '/' || c == '-':
 		default:
 			return false
 		}
 	}
-	if len(v) != 14 || !letras || v[12] > 9 || v[13] > 9 || (v[8] == 0 && v[9] == 0 && v[10] == 0 && v[11] == 0) {
+	if len(v) != 14 || !letters || v[12] > 9 || v[13] > 9 || (v[8] == 0 && v[9] == 0 && v[10] == 0 && v[11] == 0) {
 		return false
 	}
-	pesos := [][]int{{5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2}, {6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2}}
+	weights := [][]int{{5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2}, {6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2}}
 	for j, n := range []int{12, 13} {
-		soma := 0
+		sum := 0
 		for k := 0; k < n; k++ {
-			soma += v[k] * pesos[j][k]
+			sum += v[k] * weights[j][k]
 		}
 		dv := 0
-		if r := soma % 11; r >= 2 {
+		if r := sum % 11; r >= 2 {
 			dv = 11 - r
 		}
 		if dv != v[n] {
@@ -273,23 +273,23 @@ func CNPJAlfaValido(s string) bool {
 	return true
 }
 
-// IBANValido: conta bancária internacional (2 letras do país, 2 verificadores, até 30
+// ValidIBAN: conta bancária internacional (2 letras do país, 2 verificadores, até 30
 // letras ou dígitos; mod 97 = 1).
-func IBANValido(s string) bool {
+func ValidIBAN(s string) bool {
 	s = strings.ToUpper(strings.ReplaceAll(s, " ", ""))
 	if len(s) < 15 || len(s) > 34 {
 		return false
 	}
-	resto := 0
+	rest := 0
 	for _, c := range s[4:] + s[:4] {
 		switch {
 		case c >= '0' && c <= '9':
-			resto = (resto*10 + int(c-'0')) % 97
+			rest = (rest*10 + int(c-'0')) % 97
 		case c >= 'A' && c <= 'Z':
-			resto = (resto*100 + int(c-'A') + 10) % 97
+			rest = (rest*100 + int(c-'A') + 10) % 97
 		default:
 			return false
 		}
 	}
-	return resto == 1
+	return rest == 1
 }

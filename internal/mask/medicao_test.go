@@ -23,31 +23,31 @@ import (
 //
 // O Masker usa chave e configuração de teste (nada da instalação real é lido nem gravado).
 
-type contRegra struct {
-	mu      sync.Mutex
-	achados map[string]int
-	valores map[string]map[string]bool // regra -> valores achados
+type ruleCount struct {
+	mu       sync.Mutex
+	findings map[string]int
+	values   map[string]map[string]bool // regra -> valores achados
 }
 
-func (c *contRegra) ligar() {
-	c.achados, c.valores = map[string]int{}, map[string]map[string]bool{}
-	ganchoAchado = func(leitor string, o ObjAchado, v string) {
-		k := leitor + "/" + o.Regra
+func (c *ruleCount) enable() {
+	c.findings, c.values = map[string]int{}, map[string]map[string]bool{}
+	hookFound = func(reader string, o ObjFinding, v string) {
+		k := reader + "/" + o.Rule
 		c.mu.Lock()
-		c.achados[k]++
-		if c.valores[k] == nil {
-			c.valores[k] = map[string]bool{}
+		c.findings[k]++
+		if c.values[k] == nil {
+			c.values[k] = map[string]bool{}
 		}
-		c.valores[k][strings.Trim(v, "[]\"`")] = true
+		c.values[k][strings.Trim(v, "[]\"`")] = true
 		c.mu.Unlock()
 	}
 }
 
-func desligarGancho() { ganchoAchado = nil }
+func disableHook() { hookFound = nil }
 
-// arquivosCorpus: os arquivos de texto do corpus, em ordem, até max bytes.
-func arquivosCorpus(dirs []string, max int64) []string {
-	exts := conj(".go", ".py", ".md", ".rst", ".txt", ".yaml", ".yml", ".json", ".toml", ".sql", ".sh", ".cfg", ".ini")
+// corpusFiles: os arquivos de texto do corpus, em ordem, até max bytes.
+func corpusFiles(dirs []string, max int64) []string {
+	exts := setOf(".go", ".py", ".md", ".rst", ".txt", ".yaml", ".yml", ".json", ".toml", ".sql", ".sh", ".cfg", ".ini")
 	var out []string
 	var tot int64
 	for _, d := range dirs {
@@ -74,7 +74,7 @@ func arquivosCorpus(dirs []string, max int64) []string {
 	return out
 }
 
-func TestMedirCorpusPublico(t *testing.T) {
+func TestMeasurePublicCorpus(t *testing.T) {
 	dirs := os.Getenv("LLM_DLP_CORPUS")
 	if dirs == "" {
 		t.Skip("LLM_DLP_CORPUS não definido")
@@ -84,34 +84,34 @@ func TestMedirCorpusPublico(t *testing.T) {
 		fmt.Sscan(os.Getenv("LLM_DLP_CORPUS_MB"), &lim)
 		lim <<= 20
 	}
-	arqs := arquivosCorpus(strings.Split(dirs, ":"), lim)
-	var c contRegra
-	c.ligar()
-	defer desligarGancho()
+	files := corpusFiles(strings.Split(dirs, ":"), lim)
+	var c ruleCount
+	c.enable()
+	defer disableHook()
 	var bytes int64
-	for i, a := range arqs {
+	for i, a := range files {
 		b, err := os.ReadFile(a)
 		if err != nil {
 			continue
 		}
 		bytes += int64(len(b))
 		if i%200 == 0 { // um Masker novo de tempos em tempos: o que se aprende num projeto não vaza para o outro
-			t.Logf("... %d/%d arquivos", i, len(arqs))
+			t.Logf("... %d/%d arquivos", i, len(files))
 		}
-		m := novoTeste(t)
-		m.cfg.DominiosInternos, m.cfg.Termos = nil, nil
-		m.Mascarar(string(b))
+		m := newTest(t)
+		m.cfg.InternalDomains, m.cfg.Terms = nil, nil
+		m.Mask(string(b))
 	}
 	mb := float64(bytes) / (1 << 20)
 	var ls []string
 	tot := 0
-	for k, n := range c.achados {
-		ls = append(ls, fmt.Sprintf("  %-40s %6d achados %6d valores distintos  %7.2f/MB", k, n, len(c.valores[k]), float64(n)/mb))
+	for k, n := range c.findings {
+		ls = append(ls, fmt.Sprintf("  %-40s %6d achados %6d valores distintos  %7.2f/MB", k, n, len(c.values[k]), float64(n)/mb))
 		tot += n
 	}
 	sort.Strings(ls)
 	if os.Getenv("LLM_DLP_AMOSTRA") != "" { // só no corpus público (nunca nas sessões): exemplos por regra
-		for k, vs := range c.valores {
+		for k, vs := range c.values {
 			var xs []string
 			for v := range vs {
 				if xs = append(xs, v); len(xs) == 12 {
@@ -121,20 +121,20 @@ func TestMedirCorpusPublico(t *testing.T) {
 			t.Logf("amostra %s: %s", k, strings.Join(xs, " "))
 		}
 	}
-	t.Logf("corpus público: %d arquivos, %.1f MB, %d achados (%.2f/MB)\n%s", len(arqs), mb, tot, float64(tot)/mb, strings.Join(ls, "\n"))
+	t.Logf("corpus público: %d arquivos, %.1f MB, %d achados (%.2f/MB)\n%s", len(files), mb, tot, float64(tot)/mb, strings.Join(ls, "\n"))
 }
 
-// identificadoresPublicos: os identificadores (com cara de nome) que aparecem no corpus público.
-func identificadoresPublicos(dirs []string) map[string]bool {
+// publicIdentifiers: os identificadores (com cara de nome) que aparecem no corpus público.
+func publicIdentifiers(dirs []string) map[string]bool {
 	out := map[string]bool{}
-	for _, a := range arquivosCorpus(dirs, 200<<20) {
+	for _, a := range corpusFiles(dirs, 200<<20) {
 		b, err := os.ReadFile(a)
 		if err != nil {
 			continue
 		}
 		s := string(b)
-		tokensObj(s, func(i, j int) {
-			if v := s[i:j]; caraDeIdentificador(v) {
+		objTokens(s, func(i, j int) {
+			if v := s[i:j]; identifierShape(v) {
 				out[strings.ToLower(v)] = true
 			}
 		})
@@ -142,89 +142,89 @@ func identificadoresPublicos(dirs []string) map[string]bool {
 	return out
 }
 
-func TestMedirSessoesReais(t *testing.T) {
+func TestMeasureRealSessions(t *testing.T) {
 	dir, corpus := os.Getenv("LLM_DLP_SESSOES"), os.Getenv("LLM_DLP_CORPUS")
 	if dir == "" || corpus == "" {
 		t.Skip("LLM_DLP_SESSOES e LLM_DLP_CORPUS não definidos")
 	}
-	pub := identificadoresPublicos(strings.Split(corpus, ":"))
-	var arqs []string
+	pub := publicIdentifiers(strings.Split(corpus, ":"))
+	var files []string
 	filepath.WalkDir(dir, func(p string, e fs.DirEntry, err error) error {
 		if err == nil && !e.IsDir() && strings.HasSuffix(p, ".jsonl") {
-			arqs = append(arqs, p)
+			files = append(files, p)
 		}
 		return nil
 	})
-	sort.Strings(arqs)
-	aprendidos := map[string]map[string]bool{} // regra -> valores aprendidos
-	textos := 0
-	var comuns []int
-	porRegra := map[string]int{}
-	trocas := map[string]int{}
+	sort.Strings(files)
+	learnedOnes := map[string]map[string]bool{} // regra -> valores aprendidos
+	texts := 0
+	var commons []int
+	byRule := map[string]int{}
+	swaps := map[string]int{}
 	var pu, tu, pa, ta int
-	for _, a := range arqs {
-		var c contRegra
-		c.ligar()
-		m := novoTeste(t)
-		m.cfg.DominiosInternos, m.cfg.Termos = nil, nil
-		st := mascararSessao(m, a)
-		textos += st.textos
-		comuns = append(comuns, st.comunsNaMemoria)
-		for k, n := range st.porRegra {
-			porRegra[k] += n
+	for _, a := range files {
+		var c ruleCount
+		c.enable()
+		m := newTest(t)
+		m.cfg.InternalDomains, m.cfg.Terms = nil, nil
+		st := maskSession(m, a)
+		texts += st.texts
+		commons = append(commons, st.commonsInMemory)
+		for k, n := range st.byRule {
+			byRule[k] += n
 		}
-		for k, n := range st.trocasPorTipo {
-			trocas[k] += n
+		for k, n := range st.swapsByType {
+			swaps[k] += n
 		}
-		pu, tu, pa, ta = pu+st.palavrasUsuario, tu+st.trocadasUsuario, pa+st.palavrasAssist, ta+st.trocadasAssist
-		for k, vs := range c.valores {
+		pu, tu, pa, ta = pu+st.userWords, tu+st.userSwaps, pa+st.assistWords, ta+st.assistSwaps
+		for k, vs := range c.values {
 			for v := range vs {
-				if _, ok := m.entAprendido(v); ok {
-					if aprendidos[k] == nil {
-						aprendidos[k] = map[string]bool{}
+				if _, ok := m.learnedEnt(v); ok {
+					if learnedOnes[k] == nil {
+						learnedOnes[k] = map[string]bool{}
 					}
-					aprendidos[k][strings.ToLower(v)] = true
+					learnedOnes[k][strings.ToLower(v)] = true
 				}
 			}
 		}
-		desligarGancho()
+		disableHook()
 	}
 	var ls []string
-	ruins := 0
-	for k, vs := range aprendidos {
+	bad := 0
+	for k, vs := range learnedOnes {
 		p := 0
 		for v := range vs {
 			if pub[v] {
 				p++
 			}
 		}
-		taxa := 100 * float64(p) / float64(len(vs))
-		marca := ""
-		if taxa > 2 && p > 1 {
-			marca = "  <-- acima de 2%" + formas(vs, pub)
-			ruins++
+		rate := 100 * float64(p) / float64(len(vs))
+		mark := ""
+		if rate > 2 && p > 1 {
+			mark = "  <-- acima de 2%" + shapes(vs, pub)
+			bad++
 		}
-		ls = append(ls, fmt.Sprintf("  %-40s %6d aprendidos %5d no corpus público %6.1f%%%s", k, len(vs), p, taxa, marca))
+		ls = append(ls, fmt.Sprintf("  %-40s %6d aprendidos %5d no corpus público %6.1f%%%s", k, len(vs), p, rate, mark))
 	}
 	sort.Strings(ls)
-	t.Logf("sessões: %d arquivos, %d textos; identificadores públicos de referência: %d\n%s", len(arqs), textos, len(pub), strings.Join(ls, "\n"))
-	if ruins > 0 {
-		t.Logf("%d regras acima de 2%%", ruins)
+	t.Logf("sessões: %d arquivos, %d textos; identificadores públicos de referência: %d\n%s", len(files), texts, len(pub), strings.Join(ls, "\n"))
+	if bad > 0 {
+		t.Logf("%d regras acima de 2%%", bad)
 	}
-	sort.Ints(comuns)
+	sort.Ints(commons)
 	q := func(p float64) int {
-		if len(comuns) == 0 {
+		if len(commons) == 0 {
 			return 0
 		}
-		return comuns[int(float64(len(comuns)-1)*p)]
+		return commons[int(float64(len(commons)-1)*p)]
 	}
 	var rs []string
-	for k, n := range porRegra {
+	for k, n := range byRule {
 		rs = append(rs, fmt.Sprintf("%s=%d", k, n))
 	}
 	sort.Strings(rs)
 	var tr []string
-	for k, n := range trocas {
+	for k, n := range swaps {
 		tr = append(tr, fmt.Sprintf("%s=%d", k, n))
 	}
 	sort.Strings(tr)
@@ -235,30 +235,30 @@ func TestMedirSessoesReais(t *testing.T) {
 		q(.5), q(.9), q(1), strings.Join(rs, " "), tu, pu, pct(tu, pu), ta, pa, pct(ta, pa))
 }
 
-// statsSessao: as duas métricas da memória da conversa numa sessão (só contagens).
-type statsSessao struct {
-	textos          int
-	comunsNaMemoria int            // palavras comuns (sem cara de identificador) que entram na memória
-	porRegra        map[string]int // as mesmas, pela regra que decidiu
-	palavrasUsuario int            // palavras de texto corrido nas mensagens do usuário
-	trocadasUsuario int            // quantas a memória trocaria
-	palavrasAssist  int            // o mesmo nos textos do assistente (pior caso: sem registro)
-	trocadasAssist  int
-	trocasPorTipo   map[string]int // trocas no texto do usuário, pelo tipo do nome (forma, sem valor)
+// sessionStats: as duas métricas da memória da conversa numa sessão (só contagens).
+type sessionStats struct {
+	texts           int
+	commonsInMemory int            // palavras comuns (sem cara de identificador) que entram na memória
+	byRule          map[string]int // as mesmas, pela regra que decidiu
+	userWords       int            // palavras de texto corrido nas mensagens do usuário
+	userSwaps       int            // quantas a memória trocaria
+	assistWords     int            // o mesmo nos textos do assistente (pior caso: sem registro)
+	assistSwaps     int
+	swapsByType     map[string]int // trocas no texto do usuário, pelo tipo do nome (forma, sem valor)
 }
 
-// mascararSessao: os textos de um transcript na ordem, com a dica de cada resultado de
+// maskSession: os textos de um transcript na ordem, com a dica de cada resultado de
 // ferramenta como o proxy monta (comando, pedido do usuário, extensão), e no fim a memória da
 // conversa da sessão inteira (o último pedido de uma conversa carrega o histórico todo).
-func mascararSessao(m *Masker, arq string) statsSessao {
-	var st statsSessao
-	b, err := os.ReadFile(arq)
+func maskSession(m *Masker, file string) sessionStats {
+	var st sessionStats
+	b, err := os.ReadFile(file)
 	if err != nil {
 		return st
 	}
 	type item struct {
-		s, dica string
-		papel   string // "user", "assistant" ou "tool"
+		s, hint  string
+		hostRole string // "user", "assistant" ou "tool"
 	}
 	var msgs []map[string]any
 	for _, l := range strings.Split(string(b), "\n") {
@@ -270,10 +270,10 @@ func mascararSessao(m *Masker, arq string) statsSessao {
 			msgs = append(msgs, msg)
 		}
 	}
-	cs := NovosComandos()
+	cs := NewCommands()
 	cmds := map[string]string{}
-	chs := map[string]*Chamada{}
-	blocos := func(msg map[string]any) []map[string]any {
+	chs := map[string]*Call{}
+	blocks := func(msg map[string]any) []map[string]any {
 		if t, ok := msg["content"].(string); ok {
 			return []map[string]any{{"type": "text", "text": t}}
 		}
@@ -286,93 +286,93 @@ func mascararSessao(m *Masker, arq string) statsSessao {
 		return out
 	}
 	for _, msg := range msgs {
-		for _, bl := range blocos(msg) {
+		for _, bl := range blocks(msg) {
 			if bl["type"] == "tool_use" {
 				id, _ := bl["id"].(string)
-				cmds[id] = comandoSessao(bl["input"])
-				cs.Argumentos(cmds[id])
+				cmds[id] = sessionCommand(bl["input"])
+				cs.ArgumentText(cmds[id])
 			}
 		}
 	}
-	var itens []item
+	var items []item
 	for _, msg := range msgs {
-		papel, _ := msg["role"].(string)
-		for _, bl := range blocos(msg) {
+		hostRole, _ := msg["role"].(string)
+		for _, bl := range blocks(msg) {
 			switch bl["type"] {
 			case "text":
 				if t, ok := bl["text"].(string); ok {
-					if papel == "user" {
-						cs.Usuario(t)
+					if hostRole == "user" {
+						cs.User(t)
 					}
-					itens = append(itens, item{t, "", papel})
+					items = append(items, item{t, "", hostRole})
 				}
 			case "tool_use":
 				id, _ := bl["id"].(string)
-				chs[id] = cs.Uso(cmds[id], nil)
+				chs[id] = cs.Usage(cmds[id], nil)
 			case "tool_result":
 				id, _ := bl["tool_use_id"].(string)
-				saida := strings.Join(textosResultado(bl["content"]), "\n")
+				output := strings.Join(resultTexts(bl["content"]), "\n")
 				d := ""
 				if cmd := cmds[id]; cmd != "" {
-					d = cs.Dica(cmd, saida)
+					d = cs.Hint(cmd, output)
 				}
-				d = ComExtensao(d, cs.Resultado(chs[id], saida))
-				for _, x := range textosResultado(bl["content"]) {
-					itens = append(itens, item{x, d, "tool"})
+				d = WithExtension(d, cs.Result(chs[id], output))
+				for _, x := range resultTexts(bl["content"]) {
+					items = append(items, item{x, d, "tool"})
 				}
 			}
 		}
-		if papel == "assistant" {
-			cs.FimTurno()
+		if hostRole == "assistant" {
+			cs.EndTurn()
 		}
 	}
-	var decs []Decisao
-	res := make([]resultado, len(itens))
-	for i, it := range itens {
-		res[i], _ = m.mascararD(it.s, true, it.dica)
-		decs = append(decs, res[i].decididos...)
+	var decs []Decision
+	res := make([]result, len(items))
+	for i, it := range items {
+		res[i], _ = m.maskD(it.s, true, it.hint)
+		decs = append(decs, res[i].decidedSet...)
 	}
-	st.textos = len(itens)
-	mm := m.novaMemoria(decs)
-	st.porRegra = map[string]int{}
+	st.texts = len(items)
+	mm := m.newMemory(decs)
+	st.byRule = map[string]int{}
 	if mm == nil {
 		return st
 	}
-	visto := map[string]bool{}
+	seen := map[string]bool{}
 	for _, d := range decs {
-		if d.Generica || len(d.Nome) < memMin || caraDeIdentificador(d.Nome) || visto[d.Chave()] {
+		if d.Generic || len(d.Name) < memMin || identifierShape(d.Name) || seen[d.Key()] {
 			continue
 		}
-		visto[d.Chave()] = true
-		st.comunsNaMemoria++
-		st.porRegra[d.Regra]++
+		seen[d.Key()] = true
+		st.commonsInMemory++
+		st.byRule[d.Rule]++
 	}
-	for i, it := range itens {
-		if it.papel == "tool" {
+	for i, it := range items {
+		if it.hostRole == "tool" {
 			continue
 		}
 		n := 0
-		varrerPalavras(it.s, func(a, b int) { n++ })
+		scanWords(it.s, func(a, b int) { n++ })
 		k := 0
-		for _, t := range mm.varrerF(it.s, res[i].trechos, filtroDe(it.dica)) {
+		for _, t := range mm.scanF(it.s, res[i].snippets, filterOf(it.hint)) {
 			k++
-			if it.papel == "user" {
-				if st.trocasPorTipo == nil {
-					st.trocasPorTipo = map[string]int{}
+			if it.hostRole == "user" {
+				if st.swapsByType == nil {
+					st.swapsByType = map[string]int{}
 				}
-				forma := "comum"
-				if caraDeIdentificador(it.s[t.Ini:t.Fim]) {
-					forma = "identificador"
+				shape := "comum"
+				if identifierShape(it.s[t.Start:t.End]) {
+					shape = "identificador"
 				}
-				st.trocasPorTipo[strings.TrimPrefix(t.Tipo, prefTipoObj)+"/"+forma]++
+				st.swapsByType[strings.TrimPrefix(t.Type, objTypePrefix)+"/"+shape]++
 			}
 		}
-		if it.papel == "user" {
-			st.palavrasUsuario += n
-			st.trocadasUsuario += k
+		if it.hostRole == "user" {
+			st.userWords += n
+			st.userSwaps += k
 		} else {
-			st.palavrasAssist += n
-			st.trocadasAssist += k
+			st.assistWords += n
+			st.assistSwaps += k
 		}
 	}
 	return st
@@ -380,8 +380,8 @@ func mascararSessao(m *Masker, arq string) statsSessao {
 
 func asSlice(v any) []any { x, _ := v.([]any); return x }
 
-// comandoSessao: como o proxy (comandoDe): o comando do shell, ou as strings da entrada.
-func comandoSessao(v any) string {
+// sessionCommand: como o proxy (commandOf): o comando do shell, ou as strings da entrada.
+func sessionCommand(v any) string {
 	in, _ := v.(map[string]any)
 	if c, ok := in["command"].(string); ok {
 		return c
@@ -400,7 +400,7 @@ func comandoSessao(v any) string {
 	return b.String()
 }
 
-func textosResultado(c any) []string {
+func resultTexts(c any) []string {
 	switch x := c.(type) {
 	case string:
 		return []string{x}
@@ -420,7 +420,7 @@ func textosResultado(c any) []string {
 
 // formas: só a FORMA dos aprendidos que existem no corpus público (nenhum valor), para achar a
 // regra que precisa de freio.
-func formas(vs, pub map[string]bool) string {
+func shapes(vs, pub map[string]bool) string {
 	n := map[string]int{}
 	for v := range vs {
 		if !pub[v] {

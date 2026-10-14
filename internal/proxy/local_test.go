@@ -16,13 +16,13 @@ import (
 
 // A porta local: quem pode falar com ela, quem lê a última conversa e a prova de identidade.
 
-var chaveTeste = []byte("0123456789abcdef0123456789abcdef")
+var testKey = []byte("0123456789abcdef0123456789abcdef")
 
-// montarLocal: proxy com a chave ligada. Devolve também quantas requisições chegaram à API e o log.
-func montarLocal(t *testing.T, comChave bool) (*httptest.Server, *int, *logSeguro) {
+// buildLocal: proxy com a chave ligada. Devolve também quantas requisições chegaram à API e o log.
+func buildLocal(t *testing.T, withKey bool) (*httptest.Server, *int, *safeLog) {
 	t.Helper()
-	cfg := config.Padrao()
-	m, err := mask.NovoMasker(cfg, chaveTeste, nil, nil)
+	cfg := config.Default()
+	m, err := mask.NewMasker(cfg, testKey, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -34,19 +34,19 @@ func montarLocal(t *testing.T, comChave bool) (*httptest.Server, *int, *logSegur
 		w.Write([]byte(`{"type":"message","role":"assistant","content":[{"type":"text","text":"ok"}]}`))
 	}))
 	cfg.Upstream = up.URL
-	lg := &logSeguro{}
-	p := Novo(cfg, m, nil, log.New(lg, "", 0))
-	if comChave {
-		p.ComChave(chaveTeste)
+	lg := &safeLog{}
+	p := New(cfg, m, nil, log.New(lg, "", 0))
+	if withKey {
+		p.WithKey(testKey)
 	}
 	px := httptest.NewServer(p)
 	t.Cleanup(func() { up.Close(); px.Close() })
 	return px, &n, lg
 }
 
-func pedir(t *testing.T, metodo, url string, corpo []byte, f func(*http.Request)) (int, []byte) {
+func ask(t *testing.T, method, url string, body []byte, f func(*http.Request)) (int, []byte) {
 	t.Helper()
-	req, err := http.NewRequest(metodo, url, bytes.NewReader(corpo))
+	req, err := http.NewRequest(method, url, bytes.NewReader(body))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,8 +65,8 @@ func pedir(t *testing.T, metodo, url string, corpo []byte, f func(*http.Request)
 // Uma página no navegador chega à porta local: pelo próprio domínio apontando para 127.0.0.1
 // (DNS rebinding; o Host é o domínio dela) ou mandando a requisição de outro site (a Origin é a
 // dela). Nenhuma das duas é atendida, e nada vai para a API.
-func TestSoAtendeProgramaLocal(t *testing.T) {
-	casos := []struct {
+func TestServesOnlyLocalProgram(t *testing.T) {
+	cases := []struct {
 		host, origin, site string
 		local              bool
 	}{
@@ -84,7 +84,7 @@ func TestSoAtendeProgramaLocal(t *testing.T) {
 		{"127.0.0.1:8787", "", "cross-site", true},
 		{"", "", "", false},
 	}
-	for _, c := range casos {
+	for _, c := range cases {
 		r := httptest.NewRequest("GET", "http://x/", nil)
 		r.Host = c.host
 		if c.origin != "" {
@@ -98,75 +98,75 @@ func TestSoAtendeProgramaLocal(t *testing.T) {
 		}
 	}
 
-	px, chegou, lg := montarLocal(t, true)
-	corpo := []byte(`{"model":"x","messages":[{"role":"user","content":"o owner é ` + email + `"}]}`)
+	px, arrived, lg := buildLocal(t, true)
+	body := []byte(`{"model":"x","messages":[{"role":"user","content":"o owner é ` + email + `"}]}`)
 	for _, f := range []func(*http.Request){
 		func(r *http.Request) { r.Host = "atacante.example:8787" },
 		func(r *http.Request) { r.Header.Set("Origin", "https://atacante.example") },
 	} {
-		for _, caminho := range []string{"/v1/messages", "/__llm-dlp/saude", "/__llm-dlp/ultima"} {
-			if st, _ := pedir(t, "POST", px.URL+caminho, corpo, f); st != http.StatusForbidden {
-				t.Errorf("%s de fora: status %d, esperado 403", caminho, st)
+		for _, path := range []string{"/v1/messages", "/__llm-dlp/saude", "/__llm-dlp/ultima"} {
+			if st, _ := ask(t, "POST", px.URL+path, body, f); st != http.StatusForbidden {
+				t.Errorf("%s de fora: status %d, esperado 403", path, st)
 			}
 		}
 	}
-	if *chegou != 0 {
-		t.Errorf("requisição de fora chegou à API %d vez(es)", *chegou)
+	if *arrived != 0 {
+		t.Errorf("requisição de fora chegou à API %d vez(es)", *arrived)
 	}
 	if !strings.Contains(lg.String(), "RECUSADO") {
 		t.Errorf("a recusa devia estar no log: %s", lg.String())
 	}
-	if st, _ := pedir(t, "POST", px.URL+"/v1/messages", corpo, nil); st != 200 || *chegou != 1 {
-		t.Errorf("o programa local devia ser atendido: status %d, chegou=%d", st, *chegou)
+	if st, _ := ask(t, "POST", px.URL+"/v1/messages", body, nil); st != 200 || *arrived != 1 {
+		t.Errorf("o programa local devia ser atendido: status %d, chegou=%d", st, *arrived)
 	}
 }
 
 // A última conversa (mascarada) só sai para quem lê a chave: o comando "llm-dlp last". Outro
 // usuário da máquina, sem a chave, não lê nem usa o proxy para conferir palpites.
-func TestUltimaSoComAProva(t *testing.T) {
-	px, _, _ := montarLocal(t, true)
-	corpo, _ := json.Marshal(map[string]any{"model": "x", "messages": []any{msg("user", strings.Repeat("texto da conversa ", 200))}})
-	if st, _ := pedir(t, "POST", px.URL+"/v1/messages", corpo, nil); st != 200 {
+func TestLastOnlyWithProof(t *testing.T) {
+	px, _, _ := buildLocal(t, true)
+	body, _ := json.Marshal(map[string]any{"model": "x", "messages": []any{msg("user", strings.Repeat("texto da conversa ", 200))}})
+	if st, _ := ask(t, "POST", px.URL+"/v1/messages", body, nil); st != 200 {
 		t.Fatalf("status %d", st)
 	}
-	for nome, prova := range map[string]string{"sem prova": "", "prova errada": Prova([]byte("outra chave, de outro usuario...."), "ultima"),
-		"prova de outro uso": Prova(chaveTeste, "saude\x00"+strings.Repeat("ab", 16))} {
-		st, b := pedir(t, "GET", px.URL+"/__llm-dlp/ultima", nil, func(r *http.Request) { r.Header.Set(CabecalhoProva, prova) })
+	for name, proof := range map[string]string{"sem prova": "", "prova errada": Proof([]byte("outra chave, de outro usuario...."), "ultima"),
+		"prova de outro uso": Proof(testKey, "saude\x00"+strings.Repeat("ab", 16))} {
+		st, b := ask(t, "GET", px.URL+"/__llm-dlp/ultima", nil, func(r *http.Request) { r.Header.Set(ProofHeader, proof) })
 		if st != http.StatusForbidden || bytes.Contains(b, []byte("texto da conversa")) {
-			t.Errorf("%s: status %d, corpo %.80s", nome, st, b)
+			t.Errorf("%s: status %d, corpo %.80s", name, st, b)
 		}
 	}
-	st, b := pedir(t, "GET", px.URL+"/__llm-dlp/ultima", nil, func(r *http.Request) { r.Header.Set(CabecalhoProva, Prova(chaveTeste, "ultima")) })
+	st, b := ask(t, "GET", px.URL+"/__llm-dlp/ultima", nil, func(r *http.Request) { r.Header.Set(ProofHeader, Proof(testKey, "ultima")) })
 	if st != 200 || !bytes.Contains(b, []byte("texto da conversa")) {
 		t.Errorf("com a prova: status %d, corpo %.80s", st, b)
 	}
 
 	// sem chave ligada, não há quem possa ler
-	semChave, _, _ := montarLocal(t, false)
-	if st, _ := pedir(t, "GET", semChave.URL+"/__llm-dlp/ultima", nil, func(r *http.Request) { r.Header.Set(CabecalhoProva, Prova(nil, "ultima")) }); st != http.StatusForbidden {
+	noKey, _, _ := buildLocal(t, false)
+	if st, _ := ask(t, "GET", noKey.URL+"/__llm-dlp/ultima", nil, func(r *http.Request) { r.Header.Set(ProofHeader, Proof(nil, "ultima")) }); st != http.StatusForbidden {
 		t.Errorf("sem chave: status %d, esperado 403", st)
 	}
 }
 
 // O llm-dlp prova que é ele respondendo a um desafio novo; só assina desafio em hexadecimal, e a
 // prova de um desafio não serve para ler a última conversa.
-func TestSaudeProvaQuemE(t *testing.T) {
-	px, _, _ := montarLocal(t, true)
-	desafio := strings.Repeat("0f", 16)
-	_, b := pedir(t, "GET", px.URL+"/__llm-dlp/saude?desafio="+desafio, nil, nil)
+func TestHealthProvesIdentity(t *testing.T) {
+	px, _, _ := buildLocal(t, true)
+	challenge := strings.Repeat("0f", 16)
+	_, b := ask(t, "GET", px.URL+"/__llm-dlp/saude?desafio="+challenge, nil, nil)
 	var s struct {
 		OK    bool
-		Prova string
+		Proof string `json:"prova"`
 	}
 	json.Unmarshal(b, &s)
-	if !s.OK || !ProvaConfere(chaveTeste, "saude\x00"+desafio, s.Prova) {
+	if !s.OK || !ProofMatches(testKey, "saude\x00"+challenge, s.Proof) {
 		t.Fatalf("prova errada: %s", b)
 	}
-	if ProvaConfere([]byte("outra chave, de outro usuario...."), "saude\x00"+desafio, s.Prova) || ProvaConfere(nil, "saude\x00"+desafio, s.Prova) {
+	if ProofMatches([]byte("outra chave, de outro usuario...."), "saude\x00"+challenge, s.Proof) || ProofMatches(nil, "saude\x00"+challenge, s.Proof) {
 		t.Error("a prova conferiu com outra chave")
 	}
 	for _, d := range []string{"", "ultima", "curto", strings.Repeat("zz", 16), strings.Repeat("0f", 40)} {
-		_, b := pedir(t, "GET", px.URL+"/__llm-dlp/saude?desafio="+d, nil, nil)
+		_, b := ask(t, "GET", px.URL+"/__llm-dlp/saude?desafio="+d, nil, nil)
 		if bytes.Contains(b, []byte(`"prova"`)) {
 			t.Errorf("assinou um desafio inválido %q: %s", d, b)
 		}
@@ -175,11 +175,11 @@ func TestSaudeProvaQuemE(t *testing.T) {
 
 // O caminho da requisição vai para o log sem caracteres de controle: uma quebra de linha no
 // caminho não forja outra linha.
-func TestLogSemLinhaForjada(t *testing.T) {
-	px, _, lg := montarLocal(t, true)
-	pedir(t, "GET", px.URL+"/v1/x%0aPOST%20/v1/messages%20-%3E%20200%20%7C%20linha%20forjada", nil, nil)
-	linhas := strings.Split(strings.TrimSpace(lg.String()), "\n")
-	if len(linhas) != 1 || !strings.Contains(linhas[0], "/v1/x?POST") {
-		t.Errorf("o log devia ter uma linha só, com o caminho limpo: %q", linhas)
+func TestLogWithoutForgedLine(t *testing.T) {
+	px, _, lg := buildLocal(t, true)
+	ask(t, "GET", px.URL+"/v1/x%0aPOST%20/v1/messages%20-%3E%20200%20%7C%20linha%20forjada", nil, nil)
+	lines := strings.Split(strings.TrimSpace(lg.String()), "\n")
+	if len(lines) != 1 || !strings.Contains(lines[0], "/v1/x?POST") {
+		t.Errorf("o log devia ter uma linha só, com o caminho limpo: %q", lines)
 	}
 }

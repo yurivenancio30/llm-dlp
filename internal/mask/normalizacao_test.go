@@ -10,12 +10,12 @@ import (
 // Transportes: o mesmo conteúdo embrulhado como chega na conversa. Usados também
 // pela matriz CONTEÚDO × TRANSPORTE × DESENHO.
 
-type transporte struct {
-	nome string
+type transport struct {
+	name string
 	f    func(string) string
 }
 
-func cadaLinha(s string, f func(i int, l string) string) string {
+func eachLine(s string, f func(i int, l string) string) string {
 	ls := strings.Split(strings.TrimRight(s, "\n"), "\n")
 	for i, l := range ls {
 		ls[i] = f(i, l)
@@ -23,19 +23,19 @@ func cadaLinha(s string, f func(i int, l string) string) string {
 	return strings.Join(ls, "\n") + "\n"
 }
 
-var transportes = []transporte{
+var transports = []transport{
 	{"cru", func(s string) string { return s }},
 	{"Read", func(s string) string {
-		return cadaLinha(s, func(i int, l string) string { return fmt.Sprintf("%6d→%s", i+1, l) })
+		return eachLine(s, func(i int, l string) string { return fmt.Sprintf("%6d→%s", i+1, l) })
 	}},
 	{"cat -n", func(s string) string {
-		return cadaLinha(s, func(i int, l string) string { return fmt.Sprintf("%6d\t%s", i+1, l) })
+		return eachLine(s, func(i int, l string) string { return fmt.Sprintf("%6d\t%s", i+1, l) })
 	}},
 	{"grep -n", func(s string) string {
-		return cadaLinha(s, func(i int, l string) string { return fmt.Sprintf("dados/saida.txt:%d:%s", i+1, l) })
+		return eachLine(s, func(i int, l string) string { return fmt.Sprintf("dados/saida.txt:%d:%s", i+1, l) })
 	}},
 	{"diff", func(s string) string {
-		return "diff --git a/x b/x\n--- a/x\n+++ b/x\n@@ -0,0 +1,9 @@\n" + cadaLinha(s, func(i int, l string) string { return "+" + l })
+		return "diff --git a/x b/x\n--- a/x\n+++ b/x\n@@ -0,0 +1,9 @@\n" + eachLine(s, func(i int, l string) string { return "+" + l })
 	}},
 	{"markdown", func(s string) string { return "Saída:\n\n```text\n" + s + "```\n" }},
 	{"JSON escapado", func(s string) string {
@@ -43,45 +43,45 @@ var transportes = []transporte{
 		return string(b)
 	}},
 	{"ANSI", func(s string) string {
-		return cadaLinha(s, func(i int, l string) string { return "\x1b[32m" + l + "\x1b[0m" })
+		return eachLine(s, func(i int, l string) string { return "\x1b[32m" + l + "\x1b[0m" })
 	}},
 	{"CRLF", func(s string) string { return strings.ReplaceAll(s, "\n", "\r\n") }},
-	{"citação", func(s string) string { return cadaLinha(s, func(i int, l string) string { return "> " + l }) }},
+	{"citação", func(s string) string { return eachLine(s, func(i int, l string) string { return "> " + l }) }},
 	{"log", func(s string) string {
-		return cadaLinha(s, func(i int, l string) string { return fmt.Sprintf("2026-10-05 10:11:%02d INFO %s", i, l) })
+		return eachLine(s, func(i int, l string) string { return fmt.Sprintf("2026-10-05 10:11:%02d INFO %s", i, l) })
 	}},
 }
 
-// conferirMascarado: nenhum dos nomes sobra na saída, e a volta reproduz o texto exato.
-func conferirMascarado(t *testing.T, m *Masker, rotulo, texto string, nomes []string) (ok, tot int) {
+// checkMasked: nenhum dos nomes sobra na saída, e a volta reproduz o texto exato.
+func checkMasked(t *testing.T, m *Masker, label, text string, names []string) (ok, tot int) {
 	t.Helper()
-	out, ents := m.Mascarar(texto)
-	for _, n := range nomes {
-		a, b := strings.Count(texto, n), strings.Count(out, n)
+	out, ents := m.Mask(text)
+	for _, n := range names {
+		a, b := strings.Count(text, n), strings.Count(out, n)
 		tot += a
 		ok += a - b
 	}
-	if volta := NovaTabela(ents).Desmascarar(out, false); volta != texto {
-		t.Errorf("%s: a volta não reproduz o original", rotulo)
+	if back := NewTable(ents).Unmask(out, false); back != text {
+		t.Errorf("%s: a volta não reproduz o original", label)
 	}
 	return ok, tot
 }
 
-func TestTransporteMesmoCSV(t *testing.T) {
+func TestTransportSameCSV(t *testing.T) {
 	csv := "table_schema,table_name,column_name\nfin_contab,lanc_diario,vl_lancto\nfin_contab,plano_contas,cd_conta\n"
-	nomes := []string{"fin_contab", "lanc_diario", "plano_contas", "vl_lancto", "cd_conta"}
-	for _, tr := range transportes {
-		m := novoTeste(t)
-		ok, tot := conferirMascarado(t, m, tr.nome, tr.f(csv), nomes)
+	names := []string{"fin_contab", "lanc_diario", "plano_contas", "vl_lancto", "cd_conta"}
+	for _, tr := range transports {
+		m := newTest(t)
+		ok, tot := checkMasked(t, m, tr.name, tr.f(csv), names)
 		if ok != tot {
-			out, _ := m.Mascarar(tr.f(csv))
-			t.Errorf("%s: %d/%d mascarados\n%s", tr.nome, ok, tot, out)
+			out, _ := m.Mask(tr.f(csv))
+			t.Errorf("%s: %d/%d mascarados\n%s", tr.name, ok, tot, out)
 		}
 	}
 }
 
-func TestNormalizarMapa(t *testing.T) {
-	casos := []string{
+func TestNormalizeMap(t *testing.T) {
+	cases := []string{
 		"  1→a: b\n  2→c: d\n",
 		"\x1b[1mtitulo\x1b[0m\r\nlinha  \r\n",
 		"┌────┬────┐\n│ a  │ b  │\n╞════╪════╡\n│ x  ┆ y  │\n└────┴────┘\n",
@@ -90,8 +90,8 @@ func TestNormalizarMapa(t *testing.T) {
 		"@@ -1,2 +1,2 @@\n-a\n+b\n c\n",
 		"\ufeff> citado\n> > duplo\n",
 	}
-	for _, c := range casos {
-		n, ok := normalizar(c)
+	for _, c := range cases {
+		n, ok := normalize(c)
 		if !ok {
 			t.Errorf("%q: nada normalizado", c)
 			continue
@@ -110,19 +110,19 @@ func TestNormalizarMapa(t *testing.T) {
 	}
 	// texto comum não é tocado
 	for _, c := range []string{"SELECT a FROM b\nWHERE c = 1\n", "nome: x\n12: y\nz: 3\n", "- name: a\n- name: b\n"} {
-		if _, ok := normalizar(c); ok {
+		if _, ok := normalize(c); ok {
 			t.Errorf("%q: normalizado sem transporte", c)
 		}
 	}
 }
 
 // O manifesto chega com prefixo de linha
-func TestTransporteManifesto(t *testing.T) {
+func TestTransportManifest(t *testing.T) {
 	y := "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: svc-cobranca-lote\n  namespace: ns-financeiro\nspec:\n  replicas: 2\n"
-	for _, tr := range transportes {
-		m := novoTeste(t)
-		if ok, tot := conferirMascarado(t, m, tr.nome, tr.f(y), []string{"svc-cobranca-lote", "ns-financeiro"}); ok != tot {
-			t.Errorf("%s: %d/%d", tr.nome, ok, tot)
+	for _, tr := range transports {
+		m := newTest(t)
+		if ok, tot := checkMasked(t, m, tr.name, tr.f(y), []string{"svc-cobranca-lote", "ns-financeiro"}); ok != tot {
+			t.Errorf("%s: %d/%d", tr.name, ok, tot)
 		}
 	}
 }

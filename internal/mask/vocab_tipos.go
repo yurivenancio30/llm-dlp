@@ -6,7 +6,7 @@ import "strings"
 // Protobuf, R). É vocabulário de FORMATO, fechado: onde um nome vem com um tipo de dado ao
 // lado, o nome é coluna (leitor de esquema), e um tipo de dado nunca é nome de objeto.
 
-var tiposDado = conj(
+var dataTypes = setOf(
 	// SQL
 	"int", "integer", "bigint", "smallint", "tinyint", "mediumint", "decimal", "numeric", "number", "float", "real",
 	"double", "money", "smallmoney", "bit", "boolean", "bool", "char", "nchar", "varchar", "nvarchar", "varchar2",
@@ -30,9 +30,9 @@ var tiposDado = conj(
 	"chr", "dbl", "lgl", "fct", "dttm", "num", "logi", "factor", "character", "numeric", "complex",
 )
 
-// ehTipoDado: v é um tipo de dado, com ou sem parâmetros e marcadores (varchar(50),
+// isDataType: v é um tipo de dado, com ou sem parâmetros e marcadores (varchar(50),
 // datetime64[ns], <chr>, Int64, decimal(10,2), "string?", list<int>).
-func ehTipoDado(v string) bool {
+func isDataType(v string) bool {
 	v = strings.TrimSpace(v)
 	if v == "" || len(v) > 48 {
 		return false
@@ -44,5 +44,5 @@ func ehTipoDado(v string) bool {
 	}
 	v = strings.ToLower(strings.TrimSpace(v))
 	v = strings.TrimSuffix(v, "()")
-	return tiposDado[v]
+	return dataTypes[v]
 }

@@ -1,8 +1,8 @@
 name: release
 
-# Ao receber a tag vX.Y.Z (criada por "make release"): testa e o GoReleaser (.goreleaser.yaml)
-# monta os pacotes e publica a release com as notas da seção X.Y.Z do CHANGELOG.md.
-# Ver docs/versioning.md (em português: docs/pt-BR/versoes.md).
+# On the tag vX.Y.Z (created by "make release"): tests, and GoReleaser (.goreleaser.yaml)
+# builds the archives and publishes the release with the notes of section X.Y.Z of CHANGELOG.md.
+# See docs/versioning.md (in Portuguese: docs/pt-BR/versioning.md).
 on:
   push:
     tags: ["v[0-9]+.[0-9]+.[0-9]+"]
@@ -20,29 +20,29 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - name: a tag é a versão do código
+      - name: the tag is the code version
         run: |
           V="${GITHUB_REF_NAME#v}"
-          test "$V" = "$(make -s versao | cut -d' ' -f1)" || { echo "a tag $GITHUB_REF_NAME não bate com internal/versao/versao.go"; exit 1; }
-          echo "VERSAO=$V" >> "$GITHUB_ENV"
-      - name: testes
+          test "$V" = "$(make -s version | cut -d' ' -f1)" || { echo "tag $GITHUB_REF_NAME does not match internal/version/version.go"; exit 1; }
+          echo "VERSION=$V" >> "$GITHUB_ENV"
+      - name: tests
         run: make test
-      - name: notas da versão
-        run: ./scripts/notas-da-versao.sh "$VERSAO" > "$RUNNER_TEMP/notas.md"
-      - name: pacotes e publicação
+      - name: release notes
+        run: ./scripts/release-notes.sh "$VERSION" > "$RUNNER_TEMP/notes.md"
+      - name: archives and publication
         uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
           version: "~> v2"
-          args: release --clean --release-notes ${{ runner.temp }}/notas.md
+          args: release --clean --release-notes ${{ runner.temp }}/notes.md
         env:
           GITHUB_TOKEN: ${{ github.token }}
-      # a 0.2.1 e a 0.3.0 saíram com as notas vazias sem ninguém notar: uma release sem notas falha aqui
-      - name: a release saiu com as notas
+      # 0.2.1 and 0.3.0 went out with empty notes without anyone noticing: a release without notes fails here
+      - name: the release has the notes
         run: |
-          test -n "$(gh release view "v$VERSAO" --json body -q .body)" && exit 0
-          echo "a release v$VERSAO saiu sem notas; gravando as do CHANGELOG"
-          gh release edit "v$VERSAO" --notes-file "$RUNNER_TEMP/notas.md"
+          test -n "$(gh release view "v$VERSION" --json body -q .body)" && exit 0
+          echo "release v$VERSION went out without notes; writing the ones from the CHANGELOG"
+          gh release edit "v$VERSION" --notes-file "$RUNNER_TEMP/notes.md"
           exit 1
         env:
           GH_TOKEN: ${{ github.token }}

@@ -6,13 +6,13 @@ import (
 	"testing"
 )
 
-func TestDetecta(t *testing.T) {
-	m := novoTeste(t)
-	cpf := gerarCPF("529982247")
-	pis := gerarOnze("1201234567", PISValido)
-	cnh := gerarOnze("123456789", CNHValida)
-	casos := []struct {
-		texto, tipo, real string
+func TestDetects(t *testing.T) {
+	m := newTest(t)
+	cpf := genCPF("529982247")
+	pis := genEleven("1201234567", ValidPIS)
+	cnh := genEleven("123456789", ValidCNH)
+	cases := []struct {
+		text, typ, real string
 	}{
 		{"owner: joao.silva@empresa-ficticia.com.br ok", "email", "joao.silva@empresa-ficticia.com.br"},
 		{"conectando em 10.42.7.15:3306", "ip", "10.42.7.15"},
@@ -38,22 +38,22 @@ func TestDetecta(t *testing.T) {
 		{"o Projeto Fenix atrasou", "t:projeto", "Projeto Fenix"},
 		{"token=ghp_k3Jd9sLq2mXv8RtY7wPz4nBc6HfG1aE5uQiO", "segredo", "ghp_k3Jd9sLq2mXv8RtY7wPz4nBc6HfG1aE5uQiO"},
 	}
-	for _, c := range casos {
-		achou := false
-		for _, a := range m.Detectar(c.texto) {
-			if a.Tipo == c.tipo && a.Real == c.real {
-				achou = true
+	for _, c := range cases {
+		foundIt := false
+		for _, a := range m.Detect(c.text) {
+			if a.Type == c.typ && a.Real == c.real {
+				foundIt = true
 			}
 		}
-		if !achou {
-			t.Errorf("não detectou %s %q em %q; achados: %+v", c.tipo, c.real, c.texto, m.Detectar(c.texto))
+		if !foundIt {
+			t.Errorf("não detectou %s %q em %q; achados: %+v", c.typ, c.real, c.text, m.Detect(c.text))
 		}
 	}
 }
 
-func TestNaoDetecta(t *testing.T) {
-	m := novoTeste(t)
-	limpos := []string{
+func TestDoesNotDetect(t *testing.T) {
+	m := newTest(t)
+	cleanedOnes := []string{
 		"versão 2.1.280, porta 8080 em 127.0.0.1, dns 8.8.8.8",
 		"oid 1.3.6.1.4.1.311 e build 10.0.19045.1",
 		"run_id 123e4567-e89b-42d3-a456-426614174000 terminou",
@@ -68,22 +68,22 @@ func TestNaoDetecta(t *testing.T) {
 		"exception no concept 20261003-153000-1abc do receptor", // "cep" dentro de outra palavra, e uma data
 		"CEP de teste: 20261003",                                // data escrita junta
 	}
-	for _, s := range limpos {
-		if as := m.Detectar(s); len(as) > 0 {
+	for _, s := range cleanedOnes {
+		if as := m.Detect(s); len(as) > 0 {
 			t.Errorf("falso positivo em %q: %+v", s, as)
 		}
 	}
 }
 
-func TestIdempotenteEDeterministico(t *testing.T) {
-	m := novoTeste(t)
-	s := "owner joao.silva@empresa-ficticia.com.br (João Silva) em 10.42.7.15 e 10.42.7.80, cpf " + gerarCPF("529982247")
-	a, _ := m.Mascarar(s)
-	b, _ := m.Mascarar(s)
+func TestIdempotentAndDeterministic(t *testing.T) {
+	m := newTest(t)
+	s := "owner joao.silva@empresa-ficticia.com.br (João Silva) em 10.42.7.15 e 10.42.7.80, cpf " + genCPF("529982247")
+	a, _ := m.Mask(s)
+	b, _ := m.Mask(s)
 	if a != b {
 		t.Fatal("não determinístico")
 	}
-	if c, ents := m.Mascarar(a); c != a || len(ents) > 0 {
+	if c, ents := m.Mask(a); c != a || len(ents) > 0 {
 		t.Fatalf("mascarar de novo mudou o texto (pseudônimo re-detectado): %q -> %q", a, c)
 	}
 	// nome e e-mail da mesma pessoa ganham o mesmo identificador
@@ -99,14 +99,14 @@ func TestIdempotenteEDeterministico(t *testing.T) {
 		t.Errorf("octeto do host não preservado: %q", a)
 	}
 	// outra chave -> outros pseudônimos
-	m2, _ := NovoMasker(m.cfg, []byte("ffffffffffffffffffffffffffffffff"), nil, nil)
-	if c, _ := m2.Mascarar(s); c == a {
+	m2, _ := NewMasker(m.cfg, []byte("ffffffffffffffffffffffffffffffff"), nil, nil)
+	if c, _ := m2.Mask(s); c == a {
 		t.Error("chave diferente gerou os mesmos pseudônimos")
 	}
 }
 
-func TestSenhas(t *testing.T) {
-	pega := map[string]string{
+func TestPasswords(t *testing.T) {
+	takes := map[string]string{
 		"senha: Zq8wPrimeiroValor01":                  "Zq8wPrimeiroValor01",
 		"senha=Ficticia@2024":                         "Ficticia@2024",
 		"a senha é Ficticia@2024.":                    "Ficticia@2024",
@@ -133,12 +133,12 @@ func TestSenhas(t *testing.T) {
 		"password_file: /run/secrets/db_pass1":        "/run/secrets/db_pass1",
 		"PASSWORD: cofre-producao:DB_PASSWORD:Atual1": "cofre-producao:DB_PASSWORD:Atual1",
 	}
-	for texto, senha := range pega {
-		if out, _ := novoTeste(t).Mascarar(texto); strings.Contains(out, senha) {
-			t.Errorf("senha passou: %q -> %q", texto, out)
+	for text, password := range takes {
+		if out, _ := newTest(t).Mask(text); strings.Contains(out, password) {
+			t.Errorf("senha passou: %q -> %q", text, out)
 		}
 	}
-	limpos := []string{
+	cleanedOnes := []string{
 		"a senha é obrigatória para entrar",
 		"password = os.getenv(\"DB_PASSWORD\")",
 		"password: str = None",
@@ -159,18 +159,18 @@ func TestSenhas(t *testing.T) {
 		"edite o secrets.yaml: ele fica na raiz",
 		"# password: 123-",
 	}
-	for _, texto := range limpos {
-		if out, ents := novoTeste(t).Mascarar(texto); len(ents) > 0 {
-			t.Errorf("falso positivo: %q -> %q", texto, out)
+	for _, text := range cleanedOnes {
+		if out, ents := newTest(t).Mask(text); len(ents) > 0 {
+			t.Errorf("falso positivo: %q -> %q", text, out)
 		}
 	}
 }
 
-func TestDetectoresExtras(t *testing.T) {
-	tit := gerarValido("1234567801", 12, TituloValido)
-	cns := gerarValido("7000000000000", 15, CNSValido)
-	ren := gerarValido("6392748451", 11, RenavamValido)
-	pega := map[string]string{
+func TestExtraDetectors(t *testing.T) {
+	ttl := genValid("1234567801", 12, ValidVoterID)
+	cns := genValid("7000000000000", 15, ValidCNS)
+	ren := genValid("6392748451", 11, ValidRenavam)
+	takes := map[string]string{
 		"Authorization: Basic am9hbzpGaWN0aWNpYUAyMDI0":                             "am9hbzpGaWN0aWNpYUAyMDI0",
 		"> authorization: Bearer 8f3a2b1c9d4e5f60718293a4b5c6d7e8":                  "8f3a2b1c9d4e5f60718293a4b5c6d7e8",
 		"Cookie: JSESSIONID=A1B2C3D4E5F60718293A4B5C6D7E8F90; theme=dark":           "A1B2C3D4E5F60718293A4B5C6D7E8F90",
@@ -179,7 +179,7 @@ func TestDetectoresExtras(t *testing.T) {
 		"fornecedor 12.ABC.345/01DE-35 ativo":                                       "12.ABC.345/01DE-35",
 		"transferir para GB82 WEST 1234 5698 7654 32 hoje":                          "GB82 WEST 1234 5698 7654 32",
 		"conta BR1500000000000010932840814P2.":                                      "BR1500000000000010932840814P2",
-		"título de eleitor " + tit:                                                  tit,
+		"título de eleitor " + ttl:                                                  ttl,
 		"cartão do SUS: " + cns:                                                     cns,
 		"RENAVAM " + ren:                                                            ren,
 		"passaporte FZ123456 vencido":                                               "FZ123456",
@@ -193,12 +193,12 @@ func TestDetectoresExtras(t *testing.T) {
 		"credit_card_number: 4111111111111111":                                      "4111111111111111",
 		"employeeId=E0098765 dept=TI":                                               "E0098765",
 	}
-	for texto, real := range pega {
-		if out, _ := novoTeste(t).Mascarar(texto); strings.Contains(out, real) {
-			t.Errorf("passou %q em %q -> %q", real, texto, out)
+	for text, real := range takes {
+		if out, _ := newTest(t).Mask(text); strings.Contains(out, real) {
+			t.Errorf("passou %q em %q -> %q", real, text, out)
 		}
 	}
-	fica := []string{
+	stays := []string{
 		"Cookie: theme=dark; lang=pt-BR",
 		"Set-Cookie: a=b; Path=/; Max-Age=3600; SameSite=Lax",
 		"versão 2023.8.13 do pacote, build 0001234",
@@ -213,57 +213,57 @@ func TestDetectoresExtras(t *testing.T) {
 		"client_id: 3f2a1b4c-5d6e-7f80-9a1b-2c3d4e5f6071\ntenant_id: AZURE_TENANT_ID",
 		"WHERE user_id = :user_id",
 	}
-	for _, s := range fica {
-		if out, ents := novoTeste(t).Mascarar(s); len(ents) > 0 {
+	for _, s := range stays {
+		if out, ents := newTest(t).Mask(s); len(ents) > 0 {
 			t.Errorf("mascarou sem precisar: %q -> %q", s, out)
 		}
 	}
 }
 
-// Nome importado em qualquer grafia.
-func TestNomeQualquerGrafia(t *testing.T) {
-	m := novoTeste(t)
+// Name importado em qualquer grafia.
+func TestNameAnySpelling(t *testing.T) {
+	m := newTest(t)
 	for _, s := range []string{"falei com joão silva ontem", "o JOAO CARLOS SILVA saiu", "Joao Carlos Silva", "ana paula souza aprovou"} {
 		// o pseudônimo segue a caixa do nome: Pessoa, PESSOA ou pessoa
-		if out, _ := m.Mascarar(s); !strings.Contains(strings.ToLower(out), "pessoa ") {
+		if out, _ := m.Mask(s); !strings.Contains(strings.ToLower(out), "pessoa ") {
 			t.Errorf("nome não mascarado em %q: %q", s, out)
 		}
 	}
 	// palavras comuns que não são nome importado continuam intactas
-	if out, _ := m.Mascarar("a silva e souza são sobrenomes comuns"); strings.Contains(strings.ToLower(out), "pessoa ") {
+	if out, _ := m.Mask("a silva e souza são sobrenomes comuns"); strings.Contains(strings.ToLower(out), "pessoa ") {
 		t.Errorf("falso positivo: %q", out)
 	}
 }
 
 // Segredo dentro de base64 (Secret do Kubernetes), sem palavra-chave por perto.
-func TestSegredoEmBase64(t *testing.T) {
-	m := novoTeste(t)
+func TestSecretInBase64(t *testing.T) {
+	m := newTest(t)
 	enc := base64.StdEncoding.EncodeToString([]byte("ghp_k3Jd9sLq2mXv8RtY7wPz4nBc6HfG1aE5uQiO"))
 	for _, s := range []string{
 		"apiVersion: v1\nkind: Secret\ndata:\n  conexao: " + enc + "\n  outro: abc\n",
 		enc + "\nlinha seguinte", // na primeira linha (coluna do gitleaks tem outro deslocamento)
 	} {
-		out, _ := m.Mascarar(s)
+		out, _ := m.Mask(s)
 		if strings.Contains(out, enc) || strings.Contains(out, enc[:20]) {
 			t.Errorf("base64 com segredo não mascarado:\n%s", out)
 		}
 	}
 }
 
-// Texto grande vai ao gitleaks em janelas. Um segredo em qualquer posição, inclusive em cima
+// Text grande vai ao gitleaks em janelas. Um segredo em qualquer posição, inclusive em cima
 // do corte, tem que ser achado como no texto inteiro.
-func TestSegredoNaFronteiraDaJanela(t *testing.T) {
+func TestSecretAtWindowBoundary(t *testing.T) {
 	tok := "ghp_k3Jd9sLq2mXv8RtY7wPz4nBc6HfG1aE5uQiO"
-	linha := "linha de log comum sem nada sensivel, status=200\n"
-	for _, pos := range []int{0, janelaLeaks - 20, janelaLeaks - 5, janelaLeaks, janelaLeaks + 3, 2*janelaLeaks - sobraLeaks - 10, 3 * janelaLeaks} {
-		s := strings.Repeat(linha, pos/len(linha)+1)[:pos] + "\ntoken=" + tok + "\n" + strings.Repeat(linha, 2*janelaLeaks/len(linha))
-		if out, _ := novoTeste(t).Mascarar(s); strings.Contains(out, tok) {
-			t.Errorf("token na posição %d (janela de %d) passou", pos, janelaLeaks)
+	line := "linha de log comum sem nada sensivel, status=200\n"
+	for _, pos := range []int{0, leaksWindow - 20, leaksWindow - 5, leaksWindow, leaksWindow + 3, 2*leaksWindow - leaksLeftover - 10, 3 * leaksWindow} {
+		s := strings.Repeat(line, pos/len(line)+1)[:pos] + "\ntoken=" + tok + "\n" + strings.Repeat(line, 2*leaksWindow/len(line))
+		if out, _ := newTest(t).Mask(s); strings.Contains(out, tok) {
+			t.Errorf("token na posição %d (janela de %d) passou", pos, leaksWindow)
 		}
 	}
 	// sem nenhuma quebra de linha (um bloco só)
-	bloco := strings.Repeat("a ", janelaLeaks/2-10) + "token=" + tok + " " + strings.Repeat("b ", janelaLeaks)
-	if out, _ := novoTeste(t).Mascarar(bloco); strings.Contains(out, tok) {
+	block := strings.Repeat("a ", leaksWindow/2-10) + "token=" + tok + " " + strings.Repeat("b ", leaksWindow)
+	if out, _ := newTest(t).Mask(block); strings.Contains(out, tok) {
 		t.Error("token em cima do corte, sem quebra de linha, passou")
 	}
 }
@@ -271,21 +271,21 @@ func TestSegredoNaFronteiraDaJanela(t *testing.T) {
 // Item 1 e 2 (revisão externa): CPF e CNPJ válidos, só com dígitos, sem a palavra "cpf" por
 // perto e sem nome de coluna reconhecido. Reproduz uma consulta com UNION em que a coluna
 // recebeu o alias "valor": os valores saíam em claro.
-func TestDocumentoSoDigitosSemContexto(t *testing.T) {
-	cpf1 := strings.NewReplacer(".", "", "-", "").Replace(gerarCPF("318452760"))
-	cpf2 := strings.NewReplacer(".", "", "-", "").Replace(gerarCPF("529982247"))
+func TestDigitsOnlyDocumentWithoutContext(t *testing.T) {
+	cpf1 := strings.NewReplacer(".", "", "-", "").Replace(genCPF("318452760"))
+	cpf2 := strings.NewReplacer(".", "", "-", "").Replace(genCPF("529982247"))
 	cnpj := strings.NewReplacer(".", "", "-", "", "/", "").Replace("11.222.333/0001-81")
-	casos := map[string][]string{
+	cases := map[string][]string{
 		"valor\n" + cpf1 + "\n" + cpf2 + "\n":               {cpf1, cpf2},
 		`{"id": 7, "userDocument": "` + cpf1 + `"}`:         {cpf1},
 		"o resultado da consulta foi " + cpf2 + " e pronto": {cpf2},
 		"fornecedor " + cnpj + " ativo":                     {cnpj},
 	}
-	for texto, reais := range casos {
-		out, _ := novoTeste(t).Mascarar(texto)
-		for _, r := range reais {
+	for text, reals := range cases {
+		out, _ := newTest(t).Mask(text)
+		for _, r := range reals {
 			if strings.Contains(out, r) {
-				t.Errorf("passou %q em %q -> %q", r, texto, out)
+				t.Errorf("passou %q em %q -> %q", r, text, out)
 			}
 		}
 	}
@@ -293,23 +293,23 @@ func TestDocumentoSoDigitosSemContexto(t *testing.T) {
 
 // As exceções do CPF/CNPJ sem contexto: pedaço de hash, parte decimal, número com versão e
 // carimbo de data e hora (14 dígitos) não são documentos.
-func TestDocumentoSoDigitosExcecoes(t *testing.T) {
-	cpf := strings.NewReplacer(".", "", "-", "").Replace(gerarCPF("318452760"))
-	fica := []string{
+func TestDigitsOnlyDocumentExceptions(t *testing.T) {
+	cpf := strings.NewReplacer(".", "", "-", "").Replace(genCPF("318452760"))
+	stays := []string{
 		"hash a" + cpf + "f e id_" + cpf,
 		"pi vale 3." + cpf,
 		"versão v1." + cpf + ".2",
 		"carimbo 20261004104220 gravado",
 	}
-	for _, s := range fica {
-		if out, ents := novoTeste(t).Mascarar(s); len(ents) > 0 {
+	for _, s := range stays {
+		if out, ents := newTest(t).Mask(s); len(ents) > 0 {
 			t.Errorf("mascarou sem precisar: %q -> %q", s, out)
 		}
 	}
-	cfg := novoTeste(t).cfg
-	cfg.DocumentosSemContexto = false
-	m, _ := NovoMasker(cfg, chaveTeste, nil, nil)
-	if out, _ := m.Mascarar("valor " + cpf); !strings.Contains(out, cpf) {
+	cfg := newTest(t).cfg
+	cfg.DocumentsWithoutContext = false
+	m, _ := NewMasker(cfg, testKey, nil, nil)
+	if out, _ := m.Mask("valor " + cpf); !strings.Contains(out, cpf) {
 		t.Errorf("com documentos_sem_contexto desligado, deveria ficar como está: %q", out)
 	}
 }

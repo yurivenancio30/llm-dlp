@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// Leitor de configuração estruturada (YAML e JSON): o motor que lê por caminho, o despachante
+// Reader de configuração estruturada (YAML e JSON): o motor que lê por caminho, o despachante
 // que decide a família (Kubernetes, compose, CloudFormation, ARM, Helm, Ansible, CI) e os
 // auxiliares comuns. As regras de cada família estão nos arquivos leitor_kubernetes.go,
 // leitor_iac.go, leitor_ansible.go e leitor_ci.go.
@@ -20,11 +20,11 @@ type yEnt struct {
 	tmpl   bool // valor com {{ }} (template Helm/Jinja): não é tocado
 }
 
-func (e *yEnt) chave() string { return e.path[len(e.path)-1] }
+func (e *yEnt) key() string { return e.path[len(e.path)-1] }
 
 func (e *yEnt) id() int { return e.ids[len(e.ids)-1] }
 
-func (e *yEnt) pai() int {
+func (e *yEnt) parent() int {
 	if len(e.ids) < 2 {
 		return e.root
 	}
@@ -33,19 +33,19 @@ func (e *yEnt) pai() int {
 
 // limites para entrada patológica (memória e tempo): profundidade e número de entradas
 const (
-	maxProfYAML = 32
-	maxEntsYAML = 50_000
+	maxYAMLDepth = 32
+	maxEntsYAML  = 50_000
 )
 
-type yColetor struct {
+type yCollector struct {
 	ents []yEnt
 	nid  int
 }
 
-func (w *yColetor) novo() int { w.nid++; return w.nid }
+func (w *yCollector) newOne() int { w.nid++; return w.nid }
 
-func (w *yColetor) emitir(path []string, ids []int, root, ki, kf, vi, vf int, tag string, tmpl bool) {
-	if len(w.ents) >= maxEntsYAML || len(path) > maxProfYAML {
+func (w *yCollector) emitIt(path []string, ids []int, root, ki, kf, vi, vf int, tag string, tmpl bool) {
+	if len(w.ents) >= maxEntsYAML || len(path) > maxYAMLDepth {
 		return
 	}
 	w.ents = append(w.ents, yEnt{append([]string(nil), path...), append([]int(nil), ids...), root, ki, kf, vi, vf, tag, tmpl})
@@ -58,16 +58,16 @@ type yEl struct {
 	item bool
 }
 
-// lerYAML: linhas com indentação de espaços (linha com tab na indentação não é YAML), itens
+// readYAML: linhas com indentação de espaços (linha com tab na indentação não é YAML), itens
 // "- ", chaves simples ou entre aspas, valores simples, entre aspas, com tag (!Ref), em fluxo
 // ({a: b}, [a, b]) e blocos | > (pulados). "---" separa documentos.
-func (w *yColetor) lerYAML(s string) {
-	root := w.novo()
+func (w *yCollector) readYAML(s string) {
+	root := w.newOne()
 	var st []yEl
-	bloco := -1
+	block := -1
 	path := make([]string, 0, 16)
 	ids := make([]int, 0, 16)
-	caminho := func() ([]string, []int) {
+	curPath := func() ([]string, []int) {
 		path, ids = path[:0], ids[:0]
 		for _, e := range st {
 			path = append(path, e.key)
@@ -82,30 +82,30 @@ func (w *yColetor) lerYAML(s string) {
 		} else {
 			b += a
 		}
-		ini, fim := a, b
+		ini, end := a, b
 		a = b + 1
-		if fim > ini && s[fim-1] == '\r' {
-			fim--
+		if end > ini && s[end-1] == '\r' {
+			end--
 		}
 		ind := 0
-		for ini+ind < fim && s[ini+ind] == ' ' {
+		for ini+ind < end && s[ini+ind] == ' ' {
 			ind++
 		}
-		if ini+ind >= fim {
+		if ini+ind >= end {
 			continue
 		}
-		if bloco >= 0 {
-			if ind > bloco {
+		if block >= 0 {
+			if ind > block {
 				continue
 			}
-			bloco = -1
+			block = -1
 		}
 		c := s[ini+ind]
 		if c == '\t' {
 			continue
 		}
-		if ind == 0 && (strings.HasPrefix(s[ini:fim], "---") || strings.HasPrefix(s[ini:fim], "...")) {
-			root = w.novo()
+		if ind == 0 && (strings.HasPrefix(s[ini:end], "---") || strings.HasPrefix(s[ini:end], "...")) {
+			root = w.newOne()
 			st = st[:0]
 			continue
 		}
@@ -114,52 +114,52 @@ func (w *yColetor) lerYAML(s string) {
 		}
 		p := ini + ind
 		item := false
-		for p < fim && s[p] == '-' && (p+1 == fim || s[p+1] == ' ') && len(st) <= maxProfYAML {
+		for p < end && s[p] == '-' && (p+1 == end || s[p+1] == ' ') && len(st) <= maxYAMLDepth {
 			col := p - ini
 			for len(st) > 0 && (st[len(st)-1].col > col || st[len(st)-1].col == col && st[len(st)-1].item) {
 				st = st[:len(st)-1]
 			}
-			st = append(st, yEl{col, "-", w.novo(), true})
+			st = append(st, yEl{col, "-", w.newOne(), true})
 			item = true
 			p++
-			for p < fim && s[p] == ' ' {
+			for p < end && s[p] == ' ' {
 				p++
 			}
 		}
-		if p >= fim || s[p] == '#' || len(st) > maxProfYAML {
+		if p >= end || s[p] == '#' || len(st) > maxYAMLDepth {
 			continue
 		}
 		col := p - ini
-		ki, kf, vp, ok := chaveYAML(s, p, fim)
+		ki, kf, vp, ok := yamlKey(s, p, end)
 		if !ok {
 			if item {
-				pt, is := caminho()
-				w.valorYAML(s, pt, is, root, -1, -1, p, fim, st[len(st)-1].col, &bloco)
+				pt, is := curPath()
+				w.yamlValue(s, pt, is, root, -1, -1, p, end, st[len(st)-1].col, &block)
 			}
 			continue
 		}
 		for len(st) > 0 && st[len(st)-1].col >= col {
 			st = st[:len(st)-1]
 		}
-		st = append(st, yEl{col, s[ki:kf], w.novo(), false})
-		pt, is := caminho()
-		w.valorYAML(s, pt, is, root, ki, kf, vp, fim, col, &bloco)
+		st = append(st, yEl{col, s[ki:kf], w.newOne(), false})
+		pt, is := curPath()
+		w.yamlValue(s, pt, is, root, ki, kf, vp, end, col, &block)
 	}
 }
 
-// chaveYAML: a chave que começa em p (simples ou entre aspas) e onde começa o valor.
-func chaveYAML(s string, p, fim int) (ki, kf, vp int, ok bool) {
+// yamlKey: a chave que começa em p (simples ou entre aspas) e onde começa o valor.
+func yamlKey(s string, p, end int) (ki, kf, vp int, ok bool) {
 	c := s[p]
 	if c == '"' || c == '\'' {
-		q := fechaAspas(s, p, fim)
+		q := closeQuotes(s, p, end)
 		if q < 0 {
 			return
 		}
 		j := q + 1
-		for j < fim && s[j] == ' ' {
+		for j < end && s[j] == ' ' {
 			j++
 		}
-		if j < fim && s[j] == ':' && (j+1 == fim || s[j+1] == ' ' || s[j+1] == '\t') {
+		if j < end && s[j] == ':' && (j+1 == end || s[j+1] == ' ' || s[j+1] == '\t') {
 			return p + 1, q, j + 1, true
 		}
 		return
@@ -167,8 +167,8 @@ func chaveYAML(s string, p, fim int) (ki, kf, vp int, ok bool) {
 	if strings.IndexByte("[{&*!|>%@`#,?", c) >= 0 {
 		return
 	}
-	for j := p; j < fim; j++ {
-		if s[j] == ':' && (j+1 == fim || s[j+1] == ' ' || s[j+1] == '\t') {
+	for j := p; j < end; j++ {
+		if s[j] == ':' && (j+1 == end || s[j+1] == ' ' || s[j+1] == '\t') {
 			k := j
 			for k > p && s[k-1] == ' ' {
 				k--
@@ -185,15 +185,15 @@ func chaveYAML(s string, p, fim int) (ki, kf, vp int, ok bool) {
 	return
 }
 
-// fechaAspas: a aspa que fecha a que está em s[p], na mesma linha (” e \" são escapes).
-func fechaAspas(s string, p, fim int) int {
+// closeQuotes: a aspa que fecha a que está em s[p], na mesma linha (” e \" são escapes).
+func closeQuotes(s string, p, end int) int {
 	q := s[p]
-	for j := p + 1; j < fim; j++ {
+	for j := p + 1; j < end; j++ {
 		switch {
 		case q == '"' && s[j] == '\\':
 			j++
 		case s[j] == q:
-			if q == '\'' && j+1 < fim && s[j+1] == '\'' {
+			if q == '\'' && j+1 < end && s[j+1] == '\'' {
 				j++
 				continue
 			}
@@ -203,109 +203,109 @@ func fechaAspas(s string, p, fim int) int {
 	return -1
 }
 
-func (w *yColetor) valorYAML(s string, path []string, ids []int, root, ki, kf, v, fim, refCol int, bloco *int) {
-	for v < fim && (s[v] == ' ' || s[v] == '\t') {
+func (w *yCollector) yamlValue(s string, path []string, ids []int, root, ki, kf, v, end, refCol int, block *int) {
+	for v < end && (s[v] == ' ' || s[v] == '\t') {
 		v++
 	}
 	tag := ""
-	for v < fim && (s[v] == '&' || s[v] == '!') { // âncora, tag
+	for v < end && (s[v] == '&' || s[v] == '!') { // âncora, tag
 		j := v
-		for j < fim && s[j] != ' ' {
+		for j < end && s[j] != ' ' {
 			j++
 		}
 		if s[v] == '!' {
 			tag = s[v:j]
 		}
 		v = j
-		for v < fim && s[v] == ' ' {
+		for v < end && s[v] == ' ' {
 			v++
 		}
 	}
-	if v >= fim || s[v] == '#' || s[v] == '*' {
-		w.emitir(path, ids, root, ki, kf, -1, -1, tag, false)
+	if v >= end || s[v] == '#' || s[v] == '*' {
+		w.emitIt(path, ids, root, ki, kf, -1, -1, tag, false)
 		return
 	}
 	switch s[v] {
 	case '|', '>':
-		*bloco = refCol
-		w.emitir(path, ids, root, ki, kf, -1, -1, tag, false)
+		*block = refCol
+		w.emitIt(path, ids, root, ki, kf, -1, -1, tag, false)
 	case '"', '\'':
-		q := fechaAspas(s, v, fim)
+		q := closeQuotes(s, v, end)
 		if q < 0 {
-			w.emitir(path, ids, root, ki, kf, -1, -1, tag, false)
+			w.emitIt(path, ids, root, ki, kf, -1, -1, tag, false)
 			return
 		}
-		w.emitir(path, ids, root, ki, kf, v+1, q, tag, strings.Contains(s[v+1:q], "{{"))
+		w.emitIt(path, ids, root, ki, kf, v+1, q, tag, strings.Contains(s[v+1:q], "{{"))
 	case '{', '[':
-		if v+1 < fim && s[v] == '{' && s[v+1] == '{' {
-			w.emitir(path, ids, root, ki, kf, v, fim, tag, true)
+		if v+1 < end && s[v] == '{' && s[v+1] == '{' {
+			w.emitIt(path, ids, root, ki, kf, v, end, tag, true)
 			return
 		}
-		w.emitir(path, ids, root, ki, kf, -1, -1, tag, false)
-		w.fluxo(s, v, fim, path, ids, root, 0)
+		w.emitIt(path, ids, root, ki, kf, -1, -1, tag, false)
+		w.stream(s, v, end, path, ids, root, 0)
 	default:
 		e := v
-		for e < fim && !(s[e] == '#' && (s[e-1] == ' ' || s[e-1] == '\t')) {
+		for e < end && !(s[e] == '#' && (s[e-1] == ' ' || s[e-1] == '\t')) {
 			e++
 		}
 		for e > v && (s[e-1] == ' ' || s[e-1] == '\t') {
 			e--
 		}
-		w.emitir(path, ids, root, ki, kf, v, e, tag, strings.Contains(s[v:e], "{{"))
+		w.emitIt(path, ids, root, ki, kf, v, e, tag, strings.Contains(s[v:e], "{{"))
 	}
 }
 
 // fluxo: {a: b, c: [d, e]} numa linha só. Devolve onde parou.
-func (w *yColetor) fluxo(s string, i, fim int, path []string, ids []int, root, prof int) int {
-	if prof > 20 {
-		return fim
+func (w *yCollector) stream(s string, i, end int, path []string, ids []int, root, depth int) int {
+	if depth > 20 {
+		return end
 	}
-	abre := s[i]
-	fecha := byte('}')
-	if abre == '[' {
-		fecha = ']'
+	opener := s[i]
+	closes := byte('}')
+	if opener == '[' {
+		closes = ']'
 	}
 	i++
-	for i < fim {
-		for i < fim && (s[i] == ' ' || s[i] == ',' || s[i] == '\t') {
+	for i < end {
+		for i < end && (s[i] == ' ' || s[i] == ',' || s[i] == '\t') {
 			i++
 		}
-		if i >= fim {
-			return fim
+		if i >= end {
+			return end
 		}
-		if s[i] == fecha {
+		if s[i] == closes {
 			return i + 1
 		}
-		if abre == '[' {
+		if opener == '[' {
 			pp := append(path[:len(path):len(path)], "-")
-			pi := append(ids[:len(ids):len(ids)], w.novo())
-			n := w.escalarFluxo(s, i, fim, pp, pi, root, -1, -1, prof)
+			pi := append(ids[:len(ids):len(ids)], w.newOne())
+			n := w.scaleStream(s, i, end, pp, pi, root, -1, -1, depth)
 			if n <= i {
-				return fim
+				return end
 			}
 			i = n
 			continue
 		}
 		var ki, kf, j int
 		if s[i] == '"' || s[i] == '\'' {
-			q := fechaAspas(s, i, fim)
+			q := closeQuotes(s, i, end)
 			if q < 0 {
-				return fim
+				return end
 			}
 			ki, kf, j = i+1, q, q+1
-			for j < fim && s[j] == ' ' {
+			for j < end && s[j] == ' ' {
 				j++
 			}
-			if j >= fim || s[j] != ':' {
-				return fim
+			if j >= end || s[j] != ':' {
+				return end
 			}
 		} else {
 			j = i
-			for j < fim && s[j] != ',' && s[j] != fecha && !(s[j] == ':' && (j+1 == fim || s[j+1] == ' ')) {
+			for j < end && s[j] != ',' && s[j] != closes && !(s[j] == ':' && (j+1 == end || s[j+1] == ' ')) {
 				j++
 			}
-			if j >= fim || s[j] != ':' {
-				if j < fim && s[j] == ',' {
+			if j >= end || s[j] != ':' {
+				if j < end && s[j] == ',' {
 					i = j + 1
 					continue
 				}
@@ -317,63 +317,63 @@ func (w *yColetor) fluxo(s string, i, fim int, path []string, ids []int, root, p
 			}
 		}
 		j++
-		for j < fim && s[j] == ' ' {
+		for j < end && s[j] == ' ' {
 			j++
 		}
 		pp := append(path[:len(path):len(path)], s[ki:kf])
-		pi := append(ids[:len(ids):len(ids)], w.novo())
-		n := w.escalarFluxo(s, j, fim, pp, pi, root, ki, kf, prof)
+		pi := append(ids[:len(ids):len(ids)], w.newOne())
+		n := w.scaleStream(s, j, end, pp, pi, root, ki, kf, depth)
 		if n <= i {
-			return fim
+			return end
 		}
 		i = n
 	}
-	return fim
+	return end
 }
 
-func (w *yColetor) escalarFluxo(s string, i, fim int, path []string, ids []int, root, ki, kf, prof int) int {
-	if i >= fim {
-		w.emitir(path, ids, root, ki, kf, -1, -1, "", false)
-		return fim
+func (w *yCollector) scaleStream(s string, i, end int, path []string, ids []int, root, ki, kf, depth int) int {
+	if i >= end {
+		w.emitIt(path, ids, root, ki, kf, -1, -1, "", false)
+		return end
 	}
 	switch s[i] {
 	case '{', '[':
-		w.emitir(path, ids, root, ki, kf, -1, -1, "", false)
-		return w.fluxo(s, i, fim, path, ids, root, prof+1)
+		w.emitIt(path, ids, root, ki, kf, -1, -1, "", false)
+		return w.stream(s, i, end, path, ids, root, depth+1)
 	case '"', '\'':
-		q := fechaAspas(s, i, fim)
+		q := closeQuotes(s, i, end)
 		if q < 0 {
-			return fim
+			return end
 		}
-		w.emitir(path, ids, root, ki, kf, i+1, q, "", strings.Contains(s[i+1:q], "{{"))
+		w.emitIt(path, ids, root, ki, kf, i+1, q, "", strings.Contains(s[i+1:q], "{{"))
 		return q + 1
 	}
 	e := i
-	for e < fim && s[e] != ',' && s[e] != ']' && s[e] != '}' {
+	for e < end && s[e] != ',' && s[e] != ']' && s[e] != '}' {
 		e++
 	}
 	f := e
 	for f > i && s[f-1] == ' ' {
 		f--
 	}
-	w.emitir(path, ids, root, ki, kf, i, f, "", false)
+	w.emitIt(path, ids, root, ki, kf, i, f, "", false)
 	return e
 }
 
-// lerJSON: objetos JSON no meio do texto (começam com { seguido de chave entre aspas). Em
+// readJSON: objetos JSON no meio do texto (começam com { seguido de chave entre aspas). Em
 // qualquer coisa que não seja JSON, larga o objeto e segue procurando.
-func (w *yColetor) lerJSON(s string) {
+func (w *yCollector) readJSON(s string) {
 	type ctx struct {
-		obj, temChave bool
-		chave         string
-		ki, kf        int
+		obj, hasKey bool
+		key         string
+		ki, kf      int
 	}
 	var st []ctx
 	var path []string
 	var ids []int
 	root := 0
 	ws := func(c byte) bool { return c == ' ' || c == '\n' || c == '\t' || c == '\r' }
-	larga := func() { st, path, ids = st[:0], path[:0], ids[:0] }
+	wide := func() { st, path, ids = st[:0], path[:0], ids[:0] }
 	for i := 0; i < len(s); {
 		if len(st) == 0 {
 			j := strings.IndexByte(s[i:], '{')
@@ -386,7 +386,7 @@ func (w *yColetor) lerJSON(s string) {
 				k++
 			}
 			if k < len(s) && s[k] == '"' {
-				root = w.novo()
+				root = w.newOne()
 				st = append(st, ctx{obj: true})
 			}
 			continue
@@ -412,53 +412,53 @@ func (w *yColetor) lerJSON(s string) {
 				}
 			}
 			if q < 0 {
-				larga()
+				wide()
 				i++
 				continue
 			}
-			if top.obj && !top.temChave {
+			if top.obj && !top.hasKey {
 				k := q + 1
 				for k < len(s) && ws(s[k]) {
 					k++
 				}
 				if k >= len(s) || s[k] != ':' {
-					larga()
+					wide()
 					i = q + 1
 					continue
 				}
-				top.chave, top.ki, top.kf, top.temChave = s[i+1:q], i+1, q, true
+				top.key, top.ki, top.kf, top.hasKey = s[i+1:q], i+1, q, true
 				i = k + 1
 				continue
 			}
-			nome, ki, kf := "-", -1, -1
+			name, ki, kf := "-", -1, -1
 			if top.obj {
-				nome, ki, kf = top.chave, top.ki, top.kf
-				top.temChave = false
+				name, ki, kf = top.key, top.ki, top.kf
+				top.hasKey = false
 			}
-			path = append(path, nome)
-			ids = append(ids, w.novo())
-			w.emitir(path, ids, root, ki, kf, i+1, q, "", strings.Contains(s[i+1:q], "{{"))
+			path = append(path, name)
+			ids = append(ids, w.newOne())
+			w.emitIt(path, ids, root, ki, kf, i+1, q, "", strings.Contains(s[i+1:q], "{{"))
 			path, ids = path[:len(path)-1], ids[:len(ids)-1]
 			i = q + 1
 		case c == '{' || c == '[':
-			if top.obj && !top.temChave || len(st) > maxProfYAML {
-				larga()
+			if top.obj && !top.hasKey || len(st) > maxYAMLDepth {
+				wide()
 				i++
 				continue
 			}
-			nome, ki, kf := "-", -1, -1
+			name, ki, kf := "-", -1, -1
 			if top.obj {
-				nome, ki, kf = top.chave, top.ki, top.kf
-				top.temChave = false
+				name, ki, kf = top.key, top.ki, top.kf
+				top.hasKey = false
 			}
-			path = append(path, nome)
-			ids = append(ids, w.novo())
-			w.emitir(path, ids, root, ki, kf, -1, -1, "", false)
+			path = append(path, name)
+			ids = append(ids, w.newOne())
+			w.emitIt(path, ids, root, ki, kf, -1, -1, "", false)
 			st = append(st, ctx{obj: c == '{'})
 			i++
 		case c == '}' || c == ']':
 			if top.obj != (c == '}') {
-				larga()
+				wide()
 				i++
 				continue
 			}
@@ -469,15 +469,15 @@ func (w *yColetor) lerJSON(s string) {
 			i++
 		default:
 			k := i
-			for k < len(s) && (ehAlnum(s[k]) || s[k] == '.' || s[k] == '-' || s[k] == '+') {
+			for k < len(s) && (isAlnum(s[k]) || s[k] == '.' || s[k] == '-' || s[k] == '+') {
 				k++
 			}
-			if k == i || top.obj && !top.temChave {
-				larga()
+			if k == i || top.obj && !top.hasKey {
+				wide()
 				i++
 				continue
 			}
-			top.temChave = false
+			top.hasKey = false
 			i = k
 		}
 	}
@@ -486,7 +486,7 @@ func (w *yColetor) lerJSON(s string) {
 // ---------------------------------------------------------------------------------------
 // Vocabulário público e validação de valor
 
-var publicosDevops = func() map[string]bool {
+var publicDevopsSet = func() map[string]bool {
 	m := map[string]bool{}
 	for _, w := range strings.Fields(`default kube-system kube-public kube-node-lease kubernetes kube-dns coredns
 		cluster-admin admin edit view localhost all ungrouped latest stable true false null none yes no
@@ -501,11 +501,11 @@ var publicosDevops = func() map[string]bool {
 }()
 
 // regiões e zonas dos provedores (formas oficiais): us-east-1, sa-east-1, southamerica-east1, europe-west1-b
-var reRegiao = regexp.MustCompile(`^(?:(?:us|eu|ap|sa|ca|me|af|il|mx|cn)(?:-gov)?-(?:east|west|north|south|central|northeast|southeast|northwest|southwest)-\d[a-z]?|(?:us|europe|asia|australia|southamerica|northamerica|me|africa)-[a-z]+\d(?:-[a-z])?)$`)
+var reRegion = regexp.MustCompile(`^(?:(?:us|eu|ap|sa|ca|me|af|il|mx|cn)(?:-gov)?-(?:east|west|north|south|central|northeast|southeast|northwest|southwest)-\d[a-z]?|(?:us|europe|asia|australia|southamerica|northamerica|me|africa)-[a-z]+\d(?:-[a-z])?)$`)
 
-func publicoDevops(v string) bool {
+func publicDevops(v string) bool {
 	l := strings.ToLower(v)
-	if publicosDevops[l] || reRegiao.MatchString(l) {
+	if publicDevopsSet[l] || reRegion.MatchString(l) {
 		return true
 	}
 	for _, p := range []string{"ubuntu-", "windows-", "macos-"} {
@@ -513,13 +513,13 @@ func publicoDevops(v string) bool {
 			return true
 		}
 	}
-	return publicoConexao(v)
+	return publicConnection(v)
 }
 
 // nome de recurso: letras, dígitos, _ . -; sem espaço, aspas, expressão ou caminho
-var reNomeRecurso = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9_.\-]{0,252}$`)
+var reResourceName = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9_.\-]{0,252}$`)
 
-func todoDigitos(v string) bool {
+func allDigits(v string) bool {
 	for i := 0; i < len(v); i++ {
 		if v[i] < '0' || v[i] > '9' {
 			return false
@@ -528,31 +528,31 @@ func todoDigitos(v string) bool {
 	return v != ""
 }
 
-func ehIPv4(v string) bool {
+func isIPv4(v string) bool {
 	if strings.Count(v, ".") != 3 {
 		return false
 	}
 	for _, p := range strings.Split(v, ".") {
-		if !todoDigitos(p) || len(p) > 3 {
+		if !allDigits(p) || len(p) > 3 {
 			return false
 		}
 	}
 	return true
 }
 
-func addNome(s string, a, b int, ent, regra string, forte bool, add func(ObjAchado)) {
+func addName(s string, a, b int, ent, rule string, strong bool, add func(ObjFinding)) {
 	if a < 0 || b > len(s) || b <= a {
 		return
 	}
 	v := s[a:b]
-	if !reNomeRecurso.MatchString(v) || todoDigitos(v) && !(ent == "conta_nuvem" && len(v) == 12) || ehIPv4(v) {
+	if !reResourceName.MatchString(v) || allDigits(v) && !(ent == "conta_nuvem" && len(v) == 12) || isIPv4(v) {
 		return
 	}
-	add(ObjAchado{a, b, ent, regra, forte})
+	add(ObjFinding{a, b, ent, rule, strong})
 }
 
-// addSegmentos: valor com interpolação (${...}): só os pedaços literais, e fracos.
-func addSegmentos(s string, a, b int, ent, regra string, add func(ObjAchado)) {
+// addSegments: valor com interpolação (${...}): só os pedaços literais, e fracos.
+func addSegments(s string, a, b int, ent, rule string, add func(ObjFinding)) {
 	for a < b {
 		j := strings.Index(s[a:b], "${")
 		f := b
@@ -566,8 +566,8 @@ func addSegmentos(s string, a, b int, ent, regra string, add func(ObjAchado)) {
 		for y > x && strings.IndexByte("-_./:", s[y-1]) >= 0 {
 			y--
 		}
-		if y-x >= 4 && caraDeIdentificador(s[x:y]) {
-			addNome(s, x, y, ent, regra, false, add)
+		if y-x >= 4 && identifierShape(s[x:y]) {
+			addName(s, x, y, ent, rule, false, add)
 		}
 		if j < 0 {
 			return
@@ -580,45 +580,45 @@ func addSegmentos(s string, a, b int, ent, regra string, add func(ObjAchado)) {
 	}
 }
 
-// addARNouNome: nome que pode vir como ARN (arn:aws:eks:região:conta:cluster/nome).
-func addARNouNome(s string, a, b int, ent, regra string, add func(ObjAchado)) {
+// addARNOrName: nome que pode vir como ARN (arn:aws:eks:região:conta:cluster/nome).
+func addARNOrName(s string, a, b int, ent, rule string, add func(ObjFinding)) {
 	v := s[a:b]
 	if !strings.HasPrefix(v, "arn:") {
-		addNome(s, a, b, ent, regra, true, add)
+		addName(s, a, b, ent, rule, true, add)
 		return
 	}
 	ps := strings.SplitN(v, ":", 6)
 	if len(ps) < 6 {
 		return
 	}
-	conta := a + len(ps[0]) + len(ps[1]) + len(ps[2]) + len(ps[3]) + 4
-	addNome(s, conta, conta+len(ps[4]), "conta_nuvem", regra, true, add)
+	account := a + len(ps[0]) + len(ps[1]) + len(ps[2]) + len(ps[3]) + 4
+	addName(s, account, account+len(ps[4]), "conta_nuvem", rule, true, add)
 	if i := strings.LastIndexByte(v, '/'); i >= 0 {
-		addNome(s, a+i+1, b, ent, regra, true, add)
+		addName(s, a+i+1, b, ent, rule, true, add)
 	}
 }
 
 // ---------------------------------------------------------------------------------------
-// Leitor de YAML/JSON estruturado: Kubernetes, kubeconfig, Helm, compose, CloudFormation, ARM,
+// Reader de YAML/JSON estruturado: Kubernetes, kubeconfig, Helm, compose, CloudFormation, ARM,
 // Ansible (YAML) e pipelines de CI.
 
-// chavesServicoCompose: as chaves de um serviço na especificação do Compose
+// composeServiceKeys: as chaves de um serviço na especificação do Compose
 // (https://github.com/compose-spec/compose-spec/blob/main/05-services.md), mais a fusão "<<"
 // (serviço que herda tudo de uma âncora, "<<: *comum"). Um filho de "services:" com uma delas
 // é serviço, tenha imagem própria ou não.
-var chavesServicoCompose = conj("image", "build", "ports", "environment", "env_file", "command", "entrypoint",
+var composeServiceKeys = setOf("image", "build", "ports", "environment", "env_file", "command", "entrypoint",
 	"depends_on", "volumes", "networks", "restart", "healthcheck", "deploy", "container_name", "hostname",
 	"labels", "expose", "links", "extends", "profiles", "working_dir", "user", "logging", "ulimits",
 	"cap_add", "cap_drop", "secrets", "configs", "extra_hosts", "tmpfs", "stdin_open", "tty", "platform",
 	"pull_policy", "init", "privileged", "network_mode", "external_links", "shm_size", "stop_signal",
 	"stop_grace_period", "sysctls", "devices", "dns", "<<")
 
-var sinaisYAML = []string{"apiVersion", "services:", "Resources:", "runs-on", "stages:", "script:", "pool:",
+var yamlSignals = []string{"apiVersion", "services:", "Resources:", "runs-on", "stages:", "script:", "pool:",
 	"jobs:", "hosts:", "ansible_", "delegate_to"}
 
-var sinaisJSON = []string{`"apiVersion"`, `"Resources"`, `"resources"`}
+var jsonSignals = []string{`"apiVersion"`, `"Resources"`, `"resources"`}
 
-func temAlgum(s string, ss []string) bool {
+func hasAny(s string, ss []string) bool {
 	for _, x := range ss {
 		if strings.Contains(s, x) {
 			return true
@@ -627,27 +627,27 @@ func temAlgum(s string, ss []string) bool {
 	return false
 }
 
-func acharDevopsEstruturado(s string, add func(ObjAchado)) {
+func findStructuredDevops(s string, add func(ObjFinding)) {
 	if strings.IndexByte(s, ':') < 0 {
 		return
 	}
-	y, j := temAlgum(s, sinaisYAML), temAlgum(s, sinaisJSON)
+	y, j := hasAny(s, yamlSignals), hasAny(s, jsonSignals)
 	if !y && !j {
 		return
 	}
-	w := &yColetor{}
-	w.lerYAML(s) // o JSON indentado também é lido linha a linha
+	w := &yCollector{}
+	w.readYAML(s) // o JSON indentado também é lido linha a linha
 	if j {
-		w.lerJSON(s)
+		w.readJSON(s)
 	}
 	if len(w.ents) == 0 {
 		return
 	}
-	visto := map[[2]int]bool{}
-	regrasEstrutura(s, w.ents, func(o ObjAchado) {
-		k := [2]int{o.Ini, o.Fim}
-		if !visto[k] {
-			visto[k] = true
+	seen := map[[2]int]bool{}
+	structureRules(s, w.ents, func(o ObjFinding) {
+		k := [2]int{o.Start, o.End}
+		if !seen[k] {
+			seen[k] = true
 			add(o)
 		}
 	})
@@ -656,24 +656,24 @@ func acharDevopsEstruturado(s string, add func(ObjAchado)) {
 var reAPIVersion = regexp.MustCompile(`^(?:[a-z0-9.-]+/)?v\d+(?:(?:alpha|beta)\d+)?$`)
 
 // propriedades de CloudFormation que guardam o nome real do recurso
-var propsCFN = map[string]string{"BucketName": "bucket", "DBInstanceIdentifier": "database", "DBClusterIdentifier": "database",
+var cfnProps = map[string]string{"BucketName": "bucket", "DBInstanceIdentifier": "database", "DBClusterIdentifier": "database",
 	"DBName": "database", "DatabaseName": "database", "TableName": "tabela", "ServerName": "servidor", "ClusterName": "servidor",
 	"QueueName": "fila", "TopicName": "fila", "StreamName": "fila", "FunctionName": "servico", "RepositoryName": "repositorio",
 	"ServiceName": "servico", "RoleName": "usuario", "UserName": "usuario", "MasterUsername": "usuario", "GroupName": "usuario"}
 
-var rotulosK8s = map[string]bool{"app.kubernetes.io/name": true, "app.kubernetes.io/instance": true, "app.kubernetes.io/part-of": true}
+var k8sLabels = map[string]bool{"app.kubernetes.io/name": true, "app.kubernetes.io/instance": true, "app.kubernetes.io/part-of": true}
 
-var palavrasPlay = []string{"tasks", "roles", "become", "gather_facts", "vars", "handlers", "pre_tasks", "post_tasks", "remote_user"}
+var playWords = []string{"tasks", "roles", "become", "gather_facts", "vars", "handlers", "pre_tasks", "post_tasks", "remote_user"}
 
-func regrasEstrutura(s string, ents []yEnt, add func(ObjAchado)) {
-	filhos := map[int][]int{}
-	chaves := map[int]map[string]int{} // contêiner -> chave -> primeira entrada
-	raiz := map[int]map[string]int{}
-	type recurso struct{ api, kind string }
-	res := map[int]*recurso{}
+func structureRules(s string, ents []yEnt, add func(ObjFinding)) {
+	children := map[int][]int{}
+	keys := map[int]map[string]int{} // contêiner -> chave -> primeira entrada
+	rootDir := map[int]map[string]int{}
+	type resource struct{ api, kind string }
+	res := map[int]*resource{}
 	compose := map[int]bool{}
-	servCompose := map[int]bool{}
-	declCompose := map[int]map[string]bool{} // redes e volumes declarados no topo
+	composeSvc := map[int]bool{}
+	composeDecl := map[int]map[string]bool{} // redes e volumes declarados no topo
 	ci := map[int]bool{}
 	val := func(e *yEnt) string {
 		if e.vi < 0 || e.tmpl {
@@ -683,23 +683,23 @@ func regrasEstrutura(s string, ents []yEnt, add func(ObjAchado)) {
 	}
 	for i := range ents {
 		e := &ents[i]
-		p := e.pai()
-		filhos[p] = append(filhos[p], i)
-		k := e.chave()
+		p := e.parent()
+		children[p] = append(children[p], i)
+		k := e.key()
 		if e.ki >= 0 {
-			if chaves[p] == nil {
-				chaves[p] = map[string]int{}
+			if keys[p] == nil {
+				keys[p] = map[string]int{}
 			}
-			if _, ok := chaves[p][k]; !ok {
-				chaves[p][k] = i
+			if _, ok := keys[p][k]; !ok {
+				keys[p][k] = i
 			}
 		}
 		if len(e.path) == 1 {
-			if raiz[e.root] == nil {
-				raiz[e.root] = map[string]int{}
+			if rootDir[e.root] == nil {
+				rootDir[e.root] = map[string]int{}
 			}
-			if _, ok := raiz[e.root][k]; !ok {
-				raiz[e.root][k] = i
+			if _, ok := rootDir[e.root][k]; !ok {
+				rootDir[e.root][k] = i
 			}
 			switch k {
 			case "jobs", "stages", "steps", "trigger", "workflow":
@@ -709,7 +709,7 @@ func regrasEstrutura(s string, ents []yEnt, add func(ObjAchado)) {
 		if e.vi >= 0 && (k == "apiVersion" || k == "kind") {
 			r := res[p]
 			if r == nil {
-				r = &recurso{}
+				r = &resource{}
 				res[p] = r
 			}
 			if k == "kind" {
@@ -722,23 +722,23 @@ func regrasEstrutura(s string, ents []yEnt, add func(ObjAchado)) {
 			ci[e.root] = true
 		}
 		if len(e.path) == 2 && e.ki >= 0 && (e.path[0] == "networks" || e.path[0] == "volumes") {
-			if declCompose[e.root] == nil {
-				declCompose[e.root] = map[string]bool{}
+			if composeDecl[e.root] == nil {
+				composeDecl[e.root] = map[string]bool{}
 			}
-			declCompose[e.root][e.path[0]+"\x00"+k] = true
+			composeDecl[e.root][e.path[0]+"\x00"+k] = true
 		}
-		if len(e.path) == 3 && e.path[0] == "services" && chavesServicoCompose[k] {
+		if len(e.path) == 3 && e.path[0] == "services" && composeServiceKeys[k] {
 			compose[e.root] = true
-			servCompose[e.ids[1]] = true
+			composeSvc[e.ids[1]] = true
 		}
 	}
-	filho := func(id int, k string) *yEnt {
-		if i, ok := chaves[id][k]; ok {
+	child := func(id int, k string) *yEnt {
+		if i, ok := keys[id][k]; ok {
 			return &ents[i]
 		}
 		return nil
 	}
-	ehRecurso := func(c int) (string, bool) {
+	isResource := func(c int) (string, bool) {
 		r := res[c]
 		if r == nil || r.kind == "" || !reAPIVersion.MatchString(r.api) {
 			return "", false
@@ -747,7 +747,7 @@ func regrasEstrutura(s string, ents []yEnt, add func(ObjAchado)) {
 	}
 	// Helm Chart.yaml: apiVersion v1/v2 + name + version, sem kind
 	chart := map[int]bool{}
-	for root, ks := range raiz {
+	for root, ks := range rootDir {
 		_, n := ks["name"]
 		_, v := ks["version"]
 		_, k := ks["kind"]
@@ -759,42 +759,42 @@ func regrasEstrutura(s string, ents []yEnt, add func(ObjAchado)) {
 	}
 	for i := range ents {
 		e := &ents[i]
-		k := e.chave()
+		k := e.key()
 		v := val(e)
 		// Kubernetes: o recurso mais próximo (objeto com apiVersion e kind)
-		emK8s := false
+		inK8s := false
 		for j := len(e.path) - 1; j >= 0; j-- {
 			c := e.root
 			if j > 0 {
 				c = e.ids[j-1]
 			}
-			if kind, ok := ehRecurso(c); ok {
-				regraK8s(s, e, e.path[j:], kind, v, add)
-				emK8s = true
+			if kind, ok := isResource(c); ok {
+				k8sRule(s, e, e.path[j:], kind, v, add)
+				inK8s = true
 				break
 			}
 		}
-		if emK8s {
+		if inK8s {
 			continue
 		}
 		if chart[e.root] && len(e.path) == 1 && k == "name" && v != "" {
-			addNome(s, e.vi, e.vf, "servico", "helm", true, add)
+			addName(s, e.vi, e.vf, "servico", "helm", true, add)
 		}
 		if compose[e.root] && len(e.path) >= 2 {
 			switch {
-			case e.path[0] == "services" && len(e.path) == 2 && e.ki >= 0 && servCompose[e.id()]:
-				addNome(s, e.ki, e.kf, "servico", "compose", true, add)
+			case e.path[0] == "services" && len(e.path) == 2 && e.ki >= 0 && composeSvc[e.id()]:
+				addName(s, e.ki, e.kf, "servico", "compose", true, add)
 			case e.path[0] == "services" && len(e.path) == 3 && v != "":
 				switch k {
 				case "container_name":
-					addNome(s, e.vi, e.vf, "servico", "compose", true, add)
+					addName(s, e.vi, e.vf, "servico", "compose", true, add)
 				case "hostname":
-					addNome(s, e.vi, e.vf, "servidor", "compose", true, add)
+					addName(s, e.vi, e.vf, "servidor", "compose", true, add)
 				case "image":
-					addImagem(s, e.vi, e.vf, "imagem", add)
+					addImage(s, e.vi, e.vf, "imagem", add)
 				}
 			case (e.path[0] == "networks" || e.path[0] == "volumes") && len(e.path) == 2 && e.ki >= 0:
-				addNome(s, e.ki, e.kf, "servico", "compose", false, add)
+				addName(s, e.ki, e.kf, "servico", "compose", false, add)
 			case e.path[0] == "services" && len(e.path) == 4 && (e.path[2] == "networks" || e.path[2] == "volumes"):
 				// referência a rede/volume declarado no topo: "- rede", "rede:", "- volume:/caminho"
 				a, b := e.ki, e.kf
@@ -806,40 +806,40 @@ func regrasEstrutura(s string, ents []yEnt, add func(ObjAchado)) {
 						}
 					}
 				}
-				if a >= 0 && b > a && declCompose[e.root][e.path[2]+"\x00"+s[a:b]] {
-					addNome(s, a, b, "servico", "compose", false, add)
+				if a >= 0 && b > a && composeDecl[e.root][e.path[2]+"\x00"+s[a:b]] {
+					addName(s, a, b, "servico", "compose", false, add)
 				}
 			}
 		}
 		// CloudFormation: Resources.<lógico>.Properties.<XxxName>
 		if len(e.path) == 4 && e.path[0] == "Resources" && e.path[2] == "Properties" && v != "" {
-			if ent, ok := propsCFN[k]; ok {
+			if ent, ok := cfnProps[k]; ok {
 				switch e.tag {
 				case "":
-					addNome(s, e.vi, e.vf, ent, "cfn", true, add)
+					addName(s, e.vi, e.vf, ent, "cfn", true, add)
 				case "!Sub":
-					addSegmentos(s, e.vi, e.vf, ent, "cfn", add)
+					addSegments(s, e.vi, e.vf, ent, "cfn", add)
 				}
 			}
 		}
 		// ARM: resources[].name, com o tipo Microsoft.X/y ao lado; "[...]" é expressão
 		if k == "name" && v != "" && v[0] != '[' && len(e.path) >= 3 && e.path[len(e.path)-2] == "-" && e.path[len(e.path)-3] == "resources" {
-			if t := filho(e.pai(), "type"); t != nil && strings.HasPrefix(strings.ToLower(val(t)), "microsoft.") {
-				addNomeAzure(s, e.vi, e.vf, val(t), "arm", add)
+			if t := child(e.parent(), "type"); t != nil && strings.HasPrefix(strings.ToLower(val(t)), "microsoft.") {
+				addAzureName(s, e.vi, e.vf, val(t), "arm", add)
 			}
 		}
 		// Ansible (YAML)
 		switch {
 		case k == "hosts" && e.vi < 0:
-			for _, f := range filhos[e.id()] {
+			for _, f := range children[e.id()] {
 				if c := &ents[f]; c.ki >= 0 && !c.tmpl {
-					addNome(s, c.ki, c.kf, "servidor", "ansible", true, add)
+					addName(s, c.ki, c.kf, "servidor", "ansible", true, add)
 				}
 			}
 		case k == "hosts" && v != "" && len(e.path) == 2 && e.path[0] == "-":
 			play := false
-			for _, p := range palavrasPlay {
-				if filho(e.pai(), p) != nil {
+			for _, p := range playWords {
+				if child(e.parent(), p) != nil {
 					play = true
 					break
 				}
@@ -857,7 +857,7 @@ func regrasEstrutura(s string, ents []yEnt, add func(ObjAchado)) {
 					for b > a && s[b-1] == ' ' {
 						b--
 					}
-					addNome(s, a, b, "servidor", "ansible", false, add)
+					addName(s, a, b, "servidor", "ansible", false, add)
 					x = y + 1
 				}
 			}
@@ -866,12 +866,12 @@ func regrasEstrutura(s string, ents []yEnt, add func(ObjAchado)) {
 			if k == "ansible_user" {
 				ent = "usuario"
 			}
-			addNome(s, e.vi, e.vf, ent, "ansible", true, add)
+			addName(s, e.vi, e.vf, ent, "ansible", true, add)
 		case k == "delegate_to" && v != "":
-			addNome(s, e.vi, e.vf, "servidor", "ansible", false, add)
+			addName(s, e.vi, e.vf, "servidor", "ansible", false, add)
 		}
 		if ci[e.root] {
-			regraCI(s, ents, e, v, filho, add)
+			ciRule(s, ents, e, v, child, add)
 		}
 	}
 }

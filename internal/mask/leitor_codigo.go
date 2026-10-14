@@ -41,10 +41,10 @@ func literal(s string, i int) int {
 	return -1
 }
 
-func ehAspa(c byte) bool { return c == '"' || c == '\'' || c == '`' }
+func isQuote(c byte) bool { return c == '"' || c == '\'' || c == '`' }
 
-// antesBranco: a posição do último caractere antes de i que não é espaço (ou -1).
-func antesBranco(s string, i int) int {
+// beforeBlank: a posição do último caractere antes de i que não é espaço (ou -1).
+func beforeBlank(s string, i int) int {
 	k := i - 1
 	for k >= 0 && (s[k] == ' ' || s[k] == '\t') {
 		k--
@@ -52,37 +52,37 @@ func antesBranco(s string, i int) int {
 	return k
 }
 
-// identAntes: o identificador que termina em s[k] (inclusive): letras, dígitos, _ $ .
+// identBefore: o identificador que termina em s[k] (inclusive): letras, dígitos, _ $ .
 // Devolve o início e o último pedaço depois de "." ou "->" (self.table_name -> table_name).
-func identAntes(s string, k int) (ini int, ult string) {
+func identBefore(s string, k int) (ini int, lastPos string) {
 	a := k
-	for a >= 0 && (ehAlnum(s[a]) || s[a] == '_' || s[a] == '$' || s[a] == '.' || s[a] == '>' && a > 0 && s[a-1] == '-' || s[a] == '-' && a+1 <= k && s[a+1] == '>') {
+	for a >= 0 && (isAlnum(s[a]) || s[a] == '_' || s[a] == '$' || s[a] == '.' || s[a] == '>' && a > 0 && s[a-1] == '-' || s[a] == '-' && a+1 <= k && s[a+1] == '>') {
 		a--
 	}
-	nome := s[a+1 : k+1]
-	if i := strings.LastIndexAny(nome, ".>"); i >= 0 {
-		nome = nome[i+1:]
+	name := s[a+1 : k+1]
+	if i := strings.LastIndexAny(name, ".>"); i >= 0 {
+		name = name[i+1:]
 	}
-	return a + 1, strings.TrimLeft(nome, "$")
+	return a + 1, strings.TrimLeft(name, "$")
 }
 
-// nomeAntes: o nome que fica à esquerda de um operador que termina em s[k]: um identificador,
+// nameBefore: o nome que fica à esquerda de um operador que termina em s[k]: um identificador,
 // um texto entre aspas ('queue' =>, "host":), um índice (config["Kafka:Topic"]) ou um
 // símbolo do Ruby (:host =>). Pula a anotação de tipo ("NAME: str =", "x: String =").
-func nomeAntes(s string, k int) string {
-	k = antesBranco(s, k+1)
+func nameBefore(s string, k int) string {
+	k = beforeBlank(s, k+1)
 	if k < 0 {
 		return ""
 	}
 	switch {
-	case ehAspa(s[k]):
+	case isQuote(s[k]):
 		q := s[k]
 		a := strings.LastIndexByte(s[max(0, k-120):k], q)
 		if a < 0 {
 			return ""
 		}
 		a += max(0, k-120)
-		if v := s[a+1 : k]; chaveComForma(v) {
+		if v := s[a+1 : k]; shapedKey(v) {
 			return v
 		}
 		return ""
@@ -93,34 +93,34 @@ func nomeAntes(s string, k int) string {
 		}
 		a += max(0, k-120)
 		v := strings.TrimSpace(s[a+1 : k])
-		if len(v) >= 2 && ehAspa(v[0]) && v[len(v)-1] == v[0] && chaveComForma(v[1:len(v)-1]) {
+		if len(v) >= 2 && isQuote(v[0]) && v[len(v)-1] == v[0] && shapedKey(v[1:len(v)-1]) {
 			return v[1 : len(v)-1]
 		}
 		return ""
-	case ehAlnum(s[k]) || s[k] == '_':
-		a, nome := identAntes(s, k)
+	case isAlnum(s[k]) || s[k] == '_':
+		a, name := identBefore(s, k)
 		// "NAME: str =": o tipo está à direita do ":"; o nome vem antes
-		if palavrasTipo[strings.ToLower(nome)] || tipoComum(nome) {
-			if p := antesBranco(s, a); p >= 0 && s[p] == ':' {
-				if _, n2 := identAntes(s, antesBranco(s, p)); n2 != "" {
+		if typeWords[strings.ToLower(name)] || commonType(name) {
+			if p := beforeBlank(s, a); p >= 0 && s[p] == ':' {
+				if _, n2 := identBefore(s, beforeBlank(s, p)); n2 != "" {
 					return n2
 				}
 			}
 		}
-		return nome
+		return name
 	}
 	return ""
 }
 
-// valorMarcado: em código, só ensina sozinho o valor com dígito, "_" ou "." (pgsrv-01, vendas_prd,
+// markedValue: em código, só ensina sozinho o valor com dígito, "_" ou "." (pgsrv-01, vendas_prd,
 // db.interno); "payments-api" é mascarado no lugar e só é aprendido se aparecer em duas regras
 // (duas palavras com hífen aparecem demais em código público).
-func valorMarcado(v string) bool { return strings.ContainsAny(v, "0123456789_.") }
+func markedValue(v string) bool { return strings.ContainsAny(v, "0123456789_.") }
 
-// ambiguaNoCodigo: o último pedaço do nome é uma palavra de tipo que, em código, quase sempre
+// ambiguousInCode: o último pedaço do nome é uma palavra de tipo que, em código, quase sempre
 // quer dizer outra coisa: stream (fluxo de entrada e saída), subject (assunto de e-mail)
-func ambiguaNoCodigo(nome string) bool {
-	switch strings.ToLower(ultimoPedaco(nome)) {
+func ambiguousInCode(name string) bool {
+	switch strings.ToLower(lastPiece(name)) {
 	case "stream", "streams", "subject", "subjects":
 		return true
 	}
@@ -128,26 +128,26 @@ func ambiguaNoCodigo(nome string) bool {
 }
 
 // embrulho: funções que só embrulham o valor (aws.String("x"), to.Ptr("x"), Optional.of("x"))
-var embrulho = conj("string", "str", "ptr", "toptr", "stringptr", "pointer", "some", "of", "value", "valueof",
+var wrapper = setOf("string", "str", "ptr", "toptr", "stringptr", "pointer", "some", "of", "value", "valueof",
 	"stringvalue", "new", "text", "s")
 
-// chaveComForma: uma chave entre aspas que é um nome ("host", "Kafka:Topic", "db.host"), e não
+// shapedKey: uma chave entre aspas que é um nome ("host", "Kafka:Topic", "db.host"), e não
 // uma URL ou uma frase
-func chaveComForma(v string) bool {
-	if v == "" || len(v) > 80 || strings.Contains(v, "//") || !(letraD(v[0]) || v[0] == '_') {
+func shapedKey(v string) bool {
+	if v == "" || len(v) > 80 || strings.Contains(v, "//") || !(letterD(v[0]) || v[0] == '_') {
 		return false
 	}
 	for i := 0; i < len(v); i++ {
-		if c := v[i]; !(ehAlnum(c) || c == '_' || c == '.' || c == '-' || c == ':') {
+		if c := v[i]; !(isAlnum(c) || c == '_' || c == '.' || c == '-' || c == ':') {
 			return false
 		}
 	}
 	return true
 }
 
-// tipoComum: nomes de tipo que aparecem entre o nome e o "=" ("String x =" fica com x, mas
+// commonType: nomes de tipo que aparecem entre o nome e o "=" ("String x =" fica com x, mas
 // "x: String =" precisa pular "String").
-func tipoComum(v string) bool {
+func commonType(v string) bool {
 	switch v {
 	case "String", "str", "string", "Str", "&str", "text", "Text", "char", "Optional", "Any", "any":
 		return true
@@ -155,7 +155,7 @@ func tipoComum(v string) bool {
 	return false
 }
 
-func acharCodigoNome(s string, add func(ObjAchado)) {
+func findCodeName(s string, add func(ObjFinding)) {
 	if strings.IndexByte(s, '"') < 0 && strings.IndexByte(s, '\'') < 0 {
 		return
 	}
@@ -173,51 +173,51 @@ func acharCodigoNome(s string, add func(ObjAchado)) {
 		if b-a < 2 || b-a > 200 {
 			continue
 		}
-		k := antesBranco(s, a-1)
+		k := beforeBlank(s, a-1)
 		// prefixo de literal: r"", f"", b"", u"", @"" (C#)
-		if k >= 0 && strings.IndexByte("rRfFbBuU@", s[k]) >= 0 && k == a-2 && (k == 0 || !ehAlnum(s[k-1])) {
-			k = antesBranco(s, k)
+		if k >= 0 && strings.IndexByte("rRfFbBuU@", s[k]) >= 0 && k == a-2 && (k == 0 || !isAlnum(s[k-1])) {
+			k = beforeBlank(s, k)
 		}
 		if k < 0 {
 			continue
 		}
-		nome := ""
+		name := ""
 		switch c := s[k]; {
 		case c == '>' && k > 0 && s[k-1] == '=': // 'k' => 'v'
-			nome = nomeAntes(s, k-2)
+			name = nameBefore(s, k-2)
 		case c == '=' && (k == 0 || strings.IndexByte("=!<>+-*/%&|^", s[k-1]) < 0) && (k+1 >= len(s) || s[k+1] != '='):
 			p := k - 1
 			if p >= 0 && (s[p] == ':' || s[p] == '?') { // := ?=
 				p--
 			}
-			nome = nomeAntes(s, p)
+			name = nameBefore(s, p)
 		case c == ':' && (k == 0 || s[k-1] != ':') && (k+1 >= len(s) || s[k+1] != ':'):
-			nome = nomeAntes(s, k-1)
+			name = nameBefore(s, k-1)
 			// "? 'x' : 'y'" (operador ternário) não é chave
-			if p := antesBranco(s, k); p >= 0 && ehAspa(s[p]) {
-				a := max(0, p-janelaLinha)
+			if p := beforeBlank(s, k); p >= 0 && isQuote(s[p]) {
+				a := max(0, p-lineWindow)
 				if o := strings.LastIndexByte(s[a:p], s[p]); o >= 0 {
-					if q := antesBranco(s, a+o); q >= 0 && s[q] == '?' {
-						nome = ""
+					if q := beforeBlank(s, a+o); q >= 0 && s[q] == '?' {
+						name = ""
 					}
 				}
 			}
 		case c == ',':
 			// chave e valor em chamada: f("KEY", "v")
-			p := antesBranco(s, k)
-			if p >= 0 && ehAspa(s[p]) {
+			p := beforeBlank(s, k)
+			if p >= 0 && isQuote(s[p]) {
 				q := strings.LastIndexByte(s[max(0, p-120):p], s[p])
 				if q >= 0 {
 					q += max(0, p-120)
-					if r := antesBranco(s, q); r >= 0 && s[r] == '(' && chamadaChaveValor(s, r) {
-						nome = s[q+1 : p]
+					if r := beforeBlank(s, q); r >= 0 && s[r] == '(' && keyValueCall(s, r) {
+						name = s[q+1 : p]
 					}
 				}
 			}
 		case c == '|' && k > 0 && s[k-1] == '|', c == '?' && k > 0 && s[k-1] == '?':
-			nome = nomeDefault(s, k-2)
-		case c == 'r' && k >= 1 && s[k-1] == 'o' && (k < 2 || !ehAlnum(s[k-2])): // "... or 'v'"
-			nome = nomeDefault(s, k-2)
+			name = defaultName(s, k-2)
+		case c == 'r' && k >= 1 && s[k-1] == 'o' && (k < 2 || !isAlnum(s[k-2])): // "... or 'v'"
+			name = defaultName(s, k-2)
 		case c == '(':
 			// valor embrulhado: KEY: fn("v") / KEY = fn("v") com um argumento só
 			r := b + 1
@@ -225,45 +225,45 @@ func acharCodigoNome(s string, add func(ObjAchado)) {
 				r++
 			}
 			if r < len(s) && s[r] == ')' {
-				ini, f := identAntes(s, antesBranco(s, k))
-				if p := antesBranco(s, ini); embrulho[strings.ToLower(f)] && p >= 0 && (s[p] == ':' || s[p] == '=') && (p == 0 || s[p-1] != ':') {
-					nome = nomeAntes(s, p-1)
+				ini, f := identBefore(s, beforeBlank(s, k))
+				if p := beforeBlank(s, ini); wrapper[strings.ToLower(f)] && p >= 0 && (s[p] == ':' || s[p] == '=') && (p == 0 || s[p-1] != ':') {
+					name = nameBefore(s, p-1)
 				}
 			}
-		case ehAlnum(c) || c == '_':
+		case isAlnum(c) || c == '_':
 			// #define NOME "v"
-			ini, n := identAntes(s, k)
-			if p := antesBranco(s, ini); p >= 6 && s[p-6:p+1] == "#define" {
-				nome = n
+			ini, n := identBefore(s, k)
+			if p := beforeBlank(s, ini); p >= 6 && s[p-6:p+1] == "#define" {
+				name = n
 			}
 		}
-		if nome == "" {
+		if name == "" {
 			continue
 		}
-		if ambiguaNoCodigo(nome) {
+		if ambiguousInCode(name) {
 			continue
 		}
-		ent, forte := entChave(nome)
-		if ent == "" && (nome == "name" || nome == "value" || nome == "names") {
+		ent, strong := entKey(name)
+		if ent == "" && (name == "name" || name == "value" || name == "names") {
 			// @Table(name = "x"), Queue(name="x"): o tipo vem de quem é chamado
-			if f := chamadaEnvolvente(s, k); f != "" {
-				ent, forte = entFuncao(f), true
+			if f := enclosingCall(s, k); f != "" {
+				ent, strong = entFunc(f), true
 			}
 		}
 		if ent == "" {
 			continue
 		}
-		marcarValor(s, a, b, ent, "código-nome", forte && valorMarcado(s[a:b]), add)
+		markValue(s, a, b, ent, "código-nome", strong && markedValue(s[a:b]), add)
 	}
 }
 
 // Default de placeholder: ${NOME:valor} (Spring, Micronaut), ${NOME:-valor} e ${NOME-valor}
 // (shell, docker-compose). O nome da variável diz o tipo do valor, como em "NOME = valor".
-func acharPlaceholder(s string, add func(ObjAchado)) {
+func findPlaceholder(s string, add func(ObjFinding)) {
 	for i := strings.Index(s, "${"); i >= 0; {
 		a := i + 2
 		b := a
-		for b < len(s) && (ehAlnum(s[b]) || s[b] == '_' || s[b] == '.' || s[b] == '-' && b+1 < len(s) && s[b+1] != '}' && !(b > a && s[b-1] == ':')) {
+		for b < len(s) && (isAlnum(s[b]) || s[b] == '_' || s[b] == '.' || s[b] == '-' && b+1 < len(s) && s[b+1] != '}' && !(b > a && s[b-1] == ':')) {
 			b++
 		}
 		if b > a && b < len(s) && (s[b] == ':' || s[b] == '-') {
@@ -271,10 +271,10 @@ func acharPlaceholder(s string, add func(ObjAchado)) {
 			if s[b] == ':' && v < len(s) && (s[v] == '-' || s[v] == '=') {
 				v++
 			}
-			fim := strings.IndexByte(s[v:min(len(s), v+300)], '}')
-			if fim > 0 && !strings.Contains(s[v:v+fim], "://") { // URL: fica com o leitor de URL
-				if ent, forte := entChave(s[a:b]); ent != "" {
-					marcarValor(s, v, v+fim, ent, "placeholder", forte, add)
+			end := strings.IndexByte(s[v:min(len(s), v+300)], '}')
+			if end > 0 && !strings.Contains(s[v:v+end], "://") { // URL: fica com o leitor de URL
+				if ent, strong := entKey(s[a:b]); ent != "" {
+					markValue(s, v, v+end, ent, "placeholder", strong, add)
 				}
 			}
 		}
@@ -297,43 +297,43 @@ func defaultPlaceholder(s string, k int) bool {
 	}
 	a += max(0, k-120) + 2
 	for x := a; x < k; x++ {
-		if !(ehAlnum(s[x]) || s[x] == '_' || s[x] == '.' || s[x] == '-') {
+		if !(isAlnum(s[x]) || s[x] == '_' || s[x] == '.' || s[x] == '-') {
 			return false
 		}
 	}
 	return k > a
 }
 
-// chamadaEnvolvente: o nome da função, construtor ou anotação cujo "(" ainda está aberto
+// enclosingCall: o nome da função, construtor ou anotação cujo "(" ainda está aberto
 // antes de s[k] (na mesma instrução, até 300 bytes atrás).
-func chamadaEnvolvente(s string, k int) string {
-	prof := 0
+func enclosingCall(s string, k int) string {
+	depth := 0
 	for i := k; i >= 0 && i > k-300; i-- {
 		switch s[i] {
 		case ')', ']', '}':
-			prof++
+			depth++
 		case '(', '[', '{':
-			if prof == 0 {
+			if depth == 0 {
 				if s[i] != '(' && s[i] != '[' {
 					return ""
 				}
-				p := antesBranco(s, i)
+				p := beforeBlank(s, i)
 				if s[i] == '[' { // [Table("x", Schema = "y")] do C#: o nome vem depois do "["
 					e := i + 1
-					for e < len(s) && (ehAlnum(s[e]) || s[e] == '_') {
+					for e < len(s) && (isAlnum(s[e]) || s[e] == '_') {
 						e++
 					}
 					return s[i+1 : e]
 				}
-				if p >= 0 && (ehAlnum(s[p]) || s[p] == '_') {
-					_, n := identAntes(s, p)
+				if p >= 0 && (isAlnum(s[p]) || s[p] == '_') {
+					_, n := identBefore(s, p)
 					return n
 				}
 				return ""
 			}
-			prof--
+			depth--
 		case ';', '\n':
-			if prof == 0 && s[i] == ';' {
+			if depth == 0 && s[i] == ';' {
 				return ""
 			}
 		}
@@ -343,35 +343,35 @@ func chamadaEnvolvente(s string, k int) string {
 
 // palavras do nome de uma função que recebe (chave, valor): setProperty, define, getenv,
 // os.environ.get, ENV.fetch, getOrDefault, Setenv, put, config.set...
-var funcaoChaveValor = conj("set", "put", "define", "getenv", "env", "environ", "get", "fetch", "default",
+var keyValueFunc = setOf("set", "put", "define", "getenv", "env", "environ", "get", "fetch", "default",
 	"property", "properties", "setting", "settings", "config", "option", "options", "param", "attr", "setenv",
 	"header", "add", "with", "or")
 
-// chamadaChaveValor: o "(" em s[i] abre a chamada de uma função de (chave, valor)?
-func chamadaChaveValor(s string, i int) bool {
-	k := antesBranco(s, i)
-	if k < 0 || !(ehAlnum(s[k]) || s[k] == '_') {
+// keyValueCall: o "(" em s[i] abre a chamada de uma função de (chave, valor)?
+func keyValueCall(s string, i int) bool {
+	k := beforeBlank(s, i)
+	if k < 0 || !(isAlnum(s[k]) || s[k] == '_') {
 		return false
 	}
-	_, nome := identAntes(s, k)
+	_, name := identBefore(s, k)
 	var ps [16][2]int
-	n, ok := pedacosChave(nome, &ps)
+	n, ok := keyPieces(name, &ps)
 	if !ok {
 		return false
 	}
 	var buf [24]byte
 	for x := 0; x < n; x++ {
-		if w := minusculo(nome, ps[x], &buf); w != nil && funcaoChaveValor[string(w)] {
+		if w := lowercase(name, ps[x], &buf); w != nil && keyValueFunc[string(w)] {
 			return true
 		}
 	}
 	return false
 }
 
-// nomeDefault: o nome da variável de ambiente antes de "||", "??" ou "or" (process.env.X,
+// defaultName: o nome da variável de ambiente antes de "||", "??" ou "or" (process.env.X,
 // os.getenv("X"), ENV["X"]).
-func nomeDefault(s string, k int) string {
-	k = antesBranco(s, k+1)
+func defaultName(s string, k int) string {
+	k = beforeBlank(s, k+1)
 	if k < 0 {
 		return ""
 	}
@@ -382,56 +382,56 @@ func nomeDefault(s string, k int) string {
 		}
 		a += max(0, k-120)
 		v := strings.TrimSpace(s[a+1 : k])
-		if len(v) >= 2 && ehAspa(v[0]) && v[len(v)-1] == v[0] {
+		if len(v) >= 2 && isQuote(v[0]) && v[len(v)-1] == v[0] {
 			return v[1 : len(v)-1]
 		}
 		return ""
 	}
-	if ehAlnum(s[k]) || s[k] == '_' {
-		_, n := identAntes(s, k)
+	if isAlnum(s[k]) || s[k] == '_' {
+		_, n := identBefore(s, k)
 		return n
 	}
 	return ""
 }
 
 // palavras do fim do nome de uma função que não dizem o tipo ("getQueueUrl", "QueueClient")
-var caudaFuncao = conj("client", "url", "uri", "name", "names", "id", "arn", "by", "get", "set", "put", "info", "exists",
+var funcTail = setOf("client", "url", "uri", "name", "names", "id", "arn", "by", "get", "set", "put", "info", "exists",
 	"async", "sync", "request", "input", "command", "builder", "new", "create", "delete", "list", "of", "for", "from",
 	"with", "to", "record", "options", "config", "attributes", "properties", "service", "ref", "reference", "handle")
 
 // palavras de tipo que, no nome de uma FUNÇÃO, não dizem o tipo do argumento: ParseAddr("::1")
 // recebe um endereço IP, mo.group("x") é grupo de regex, serviceOf/userOf recebem outra coisa
-var naoTipoFuncao = conj("service", "app", "application", "user", "login", "addr", "address", "group", "instance",
+var notFuncType = setOf("service", "app", "application", "user", "login", "addr", "address", "group", "instance",
 	"stream", "subject", "exchange", "catalog", "principal", "endpoint", "fqdn", "consumergroup")
 
 // verbos de mensageria: o primeiro texto entre aspas é uma fila ou tópico
-var verbosFila = conj("subscribe", "publish", "consume", "produce", "producer", "consumer", "unsubscribe")
+var queueVerbs = setOf("subscribe", "publish", "consume", "produce", "producer", "consumer", "unsubscribe")
 
-// entFuncao: o tipo que o nome da função indica (do último pedaço para o primeiro, pulando os
+// entFunc: o tipo que o nome da função indica (do último pedaço para o primeiro, pulando os
 // que não dizem o tipo).
-func entFuncao(nome string) string {
+func entFunc(name string) string {
 	var ps [16][2]int
-	n, ok := pedacosChave(nome, &ps)
+	n, ok := keyPieces(name, &ps)
 	if !ok {
 		return ""
 	}
 	var buf [24]byte
 	for i := n - 1; i >= 0; i-- {
-		w := minusculo(nome, ps[i], &buf)
+		w := lowercase(name, ps[i], &buf)
 		if w == nil {
 			return ""
 		}
 		p := string(w)
-		if verbosFila[p] {
+		if queueVerbs[p] {
 			return "fila"
 		}
-		if e, ok := entPedaco[p]; ok && !naoTipoFuncao[p] {
+		if e, ok := entPiece[p]; ok && !notFuncType[p] {
 			return e
 		}
-		if e, ok := entPedaco[strings.TrimSuffix(p, "s")]; ok && strings.HasSuffix(p, "s") && p != "users" {
+		if e, ok := entPiece[strings.TrimSuffix(p, "s")]; ok && strings.HasSuffix(p, "s") && p != "users" {
 			return e
 		}
-		if !caudaFuncao[p] {
+		if !funcTail[p] {
 			return ""
 		}
 	}
@@ -440,15 +440,15 @@ func entFuncao(nome string) string {
 
 // construtores de lista: o texto dentro deles conta como argumento da chamada de fora
 // (subscribe(List.of("x")), Arrays.asList("x"), listOf("x"), []string{"x"}, new String[]{"x"})
-var construtorLista = conj("of", "aslist", "listof", "setof", "arrayof", "mutablelistof", "singletonlist", "singleton",
+var listConstructor = setOf("of", "aslist", "listof", "setof", "arrayof", "mutablelistof", "singletonlist", "singleton",
 	"list", "tuple", "set", "frozenset", "array", "vec")
 
 // palavras do nome de uma chamada de conexão: o texto seguido de um número de porta é o
 // servidor ($redis->connect('cache01', 6379), redis.Redis("cache01", 6379), net.Dial(...))
-var palavrasConexao = conj("connect", "connection", "conn", "dial", "open", "client", "socket", "session", "pool",
+var connectionWords = setOf("connect", "connection", "conn", "dial", "open", "client", "socket", "session", "pool",
 	"link", "redis", "mongo", "connector", "strictredis")
 
-func acharCodigoChamada(s string, add func(ObjAchado)) {
+func findCodeCall(s string, add func(ObjFinding)) {
 	if strings.IndexByte(s, '(') < 0 {
 		return
 	}
@@ -458,23 +458,23 @@ func acharCodigoChamada(s string, add func(ObjAchado)) {
 		}
 		// em código o nome vem colado no "(": "namespace (for x)" é prosa
 		k := i - 1
-		if k < 0 || !(ehAlnum(s[k]) || s[k] == '_') {
+		if k < 0 || !(isAlnum(s[k]) || s[k] == '_') {
 			continue
 		}
-		_, nome := identAntes(s, k)
-		if len(nome) < 3 {
+		_, name := identBefore(s, k)
+		if len(name) < 3 {
 			continue
 		}
-		ent := entFuncao(nome)
-		conex := temPalavra(nome, palavrasConexao)
-		if ent == "" && !conex {
+		ent := entFunc(name)
+		conn := hasWord(name, connectionWords)
+		if ent == "" && !conn {
 			continue
 		}
 		// argumentos de primeiro nível, e dentro de listas ([..] e construtores de lista), até o
 		// ")" correspondente
-		var niveis []bool // cada nível aberto: é lista?
-		todosLista := func() bool {
-			for _, l := range niveis {
+		var levels []bool // cada nível aberto: é lista?
+		allList := func() bool {
+			for _, l := range levels {
 				if !l {
 					return false
 				}
@@ -485,42 +485,42 @@ func acharCodigoChamada(s string, add func(ObjAchado)) {
 			c := s[j]
 			switch {
 			case c == '(':
-				_, f := identAntes(s, j-1)
-				niveis = append(niveis, j > 0 && (ehAlnum(s[j-1]) || s[j-1] == '_') && construtorLista[strings.ToLower(f)])
+				_, f := identBefore(s, j-1)
+				levels = append(levels, j > 0 && (isAlnum(s[j-1]) || s[j-1] == '_') && listConstructor[strings.ToLower(f)])
 			case c == '{':
-				p := antesBranco(s, j)
-				lista := p >= 0 && s[p] == ']' // []string{...}, new String[]{...}
-				if p >= 0 && !lista && (ehAlnum(s[p]) || s[p] == '_') {
-					q, _ := identAntes(s, p)
-					lista = q >= 2 && s[q-2:q] == "[]"
+				p := beforeBlank(s, j)
+				list := p >= 0 && s[p] == ']' // []string{...}, new String[]{...}
+				if p >= 0 && !list && (isAlnum(s[p]) || s[p] == '_') {
+					q, _ := identBefore(s, p)
+					list = q >= 2 && s[q-2:q] == "[]"
 				}
-				niveis = append(niveis, lista)
+				levels = append(levels, list)
 			case c == ')' || c == '}':
-				if len(niveis) == 0 {
+				if len(levels) == 0 {
 					j = len(s)
 					continue
 				}
-				niveis = niveis[:len(niveis)-1]
-			case c == '\n' && len(niveis) == 0 && j > i+200:
+				levels = levels[:len(levels)-1]
+			case c == '\n' && len(levels) == 0 && j > i+200:
 				j = len(s)
 				continue
-			case ehAspa(c):
+			case isQuote(c):
 				e := literal(s, j)
 				if e < 0 {
 					j = len(s)
 					continue
 				}
-				if todosLista() {
+				if allList() {
 					// "nome: 'v'" / "nome = 'v'" dentro da chamada é parâmetro nomeado
-					if p := antesBranco(s, j); p >= 0 && (s[p] == ':' || s[p] == '=') {
+					if p := beforeBlank(s, j); p >= 0 && (s[p] == ':' || s[p] == '=') {
 						j = e
 						continue
 					}
 					switch {
-					case conex && len(niveis) == 0 && seguidoDePorta(s, e+1):
-						marcarValor(s, j+1, e, "servidor", "código-chamada", valorMarcado(s[j+1:e]), add)
+					case conn && len(levels) == 0 && followedByPort(s, e+1):
+						markValue(s, j+1, e, "servidor", "código-chamada", markedValue(s[j+1:e]), add)
 					case ent != "":
-						marcarValor(s, j+1, e, ent, "código-chamada", valorMarcado(s[j+1:e]), add)
+						markValue(s, j+1, e, ent, "código-chamada", markedValue(s[j+1:e]), add)
 					}
 				}
 				j = e
@@ -529,8 +529,8 @@ func acharCodigoChamada(s string, add func(ObjAchado)) {
 	}
 }
 
-// seguidoDePorta: depois de s[i] vem ", <número de porta>" e o fim do argumento.
-func seguidoDePorta(s string, i int) bool {
+// followedByPort: depois de s[i] vem ", <número de porta>" e o fim do argumento.
+func followedByPort(s string, i int) bool {
 	for i < len(s) && (s[i] == ' ' || s[i] == '\t') {
 		i++
 	}
@@ -542,7 +542,7 @@ func seguidoDePorta(s string, i int) bool {
 		i++
 	}
 	a := i
-	for i < len(s) && ehDig(s[i]) {
+	for i < len(s) && isDig(s[i]) {
 		i++
 	}
 	if n := i - a; n < 2 || n > 5 {
@@ -554,16 +554,16 @@ func seguidoDePorta(s string, i int) bool {
 	return i < len(s) && (s[i] == ',' || s[i] == ')')
 }
 
-// temPalavra: algum pedaço do nome (camelCase, _, .) está em ws.
-func temPalavra(nome string, ws map[string]bool) bool {
+// hasWord: algum pedaço do nome (camelCase, _, .) está em ws.
+func hasWord(name string, ws map[string]bool) bool {
 	var ps [16][2]int
-	n, ok := pedacosChave(nome, &ps)
+	n, ok := keyPieces(name, &ps)
 	if !ok {
 		return false
 	}
 	var buf [24]byte
 	for x := 0; x < n; x++ {
-		if w := minusculo(nome, ps[x], &buf); w != nil && ws[string(w)] {
+		if w := lowercase(name, ps[x], &buf); w != nil && ws[string(w)] {
 			return true
 		}
 	}

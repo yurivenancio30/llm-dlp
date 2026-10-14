@@ -6,9 +6,9 @@ import (
 	"strings"
 )
 
-// DicaInstalacao devolve o comando para instalar tesseract (com português) e poppler
+// InstallHint devolve o comando para instalar tesseract (com português) e poppler
 // no sistema atual.
-func DicaInstalacao() string {
+func InstallHint() string {
 	if runtime.GOOS == "darwin" {
 		return "brew install tesseract tesseract-lang poppler"
 	}
@@ -34,10 +34,10 @@ func DicaInstalacao() string {
 	return "instale tesseract (com o idioma português) e poppler pelo gerenciador de pacotes do sistema"
 }
 
-// ComandoInstalacao devolve o comando (para rodar como administrador) que instala o OCR no
+// InstallCommand devolve o comando (para rodar como administrador) que instala o OCR no
 // sistema atual, já atualizando a lista de pacotes. "" se o sistema não for reconhecido.
-func ComandoInstalacao() string {
-	d := DicaInstalacao()
+func InstallCommand() string {
+	d := InstallHint()
 	switch {
 	case strings.HasPrefix(d, "sudo apt "):
 		return "apt-get update && apt-get install -y " + strings.TrimPrefix(d, "sudo apt install ")

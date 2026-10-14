@@ -19,108 +19,108 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/proxy"
 )
 
-// naPorta sobe h numa porta local e devolve a configuração que aponta para ela, com a pasta do
+// onPort sobe h numa porta local e devolve a configuração que aponta para ela, com a pasta do
 // llm-dlp num diretório temporário.
-func naPorta(t *testing.T, h http.Handler) config.Config {
+func onPort(t *testing.T, h http.Handler) config.Config {
 	t.Helper()
 	t.Setenv("LLM_DLP_HOME", t.TempDir())
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
-	_, porta, _ := net.SplitHostPort(strings.TrimPrefix(srv.URL, "http://"))
-	cfg := config.Padrao()
-	cfg.Porta, _ = strconv.Atoi(porta)
+	_, port, _ := net.SplitHostPort(strings.TrimPrefix(srv.URL, "http://"))
+	cfg := config.Default()
+	cfg.Port, _ = strconv.Atoi(port)
 	return cfg
 }
 
 // Outro programa que pegue a porta e responda "sou o llm-dlp" não passa: falta a prova, que só
 // quem lê a chave calcula. Sem isso ele receberia a conversa sem máscara e a credencial da API.
-func TestSaudeExigeProva(t *testing.T) {
+func TestHealthRequiresProof(t *testing.T) {
 	impostor := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]any{"ok": true, "servico": "llm-dlp", "versao": "9.9.9",
 			"prova": strings.Repeat("0", 64)})
 	})
-	cfg := naPorta(t, impostor)
-	if info, ok := saude(cfg); ok || !info.SemProva {
-		t.Fatalf("o impostor passou: ok=%v semProva=%v", ok, info.SemProva)
+	cfg := onPort(t, impostor)
+	if info, ok := health(cfg); ok || !info.WithoutProof {
+		t.Fatalf("o impostor passou: ok=%v semProva=%v", ok, info.WithoutProof)
 	}
 
 	// o llm-dlp de verdade, com a chave da mesma pasta, passa
 	var h http.Handler
-	cfg = naPorta(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { h.ServeHTTP(w, r) }))
-	chave, err := mask.Chave(config.Caminho("chave"))
+	cfg = onPort(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { h.ServeHTTP(w, r) }))
+	key, err := mask.Key(config.Path("chave"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	m, err := mask.NovoMasker(cfg, chave, nil, nil)
+	m, err := mask.NewMasker(cfg, key, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	h = proxy.Novo(cfg, m, nil, log.New(io.Discard, "", 0)).ComChave(chave)
-	if info, ok := saude(cfg); !ok || info.SemProva {
-		t.Fatalf("o llm-dlp com a chave certa não passou: ok=%v semProva=%v", ok, info.SemProva)
+	h = proxy.New(cfg, m, nil, log.New(io.Discard, "", 0)).WithKey(key)
+	if info, ok := health(cfg); !ok || info.WithoutProof {
+		t.Fatalf("o llm-dlp com a chave certa não passou: ok=%v semProva=%v", ok, info.WithoutProof)
 	}
 
 	// o mesmo llm-dlp com outra chave (o de outro usuário) não passa
-	h = proxy.Novo(cfg, m, nil, log.New(io.Discard, "", 0)).ComChave([]byte("a chave de outro usuario........"))
-	if info, ok := saude(cfg); ok || !info.SemProva {
+	h = proxy.New(cfg, m, nil, log.New(io.Discard, "", 0)).WithKey([]byte("a chave de outro usuario........"))
+	if info, ok := health(cfg); ok || !info.WithoutProof {
 		t.Fatalf("passou com a chave de outro: ok=%v", ok)
 	}
 
 	// versão anterior, que não sabe provar
-	h = proxy.Novo(cfg, m, nil, log.New(io.Discard, "", 0))
-	if info, ok := saude(cfg); ok || !info.SemProva {
+	h = proxy.New(cfg, m, nil, log.New(io.Discard, "", 0))
+	if info, ok := health(cfg); ok || !info.WithoutProof {
 		t.Fatalf("passou sem prova: ok=%v", ok)
 	}
 }
 
 // Dizer "estou em emergência" só vale se o arquivo que o administrador grava disser o mesmo.
-func TestSaudeEmergenciaSoComOArquivo(t *testing.T) {
-	antes := dirEmergencia
+func TestHealthEmergencyOnlyWithFile(t *testing.T) {
+	before := dirEmergencia
 	dirEmergencia = t.TempDir()
-	defer func() { dirEmergencia = antes }()
-	cfg := naPorta(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	defer func() { dirEmergencia = before }()
+	cfg := onPort(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]any{"ok": true, "servico": "llm-dlp", "modo": "emergencia"})
 	}))
-	if info, ok := saude(cfg); ok || !info.SemProva {
+	if info, ok := health(cfg); ok || !info.WithoutProof {
 		t.Fatalf("emergência sem o arquivo do administrador passou: ok=%v", ok)
 	}
-	b, _ := json.Marshal(estadoEmergencia{Ate: time.Now().Add(time.Hour)})
+	b, _ := json.Marshal(emergencyState{Until: time.Now().Add(time.Hour)})
 	if err := os.WriteFile(filepath.Join(dirEmergencia, "emergencia.json"), b, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := saude(cfg); !ok {
+	if _, ok := health(cfg); !ok {
 		t.Fatal("emergência ligada pelo administrador devia passar")
 	}
 }
 
 // A configuração padrão não gera aviso; cada campo que tira proteção, ou manda as mensagens para
 // outro lugar, gera o seu.
-func TestProtecaoReduzida(t *testing.T) {
+func TestReducedProtection(t *testing.T) {
 	t.Setenv("LLM_DLP_HOME", "")
-	if a := protecaoReduzida(config.Padrao()); len(a) != 0 {
+	if a := reducedProtection(config.Default()); len(a) != 0 {
 		t.Fatalf("a configuração padrão não devia avisar: %v", a)
 	}
-	casos := map[string]func(*config.Config){
+	cases := map[string]func(*config.Config){
 		"atacante.example":     func(c *config.Config) { c.Upstream = "https://atacante.example/v1" },
 		"http://api.anthropic": func(c *config.Config) { c.Upstream = "http://api.anthropic.com" },
 		"provedor gemini": func(c *config.Config) {
-			c.Provedores = map[string]config.Provedor{"gemini": {Upstream: "https://atacante.example", Formato: "gemini"}}
+			c.Providers = map[string]config.Provider{"gemini": {Upstream: "https://atacante.example", Format: "gemini"}}
 		},
-		"fail_closed":     func(c *config.Config) { c.FalharFechado = false },
-		"ocr.mode":        func(c *config.Config) { c.OCR.Modo = "allow" },
-		"objects.enabled": func(c *config.Config) { c.Objetos.Ligado = false },
-		"segredo, email":  func(c *config.Config) { c.DetectoresDesligados = []string{"segredo", "email"} },
+		"fail_closed":     func(c *config.Config) { c.FailClosed = false },
+		"ocr.mode":        func(c *config.Config) { c.OCR.Mode = "allow" },
+		"objects.enabled": func(c *config.Config) { c.Objects.Enabled = false },
+		"segredo, email":  func(c *config.Config) { c.DisabledDetectors = []string{"segredo", "email"} },
 	}
-	for parte, f := range casos {
-		c := config.Padrao()
+	for part, f := range cases {
+		c := config.Default()
 		f(&c)
-		a := protecaoReduzida(c)
-		if len(a) != 1 || !strings.Contains(a[0], parte) {
-			t.Errorf("esperava um aviso com %q, veio %v", parte, a)
+		a := reducedProtection(c)
+		if len(a) != 1 || !strings.Contains(a[0], part) {
+			t.Errorf("esperava um aviso com %q, veio %v", part, a)
 		}
 	}
 	t.Setenv("LLM_DLP_HOME", "/tmp/outra-pasta")
-	if a := protecaoReduzida(config.Padrao()); len(a) != 1 || !strings.Contains(a[0], "LLM_DLP_HOME") {
+	if a := reducedProtection(config.Default()); len(a) != 1 || !strings.Contains(a[0], "LLM_DLP_HOME") {
 		t.Errorf("LLM_DLP_HOME devia avisar: %v", a)
 	}
 }

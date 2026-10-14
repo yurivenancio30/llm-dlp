@@ -19,79 +19,79 @@ import (
 // requisição sai byte a byte igual com ou sem os provedores, o que é só desses formatos não vale
 // para a Anthropic, e nenhuma requisição ou resposta malformada desses formatos derruba o proxy.
 
-// montarClaude: proxy com a API da Anthropic falsa (resp escreve a resposta) e os provedores dados.
-func montarClaude(t *testing.T, provs map[string]config.Provedor, resp func(corpo []byte, w http.ResponseWriter)) (*httptest.Server, *[][]byte) {
+// buildClaude: proxy com a API da Anthropic falsa (resp escreve a resposta) e os provedores dados.
+func buildClaude(t *testing.T, provs map[string]config.Provider, resp func(body []byte, w http.ResponseWriter)) (*httptest.Server, *[][]byte) {
 	t.Helper()
-	cfg := config.Padrao()
-	cfg.DominiosInternos = []string{"empresa-ficticia"}
-	cfg.Provedores = provs
-	m, err := mask.NovoMasker(cfg, chaveTeste, nil, nil)
+	cfg := config.Default()
+	cfg.InternalDomains = []string{"empresa-ficticia"}
+	cfg.Providers = provs
+	m, err := mask.NewMasker(cfg, testKey, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	corpos := &[][]byte{}
+	bodies := &[][]byte{}
 	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		b, _ := io.ReadAll(r.Body)
-		*corpos = append(*corpos, b)
+		*bodies = append(*bodies, b)
 		resp(b, w)
 	}))
 	cfg.Upstream = up.URL
-	px := httptest.NewServer(Novo(cfg, m, nil, log.New(io.Discard, "", 0)))
+	px := httptest.NewServer(New(cfg, m, nil, log.New(io.Discard, "", 0)))
 	t.Cleanup(func() { up.Close(); px.Close() })
-	return px, corpos
+	return px, bodies
 }
 
-func respostaClaude(w http.ResponseWriter, conteudo ...any) {
+func claudeResponse(w http.ResponseWriter, content ...any) {
 	w.Header().Set("content-type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{"type": "message", "role": "assistant", "content": conteudo})
+	json.NewEncoder(w).Encode(map[string]any{"type": "message", "role": "assistant", "content": content})
 }
 
-// conversaClaude: uma conversa do Claude Code com dado sensível nos lugares em que o código dos
+// claudeConversation: uma conversa do Claude Code com dado sensível nos lugares em que o código dos
 // outros formatos poderia encostar: um campo "format" na entrada de uma ferramenta, uma
 // ferramenta chamada web_fetch (nome de ferramenta de internet no Gemini CLI) e um schema.
-func conversaClaude() []byte {
+func claudeConversation() []byte {
 	b, _ := json.Marshal(map[string]any{"model": "claude", "max_tokens": 100,
 		"system": []any{map[string]any{"type": "text", "text": "You are Claude Code, Anthropic's official CLI for Claude."}},
 		"tools": []any{map[string]any{"name": "web_fetch", "description": "busca interna",
 			"input_schema": map[string]any{"type": "object", "properties": map[string]any{"url": map[string]any{"type": "string", "format": "uri"}}}}},
 		"messages": []any{
-			msg("user", "exporte os contatos de "+emailOA),
+			msg("user", "exporte os contatos de "+oaEmail),
 			msg("assistant", []any{map[string]any{"type": "tool_use", "id": "t1", "name": "exportar",
-				"input": map[string]any{"format": emailOA, "mimeType": ipOA}}}),
-			msg("user", []any{map[string]any{"type": "tool_result", "tool_use_id": "t1", "content": "ok, enviado a " + emailOA}}),
+				"input": map[string]any{"format": oaEmail, "mimeType": oaIP}}}),
+			msg("user", []any{map[string]any{"type": "tool_result", "tool_use_id": "t1", "content": "ok, enviado a " + oaEmail}}),
 		}})
 	return b
 }
 
-func TestClaudeIgualComOuSemOutrasAPIs(t *testing.T) {
-	semNada := func(_ []byte, w http.ResponseWriter) { respostaClaude(w, map[string]any{"type": "text", "text": "ok"}) }
-	sem, corposSem := montarClaude(t, nil, semNada)
-	com, corposCom := montarClaude(t, config.ProvedoresPadrao(), semNada)
-	for _, px := range []*httptest.Server{sem, com} {
-		if st, _ := pedir(t, "POST", px.URL+"/v1/messages", conversaClaude(), nil); st != 200 {
+func TestClaudeSameWithOrWithoutOtherAPIs(t *testing.T) {
+	nothingAtAll := func(_ []byte, w http.ResponseWriter) { claudeResponse(w, map[string]any{"type": "text", "text": "ok"}) }
+	without, bodiesWithout := buildClaude(t, nil, nothingAtAll)
+	with, bodiesWith := buildClaude(t, config.DefaultProviders(), nothingAtAll)
+	for _, px := range []*httptest.Server{without, with} {
+		if st, _ := ask(t, "POST", px.URL+"/v1/messages", claudeConversation(), nil); st != 200 {
 			t.Fatalf("status %d", st)
 		}
 	}
-	a, b := (*corposSem)[0], (*corposCom)[0]
+	a, b := (*bodiesWithout)[0], (*bodiesWith)[0]
 	if !bytes.Equal(a, b) {
 		t.Errorf("a requisição do Claude mudou com os provedores ligados:\n sem: %s\n com: %s", a, b)
 	}
 	// campos e ferramentas que só os outros formatos deixam intactos continuam mascarados no Claude
-	if bytes.Contains(a, []byte(emailOA)) || bytes.Contains(a, []byte(ipOA)) {
+	if bytes.Contains(a, []byte(oaEmail)) || bytes.Contains(a, []byte(oaIP)) {
 		t.Errorf("valor real chegou à API da Anthropic: %s", a)
 	}
 }
 
 // Na volta do Claude, web_fetch é uma ferramenta como outra qualquer (a entrada volta real); só
 // WebFetch, a do Claude Code, segue com os pseudônimos.
-func TestClaudeVoltaSemAsFerramentasDosOutros(t *testing.T) {
-	px, _ := montarClaude(t, config.ProvedoresPadrao(), func(corpo []byte, w http.ResponseWriter) {
-		pse := rePseEmail.FindString(string(corpo))
-		respostaClaude(w,
+func TestClaudeReturnsWithoutOthersTools(t *testing.T) {
+	px, _ := buildClaude(t, config.DefaultProviders(), func(body []byte, w http.ResponseWriter) {
+		pse := rePseEmail.FindString(string(body))
+		claudeResponse(w,
 			map[string]any{"type": "tool_use", "id": "a", "name": "web_fetch", "input": map[string]any{"q": pse}},
 			map[string]any{"type": "tool_use", "id": "b", "name": "WebFetch", "input": map[string]any{"q": pse}})
 	})
-	_, b := pedir(t, "POST", px.URL+"/v1/messages", conversaClaude(), nil)
+	_, b := ask(t, "POST", px.URL+"/v1/messages", claudeConversation(), nil)
 	var resp struct {
 		Content []struct {
 			Name  string
@@ -101,7 +101,7 @@ func TestClaudeVoltaSemAsFerramentasDosOutros(t *testing.T) {
 	if err := json.Unmarshal(b, &resp); err != nil || len(resp.Content) != 2 {
 		t.Fatalf("resposta: %s", b)
 	}
-	if resp.Content[0].Input["q"] != emailOA {
+	if resp.Content[0].Input["q"] != oaEmail {
 		t.Errorf("web_fetch no Claude devia voltar com o valor real: %q", resp.Content[0].Input["q"])
 	}
 	if !rePseEmail.MatchString(resp.Content[1].Input["q"]) {
@@ -110,44 +110,44 @@ func TestClaudeVoltaSemAsFerramentasDosOutros(t *testing.T) {
 }
 
 // variacoes: cópias de v com um nó trocado por um valor estranho, um nó e um valor de cada vez.
-func variacoes(t *testing.T, v any) [][]byte {
+func variations(t *testing.T, v any) [][]byte {
 	t.Helper()
 	orig, _ := json.Marshal(v)
-	var caminhos [][]any
-	var andar func(x any, cam []any)
-	andar = func(x any, cam []any) {
-		caminhos = append(caminhos, append([]any(nil), cam...))
+	var paths [][]any
+	var walkStep func(x any, pth []any)
+	walkStep = func(x any, pth []any) {
+		paths = append(paths, append([]any(nil), pth...))
 		switch y := x.(type) {
 		case map[string]any:
-			for _, k := range chaves(y) {
-				andar(y[k], append(cam, k))
+			for _, k := range keys(y) {
+				walkStep(y[k], append(pth, k))
 			}
 		case []any:
 			for i := range y {
-				andar(y[i], append(cam, i))
+				walkStep(y[i], append(pth, i))
 			}
 		}
 	}
-	var raiz any
-	json.Unmarshal(orig, &raiz)
-	andar(raiz, nil)
+	var rootDir any
+	json.Unmarshal(orig, &rootDir)
+	walkStep(rootDir, nil)
 	var out [][]byte
-	for _, cam := range caminhos[1:] {
-		for _, estranho := range []any{nil, 5, "x", []any{}, map[string]any{}, []any{"x", 5, nil}} {
+	for _, pth := range paths[1:] {
+		for _, odd := range []any{nil, 5, "x", []any{}, map[string]any{}, []any{"x", 5, nil}} {
 			var c any
 			json.Unmarshal(orig, &c)
 			x := c
-			for _, p := range cam[:len(cam)-1] {
+			for _, p := range pth[:len(pth)-1] {
 				if k, ok := p.(string); ok {
 					x = x.(map[string]any)[k]
 				} else {
 					x = x.([]any)[p.(int)]
 				}
 			}
-			if k, ok := cam[len(cam)-1].(string); ok {
-				x.(map[string]any)[k] = estranho
+			if k, ok := pth[len(pth)-1].(string); ok {
+				x.(map[string]any)[k] = odd
 			} else {
-				x.([]any)[cam[len(cam)-1].(int)] = estranho
+				x.([]any)[pth[len(pth)-1].(int)] = odd
 			}
 			b, _ := json.Marshal(c)
 			out = append(out, b)
@@ -158,39 +158,39 @@ func variacoes(t *testing.T, v any) [][]byte {
 
 // Requisições e respostas do Gemini e da OpenAI com qualquer nó trocado por um valor estranho:
 // o proxy nunca cai (responde sempre), e o Claude continua funcionando depois.
-func TestOutrasAPIsMalformadasNaoDerrubamOClaude(t *testing.T) {
-	cfg := config.Padrao()
-	m, err := mask.NovoMasker(cfg, chaveTeste, nil, nil)
+func TestMalformedOtherAPIsDoNotBreakClaude(t *testing.T) {
+	cfg := config.Default()
+	m, err := mask.NewMasker(cfg, testKey, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	var respostaAtual []byte
+	var currentResponse []byte
 	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		io.Copy(io.Discard, r.Body)
 		if r.URL.Path == "/v1/messages" {
-			respostaClaude(w, map[string]any{"type": "text", "text": "ok"})
+			claudeResponse(w, map[string]any{"type": "text", "text": "ok"})
 			return
 		}
 		w.Header().Set("content-type", "application/json")
-		w.Write(respostaAtual)
+		w.Write(currentResponse)
 	}))
 	cfg.Upstream = up.URL
-	cfg.Provedores = map[string]config.Provedor{"gemini": {Upstream: up.URL, Formato: "gemini"}, "xai": {Upstream: up.URL, Formato: "openai"},
-		"codeassist": {Upstream: up.URL, Formato: "codeassist"}, "chatgpt": {Upstream: up.URL, Formato: "responses"}}
-	p := Novo(cfg, m, nil, log.New(io.Discard, "", 0))
+	cfg.Providers = map[string]config.Provider{"gemini": {Upstream: up.URL, Format: "gemini"}, "xai": {Upstream: up.URL, Format: "openai"},
+		"codeassist": {Upstream: up.URL, Format: "codeassist"}, "chatgpt": {Upstream: up.URL, Format: "responses"}}
+	p := New(cfg, m, nil, log.New(io.Discard, "", 0))
 	px := httptest.NewServer(p)
 	t.Cleanup(func() { up.Close(); px.Close() })
 
-	gem := map[string]any{"systemInstruction": map[string]any{"parts": []any{map[string]any{"text": "sistema " + emailOA}}},
+	gem := map[string]any{"systemInstruction": map[string]any{"parts": []any{map[string]any{"text": "sistema " + oaEmail}}},
 		"tools": []any{map[string]any{"functionDeclarations": []any{map[string]any{"name": "f", "parameters": map[string]any{"type": "OBJECT"}}}}},
-		"contents": []any{conteudoG("user", parte("text", "oi "+emailOA)),
-			conteudoG("model", parte("functionCall", map[string]any{"name": "f", "args": map[string]any{"a": ipOA}})),
-			conteudoG("user", parte("functionResponse", map[string]any{"name": "f", "response": map[string]any{"r": ipOA}}),
-				parte("inlineData", map[string]any{"mimeType": "audio/wav", "data": "AAAA"}))}}
-	oa := conversaOA()
+		"contents": []any{contentG("user", part("text", "oi "+oaEmail)),
+			contentG("model", part("functionCall", map[string]any{"name": "f", "args": map[string]any{"a": oaIP}})),
+			contentG("user", part("functionResponse", map[string]any{"name": "f", "response": map[string]any{"r": oaIP}}),
+				part("inlineData", map[string]any{"mimeType": "audio/wav", "data": "AAAA"}))}}
+	oa := oaConversation()
 	oa["messages"] = append(oa["messages"].([]any), map[string]any{"role": "user", "content": []any{
 		map[string]any{"type": "image_url", "image_url": map[string]any{"url": "data:image/png;base64,AAAA"}}}})
-	pse := p.m.Pseudonimo("email", emailOA)
+	pse := p.m.Pseudonym("email", oaEmail)
 	respGem := map[string]any{"candidates": []any{map[string]any{"index": 0, "finishReason": "STOP", "content": map[string]any{"role": "model",
 		"parts": []any{map[string]any{"text": "oi " + pse}, map[string]any{"functionCall": map[string]any{"name": "f", "args": map[string]any{"a": pse}}}}}}}}
 	respOA := map[string]any{"choices": []any{map[string]any{"index": 0, "message": map[string]any{"role": "assistant", "content": "oi " + pse,
@@ -205,10 +205,10 @@ func TestOutrasAPIsMalformadasNaoDerrubamOClaude(t *testing.T) {
 		map[string]any{"type": "function_call", "name": "f", "arguments": `{"a":"` + pse + `"}`},
 		map[string]any{"type": "custom_tool_call", "name": "apply_patch", "input": pse},
 		map[string]any{"type": "local_shell_call", "action": map[string]any{"command": []any{"echo", pse}}}}}
-	casos := []struct {
-		caminho     string
-		req, resp   any
-		semStreamOK bool
+	cases := []struct {
+		path       string
+		req, resp  any
+		noStreamOK bool
 	}{
 		{"/gemini/v1beta/models/m:generateContent", gem, respGem, true},
 		{"/xai/v1/chat/completions", oa, respOA, true},
@@ -216,29 +216,29 @@ func TestOutrasAPIsMalformadasNaoDerrubamOClaude(t *testing.T) {
 		{"/chatgpt/responses", rs, respRS, true},
 	}
 	n := 0
-	for _, c := range casos {
-		boa, _ := json.Marshal(c.resp)
-		reqs := variacoes(t, c.req)
-		resps := variacoes(t, c.resp)
+	for _, c := range cases {
+		good, _ := json.Marshal(c.resp)
+		reqs := variations(t, c.req)
+		resps := variations(t, c.resp)
 		for i := 0; i < max(len(reqs), len(resps)); i++ {
 			req, _ := json.Marshal(c.req)
-			respostaAtual = boa
+			currentResponse = good
 			if i < len(reqs) {
 				req = reqs[i]
 			}
 			if i < len(resps) {
-				respostaAtual = resps[i]
+				currentResponse = resps[i]
 			}
-			resp, err := http.Post(px.URL+c.caminho, "application/json", bytes.NewReader(req))
+			resp, err := http.Post(px.URL+c.path, "application/json", bytes.NewReader(req))
 			if err != nil {
-				t.Fatalf("%s: o proxy caiu com\n req: %s\n resp: %s\n erro: %v", c.caminho, req, respostaAtual, err)
+				t.Fatalf("%s: o proxy caiu com\n req: %s\n resp: %s\n erro: %v", c.path, req, currentResponse, err)
 			}
 			io.Copy(io.Discard, resp.Body)
 			resp.Body.Close()
 			n++
 		}
 	}
-	if st, _ := pedir(t, "POST", px.URL+"/v1/messages", conversaClaude(), nil); st != 200 {
+	if st, _ := ask(t, "POST", px.URL+"/v1/messages", claudeConversation(), nil); st != 200 {
 		t.Errorf("o Claude parou de funcionar depois das requisições malformadas: status %d", st)
 	}
 	t.Logf("%d requisições e respostas malformadas, nenhuma derrubou o proxy", n)
@@ -246,16 +246,16 @@ func TestOutrasAPIsMalformadasNaoDerrubamOClaude(t *testing.T) {
 
 // O streaming malformado (pedaços que não são JSON, campos com o tipo errado, corte no meio)
 // também nunca derruba o proxy.
-func TestOutrasAPIsStreamingMalformado(t *testing.T) {
-	cfg := config.Padrao()
-	m, err := mask.NovoMasker(cfg, chaveTeste, nil, nil)
+func TestOtherAPIsMalformedStreaming(t *testing.T) {
+	cfg := config.Default()
+	m, err := mask.NewMasker(cfg, testKey, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	p := Novo(cfg, m, nil, log.New(io.Discard, "", 0))
-	pse := p.m.Pseudonimo("email", emailOA)
-	tab := mask.NovaTabela([]mask.Entrada{{Pseudo: pse, Real: emailOA, Tipo: "email"}})
-	pedacos := []string{
+	p := New(cfg, m, nil, log.New(io.Discard, "", 0))
+	pse := p.m.Pseudonym("email", oaEmail)
+	tab := mask.NewTable([]mask.Entry{{Pseudo: pse, Real: oaEmail, Type: "email"}})
+	pieces := []string{
 		`{"candidates":[{"content":{"parts":[{"text":"oi ` + pse[:5] + `"}]}}]}`,
 		`{"candidates":[{"index":"x","content":{"parts":[5,null,{"text":5},{"functionCall":"x"}]}}]}`,
 		`{"candidates":5}`, `{"choices":[{"delta":{"content":5,"tool_calls":[5,{"function":"x"},{"index":"a","function":{"arguments":7}}]}}]}`,
@@ -268,21 +268,21 @@ func TestOutrasAPIsStreamingMalformado(t *testing.T) {
 		`{"type":"response.completed","response":{"output":[5,null,{"type":"message","content":"x"},{"type":"local_shell_call","action":7}]}}`,
 		`{"type":"response.content_part.done","part":5}`, `{"response":{"candidates":"x"}}`, `{"response":5}`,
 	}
-	for _, fim := range []string{"", "data: [DONE]\n\n"} {
-		var corpo strings.Builder
-		for _, pc := range pedacos {
-			fmt.Fprintf(&corpo, "data: %s\n\n", pc)
+	for _, end := range []string{"", "data: [DONE]\n\n"} {
+		var body strings.Builder
+		for _, pc := range pieces {
+			fmt.Fprintf(&body, "data: %s\n\n", pc)
 		}
-		corpo.WriteString(fim)
-		for nome, f := range map[string]func(http.ResponseWriter, io.Reader, *mask.Tabela) error{
-			"gemini": p.desmascararSSEGemini, "openai": p.desmascararSSEOpenAI, "responses": p.desmascararSSEResponses} {
+		body.WriteString(end)
+		for name, f := range map[string]func(http.ResponseWriter, io.Reader, *mask.Table) error{
+			"gemini": p.unmaskSSEGemini, "openai": p.unmaskSSEOpenAI, "responses": p.unmaskSSEResponses} {
 			func() {
 				defer func() {
 					if r := recover(); r != nil {
-						t.Errorf("%s: o streaming malformado derrubou o proxy: %v", nome, r)
+						t.Errorf("%s: o streaming malformado derrubou o proxy: %v", name, r)
 					}
 				}()
-				f(httptest.NewRecorder(), strings.NewReader(corpo.String()), tab)
+				f(httptest.NewRecorder(), strings.NewReader(body.String()), tab)
 			}()
 		}
 	}

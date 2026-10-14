@@ -9,12 +9,12 @@ import (
 
 	"github.com/yurivenancio30/llm-dlp/internal/config"
 	"github.com/yurivenancio30/llm-dlp/internal/mask"
-	"github.com/yurivenancio30/llm-dlp/internal/versao"
+	"github.com/yurivenancio30/llm-dlp/internal/version"
 )
 
 // llm-dlp: ponto de entrada e lista de comandos.
 
-const ajuda = `llm-dlp %s — mascara dado sensível entre você e a LLM (Claude Code)
+const help = `llm-dlp %s — mascara dado sensível entre você e a LLM (Claude Code)
 
 Uso: llm-dlp COMANDO [argumentos]
 
@@ -59,15 +59,15 @@ Internos (quem chama são os ganchos do Claude Code e o supervisor):
   ensure, check, serve, supervise
 `
 
-func textoAjuda() string {
-	return fmt.Sprintf(ajuda, versao.Versao, config.Caminho("config.json"), config.Caminho("llm-dlp.log"))
+func helpText() string {
+	return fmt.Sprintf(help, version.Version, config.Path("config.json"), config.Path("llm-dlp.log"))
 }
 
-// nomesAntigos: os nomes em português de antes da 0.9.0. Continuam aceitos (os hooks já
+// oldNames: os nomes em português de antes da 0.9.0. Continuam aceitos (os hooks já
 // instalados no Claude Code chamam "garantir" e "verificar", e o supervisor sobe "servir" e
-// "supervisionar", que toda versão entende: ver iniciarProxy), mas não aparecem na ajuda nem
+// "supervisionar", que toda versão entende: ver startProxy), mas não aparecem na ajuda nem
 // nas docs.
-var nomesAntigos = map[string]string{
+var oldNames = map[string]string{
 	"ajuda": "help", "servir": "serve", "supervisionar": "supervise", "garantir": "ensure",
 	"verificar": "check", "atualizar": "update", "recarregar": "reload", "emergencia": "emergency",
 	"parar": "stop", "importar-pessoas": "import-people", "testar": "test", "testar-midia": "test-media",
@@ -78,64 +78,64 @@ var nomesAntigos = map[string]string{
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Print(textoAjuda())
+		fmt.Print(helpText())
 		os.Exit(2)
 	}
 	cmd, args := os.Args[1], os.Args[2:]
-	if novo, ok := nomesAntigos[cmd]; ok {
-		cmd = novo
+	if newOne, ok := oldNames[cmd]; ok {
+		cmd = newOne
 	}
 	var err error
 	switch cmd {
 	case "help", "--help", "-h":
-		fmt.Print(textoAjuda())
+		fmt.Print(helpText())
 	case "serve":
-		err = servir(args)
+		err = serve(args)
 	case "supervise":
-		err = supervisionar(args)
+		err = supervise(args)
 	case "update":
-		err = atualizar(args)
+		err = update(args)
 	case "reload":
-		err = recarregar()
+		err = reload()
 	case "ensure":
-		err = garantir()
+		err = ensure()
 	case "status":
 		err = status()
 	case "check":
-		err = verificar()
+		err = verifyIt()
 	case "emergency":
-		err = emergencia(args)
+		err = emergency(args)
 	case "stop":
-		err = parar()
+		err = stop()
 	case "import-people":
-		err = importarPessoas(args)
+		err = importPeople(args)
 	case "test":
-		err = testar()
+		err = test()
 	case "test-media":
-		err = testarMidia(args)
+		err = testMedia(args)
 	case "measure":
-		err = medir(args)
+		err = measure(args)
 	case "columns":
-		err = colunas(args)
+		err = columns(args)
 	case "last":
-		err = ultima(args)
+		err = lastConv(args)
 	case "simulate":
-		err = simular(args)
+		err = simulate(args)
 	case "audit":
-		err = auditar(args)
+		err = audit(args)
 	case "install":
-		err = instalar(args)
+		err = install(args)
 	case "uninstall":
-		err = desinstalar(args)
+		err = uninstall(args)
 	case "install-lock":
-		err = instalarTrava(false)
+		err = installLock(false)
 	case "uninstall-lock":
-		err = instalarTrava(true)
+		err = installLock(true)
 	case "version", "--version", "-v":
-		fmt.Println("llm-dlp", versao.Completa())
+		fmt.Println("llm-dlp", version.Complete())
 	default:
 		fmt.Fprintf(os.Stderr, "llm-dlp: comando desconhecido: %q\n\n", cmd)
-		fmt.Fprint(os.Stderr, textoAjuda())
+		fmt.Fprint(os.Stderr, helpText())
 		os.Exit(2)
 	}
 	if err != nil {
@@ -144,31 +144,31 @@ func main() {
 	}
 }
 
-func carregarTudo() (config.Config, []byte, *mask.Pessoas, *mask.Vistos, *mask.Masker, error) {
-	cfg, err := config.Carregar()
+func loadAll() (config.Config, []byte, *mask.People, *mask.Seen, *mask.Masker, error) {
+	cfg, err := config.Load()
 	if err != nil {
 		return cfg, nil, nil, nil, nil, fmt.Errorf("config: %w", err)
 	}
-	chave, err := mask.Chave(config.Caminho("chave"))
+	key, err := mask.Key(config.Path("chave"))
 	if err != nil {
 		return cfg, nil, nil, nil, nil, err
 	}
-	pessoas, err := mask.CarregarPessoas(config.Caminho("pessoas.json"))
+	people, err := mask.LoadPeople(config.Path("pessoas.json"))
 	if err != nil {
 		return cfg, nil, nil, nil, nil, err
 	}
-	vistos, err := mask.CarregarVistos(config.Caminho("vistos.json"))
+	seenSet, err := mask.LoadSeen(config.Path("vistos.json"))
 	if err != nil {
 		return cfg, nil, nil, nil, nil, err
 	}
-	m, err := mask.NovoMasker(cfg, chave, pessoas, vistos)
-	return cfg, chave, pessoas, vistos, m, err
+	m, err := mask.NewMasker(cfg, key, people, seenSet)
+	return cfg, key, people, seenSet, m, err
 }
 
-func abrirLog() *log.Logger {
-	l := &logGirando{p: config.Caminho("llm-dlp.log")}
+func openLog() *log.Logger {
+	l := &rotatingLog{p: config.Path("llm-dlp.log")}
 	l.mu.Lock()
-	l.reabrir()
+	l.reopen()
 	l.mu.Unlock()
 	if l.f == nil {
 		return log.New(os.Stderr, "", log.LstdFlags)
@@ -180,31 +180,31 @@ func abrirLog() *log.Logger {
 // no máximo uns 20 MB.
 var maxLog int64 = 10 << 20
 
-// logGirando: o llm-dlp.log, que gira ao passar de maxLog a qualquer momento (antes só girava
+// rotatingLog: o llm-dlp.log, que gira ao passar de maxLog a qualquer momento (antes só girava
 // quando o llm-dlp subia, e um proxy no ar por semanas fazia o arquivo crescer sem limite). Mais
 // de um processo escreve nele (supervisor e proxy): quem percebe que o outro girou reabre.
-type logGirando struct {
+type rotatingLog struct {
 	mu sync.Mutex
 	p  string
 	f  *os.File
 }
 
-func (l *logGirando) reabrir() {
+func (l *rotatingLog) reopen() {
 	if l.f != nil {
 		l.f.Close()
 	}
 	l.f, _ = os.OpenFile(l.p, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 }
 
-func (l *logGirando) Write(b []byte) (int, error) {
+func (l *rotatingLog) Write(b []byte) (int, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	st, err := os.Stat(l.p)
 	if err == nil && st.Size()+int64(len(b)) > maxLog {
 		os.Rename(l.p, l.p+".1")
-		l.reabrir()
-	} else if fst, e := statDe(l.f); err != nil || e != nil || !os.SameFile(st, fst) {
-		l.reabrir() // outro processo girou (ou apagaram o arquivo)
+		l.reopen()
+	} else if fst, e := statOf(l.f); err != nil || e != nil || !os.SameFile(st, fst) {
+		l.reopen() // outro processo girou (ou apagaram o arquivo)
 	}
 	if l.f == nil {
 		return os.Stderr.Write(b)
@@ -212,20 +212,20 @@ func (l *logGirando) Write(b []byte) (int, error) {
 	return l.f.Write(b)
 }
 
-func statDe(f *os.File) (os.FileInfo, error) {
+func statOf(f *os.File) (os.FileInfo, error) {
 	if f == nil {
 		return nil, os.ErrClosed
 	}
 	return f.Stat()
 }
 
-// arquivoDoLog: o arquivo em que o log escreve agora (o supervisor o passa como saída de erro
+// logFile: o arquivo em que o log escreve agora (o supervisor o passa como saída de erro
 // do proxy, para um panic ficar registrado), ou nil.
-func arquivoDoLog(lg *log.Logger) *os.File {
+func logFile(lg *log.Logger) *os.File {
 	switch w := lg.Writer().(type) {
 	case *os.File:
 		return w
-	case *logGirando:
+	case *rotatingLog:
 		w.mu.Lock()
 		defer w.mu.Unlock()
 		return w.f
@@ -233,4 +233,4 @@ func arquivoDoLog(lg *log.Logger) *os.File {
 	return nil
 }
 
-func endereco(cfg config.Config) string { return "127.0.0.1:" + strconv.Itoa(cfg.Porta) }
+func address(cfg config.Config) string { return "127.0.0.1:" + strconv.Itoa(cfg.Port) }

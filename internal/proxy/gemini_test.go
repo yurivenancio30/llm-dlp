@@ -21,76 +21,76 @@ import (
 // A API do Gemini pela rota /gemini: nada real chega à API, a resposta volta real (inteira e em
 // streaming) e o histórico sai idêntico de uma requisição para a outra.
 
-type pedidoGemini struct {
-	caminho, chave string
-	corpo          []byte
+type geminiRequest struct {
+	path, key string
+	body      []byte
 }
 
-// montarGemini: proxy com o provedor "gemini" apontando para uma API falsa, que responde com resp.
-func montarGemini(t *testing.T, f func(*config.Config), resp func(p pedidoGemini, w http.ResponseWriter)) (*httptest.Server, *[]pedidoGemini) {
+// buildGemini: proxy com o provedor "gemini" apontando para uma API falsa, que responde com resp.
+func buildGemini(t *testing.T, f func(*config.Config), resp func(p geminiRequest, w http.ResponseWriter)) (*httptest.Server, *[]geminiRequest) {
 	t.Helper()
-	cfg := config.Padrao()
-	cfg.DominiosInternos = []string{"empresa-ficticia"}
+	cfg := config.Default()
+	cfg.InternalDomains = []string{"empresa-ficticia"}
 	if f != nil {
 		f(&cfg)
 	}
-	m, err := mask.NovoMasker(cfg, chaveTeste, nil, nil)
+	m, err := mask.NewMasker(cfg, testKey, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	pedidos := &[]pedidoGemini{}
+	requests := &[]geminiRequest{}
 	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		b, _ := io.ReadAll(r.Body)
-		p := pedidoGemini{r.URL.RequestURI(), r.Header.Get("x-goog-api-key"), b}
-		*pedidos = append(*pedidos, p)
+		p := geminiRequest{r.URL.RequestURI(), r.Header.Get("x-goog-api-key"), b}
+		*requests = append(*requests, p)
 		resp(p, w)
 	}))
 	anthropic := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Errorf("a requisição do Gemini foi para o upstream da Anthropic: %s", r.URL.Path)
 	}))
 	cfg.Upstream = anthropic.URL
-	cfg.Provedores = map[string]config.Provedor{"gemini": {Upstream: up.URL, Formato: "gemini"}}
-	px := httptest.NewServer(Novo(cfg, m, nil, log.New(io.Discard, "", 0)))
+	cfg.Providers = map[string]config.Provider{"gemini": {Upstream: up.URL, Format: "gemini"}}
+	px := httptest.NewServer(New(cfg, m, nil, log.New(io.Discard, "", 0)))
 	t.Cleanup(func() { up.Close(); anthropic.Close(); px.Close() })
-	return px, pedidos
+	return px, requests
 }
 
-func parte(k string, v any) map[string]any { return map[string]any{k: v} }
+func part(k string, v any) map[string]any { return map[string]any{k: v} }
 
-func conteudoG(papel string, partes ...any) map[string]any {
-	return map[string]any{"role": papel, "parts": partes}
+func contentG(hostRole string, parts ...any) map[string]any {
+	return map[string]any{"role": hostRole, "parts": parts}
 }
 
 const (
-	assinatura   = "Q2lRQmxXVnpkR1VnWkdVZ1lYTnphVzVoZEhWeVlRPT0="
-	textoUsuario = "o owner " + email + " (cpf " + cpf + ") não acessa " + host
-	caminhoG     = "/v1beta/models/gemini-x:generateContent"
+	signature = "Q2lRQmxXVnpkR1VnWkdVZ1lYTnphVzVoZEhWeVlRPT0="
+	userText  = "o owner " + email + " (cpf " + cpf + ") não acessa " + host
+	pathG     = "/v1beta/models/gemini-x:generateContent"
 )
 
-func requisicaoGemini() map[string]any {
+func geminiRequestOf() map[string]any {
 	return map[string]any{
-		"systemInstruction": map[string]any{"parts": []any{parte("text", "Você é um agente. Usuário logado: "+email)}},
+		"systemInstruction": map[string]any{"parts": []any{part("text", "Você é um agente. Usuário logado: "+email)}},
 		"tools": []any{map[string]any{"functionDeclarations": []any{map[string]any{
 			"name": "run_shell_command", "description": "Roda um comando. Dúvidas: " + email,
 			"parameters": map[string]any{"type": "OBJECT", "required": []any{"command"},
 				"properties": map[string]any{"command": map[string]any{"type": "STRING", "description": "o comando"}}}}}}},
 		"generationConfig": map[string]any{"temperature": json.Number("0.2"), "responseMimeType": "text/plain"},
 		"contents": []any{
-			conteudoG("user", parte("text", textoUsuario)),
-			conteudoG("model",
+			contentG("user", part("text", userText)),
+			contentG("model",
 				map[string]any{"text": "vou conferir o p.aaaaaaaa", "thought": true},
 				map[string]any{"functionCall": map[string]any{"name": "run_shell_command", "args": map[string]any{"command": "ping -c1 " + ip}},
-					"thoughtSignature": assinatura}),
-			conteudoG("user", parte("functionResponse", map[string]any{"name": "run_shell_command",
+					"thoughtSignature": signature}),
+			contentG("user", part("functionResponse", map[string]any{"name": "run_shell_command",
 				"response": map[string]any{"output": "PING " + ip + " from " + host, "exitCode": json.Number("0")}})),
 		},
 	}
 }
 
-func postarG(t *testing.T, px *httptest.Server, caminho string, corpo any) (int, []byte) {
+func postG(t *testing.T, px *httptest.Server, path string, body any) (int, []byte) {
 	t.Helper()
-	b, _ := json.Marshal(corpo)
-	req, _ := http.NewRequest("POST", px.URL+"/gemini"+caminho, bytes.NewReader(b))
+	b, _ := json.Marshal(body)
+	req, _ := http.NewRequest("POST", px.URL+"/gemini"+path, bytes.NewReader(b))
 	req.Header.Set("content-type", "application/json")
 	req.Header.Set("x-goog-api-key", "chave-de-teste")
 	resp, err := http.DefaultClient.Do(req)
@@ -113,79 +113,79 @@ type respG struct {
 
 // A requisição chega à API do Gemini sem nada real, no caminho certo, com a mesma estrutura; o
 // que não é dado (assinatura do raciocínio, configuração, nome da ferramenta, schema) não muda.
-func TestGeminiIdaMascarada(t *testing.T) {
-	px, pedidos := montarGemini(t, nil, func(p pedidoGemini, w http.ResponseWriter) {
+func TestGeminiMaskedOutbound(t *testing.T) {
+	px, requests := buildGemini(t, nil, func(p geminiRequest, w http.ResponseWriter) {
 		w.Header().Set("content-type", "application/json")
 		w.Write([]byte(`{"candidates":[{"content":{"role":"model","parts":[{"text":"ok"}]},"finishReason":"STOP"}]}`))
 	})
-	if st, b := postarG(t, px, caminhoG+"?alt=json", requisicaoGemini()); st != 200 {
+	if st, b := postG(t, px, pathG+"?alt=json", geminiRequestOf()); st != 200 {
 		t.Fatalf("status %d: %s", st, b)
 	}
-	p := (*pedidos)[0]
-	if p.caminho != caminhoG+"?alt=json" || p.chave != "chave-de-teste" {
-		t.Errorf("caminho ou chave não chegaram como vieram: %q %q", p.caminho, p.chave)
+	p := (*requests)[0]
+	if p.path != pathG+"?alt=json" || p.key != "chave-de-teste" {
+		t.Errorf("caminho ou chave não chegaram como vieram: %q %q", p.path, p.key)
 	}
 	for _, r := range []string{email, ip, host, cpf} {
-		if bytes.Contains(p.corpo, []byte(r)) {
-			t.Errorf("vazou %q: %s", r, p.corpo)
+		if bytes.Contains(p.body, []byte(r)) {
+			t.Errorf("vazou %q: %s", r, p.body)
 		}
 	}
-	var saiu, orig map[string]any
-	json.Unmarshal(p.corpo, &saiu)
-	b, _ := json.Marshal(requisicaoGemini())
+	var wentOut, orig map[string]any
+	json.Unmarshal(p.body, &wentOut)
+	b, _ := json.Marshal(geminiRequestOf())
 	json.Unmarshal(b, &orig)
-	if !reflect.DeepEqual(saiu["generationConfig"], orig["generationConfig"]) {
-		t.Errorf("generationConfig mudou: %v", saiu["generationConfig"])
+	if !reflect.DeepEqual(wentOut["generationConfig"], orig["generationConfig"]) {
+		t.Errorf("generationConfig mudou: %v", wentOut["generationConfig"])
 	}
-	fd := saiu["tools"].([]any)[0].(map[string]any)["functionDeclarations"].([]any)[0].(map[string]any)
+	fd := wentOut["tools"].([]any)[0].(map[string]any)["functionDeclarations"].([]any)[0].(map[string]any)
 	fdOrig := orig["tools"].([]any)[0].(map[string]any)["functionDeclarations"].([]any)[0].(map[string]any)
 	if fd["name"] != "run_shell_command" || !reflect.DeepEqual(fd["parameters"], fdOrig["parameters"]) {
 		t.Errorf("nome ou schema da ferramenta mudou: %v", fd)
 	}
-	cs := saiu["contents"].([]any)
+	cs := wentOut["contents"].([]any)
 	if len(cs) != 3 {
 		t.Fatalf("contents: %d", len(cs))
 	}
-	modelo := cs[1].(map[string]any)
-	ps := modelo["parts"].([]any)
-	if modelo["role"] != "model" || len(ps) != 2 {
-		t.Fatalf("mensagem do modelo mudou de forma: %v", modelo)
+	model := cs[1].(map[string]any)
+	ps := model["parts"].([]any)
+	if model["role"] != "model" || len(ps) != 2 {
+		t.Fatalf("mensagem do modelo mudou de forma: %v", model)
 	}
-	if pensou := ps[0].(map[string]any); pensou["text"] != "vou conferir o p.aaaaaaaa" || pensou["thought"] != true {
-		t.Errorf("o raciocínio mudou: %v", pensou)
+	if thought := ps[0].(map[string]any); thought["text"] != "vou conferir o p.aaaaaaaa" || thought["thought"] != true {
+		t.Errorf("o raciocínio mudou: %v", thought)
 	}
-	chamada := ps[1].(map[string]any)
-	if chamada["thoughtSignature"] != assinatura {
-		t.Errorf("a assinatura do raciocínio mudou: %v", chamada["thoughtSignature"])
+	call := ps[1].(map[string]any)
+	if call["thoughtSignature"] != signature {
+		t.Errorf("a assinatura do raciocínio mudou: %v", call["thoughtSignature"])
 	}
-	if cmd := chamada["functionCall"].(map[string]any)["args"].(map[string]any)["command"].(string); !strings.HasPrefix(cmd, "ping -c1 ") {
+	if cmd := call["functionCall"].(map[string]any)["args"].(map[string]any)["command"].(string); !strings.HasPrefix(cmd, "ping -c1 ") {
 		t.Errorf("comando: %q", cmd)
 	}
 	fr := cs[2].(map[string]any)["parts"].([]any)[0].(map[string]any)["functionResponse"].(map[string]any)
-	saida := fr["response"].(map[string]any)
-	if fr["name"] != "run_shell_command" || !strings.HasPrefix(saida["output"].(string), "PING ") || fmt.Sprint(saida["exitCode"]) != "0" {
+	output := fr["response"].(map[string]any)
+	if fr["name"] != "run_shell_command" || !strings.HasPrefix(output["output"].(string), "PING ") || fmt.Sprint(output["exitCode"]) != "0" {
 		t.Errorf("resposta da ferramenta mudou de forma: %v", fr)
 	}
 }
 
 // A resposta volta real: o texto e os argumentos da chamada de ferramenta, que o modelo escreveu
 // com os pseudônimos que recebeu.
-func TestGeminiVoltaSemStreaming(t *testing.T) {
-	px, _ := montarGemini(t, nil, func(p pedidoGemini, w http.ResponseWriter) {
+func TestGeminiReturnWithoutStreaming(t *testing.T) {
+	px, _ := buildGemini(t, nil, func(p geminiRequest, w http.ResponseWriter) {
 		var req map[string]any
-		json.Unmarshal(p.corpo, &req)
+		json.Unmarshal(p.body, &req)
 		cs := req["contents"].([]any)
-		eco := cs[0].(map[string]any)["parts"].([]any)[0].(map[string]any)["text"]
+		echo := cs[0].(map[string]any)["parts"].([]any)[0].(map[string]any)["text"]
 		args := cs[1].(map[string]any)["parts"].([]any)[1].(map[string]any)["functionCall"].(map[string]any)["args"]
 		w.Header().Set("content-type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{"candidates": []any{map[string]any{"index": 0, "finishReason": "STOP",
 			"content": map[string]any{"role": "model", "parts": []any{
-				map[string]any{"text": "pensando em " + fmt.Sprint(eco), "thought": true},
-				parte("text", eco),
-				map[string]any{"functionCall": map[string]any{"name": "run_shell_command", "args": args}, "thoughtSignature": assinatura}}}}},
+				map[string]any{"text": "pensando em " + fmt.Sprint(echo), "thought": true},
+				part("text", echo),
+				map[string]any{"functionCall": map[string]any{"name": "run_shell_command", "args": args}, "thoughtSignature": signature}}}}},
 			"usageMetadata": map[string]any{"promptTokenCount": 10}})
 	})
-	st, b := postarG(t, px, caminhoG, requisicaoGemini())
+	st, b := postG(t, px, pathG, geminiRequestOf())
 	var r respG
 	if err := json.Unmarshal(b, &r); err != nil || st != 200 || len(r.Candidates) != 1 {
 		t.Fatalf("status %d: %s", st, b)
@@ -197,11 +197,11 @@ func TestGeminiVoltaSemStreaming(t *testing.T) {
 	if s, _ := ps[0]["text"].(string); strings.Contains(s, email) || ps[0]["thought"] != true {
 		t.Errorf("o raciocínio não devia ser desmascarado: %v", ps[0])
 	}
-	if ps[1]["text"] != textoUsuario {
-		t.Errorf("texto não voltou real:\n%v\n%v", textoUsuario, ps[1]["text"])
+	if ps[1]["text"] != userText {
+		t.Errorf("texto não voltou real:\n%v\n%v", userText, ps[1]["text"])
 	}
 	fc := ps[2]["functionCall"].(map[string]any)
-	if fc["args"].(map[string]any)["command"] != "ping -c1 "+ip || ps[2]["thoughtSignature"] != assinatura {
+	if fc["args"].(map[string]any)["command"] != "ping -c1 "+ip || ps[2]["thoughtSignature"] != signature {
 		t.Errorf("chamada de ferramenta não voltou real: %v", ps[2])
 	}
 	if !bytes.Contains(b, []byte(`"promptTokenCount":10`)) {
@@ -211,75 +211,75 @@ func TestGeminiVoltaSemStreaming(t *testing.T) {
 
 // Em streaming (alt=sse) o texto chega picotado, com pseudônimos cortados entre dois pedaços, e
 // o cliente monta o texto real.
-func TestGeminiVoltaStreaming(t *testing.T) {
+func TestGeminiReturnStreaming(t *testing.T) {
 	for _, n := range []int{1, 3, 7, 50} {
-		px, _ := montarGemini(t, nil, func(p pedidoGemini, w http.ResponseWriter) {
+		px, _ := buildGemini(t, nil, func(p geminiRequest, w http.ResponseWriter) {
 			var req map[string]any
-			json.Unmarshal(p.corpo, &req)
+			json.Unmarshal(p.body, &req)
 			// picotado por letra (a API não corta uma letra acentuada ao meio)
-			eco := []rune(req["contents"].([]any)[0].(map[string]any)["parts"].([]any)[0].(map[string]any)["text"].(string))
+			echo := []rune(req["contents"].([]any)[0].(map[string]any)["parts"].([]any)[0].(map[string]any)["text"].(string))
 			w.Header().Set("content-type", "text/event-stream")
-			for i := 0; i < len(eco); i += n {
-				j := min(i+n, len(eco))
-				pedaco := map[string]any{"candidates": []any{map[string]any{"index": 0, "content": map[string]any{"role": "model", "parts": []any{parte("text", string(eco[i:j]))}}}}}
-				if j == len(eco) {
-					pedaco["candidates"].([]any)[0].(map[string]any)["finishReason"] = "STOP"
-					pedaco["usageMetadata"] = map[string]any{"totalTokenCount": 42}
+			for i := 0; i < len(echo); i += n {
+				j := min(i+n, len(echo))
+				piece := map[string]any{"candidates": []any{map[string]any{"index": 0, "content": map[string]any{"role": "model", "parts": []any{part("text", string(echo[i:j]))}}}}}
+				if j == len(echo) {
+					piece["candidates"].([]any)[0].(map[string]any)["finishReason"] = "STOP"
+					piece["usageMetadata"] = map[string]any{"totalTokenCount": 42}
 				}
-				b, _ := json.Marshal(pedaco)
+				b, _ := json.Marshal(piece)
 				fmt.Fprintf(w, "data: %s\r\n\r\n", b)
 			}
 		})
-		b, _ := json.Marshal(requisicaoGemini())
+		b, _ := json.Marshal(geminiRequestOf())
 		resp, err := http.Post(px.URL+"/gemini/v1beta/models/gemini-x:streamGenerateContent?alt=sse", "application/json", bytes.NewReader(b))
 		if err != nil {
 			t.Fatal(err)
 		}
-		var texto strings.Builder
-		fim, uso := "", false
+		var text strings.Builder
+		end, usage := "", false
 		sc := bufio.NewScanner(resp.Body)
 		sc.Buffer(make([]byte, 1<<20), 1<<20)
 		for sc.Scan() {
-			dados, ok := strings.CutPrefix(sc.Text(), "data: ")
+			data, ok := strings.CutPrefix(sc.Text(), "data: ")
 			if !ok {
 				continue
 			}
 			var r respG
-			if err := json.Unmarshal([]byte(dados), &r); err != nil {
-				t.Fatalf("pedaço inválido: %s", dados)
+			if err := json.Unmarshal([]byte(data), &r); err != nil {
+				t.Fatalf("pedaço inválido: %s", data)
 			}
-			uso = uso || strings.Contains(dados, `"totalTokenCount":42`)
+			usage = usage || strings.Contains(data, `"totalTokenCount":42`)
 			for _, c := range r.Candidates {
 				for _, p := range c.Content.Parts {
 					s, _ := p["text"].(string)
-					texto.WriteString(s)
+					text.WriteString(s)
 				}
 				if c.FinishReason != "" {
-					fim = c.FinishReason
+					end = c.FinishReason
 				}
 			}
 		}
 		resp.Body.Close()
-		if texto.String() != textoUsuario || fim != "STOP" || !uso {
-			t.Errorf("pedaços de %d: fim=%q uso=%v\n%q\n%q", n, fim, uso, textoUsuario, texto.String())
+		if text.String() != userText || end != "STOP" || !usage {
+			t.Errorf("pedaços de %d: fim=%q uso=%v\n%q\n%q", n, end, usage, userText, text.String())
 		}
 	}
 }
 
 // O histórico sai byte a byte idêntico na requisição seguinte, mesmo depois de a conversa
 // aprender um valor novo (o cache da API depende disso).
-func TestGeminiHistoricoCongelado(t *testing.T) {
-	px, pedidos := montarGemini(t, nil, func(p pedidoGemini, w http.ResponseWriter) {
+func TestGeminiFrozenHistory(t *testing.T) {
+	px, requests := buildGemini(t, nil, func(p geminiRequest, w http.ResponseWriter) {
 		w.Header().Set("content-type", "application/json")
 		w.Write([]byte(`{"candidates":[{"content":{"role":"model","parts":[{"text":"ok"}]},"finishReason":"STOP"}]}`))
 	})
-	r1 := requisicaoGemini()
-	postarG(t, px, caminhoG, r1)
-	r2 := requisicaoGemini()
+	r1 := geminiRequestOf()
+	postG(t, px, pathG, r1)
+	r2 := geminiRequestOf()
 	r2["contents"] = append(r2["contents"].([]any),
-		conteudoG("model", parte("text", "ok")),
-		conteudoG("user", parte("text", "e o servidor "+host+" com a senha "+fracaTeste+" em "+urlCom(fracaTeste)+"?")))
-	postarG(t, px, caminhoG, r2)
+		contentG("model", part("text", "ok")),
+		contentG("user", part("text", "e o servidor "+host+" com a senha "+weakTest+" em "+urlWith(weakTest)+"?")))
+	postG(t, px, pathG, r2)
 	contents := func(b []byte) []json.RawMessage {
 		var v struct {
 			Contents []json.RawMessage `json:"contents"`
@@ -287,7 +287,7 @@ func TestGeminiHistoricoCongelado(t *testing.T) {
 		json.Unmarshal(b, &v)
 		return v.Contents
 	}
-	a, b := contents((*pedidos)[0].corpo), contents((*pedidos)[1].corpo)
+	a, b := contents((*requests)[0].body), contents((*requests)[1].body)
 	if len(a) != 3 || len(b) != 5 {
 		t.Fatalf("contents: %d e %d", len(a), len(b))
 	}
@@ -296,38 +296,38 @@ func TestGeminiHistoricoCongelado(t *testing.T) {
 			t.Errorf("a mensagem %d mudou no reenvio:\n%s\n%s", i, a[i], b[i])
 		}
 	}
-	if bytes.Contains(b[4], []byte(host)) || bytes.Contains(b[4], []byte(fracaTeste)) {
+	if bytes.Contains(b[4], []byte(host)) || bytes.Contains(b[4], []byte(weakTest)) {
 		t.Errorf("a mensagem nova vazou: %s", b[4])
 	}
 }
 
 // Imagem que não dá para verificar e arquivo de tipo que o llm-dlp não verifica não saem: no
 // lugar vai uma parte de texto com o aviso.
-func TestGeminiArquivoSemVerificacao(t *testing.T) {
-	px, pedidos := montarGemini(t, func(c *config.Config) {
+func TestGeminiFileWithoutCheck(t *testing.T) {
+	px, requests := buildGemini(t, func(c *config.Config) {
 		c.OCR.Tesseract = filepath.Join(t.TempDir(), "tesseract-que-nao-existe")
-	}, func(p pedidoGemini, w http.ResponseWriter) {
+	}, func(p geminiRequest, w http.ResponseWriter) {
 		w.Header().Set("content-type", "application/json")
 		w.Write([]byte(`{"candidates":[]}`))
 	})
 	audio := "QVVESU8gREUgVEVTVEUgQVVESU8gREUgVEVTVEU="
-	req := map[string]any{"contents": []any{conteudoG("user",
-		parte("text", "veja os anexos"),
-		parte("inlineData", map[string]any{"mimeType": "image/png", "data": pngMinimo}),
-		parte("inline_data", map[string]any{"mime_type": "audio/mp3", "data": audio}))}}
-	if st, b := postarG(t, px, caminhoG, req); st != 200 {
+	req := map[string]any{"contents": []any{contentG("user",
+		part("text", "veja os anexos"),
+		part("inlineData", map[string]any{"mimeType": "image/png", "data": minimalPNG}),
+		part("inline_data", map[string]any{"mime_type": "audio/mp3", "data": audio}))}}
+	if st, b := postG(t, px, pathG, req); st != 200 {
 		t.Fatalf("status %d: %s", st, b)
 	}
-	corpo := (*pedidos)[0].corpo
-	if bytes.Contains(corpo, []byte(pngMinimo)) || bytes.Contains(corpo, []byte(audio)) || bytes.Contains(corpo, []byte("inlineData")) {
-		t.Fatalf("arquivo sem verificação saiu: %s", corpo)
+	body := (*requests)[0].body
+	if bytes.Contains(body, []byte(minimalPNG)) || bytes.Contains(body, []byte(audio)) || bytes.Contains(body, []byte("inlineData")) {
+		t.Fatalf("arquivo sem verificação saiu: %s", body)
 	}
 	var v struct {
 		Contents []struct {
 			Parts []map[string]any `json:"parts"`
 		} `json:"contents"`
 	}
-	json.Unmarshal(corpo, &v)
+	json.Unmarshal(body, &v)
 	ps := v.Contents[0].Parts
 	if len(ps) != 3 || ps[0]["text"] != "veja os anexos" {
 		t.Fatalf("partes: %v", ps)
@@ -342,17 +342,17 @@ func TestGeminiArquivoSemVerificacao(t *testing.T) {
 
 // O erro do Gemini vai para o log com o status e a mensagem; a chave da API, que pode vir no
 // endereço (?key=...), não vai para o log quando a API não responde.
-func TestGeminiErroNoLogSemAChave(t *testing.T) {
-	if s := resumoDoErro([]byte(`{"error":{"code":429,"message":"Quota exceeded for metric","status":"RESOURCE_EXHAUSTED"}}`)); s != " | API: RESOURCE_EXHAUSTED: Quota exceeded for metric" {
+func TestGeminiErrorInLogWithoutKey(t *testing.T) {
+	if s := errorSummary([]byte(`{"error":{"code":429,"message":"Quota exceeded for metric","status":"RESOURCE_EXHAUSTED"}}`)); s != " | API: RESOURCE_EXHAUSTED: Quota exceeded for metric" {
 		t.Errorf("erro do Gemini: %q", s)
 	}
-	cfg := config.Padrao()
-	m, _ := mask.NovoMasker(cfg, chaveTeste, nil, nil)
-	cfg.Provedores = map[string]config.Provedor{"gemini": {Upstream: "http://127.0.0.1:1", Formato: "gemini"}}
-	lg := &logSeguro{}
-	px := httptest.NewServer(Novo(cfg, m, nil, log.New(lg, "", 0)))
+	cfg := config.Default()
+	m, _ := mask.NewMasker(cfg, testKey, nil, nil)
+	cfg.Providers = map[string]config.Provider{"gemini": {Upstream: "http://127.0.0.1:1", Format: "gemini"}}
+	lg := &safeLog{}
+	px := httptest.NewServer(New(cfg, m, nil, log.New(lg, "", 0)))
 	defer px.Close()
-	resp, err := http.Post(px.URL+"/gemini"+caminhoG+"?key=CHAVE-SECRETA-DA-API", "application/json", strings.NewReader(`{"contents":[]}`))
+	resp, err := http.Post(px.URL+"/gemini"+pathG+"?key=CHAVE-SECRETA-DA-API", "application/json", strings.NewReader(`{"contents":[]}`))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -365,10 +365,10 @@ func TestGeminiErroNoLogSemAChave(t *testing.T) {
 
 // "llm-dlp last" também mostra a conversa do Gemini: a última requisição mascarada fica
 // guardada (só para quem tem a chave), e a contagem de tokens não toma o lugar dela.
-func TestGeminiUltima(t *testing.T) {
-	cfg := config.Padrao()
-	cfg.DominiosInternos = []string{"empresa-ficticia"}
-	m, err := mask.NovoMasker(cfg, chaveTeste, nil, nil)
+func TestGeminiLast(t *testing.T) {
+	cfg := config.Default()
+	cfg.InternalDomains = []string{"empresa-ficticia"}
+	m, err := mask.NewMasker(cfg, testKey, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -377,24 +377,24 @@ func TestGeminiUltima(t *testing.T) {
 		w.Header().Set("content-type", "application/json")
 		w.Write([]byte(`{"candidates":[{"content":{"role":"model","parts":[{"text":"ok"}]}}]}`))
 	}))
-	cfg.Provedores = map[string]config.Provedor{"gemini": {Upstream: up.URL, Formato: "gemini"}}
-	px := httptest.NewServer(Novo(cfg, m, nil, log.New(io.Discard, "", 0)).ComChave(chaveTeste))
+	cfg.Providers = map[string]config.Provider{"gemini": {Upstream: up.URL, Format: "gemini"}}
+	px := httptest.NewServer(New(cfg, m, nil, log.New(io.Discard, "", 0)).WithKey(testKey))
 	t.Cleanup(func() { up.Close(); px.Close() })
 
-	corpo := func(texto string) []byte {
-		b, _ := json.Marshal(map[string]any{"contents": []any{conteudoG("user", parte("text", texto))}})
+	body := func(text string) []byte {
+		b, _ := json.Marshal(map[string]any{"contents": []any{contentG("user", part("text", text))}})
 		return b
 	}
-	conversa := "o contato é joao.silva@empresa-ficticia.com.br. " + strings.Repeat("texto da conversa ", 200)
-	for _, p := range []struct{ caminho, texto string }{
-		{"/gemini/v1beta/models/m:generateContent", conversa},
+	conversation := "o contato é joao.silva@empresa-ficticia.com.br. " + strings.Repeat("texto da conversa ", 200)
+	for _, p := range []struct{ path, text string }{
+		{"/gemini/v1beta/models/m:generateContent", conversation},
 		{"/gemini/v1beta/models/m:countTokens", strings.Repeat("contagem de tokens ", 200)},
 	} {
-		if st, _ := pedir(t, "POST", px.URL+p.caminho, corpo(p.texto), nil); st != 200 {
-			t.Fatalf("%s: status %d", p.caminho, st)
+		if st, _ := ask(t, "POST", px.URL+p.path, body(p.text), nil); st != 200 {
+			t.Fatalf("%s: status %d", p.path, st)
 		}
 	}
-	st, b := pedir(t, "GET", px.URL+"/__llm-dlp/ultima", nil, func(r *http.Request) { r.Header.Set(CabecalhoProva, Prova(chaveTeste, "ultima")) })
+	st, b := ask(t, "GET", px.URL+"/__llm-dlp/ultima", nil, func(r *http.Request) { r.Header.Set(ProofHeader, Proof(testKey, "ultima")) })
 	if st != 200 || !bytes.Contains(b, []byte("texto da conversa")) || bytes.Contains(b, []byte("contagem de tokens")) {
 		t.Errorf("status %d, corpo %.120s", st, b)
 	}

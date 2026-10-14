@@ -20,34 +20,34 @@ import (
 // (e pode ter ido parar num arquivo); se algo saiu sem máscara; o que foi recusado.
 
 var (
-	reLogReq   = regexp.MustCompile(` -> (\d{3}) \| (\d+) substituições \| (\d+) colisões`)
-	reLogTipos = regexp.MustCompile(` \| tipos: ([^|]+)`)
-	reLogND    = regexp.MustCompile(` \| NÃO DESFEITOS \d+: ([^|]+)`)
-	reLogCol   = regexp.MustCompile(` \| colididos: ([^|]+)`)
-	reLogAPI   = regexp.MustCompile(` \| API: ([\w.-]+)`)
+	reLogReq       = regexp.MustCompile(` -> (\d{3}) \| (\d+) substituições \| (\d+) colisões`)
+	reLogTypes     = regexp.MustCompile(` \| tipos: ([^|]+)`)
+	reLogNotUndone = regexp.MustCompile(` \| NÃO DESFEITOS \d+: ([^|]+)`)
+	reLogCol       = regexp.MustCompile(` \| colididos: ([^|]+)`)
+	reLogAPI       = regexp.MustCompile(` \| API: ([\w.-]+)`)
 )
 
-type resumoLog struct {
-	desde                    time.Time
-	req, subst, colisoes     int
-	colididos                []string
+type logSummary struct {
+	since                    time.Time
+	req, substs, collisions  int
+	collided                 []string
 	status                   map[string]int // status HTTP diferente de 2xx
-	errosAPI                 map[string]int
-	tipos                    map[string]int
-	respostasND              int
-	pseudosND                []string
-	semMascara, erros, recus int
-	motivosRecusa            map[string]int
+	apiErrors                map[string]int
+	types                    map[string]int
+	ndResponses              int
+	pseudosNotUndone         []string
+	unmasked, errs, refusedN int
+	refusalReasons           map[string]int
 }
 
-func novoResumo(desde time.Time) *resumoLog {
-	return &resumoLog{desde: desde, status: map[string]int{}, errosAPI: map[string]int{}, tipos: map[string]int{},
-		motivosRecusa: map[string]int{}}
+func newSummary(since time.Time) *logSummary {
+	return &logSummary{since: since, status: map[string]int{}, apiErrors: map[string]int{}, types: map[string]int{},
+		refusalReasons: map[string]int{}}
 }
 
 // ler junta ao resumo as linhas do período (as linhas começam com "2006/01/02 15:04:05 ", na
 // hora local).
-func (r *resumoLog) ler(in io.Reader) {
+func (r *logSummary) readIt(in io.Reader) {
 	sc := bufio.NewScanner(in)
 	sc.Buffer(make([]byte, 64<<10), 1<<20)
 	for sc.Scan() {
@@ -56,24 +56,24 @@ func (r *resumoLog) ler(in io.Reader) {
 			continue
 		}
 		t, err := time.ParseInLocation("2006/01/02 15:04:05", l[:19], time.Local)
-		if err != nil || t.Before(r.desde) {
+		if err != nil || t.Before(r.since) {
 			continue
 		}
 		msg := l[20:]
 		switch {
 		case strings.HasPrefix(msg, "RECUSADO "):
-			r.recus++
+			r.refusedN++
 			if i := strings.Index(msg, ": "); i >= 0 {
 				m := msg[i+2:]
 				if len(m) > 70 {
 					m = m[:70] + "…"
 				}
-				r.motivosRecusa[m]++
+				r.refusalReasons[m]++
 			}
 		case strings.HasPrefix(msg, "AVISO ") && strings.Contains(msg, "sem máscara"):
-			r.semMascara++
+			r.unmasked++
 		case strings.HasPrefix(msg, "ERRO "):
-			r.erros++
+			r.errs++
 		}
 		m := reLogReq.FindStringSubmatch(msg)
 		if m == nil {
@@ -85,41 +85,41 @@ func (r *resumoLog) ler(in io.Reader) {
 		}
 		n, _ := strconv.Atoi(m[2])
 		c, _ := strconv.Atoi(m[3])
-		r.subst += n
-		r.colisoes += c
+		r.substs += n
+		r.collisions += c
 		if a := reLogAPI.FindStringSubmatch(msg); a != nil {
-			r.errosAPI[strings.TrimSuffix(a[1], ":")]++
+			r.apiErrors[strings.TrimSuffix(a[1], ":")]++
 		}
-		if tp := reLogTipos.FindStringSubmatch(msg); tp != nil {
-			for _, par := range strings.Split(tp[1], ",") {
-				f := strings.Fields(par)
+		if tp := reLogTypes.FindStringSubmatch(msg); tp != nil {
+			for _, pair := range strings.Split(tp[1], ",") {
+				f := strings.Fields(pair)
 				if len(f) == 2 {
 					k, _ := strconv.Atoi(f[1])
-					r.tipos[f[0]] += k
+					r.types[f[0]] += k
 				}
 			}
 		}
-		if nd := reLogND.FindStringSubmatch(msg); nd != nil {
-			r.respostasND++
-			r.pseudosND = juntarLista(r.pseudosND, nd[1])
+		if nd := reLogNotUndone.FindStringSubmatch(msg); nd != nil {
+			r.ndResponses++
+			r.pseudosNotUndone = joinList(r.pseudosNotUndone, nd[1])
 		}
 		if c := reLogCol.FindStringSubmatch(msg); c != nil {
-			r.colididos = juntarLista(r.colididos, c[1])
+			r.collided = joinList(r.collided, c[1])
 		}
 	}
 }
 
-// juntarLista acrescenta os itens de "a, b, c" que ainda não estão em xs (até 40).
-func juntarLista(xs []string, lista string) []string {
-	for _, p := range strings.Split(lista, ",") {
-		if p = strings.TrimSpace(p); p != "" && len(xs) < 40 && !contem(xs, p) {
+// joinList acrescenta os itens de "a, b, c" que ainda não estão em xs (até 40).
+func joinList(xs []string, list string) []string {
+	for _, p := range strings.Split(list, ",") {
+		if p = strings.TrimSpace(p); p != "" && len(xs) < 40 && !containsStr(xs, p) {
 			xs = append(xs, p)
 		}
 	}
 	return xs
 }
 
-func contem(xs []string, x string) bool {
+func containsStr(xs []string, x string) bool {
 	for _, y := range xs {
 		if y == x {
 			return true
@@ -129,7 +129,7 @@ func contem(xs []string, x string) bool {
 }
 
 // contagens: "a 3, b 1", do maior ao menor.
-func contagens(m map[string]int) string {
+func counts(m map[string]int) string {
 	ks := make([]string, 0, len(m))
 	for k := range m {
 		ks = append(ks, k)
@@ -142,47 +142,47 @@ func contagens(m map[string]int) string {
 	return strings.Join(ps, ", ")
 }
 
-func (r *resumoLog) texto(periodo string) string {
+func (r *logSummary) text(period string) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "llm-dlp: log das últimas %s (desde %s)\n", periodo, r.desde.Format("02/01 15:04"))
+	fmt.Fprintf(&b, "llm-dlp: log das últimas %s (desde %s)\n", period, r.since.Format("02/01 15:04"))
 	fmt.Fprintf(&b, "  requisições: %d", r.req)
 	if len(r.status) > 0 {
-		fmt.Fprintf(&b, " (status HTTP: %s)", contagens(r.status))
+		fmt.Fprintf(&b, " (status HTTP: %s)", counts(r.status))
 	}
 	b.WriteString("\n")
-	if len(r.errosAPI) > 0 {
-		fmt.Fprintf(&b, "  erros da API: %s\n", contagens(r.errosAPI))
+	if len(r.apiErrors) > 0 {
+		fmt.Fprintf(&b, "  erros da API: %s\n", counts(r.apiErrors))
 	}
-	fmt.Fprintf(&b, "  substituições: %d; colisões (pseudônimo que ficou sem desmascarar): %d\n", r.subst, r.colisoes)
-	if len(r.colididos) > 0 {
-		fmt.Fprintf(&b, "    pseudônimos colididos: %s\n", strings.Join(r.colididos, ", "))
+	fmt.Fprintf(&b, "  substituições: %d; colisões (pseudônimo que ficou sem desmascarar): %d\n", r.substs, r.collisions)
+	if len(r.collided) > 0 {
+		fmt.Fprintf(&b, "    pseudônimos colididos: %s\n", strings.Join(r.collided, ", "))
 	}
-	if len(r.tipos) > 0 {
-		fmt.Fprintf(&b, "  mascarados por tipo (valores distintos de cada requisição, somados): %s\n", contagens(r.tipos))
+	if len(r.types) > 0 {
+		fmt.Fprintf(&b, "  mascarados por tipo (valores distintos de cada requisição, somados): %s\n", counts(r.types))
 	}
-	if r.respostasND == 0 {
+	if r.ndResponses == 0 {
 		b.WriteString("  pseudônimos que voltaram sem virar o valor real: nenhum\n")
 	} else {
 		fmt.Fprintf(&b, "  ATENÇÃO: %d resposta(s) chegaram ao cliente com pseudônimo no lugar do valor real: %s\n",
-			r.respostasND, strings.Join(r.pseudosND, ", "))
+			r.ndResponses, strings.Join(r.pseudosNotUndone, ", "))
 		b.WriteString("    (procure-os nos arquivos gravados nesse período: eles ficaram com o pseudônimo)\n")
 	}
-	if r.semMascara > 0 {
-		fmt.Fprintf(&b, "  ATENÇÃO: %d requisição(ões) enviada(s) SEM máscara (fail_closed desligado e o mascaramento falhou)\n", r.semMascara)
+	if r.unmasked > 0 {
+		fmt.Fprintf(&b, "  ATENÇÃO: %d requisição(ões) enviada(s) SEM máscara (fail_closed desligado e o mascaramento falhou)\n", r.unmasked)
 	} else {
 		b.WriteString("  enviadas sem máscara: nenhuma\n")
 	}
-	if r.recus > 0 {
-		fmt.Fprintf(&b, "  recusadas: %d (%s)\n", r.recus, contagens(r.motivosRecusa))
+	if r.refusedN > 0 {
+		fmt.Fprintf(&b, "  recusadas: %d (%s)\n", r.refusedN, counts(r.refusalReasons))
 	}
-	if r.erros > 0 {
-		fmt.Fprintf(&b, "  falhas ao falar com a API: %d\n", r.erros)
+	if r.errs > 0 {
+		fmt.Fprintf(&b, "  falhas ao falar com a API: %d\n", r.errs)
 	}
 	return b.String()
 }
 
 // periodo: "24h", "90m", "7d" (dias) ou só o número de horas.
-func periodo(s string) (time.Duration, error) {
+func period(s string) (time.Duration, error) {
 	if n, err := strconv.Atoi(s); err == nil && n > 0 {
 		return time.Duration(n) * time.Hour, nil
 	}
@@ -198,30 +198,30 @@ func periodo(s string) (time.Duration, error) {
 	return d, nil
 }
 
-func auditar(args []string) error {
+func audit(args []string) error {
 	p := "24h"
 	if len(args) > 0 {
 		p = args[0]
 	}
-	d, err := periodo(p)
+	d, err := period(p)
 	if err != nil {
 		return err
 	}
-	r := novoResumo(time.Now().Add(-d))
-	arq := config.Caminho("llm-dlp.log")
-	lidos := 0
-	for _, a := range []string{arq + ".1", arq} { // o antigo primeiro: a ordem do tempo
+	r := newSummary(time.Now().Add(-d))
+	file := config.Path("llm-dlp.log")
+	readOnes := 0
+	for _, a := range []string{file + ".1", file} { // o antigo primeiro: a ordem do tempo
 		f, err := os.Open(a)
 		if err != nil {
 			continue
 		}
-		r.ler(f)
+		r.readIt(f)
 		f.Close()
-		lidos++
+		readOnes++
 	}
-	if lidos == 0 {
-		return fmt.Errorf("sem log em %s", arq)
+	if readOnes == 0 {
+		return fmt.Errorf("sem log em %s", file)
 	}
-	fmt.Print(r.texto(p))
+	fmt.Print(r.text(p))
 	return nil
 }

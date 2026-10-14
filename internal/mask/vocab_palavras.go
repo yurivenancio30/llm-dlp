@@ -6,35 +6,35 @@ import (
 	"unicode"
 )
 
-// Palavras comuns: uma palavra comum do português ou do inglês, sozinha ("tabela", "conta",
+// Words comuns: uma palavra comum do português ou do inglês, sozinha ("tabela", "conta",
 // "linhagem", "status"), decidida como nome num dado (uma tabela CONTA existe) continua
 // mascarada onde um leitor a decide (no dado, no comando, num DDL ou kubectl -n colado na
 // mensagem), mas o contágio não a leva para a prosa (o texto da mensagem, do usuário ou da
 // resposta): lá ela é a palavra, com o sentido dela ("só acesso a conta trial", "em qual tabela
 // você rodaria?"). O nome do cliente que é uma palavra comum sozinha e que o usuário cita em
 // prosa vai como palavra (escolha do usuário; o que importa proteger vai em "termos"). Vale só para nome de objeto: segredo, documento, e-mail e os detectores de formato
-// não passam por aqui. Termo cadastrado (config "termos") sempre vence: palavra comum que
+// não passam por aqui. Term cadastrado (config "termos") sempre vence: palavra comum que
 // contém um termo continua mascarada.
 //
 // Dados: palavras_comuns.txt, as 20000 palavras mais frequentes de cada idioma no FrequencyWords
 // (OpenSubtitles 2018), CC BY-SA 4.0; origem e critério no cabeçalho do arquivo.
 
 //go:embed dados/palavras_comuns.txt
-var palavrasComunsTxt string
+var commonWordsTxt string
 
-var palavrasComuns = lerListaGerada(palavrasComunsTxt)
+var commonWords = readGeneratedList(commonWordsTxt)
 
 // palavras_dicionario.txt: as 50000 mais frequentes de cada idioma, menos as comuns (gerado por
-// TestGerarDicionario). Só a prova de software o usa (memoria_software.go).
+// TestGenerateDictionary). Só a prova de software o usa (memoria_software.go).
 //
 //go:embed dados/palavras_dicionario.txt
-var palavrasDicionarioTxt string
+var dictionaryWordsTxt string
 
-var palavrasDicionario = lerListaGerada(palavrasDicionarioTxt)
+var dictionaryWords = readGeneratedList(dictionaryWordsTxt)
 
-// palavraComum: v (sem aspas e colchetes) é uma palavra só, de letras, da lista.
-func palavraComum(v string) bool {
-	v = strings.Trim(semCitacao(v), "[]")
+// commonWord: v (sem aspas e colchetes) é uma palavra só, de letras, da lista.
+func commonWord(v string) bool {
+	v = strings.Trim(unquoted(v), "[]")
 	if len(v) < 2 {
 		return false
 	}
@@ -43,11 +43,11 @@ func palavraComum(v string) bool {
 			return false
 		}
 	}
-	return palavrasComuns[strings.ToLower(v)]
+	return commonWords[strings.ToLower(v)]
 }
 
-// temTermo: v contém um termo cadastrado (config "termos").
-func (m *Masker) temTermo(v string) bool { return m.termos != nil && m.termos.MatchString(v) }
+// hasTerm: v contém um termo cadastrado (config "termos").
+func (m *Masker) hasTerm(v string) bool { return m.terms != nil && m.terms.MatchString(v) }
 
-// comumLivre: nome de objeto que fica em claro por ser palavra comum.
-func (m *Masker) comumLivre(v string) bool { return palavraComum(v) && !m.temTermo(v) }
+// freeCommon: nome de objeto que fica em claro por ser palavra comum.
+func (m *Masker) freeCommon(v string) bool { return commonWord(v) && !m.hasTerm(v) }

@@ -9,7 +9,7 @@ import (
 )
 
 // Um config.json da 0.8.0 (todos os campos com o nome antigo e valores fora do padrão).
-const configAntigo = `{
+const oldConfig = `{
   "porta": 9999,
   "upstream": "https://api.anthropic.com",
   "provedores": {"gemini": {"upstream": "https://g.example", "formato": "gemini"}},
@@ -31,32 +31,32 @@ const configAntigo = `{
   "campo_que_nao_existe": 1
 }`
 
-func esperadoDoAntigo() Config {
-	c := Padrao()
-	c.Porta = 9999
-	c.Provedores["gemini"] = Provedor{Upstream: "https://g.example", Formato: "gemini"} // soma aos padrões
-	c.DominiosInternos, c.EmailsLiberados, c.DominiosEmailLiberados = []string{"acme"}, []string{"a@b.c"}, []string{"example.com"}
-	c.PapeisHost = []string{"mysql"}
-	c.PadroesExtras = []PadraoExtra{{Rotulo: "CONTRATO", Regex: "CT-[0-9]+"}}
-	c.Termos = []Termo{{Rotulo: "nome", Valores: []string{"SGP", "Acme"}}}
-	c.DetectoresDesligados, c.DetectoresOpcionais = []string{"endereco"}, []string{"quase"}
-	c.CamposExtras = []CampoExtra{{Tipo: "cpf", Palavras: []string{"docto"}}}
-	c.DocumentosSemContexto, c.FalharFechado = false, false
-	c.OCR = OCR{Modo: "block", Tesseract: "t", PDFToText: "p", PDFToPPM: "q", Idioma: "eng", Env: map[string]string{},
-		MaxPaginas: 7, PDFEstrito: true}
-	c.FerramentasSemDesmascarar = []string{"WebFetch"}
-	c.Objetos = Objetos{Ligado: false, Mascarar: map[string]bool{"coluna": false}, Propagar: map[string]bool{"tabela": false},
-		IPPublico: true}
+func expectedFromOld() Config {
+	c := Default()
+	c.Port = 9999
+	c.Providers["gemini"] = Provider{Upstream: "https://g.example", Format: "gemini"} // soma aos padrões
+	c.InternalDomains, c.EmailsLiberados, c.AllowedEmailDomains = []string{"acme"}, []string{"a@b.c"}, []string{"example.com"}
+	c.HostRoles = []string{"mysql"}
+	c.ExtraPatterns = []ExtraPattern{{Label: "CONTRATO", Regex: "CT-[0-9]+"}}
+	c.Terms = []Term{{Label: "nome", Values: []string{"SGP", "Acme"}}}
+	c.DisabledDetectors, c.OptionalDetectors = []string{"endereco"}, []string{"quase"}
+	c.ExtraFields = []ExtraField{{Type: "cpf", Words: []string{"docto"}}}
+	c.DocumentsWithoutContext, c.FailClosed = false, false
+	c.OCR = OCR{Mode: "block", Tesseract: "t", PDFToText: "p", PDFToPPM: "q", Language: "eng", Env: map[string]string{},
+		MaxPages: 7, StrictPDF: true}
+	c.ToolsWithoutUnmask = []string{"WebFetch"}
+	c.Objects = Objects{Enabled: false, Mask: map[string]bool{"coluna": false}, Propagate: map[string]bool{"tabela": false},
+		PublicIP: true}
 	return c
 }
 
 // Os nomes antigos continuam valendo: o arquivo da 0.8.0 é lido inteiro.
-func TestConfigComNomesAntigos(t *testing.T) {
-	c := Padrao()
-	if err := Ler([]byte(configAntigo), &c); err != nil {
+func TestConfigWithOldNames(t *testing.T) {
+	c := Default()
+	if err := Read([]byte(oldConfig), &c); err != nil {
 		t.Fatal(err)
 	}
-	if want := esperadoDoAntigo(); !reflect.DeepEqual(c, want) {
+	if want := expectedFromOld(); !reflect.DeepEqual(c, want) {
 		t.Fatalf("lido:\n%+v\nesperado:\n%+v", c, want)
 	}
 }
@@ -64,52 +64,54 @@ func TestConfigComNomesAntigos(t *testing.T) {
 // update: o arquivo passa para os nomes novos (e é lido igual) e, ao voltar para uma versão
 // anterior, de volta para os antigos, que a 0.8.0 lia (um leitor só com os nomes antigos acha
 // tudo). Campo desconhecido fica.
-func TestMigrarArquivoIdaEVolta(t *testing.T) {
+func TestMigrateFileRoundTrip(t *testing.T) {
 	t.Setenv("LLM_DLP_HOME", t.TempDir())
-	p := Caminho("config.json")
-	os.WriteFile(p, []byte(configAntigo), 0o600)
+	p := Path("config.json")
+	os.WriteFile(p, []byte(oldConfig), 0o600)
 
-	bak, err := MigrarArquivo(false)
+	bak, err := MigrateFile(false)
 	if err != nil || bak == "" {
 		t.Fatalf("ida: bak=%q err=%v", bak, err)
 	}
 	b, _ := os.ReadFile(p)
-	for velho := range camposAntigos {
-		if strings.Contains(string(b), `"`+velho+`"`) {
-			t.Errorf("o nome antigo %q ficou no arquivo", velho)
+	for stale := range oldFields {
+		if strings.Contains(string(b), `"`+stale+`"`) {
+			t.Errorf("o nome antigo %q ficou no arquivo", stale)
 		}
 	}
 	if !strings.Contains(string(b), `"mode": "block"`) || !strings.Contains(string(b), "campo_que_nao_existe") {
 		t.Errorf("ocr.mode ou o campo desconhecido não ficou como devia:\n%s", b)
 	}
-	c, err := Carregar()
-	if err != nil || !reflect.DeepEqual(c, esperadoDoAntigo()) {
+	c, err := Load()
+	if err != nil || !reflect.DeepEqual(c, expectedFromOld()) {
 		t.Fatalf("depois da ida, lido diferente (err %v):\n%+v", err, c)
 	}
-	if bak2, _ := MigrarArquivo(false); bak2 != "" {
+	if bak2, _ := MigrateFile(false); bak2 != "" {
 		t.Errorf("segunda ida devia não ter o que trocar")
 	}
 
-	if _, err := MigrarArquivo(true); err != nil {
+	if _, err := MigrateFile(true); err != nil {
 		t.Fatal(err)
 	}
 	b, _ = os.ReadFile(p)
-	var antigo struct {
-		Porta    int                          `json:"porta"`
-		Dominios []string                     `json:"dominios_internos"`
-		Termos   []struct{ Valores []string } `json:"termos"`
-		OCR      struct {
-			Modo string `json:"modo"`
+	var old struct {
+		Port    int      `json:"porta"`
+		Domains []string `json:"dominios_internos"`
+		Terms   []struct {
+			Values []string `json:"valores"`
+		} `json:"termos"`
+		OCR struct {
+			Mode string `json:"modo"`
 		} `json:"ocr"`
-		Objetos struct {
-			Ligado *bool `json:"ligado"`
+		Objects struct {
+			Enabled *bool `json:"ligado"`
 		} `json:"objetos"`
 	}
-	if err := json.Unmarshal(b, &antigo); err != nil {
+	if err := json.Unmarshal(b, &old); err != nil {
 		t.Fatal(err)
 	}
-	if antigo.Porta != 9999 || len(antigo.Dominios) != 1 || len(antigo.Termos) != 1 || len(antigo.Termos[0].Valores) != 2 ||
-		antigo.OCR.Modo != "bloquear" || antigo.Objetos.Ligado == nil || *antigo.Objetos.Ligado {
+	if old.Port != 9999 || len(old.Domains) != 1 || len(old.Terms) != 1 || len(old.Terms[0].Values) != 2 ||
+		old.OCR.Mode != "bloquear" || old.Objects.Enabled == nil || *old.Objects.Enabled {
 		t.Errorf("a volta não deixou o arquivo como a 0.8.0 lê:\n%s", b)
 	}
 }

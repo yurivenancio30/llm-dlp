@@ -9,18 +9,18 @@ import (
 )
 
 // Matriz CONTEÚDO × TRANSPORTE × DESENHO: cada conteúdo (registros com
-// campos de tipo conhecido) é escrito em cada desenho e embrulhado em cada transporte. Regra:
+// campos de tipo conhecido) é escrito em cada desenho e embrulhado em cada transporte. Rule:
 // os mesmos nomes mascarados em todas as células, sem nada no config. Meta: 95%. Os negativos
 // (conteúdo sem nome interno) não podem ter nada mascarado em célula nenhuma.
 
-type conteudoM struct {
-	nome  string
+type contentM struct {
+	name  string
 	cols  []string
 	rows  [][]string
-	nomes []int // as colunas que guardam nome
+	names []int // as colunas que guardam nome
 }
 
-var conteudosMatriz = []conteudoM{
+var matrixContents = []contentM{
 	{"catálogo", []string{"table_schema", "table_name", "column_name"},
 		[][]string{{"mt_fin_contab", "mt_lanc_diario", "mt_vl_lancto"}, {"mt_fin_contab", "mt_plano_contas", "mt_cd_conta"}}, []int{0, 1, 2}},
 	{"conexão", []string{"host", "port", "database", "user"},
@@ -35,20 +35,20 @@ var conteudosMatriz = []conteudoM{
 		[][]string{{"mt_lancamento", "mt_contab", "mt_vl_total"}, {"mt_conta_razao", "mt_contab", "mt_cd_razao"}}, []int{0, 1, 2}},
 }
 
-var negativosMatriz = []conteudoM{
+var matrixNegatives = []contentM{
 	{"pip list", []string{"package", "version"}, [][]string{{"requests", "2.31.0"}, {"typing_extensions", "4.12.2"}}, nil},
 	{"benchmark", []string{"benchmark", "ns/op", "allocs/op"}, [][]string{{"FrioDenso-32", "21200000", "3"}, {"FrioComum-32", "8870000", "2"}}, nil},
 	{"arquivos", []string{"permissions", "size", "file"}, [][]string{{"-rw-r--r--", "220", "notas_reuniao.txt"}, {"drwxr-xr-x", "4096", "bin"}}, nil},
 	{"números", []string{"a", "b", "c"}, [][]string{{"0.496714", "-0.138264", "0.647689"}, {"1.523030", "-0.234153", "-0.234137"}}, nil},
 }
 
-type desenhoM struct {
-	nome      string
-	f         func(cols []string, rows [][]string) string
-	propagado bool // só pela propagação: o texto não tem a estrutura (vem depois do CSV)
+type layoutM struct {
+	name       string
+	f          func(cols []string, rows [][]string) string
+	propagated bool // só pela propagação: o texto não tem a estrutura (vem depois do CSV)
 }
 
-func larguras(cols []string, rows [][]string) []int {
+func widths(cols []string, rows [][]string) []int {
 	w := make([]int, len(cols))
 	for j, c := range cols {
 		w[j] = len(c)
@@ -59,7 +59,7 @@ func larguras(cols []string, rows [][]string) []int {
 	return w
 }
 
-func juntar(sep string) func([]string, [][]string) string {
+func join(sep string) func([]string, [][]string) string {
 	return func(cols []string, rows [][]string) string {
 		var b strings.Builder
 		b.WriteString(strings.Join(cols, sep) + "\n")
@@ -70,56 +70,56 @@ func juntar(sep string) func([]string, [][]string) string {
 	}
 }
 
-func linhaFixa(vs []string, w []int, sep, borda string) string {
+func fixedLine(vs []string, w []int, sep, edge string) string {
 	ps := make([]string, len(vs))
 	for j, v := range vs {
 		ps[j] = v + strings.Repeat(" ", w[j]-len(v))
 	}
-	return borda + strings.Join(ps, sep) + strings.TrimRight(borda, " ") + "\n"
+	return edge + strings.Join(ps, sep) + strings.TrimRight(edge, " ") + "\n"
 }
 
-func tracos(w []int, ch, cruz, ini, fim string) string {
+func dashes(w []int, ch, cross, ini, end string) string {
 	ps := make([]string, len(w))
 	for j, n := range w {
 		ps[j] = strings.Repeat(ch, n+2)
 	}
-	return ini + strings.Join(ps, cruz) + fim + "\n"
+	return ini + strings.Join(ps, cross) + end + "\n"
 }
 
-var desenhosMatriz = []desenhoM{
-	{"vírgula", juntar(","), false},
-	{"ponto e vírgula", juntar(";"), false},
-	{"tab", juntar("\t"), false},
+var matrixLayouts = []layoutM{
+	{"vírgula", join(","), false},
+	{"ponto e vírgula", join(";"), false},
+	{"tab", join("\t"), false},
 	{"|", func(cols []string, rows [][]string) string {
-		w := larguras(cols, rows)
-		s := linhaFixa(cols, w, " | ", "| ") + tracos(w, "-", "|", "|", "|")
+		w := widths(cols, rows)
+		s := fixedLine(cols, w, " | ", "| ") + dashes(w, "-", "|", "|", "|")
 		for _, r := range rows {
-			s += linhaFixa(r, w, " | ", "| ")
+			s += fixedLine(r, w, " | ", "| ")
 		}
 		return s
 	}, false},
 	{"caixa", func(cols []string, rows [][]string) string {
-		w := larguras(cols, rows)
-		s := tracos(w, "─", "┬", "┌", "┐") + linhaFixa(cols, w, " │ ", "│ ") + tracos(w, "─", "┼", "├", "┤")
+		w := widths(cols, rows)
+		s := dashes(w, "─", "┬", "┌", "┐") + fixedLine(cols, w, " │ ", "│ ") + dashes(w, "─", "┼", "├", "┤")
 		for _, r := range rows {
-			s += linhaFixa(r, w, " │ ", "│ ")
+			s += fixedLine(r, w, " │ ", "│ ")
 		}
-		return s + tracos(w, "─", "┴", "└", "┘")
+		return s + dashes(w, "─", "┴", "└", "┘")
 	}, false},
 	{"largura fixa", func(cols []string, rows [][]string) string {
-		w := larguras(cols, rows)
-		s := linhaFixa(cols, w, "   ", "")
+		w := widths(cols, rows)
+		s := fixedLine(cols, w, "   ", "")
 		for _, r := range rows {
-			s += linhaFixa(r, w, "   ", "")
+			s += fixedLine(r, w, "   ", "")
 		}
 		return s
 	}, false},
 	{"bordas", func(cols []string, rows [][]string) string {
-		w := larguras(cols, rows)
-		t := tracos(w, "-", "+", "+", "+")
-		s := t + linhaFixa(cols, w, " | ", "| ") + t
+		w := widths(cols, rows)
+		t := dashes(w, "-", "+", "+", "+")
+		s := t + fixedLine(cols, w, " | ", "| ") + t
 		for _, r := range rows {
-			s += linhaFixa(r, w, " | ", "| ")
+			s += fixedLine(r, w, " | ", "| ")
 		}
 		return s + t
 	}, false},
@@ -139,7 +139,7 @@ var desenhosMatriz = []desenhoM{
 		return s + "</table>\n"
 	}, false},
 	{"vertical", func(cols []string, rows [][]string) string {
-		w := larguras(cols, nil)
+		w := widths(cols, nil)
 		s := ""
 		for i, r := range rows {
 			s += fmt.Sprintf("-[ RECORD %d ]+------\n", i+1)
@@ -206,112 +206,112 @@ var desenhosMatriz = []desenhoM{
 	}, true},
 }
 
-// celulaMatriz: quantos nomes do conteúdo foram mascarados no texto (desenho, transporte).
-func celulaMatriz(t *testing.T, c conteudoM, d desenhoM, tr transporte) (ok, tot int, out string) {
-	m := novoTeste(t)
-	m.cfg.DominiosInternos = nil
-	m.cfg.Termos = nil
-	var nomes []string
-	visto := map[string]bool{}
+// matrixCell: quantos nomes do conteúdo foram mascarados no texto (desenho, transporte).
+func matrixCell(t *testing.T, c contentM, d layoutM, tr transport) (ok, tot int, out string) {
+	m := newTest(t)
+	m.cfg.InternalDomains = nil
+	m.cfg.Terms = nil
+	var names []string
+	seen := map[string]bool{}
 	for _, r := range c.rows {
-		for _, j := range c.nomes {
-			if visto[r[j]] {
+		for _, j := range c.names {
+			if seen[r[j]] {
 				continue
 			}
 			// só pela propagação: coluna não é propagada (nomes como user_id existem em todo código)
-			if d.propagado && strings.Contains(c.cols[j], "column") {
+			if d.propagated && strings.Contains(c.cols[j], "column") {
 				continue
 			}
-			visto[r[j]] = true
-			nomes = append(nomes, r[j])
+			seen[r[j]] = true
+			names = append(names, r[j])
 		}
 	}
-	if d.propagado {
-		m.Mascarar(juntar(",")(c.cols, c.rows)) // o arquivo passou antes pela conversa
+	if d.propagated {
+		m.Mask(join(",")(c.cols, c.rows)) // o arquivo passou antes pela conversa
 	}
 	txt := tr.f(d.f(c.cols, c.rows))
-	ok, tot = conferirMascarado(t, m, c.nome+"/"+d.nome+"/"+tr.nome, txt, nomes)
-	out, _ = m.Mascarar(txt)
+	ok, tot = checkMasked(t, m, c.name+"/"+d.name+"/"+tr.name, txt, names)
+	out, _ = m.Mask(txt)
 	return ok, tot, out
 }
 
-func TestMatrizTransporteDesenho(t *testing.T) {
+func TestMatrixTransportLayout(t *testing.T) {
 	if testing.Short() {
 		t.Skip("matriz grande")
 	}
-	type par struct{ ok, tot int }
-	porDT := map[[2]string]par{}
-	porC := map[string]par{}
-	var falhas []string
+	type pair struct{ ok, tot int }
+	byDT := map[[2]string]pair{}
+	byC := map[string]pair{}
+	var failures []string
 	okT, totT := 0, 0
-	for _, c := range conteudosMatriz {
-		for _, d := range desenhosMatriz {
-			for _, tr := range transportes {
-				ok, tot, _ := celulaMatriz(t, c, d, tr)
-				k := [2]string{d.nome, tr.nome}
-				p := porDT[k]
-				porDT[k] = par{p.ok + ok, p.tot + tot}
-				q := porC[c.nome]
-				porC[c.nome] = par{q.ok + ok, q.tot + tot}
+	for _, c := range matrixContents {
+		for _, d := range matrixLayouts {
+			for _, tr := range transports {
+				ok, tot, _ := matrixCell(t, c, d, tr)
+				k := [2]string{d.name, tr.name}
+				p := byDT[k]
+				byDT[k] = pair{p.ok + ok, p.tot + tot}
+				q := byC[c.name]
+				byC[c.name] = pair{q.ok + ok, q.tot + tot}
 				okT += ok
 				totT += tot
 				if ok < tot {
-					falhas = append(falhas, fmt.Sprintf("%s / %s / %s: %d/%d", c.nome, d.nome, tr.nome, ok, tot))
+					failures = append(failures, fmt.Sprintf("%s / %s / %s: %d/%d", c.name, d.name, tr.name, ok, tot))
 				}
 			}
 		}
 	}
 	var b strings.Builder
 	fmt.Fprintf(&b, "%-16s", "desenho \\ transp.")
-	for _, tr := range transportes {
-		fmt.Fprintf(&b, " %8.8s", tr.nome)
+	for _, tr := range transports {
+		fmt.Fprintf(&b, " %8.8s", tr.name)
 	}
 	b.WriteString("\n")
-	for _, d := range desenhosMatriz {
-		fmt.Fprintf(&b, "%-16.16s", d.nome)
-		for _, tr := range transportes {
-			p := porDT[[2]string{d.nome, tr.nome}]
+	for _, d := range matrixLayouts {
+		fmt.Fprintf(&b, "%-16.16s", d.name)
+		for _, tr := range transports {
+			p := byDT[[2]string{d.name, tr.name}]
 			fmt.Fprintf(&b, " %7.1f%%", 100*float64(p.ok)/float64(max(1, p.tot)))
 		}
 		b.WriteString("\n")
 	}
 	var cs []string
-	for k, p := range porC {
+	for k, p := range byC {
 		cs = append(cs, fmt.Sprintf("  %-22s %4d/%-4d %5.1f%%", k, p.ok, p.tot, 100*float64(p.ok)/float64(p.tot)))
 	}
 	sort.Strings(cs)
 	pct := 100 * float64(okT) / float64(totT)
 	t.Logf("matriz CONTEÚDO × TRANSPORTE × DESENHO:\n%s\npor conteúdo:\n%s\nTOTAL %d/%d = %.1f%%", b.String(), strings.Join(cs, "\n"), okT, totT, pct)
-	if testing.Verbose() && len(falhas) > 0 {
-		t.Logf("células incompletas:\n  %s", strings.Join(falhas, "\n  "))
+	if testing.Verbose() && len(failures) > 0 {
+		t.Logf("células incompletas:\n  %s", strings.Join(failures, "\n  "))
 	}
 	if pct < 95 {
 		t.Errorf("cobertura %.1f%% abaixo da meta de 95%%", pct)
 	}
 }
 
-func TestMatrizNegativos(t *testing.T) {
+func TestMatrixNegatives(t *testing.T) {
 	if testing.Short() {
 		t.Skip("matriz grande")
 	}
-	n, ruins := 0, 0
-	for _, c := range negativosMatriz {
-		for _, d := range desenhosMatriz {
-			if d.propagado {
+	n, bad := 0, 0
+	for _, c := range matrixNegatives {
+		for _, d := range matrixLayouts {
+			if d.propagated {
 				continue
 			}
-			for _, tr := range transportes {
-				m := novoTeste(t)
-				m.cfg.DominiosInternos = nil
-				m.cfg.Termos = nil
+			for _, tr := range transports {
+				m := newTest(t)
+				m.cfg.InternalDomains = nil
+				m.cfg.Terms = nil
 				txt := tr.f(d.f(c.cols, c.rows))
 				n++
-				if out, _ := m.Mascarar(txt); out != txt {
-					ruins++
-					t.Errorf("%s / %s / %s: mascarou\n%s", c.nome, d.nome, tr.nome, out)
+				if out, _ := m.Mask(txt); out != txt {
+					bad++
+					t.Errorf("%s / %s / %s: mascarou\n%s", c.name, d.name, tr.name, out)
 				}
 			}
 		}
 	}
-	t.Logf("negativos: %d células, %d com máscara", n, ruins)
+	t.Logf("negativos: %d células, %d com máscara", n, bad)
 }

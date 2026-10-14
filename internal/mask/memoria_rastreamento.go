@@ -9,133 +9,133 @@ import (
 // Rastreamento (ver docs/pt-BR/estruturas.md): cada nome do cliente é decidido onde ENTRA na conversa
 // e, a partir daí, é mascarado em todo lugar. Três regras:
 //
-//  1. Entrada: só os dados (saída de comando, arquivo lido) e o texto do usuário trazem nome do
+//  1. Entry: só os dados (saída de comando, arquivo lido) e o texto do usuário trazem nome do
 //     cliente. O texto que o assistente escreveu não é fonte: o modelo só conhece o cliente pelo
-//     que o proxy deixou passar; palavra nova dele é conhecimento público (MascararContagio).
+//     que o proxy deixou passar; palavra nova dele é conhecimento público (MaskContagion).
 //  2. Contágio: o valor decidido vale em todas as ocorrências, em qualquer texto e formato.
-//  3. Limpeza: vocabulário público nunca é marcado (publicoSistema, publicoGeral).
+//  3. Limpeza: vocabulário público nunca é marcado (publicSystem, publicGeneral).
 //
 // Cada marca leva a origem: decidida com prova direta (leitor, decisor) ou deduzida (âncora por
 // posição). Dedução não gera dedução (sem cascata), e só vale com sementes provadas na mesma
 // fonte (o arquivo ou recurso que o comando leu): quatro nomes de tabela que coincidem com
-// pacotes de um constraints.txt não fazem a lista inteira virar tabela. Palavra comum provada numa
+// pacotes de um constraints.txt não fazem a lista inteira virar tabela. Word comum provada numa
 // fonte não contamina outro arquivo lido; na conversa e nas saídas sem arquivo ela é o nome.
 
 // adicionar: põe d na memória (sem repetir). Devolve se entrou.
-func (mm *memoria) adicionar(m *Masker, d Decisao) bool {
-	if d.Generica || len(d.Nome) < memMin || publicoGeral(d.Nome) || m.softwareProvado(d.Nome) || !m.objMascara(d.Ent) || ehPseudoObj(d.Nome) {
+func (mm *memory) addEntry(m *Masker, d Decision) bool {
+	if d.Generic || len(d.Name) < memMin || publicGeneral(d.Name) || m.provenSoftware(d.Name) || !m.objMask(d.Ent) || isPseudoObj(d.Name) {
 		return false
 	}
-	if mm.tem == nil {
-		mm.tem = map[string]bool{}
+	if mm.has == nil {
+		mm.has = map[string]bool{}
 	}
-	k := d.Chave()
-	if mm.tem[k] {
+	k := d.Key()
+	if mm.has[k] {
 		return false
 	}
 	i := 0
-	for i < len(d.Nome) && !ehPalavra(d.Nome[i]) {
+	for i < len(d.Name) && !isWord(d.Name[i]) {
 		i++
 	}
 	j := i
-	for j < len(d.Nome) && ehPalavra(d.Nome[j]) {
+	for j < len(d.Name) && isWord(d.Name[j]) {
 		j++
 	}
 	if i == j {
 		return false
 	}
-	mm.tem[k] = true
-	nm := nomeMem{nome: d.Nome, off: i, ent: d.Ent, semCaixa: entSQL[d.Ent]}
-	idx, w := mm.exata, d.Nome[i:j]
-	if nm.semCaixa {
-		idx, w = mm.semCaixa, strings.ToLower(w)
-		mm.tamSemCaixa |= bitTam(j - i)
+	mm.has[k] = true
+	nm := memName{name: d.Name, off: i, ent: d.Ent, caseless: entSQL[d.Ent]}
+	idx, w := mm.exact, d.Name[i:j]
+	if nm.caseless {
+		idx, w = mm.caseless, strings.ToLower(w)
+		mm.caselessSize |= bitSize(j - i)
 	} else {
-		mm.tamExata |= bitTam(j - i)
+		mm.exactSize |= bitSize(j - i)
 	}
 	ns := append(idx[w], nm)
-	sort.SliceStable(ns, func(a, b int) bool { return len(ns[a].nome) > len(ns[b].nome) })
+	sort.SliceStable(ns, func(a, b int) bool { return len(ns[a].name) > len(ns[b].name) })
 	idx[w] = ns
 	mm.n++
 	return true
 }
 
-// aprenderAncora: os trechos novos de ts2 (fora de antes) são decisões de valor (regra 2):
+// learnAnchor: os trechos novos de ts2 (fora de antes) são decisões de valor (regra 2):
 // entram na memória e ficam marcados como deduzidos. Devolve as que entraram.
-func (l *Lote) aprenderAncora(s string, antes, ts2 []trecho) []Decisao {
-	ja := map[[2]int]bool{}
-	for _, t := range antes {
-		ja[[2]int{t.Ini, t.Fim}] = true
+func (l *Batch) learnAnchor(s string, before, ts2 []snippet) []Decision {
+	already := map[[2]int]bool{}
+	for _, t := range before {
+		already[[2]int{t.Start, t.End}] = true
 	}
-	var out []Decisao
+	var out []Decision
 	for _, t := range ts2 {
-		if ja[[2]int{t.Ini, t.Fim}] || !ehObjeto(t.Tipo) || t.Tipo == prefTipoObj+entGenerica {
+		if already[[2]int{t.Start, t.End}] || !isObject(t.Type) || t.Type == objTypePrefix+genericEnt {
 			continue
 		}
-		v := s[t.Ini:t.Fim]
-		if l.doModelo(v) {
+		v := s[t.Start:t.End]
+		if l.fromModel(v) {
 			continue
 		}
-		d := Decisao{Nome: v, Ent: t.Tipo[len(prefTipoObj):], Regra: "âncora", Generica: ehGenerica(v)}
-		l.marcarDeduzido(v)
-		if l.mem.adicionar(l.m, d) {
+		d := Decision{Name: v, Ent: t.Type[len(objTypePrefix):], Rule: "âncora", Generic: isGeneric(v)}
+		l.markDeduced(v)
+		if l.mem.addEntry(l.m, d) {
 			out = append(out, d)
 		}
 	}
 	return out
 }
 
-func (l *Lote) marcarDeduzido(v string) {
-	if l.deduzidos == nil {
-		l.deduzidos = map[string]bool{}
+func (l *Batch) markDeduced(v string) {
+	if l.deducedSet == nil {
+		l.deducedSet = map[string]bool{}
 	}
-	l.deduzidos[strings.ToLower(v)] = true
+	l.deducedSet[strings.ToLower(v)] = true
 }
 
-func (l *Lote) deduzido(v string) bool { return l.deduzidos[strings.ToLower(v)] }
+func (l *Batch) deduced(v string) bool { return l.deducedSet[strings.ToLower(v)] }
 
-// MascararContagio (regra 1): texto que o assistente escreveu e que não bate com o registro do
+// MaskContagion (regra 1): texto que o assistente escreveu e que não bate com o registro do
 // que o proxy traduziu. Só recebe o contágio: os detectores de formato (CPF, chave, e-mail:
 // valem por si), os valores já marcados e a memória da conversa. Nenhum leitor de estrutura nem
 // decisor roda aqui, e nada é aprendido.
-func (l *Lote) MascararContagio(s string, daWeb bool, pos Posicao) (string, []Entrada) {
+func (l *Batch) MaskContagion(s string, fromWeb bool, pos Position) (string, []Entry) {
 	if len(s) < 4 {
 		return s, nil
 	}
-	if r, ok := l.m.congelado(pos, s); ok {
-		return r.texto, r.entradas
+	if r, ok := l.m.frozen(pos, s); ok {
+		return r.text, r.entries
 	}
-	out := l.m.detectarBase(s)
-	numLongo, _ := perfilNumerico(s)
-	l.m.acharConhecidos(s, numLongo, func(ini, fim int, tipo string) {
-		out = append(out, Achado{ini, fim, tipo, s[ini:fim]})
+	out := l.m.detectBase(s)
+	longNum, _ := numericProfile(s)
+	l.m.findKnown(s, longNum, func(ini, end int, typ string) {
+		out = append(out, Finding{ini, end, typ, s[ini:end]})
 	})
-	l.m.unificarObjetos(out)
-	texto, ents, ts := l.m.aplicarT(s, out)
-	l.escrevendo, l.fonteAtual = true, ""
-	r := l.comMemoria(s, resultado{texto: texto, entradas: ents, trechos: ts, decididos: []Decisao{}}, "")
-	l.escrevendo = false
-	if _, ja := l.saidas[pos]; !ja {
-		l.saidas[pos] = r
+	l.m.unifyObjects(out)
+	text, ents, ts := l.m.applyT(s, out)
+	l.writing, l.currentSource = true, ""
+	r := l.withMemory(s, result{text: text, entries: ents, snippets: ts, decidedSet: []Decision{}}, "")
+	l.writing = false
+	if _, already := l.outputs[pos]; !already {
+		l.outputs[pos] = r
 	}
-	return r.texto, r.entradas
+	return r.text, r.entries
 }
 
-// publicoSistema (regra 3): vocabulário de sistema (SQL, desenvolvimento, devops, bancos); nunca
+// publicSystem (regra 3): vocabulário de sistema (SQL, desenvolvimento, devops, bancos); nunca
 // é mascarado, nem no lugar.
-func publicoSistema(v string) bool {
-	return publicoSQL(v) || publicoDev(v) || publicoDevops(v) || esquemasBanco[strings.ToLower(v)]
+func publicSystem(v string) bool {
+	return publicSQL(v) || publicDev(v) || publicDevops(v) || databaseSchemes[strings.ToLower(v)]
 }
 
-// publicoGeral: o de sistema e a referência medida (refPublica). A referência, com prova, é
+// publicGeneral: o de sistema e a referência medida (publicRef). A referência, com prova, é
 // mascarada no lugar, mas não se espalha.
-func publicoGeral(v string) bool { return publicoSistema(v) || refPublica[strings.ToLower(v)] }
+func publicGeneral(v string) bool { return publicSystem(v) || publicRef[strings.ToLower(v)] }
 
-// valorInteiro (só o valor inteiro é candidato): s[a:b] é o valor inteiro do seu token, e não um
+// wholeValue (só o valor inteiro é candidato): s[a:b] é o valor inteiro do seu token, e não um
 // pedaço de uma expressão. Um literal entre aspas é um valor; fora disso, o token vai até espaço
 // ou separador de campo (, ; | / : =), sem as aspas e os parênteses que o embrulham.
 // "pagamentos" numa coluna é; "CPF" em '.*CPF.*' ou em (CPF|CNPJ) não é.
-func valorInteiro(s string, a, b int) bool {
+func wholeValue(s string, a, b int) bool {
 	if a > 0 && b < len(s) && s[a-1] == s[b] && strings.IndexByte("'\"`", s[b]) >= 0 {
 		return true
 	}
@@ -156,8 +156,8 @@ func valorInteiro(s string, a, b int) bool {
 	return i == a && j == b
 }
 
-// contaForaAspas: quantos c há em l fora de aspas simples ou duplas (fechadas na linha).
-func contaForaAspas(l string, c byte) int {
+// countOutsideQuotes: quantos c há em l fora de aspas simples ou duplas (fechadas na linha).
+func countOutsideQuotes(l string, c byte) int {
 	n := 0
 	var q byte
 	for i := 0; i < len(l); i++ {
@@ -177,14 +177,14 @@ func contaForaAspas(l string, c byte) int {
 	return n
 }
 
-// semSobreporLongo: os trechos em ordem, sem sobreposição; no conflito fica o que cobre mais
+// noOverlapLong: os trechos em ordem, sem sobreposição; no conflito fica o que cobre mais
 // (nunca se descarta o resultado inteiro por causa de um conflito).
-func semSobreporLongo(ts []trecho) []trecho {
-	ordenarTrechos(ts)
-	out := make([]trecho, 0, len(ts))
+func noOverlapLong(ts []snippet) []snippet {
+	sortSnippets(ts)
+	out := make([]snippet, 0, len(ts))
 	for _, t := range ts {
-		if n := len(out); n > 0 && t.Ini < out[n-1].Fim {
-			if t.Fim-t.Ini > out[n-1].Fim-out[n-1].Ini {
+		if n := len(out); n > 0 && t.Start < out[n-1].End {
+			if t.End-t.Start > out[n-1].End-out[n-1].Start {
 				out[n-1] = t
 			}
 			continue
@@ -194,10 +194,10 @@ func semSobreporLongo(ts []trecho) []trecho {
 	return out
 }
 
-// ultimoQueCobre: o último trecho (em ordem) que se sobrepõe a [a, b), ou -1.
-func ultimoQueCobre(ts []trecho, a, b int) int {
-	i := sort.Search(len(ts), func(k int) bool { return ts[k].Ini >= b })
-	if k := i - 1; k >= 0 && ts[k].Fim > a {
+// lastCovering: o último trecho (em ordem) que se sobrepõe a [a, b), ou -1.
+func lastCovering(ts []snippet, a, b int) int {
+	i := sort.Search(len(ts), func(k int) bool { return ts[k].Start >= b })
+	if k := i - 1; k >= 0 && ts[k].End > a {
 		return k
 	}
 	return -1
@@ -205,85 +205,85 @@ func ultimoQueCobre(ts []trecho, a, b int) int {
 
 // ---- fonte -------------------------------------------------------------------------------
 
-// sepFonte: a fonte vai na frente da dica do resultado (ComFonte); o Lote a separa na entrada.
-const sepFonte = "\x1d"
+// sourceSep: a fonte vai na frente da dica do resultado (WithSource); o Batch a separa na entrada.
+const sourceSep = "\x1d"
 
-// ComFonte: a dica com a fonte (os arquivos ou o recurso do comando) na frente.
-func ComFonte(fonte, dica string) string {
-	if fonte == "" {
-		return dica
+// WithSource: a dica com a fonte (os arquivos ou o recurso do comando) na frente.
+func WithSource(source, hint string) string {
+	if source == "" {
+		return hint
 	}
-	return sepFonte + fonte + sepFonte + dica
+	return sourceSep + source + sourceSep + hint
 }
 
-// SepararFonte: o inverso de ComFonte.
-func SepararFonte(d string) (fonte, dica string) {
-	if !strings.HasPrefix(d, sepFonte) {
+// SplitSource: o inverso de WithSource.
+func SplitSource(d string) (source, hint string) {
+	if !strings.HasPrefix(d, sourceSep) {
 		return "", d
 	}
-	f, resto, _ := strings.Cut(d[len(sepFonte):], sepFonte)
-	return f, resto
+	f, rest, _ := strings.Cut(d[len(sourceSep):], sourceSep)
+	return f, rest
 }
 
-func semFontes(itens []ItemLote) []ItemLote {
-	out := make([]ItemLote, len(itens))
-	for i, it := range itens {
-		_, it.Dica = SepararFonte(it.Dica)
+func noSources(items []BatchItem) []BatchItem {
+	out := make([]BatchItem, len(items))
+	for i, it := range items {
+		_, it.Hint = SplitSource(it.Hint)
 		out[i] = it
 	}
 	return out
 }
 
-// registrarFontes: as decisões com prova direta de cada texto ficam ligadas à fonte dele.
-func (l *Lote) registrarFontes(itens []ItemLote, fontes []string) {
-	if l.fontes == nil {
-		l.fontes = map[string]map[string]bool{}
+// recordSources: as decisões com prova direta de cada texto ficam ligadas à fonte dele.
+func (l *Batch) recordSources(items []BatchItem, sources []string) {
+	if l.sources == nil {
+		l.sources = map[string]map[string]bool{}
 	}
-	for i, it := range itens {
-		if fontes[i] == "" || it.DaWeb {
+	for i, it := range items {
+		if sources[i] == "" || it.FromWeb {
 			continue
 		}
-		ds, _ := l.m.decididosMemo(it.S, it.Dica)
+		ds, _ := l.m.decidedMemo(it.S, it.Hint)
 		for _, d := range ds {
-			if d.Regra == "âncora" {
+			if d.Rule == "âncora" {
 				continue
 			}
-			k := strings.ToLower(d.Nome)
-			if l.fontes[k] == nil {
-				l.fontes[k] = map[string]bool{}
+			k := strings.ToLower(d.Name)
+			if l.sources[k] == nil {
+				l.sources[k] = map[string]bool{}
 			}
-			for _, f := range strings.Split(fontes[i], ",") {
-				l.fontes[k][f] = true
+			for _, f := range strings.Split(sources[i], ",") {
+				l.sources[k][f] = true
 			}
 		}
 	}
 }
 
-// provadoNaFonte: v foi decidido com prova no próprio texto ou numa fonte do texto atual.
-func (l *Lote) provadoNaFonte(v string) bool {
+// provenAtSource: v foi decidido com prova no próprio texto ou numa fonte do texto atual.
+func (l *Batch) provenAtSource(v string) bool {
 	k := strings.ToLower(v)
-	if l.provAtual[k] {
+	if l.currentProv[k] {
 		return true
 	}
-	if l.fonteAtual == "" {
+	if l.currentSource == "" {
 		return false
 	}
-	for _, f := range strings.Split(l.fonteAtual, ",") {
-		if l.fontes[k][f] {
+	for _, f := range strings.Split(l.currentSource, ",") {
+		if l.sources[k][f] {
 			return true
 		}
 	}
 	return false
 }
 
-var reFonteArq = regexp.MustCompile(`[\w~./\-]*[\w\-]\.[A-Za-z][\w]{0,5}\b`)
+var reFileSource = regexp.MustCompile(`[\w~./\-]*[\w\-]\.[A-Za-z][\w]{0,5}\b`)
 
-// FonteDoComando: os arquivos que o comando cita (nome base, minúsculas); sem arquivo, o
+// CommandSource: os arquivos que o comando cita (nome base, minúsculas); sem arquivo, o
 // programa e o primeiro argumento que não é opção ("kubectl get").
-func FonteDoComando(cmd string) string {
+func CommandSource(cmd string) string {
 	vis := map[string]bool{}
 	var fs []string
-	for _, a := range reFonteArq.FindAllString(cmd, 64) {
+	for _, a := range reFileSource.FindAllString(cmd, 64) {
 		b := strings.ToLower(a[strings.LastIndexAny(a, "/\\")+1:])
 		if !vis[b] {
 			vis[b] = true
@@ -308,8 +308,8 @@ func FonteDoComando(cmd string) string {
 	return strings.Join(fs, ",")
 }
 
-// fonteArquivo: a fonte cita arquivo (e não só um comando sem arquivo, nem nada).
-func fonteArquivo(f string) bool {
+// fileSource: a fonte cita arquivo (e não só um comando sem arquivo, nem nada).
+func fileSource(f string) bool {
 	for _, x := range strings.Split(f, ",") {
 		if x != "" && !strings.HasPrefix(x, "cmd:") {
 			return true
@@ -318,19 +318,19 @@ func fonteArquivo(f string) bool {
 	return false
 }
 
-// extDocumento: arquivos de documentação em texto (o conteúdo é prosa, menos os blocos de código).
-var extDocumento = map[string]bool{"md": true, "markdown": true, "mdx": true, "txt": true, "rst": true, "adoc": true, "asciidoc": true}
+// documentExt: arquivos de documentação em texto (o conteúdo é prosa, menos os blocos de código).
+var documentExt = map[string]bool{"md": true, "markdown": true, "mdx": true, "txt": true, "rst": true, "adoc": true, "asciidoc": true}
 
-// fonteDocumento: todo arquivo da fonte é documentação (com um arquivo de código junto, vale a
+// documentSource: todo arquivo da fonte é documentação (com um arquivo de código junto, vale a
 // regra do código, que protege mais).
-func fonteDocumento(f string) bool {
+func documentSource(f string) bool {
 	n := 0
 	for _, x := range strings.Split(f, ",") {
 		if x == "" || strings.HasPrefix(x, "cmd:") {
 			continue
 		}
 		k := strings.LastIndexByte(x, '.')
-		if k < 0 || !extDocumento[x[k+1:]] {
+		if k < 0 || !documentExt[x[k+1:]] {
 			return false
 		}
 		n++
@@ -338,34 +338,34 @@ func fonteDocumento(f string) bool {
 	return n > 0
 }
 
-// FonteSistema: a fonte de uma saída que descreve ou lista um catálogo de sistema (DESC/SHOW em
+// SystemSource: a fonte de uma saída que descreve ou lista um catálogo de sistema (DESC/SHOW em
 // SNOWFLAKE.ACCOUNT_USAGE, information_schema...). A estrutura listada é documentação pública:
 // a saída não é fonte de decisão (como o texto do assistente) e só recebe o contágio dos nomes
 // do cliente já conhecidos.
-const FonteSistema = "sistema"
+const SystemSource = "sistema"
 
-// AlvoDeSistema: o comando descreve ou lista um objeto de catálogo de sistema.
-func AlvoDeSistema(cmd string) bool { return alvoDeSistema(cmd) }
+// SystemTarget: o comando descreve ou lista um objeto de catálogo de sistema.
+func SystemTarget(cmd string) bool { return systemTarget(cmd) }
 
-// UsarPublicos: as palavras (minúsculas) que o modelo escreveu antes de um dado trazê-las nesta
+// UsePublic: as palavras (minúsculas) que o modelo escreveu antes de um dado trazê-las nesta
 // conversa (anterioridade, no proxy). São conhecimento dele: nenhum caminho as marca aqui.
-func (l *Lote) UsarPublicos(p map[string]bool) { l.publicos = p }
+func (l *Batch) UsePublic(p map[string]bool) { l.publicSet = p }
 
-// doModelo: v é conhecimento do modelo nesta conversa (e não contém termo cadastrado: o
+// fromModel: v é conhecimento do modelo nesta conversa (e não contém termo cadastrado: o
 // cadastro sempre vence).
-func (l *Lote) doModelo(v string) bool {
-	if len(l.publicos) == 0 {
+func (l *Batch) fromModel(v string) bool {
+	if len(l.publicSet) == 0 {
 		return false
 	}
-	return l.publicos[strings.ToLower(v)] && !l.m.temTermo(v)
+	return l.publicSet[strings.ToLower(v)] && !l.m.hasTerm(v)
 }
 
-// semPublicos: os trechos de objeto cujo valor é conhecimento do modelo saem (os de formato,
+// noPublics: os trechos de objeto cujo valor é conhecimento do modelo saem (os de formato,
 // como CPF e chave, ficam: valem por si).
-func (l *Lote) semPublicos(s string, ts []trecho) []trecho {
+func (l *Batch) noPublics(s string, ts []snippet) []snippet {
 	out := ts[:0:0]
 	for _, t := range ts {
-		if v := s[t.Ini:t.Fim]; ehObjeto(t.Tipo) && l.doModelo(v) {
+		if v := s[t.Start:t.End]; isObject(t.Type) && l.fromModel(v) {
 			continue
 		}
 		out = append(out, t)

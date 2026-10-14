@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// Leitor de linha de comando: opções que levam o nome de um recurso,
+// Reader de linha de comando: opções que levam o nome de um recurso,
 // iguais em qualquer ferramenta que siga a convenção.
 //
 //	-h/--host, -S/--server        servidor
@@ -20,103 +20,103 @@ import (
 // mesmo comando tem pelo menos duas delas com valor (psql -h x -d y -U z), ou, para -n,
 // quando o comando também cita um recurso <tipo>/<nome> ou um subcomando de operação.
 
-var opcaoCurta = map[string]string{"-h": "servidor", "-S": "servidor", "-d": "database", "-D": "database",
+var shortOption = map[string]string{"-h": "servidor", "-S": "servidor", "-d": "database", "-D": "database",
 	"-U": "usuario", "-u": "usuario", "-n": "namespace"}
 
-var reTipoNome = regexp.MustCompile(`^(deploy|deployment|deployments|svc|service|services|sts|statefulset|statefulsets|ds|daemonset|po|pod|pods|cm|configmap|configmaps|secret|secrets|job|jobs|cj|cronjob|cronjobs|ing|ingress|ns|namespace|namespaces|pvc|sa|serviceaccount|rs|replicaset|hpa|node|nodes)/([a-z0-9][a-z0-9.-]{0,252})$`)
+var reTypeName = regexp.MustCompile(`^(deploy|deployment|deployments|svc|service|services|sts|statefulset|statefulsets|ds|daemonset|po|pod|pods|cm|configmap|configmaps|secret|secrets|job|jobs|cj|cronjob|cronjobs|ing|ingress|ns|namespace|namespaces|pvc|sa|serviceaccount|rs|replicaset|hpa|node|nodes)/([a-z0-9][a-z0-9.-]{0,252})$`)
 
-var entTipoNome = map[string]string{"ns": "namespace", "namespace": "namespace", "namespaces": "namespace",
+var entTypeName = map[string]string{"ns": "namespace", "namespace": "namespace", "namespaces": "namespace",
 	"sa": "usuario", "serviceaccount": "usuario", "node": "servidor", "nodes": "servidor"}
 
 // subcomandos de operação que acompanham -n (namespace)
-var subcomandosOperacao = conj("get", "describe", "logs", "exec", "rollout", "scale", "delete", "apply", "edit",
+var operationSubcommands = setOf("get", "describe", "logs", "exec", "rollout", "scale", "delete", "apply", "edit",
 	"patch", "port-forward", "top", "create", "expose", "attach", "cp", "install", "upgrade", "uninstall", "status")
 
-// depoisDeComando: o token k vem depois de um verbo de operação (get, logs, rollout restart...),
+// afterCommand: o token k vem depois de um verbo de operação (get, logs, rollout restart...),
 // de uma opção (-n x, --all) ou de outro tipo/nome, na mesma linha de comando.
-func depoisDeComando(s string, toks []tokenCLI, k int) bool {
+func afterCommand(s string, toks []cliToken, k int) bool {
 	for j := k - 1; j >= 0 && j >= k-4; j-- {
 		v := s[toks[j].a:toks[j].b]
-		if subcomandosOperacao[v] || strings.HasPrefix(v, "-") || tipoNomeCLI(v) != nil || v == "restart" || v == "history" || v == "undo" {
+		if operationSubcommands[v] || strings.HasPrefix(v, "-") || cliTypeName(v) != nil || v == "restart" || v == "history" || v == "undo" {
 			return true
 		}
-		if numeroCLI(v) {
+		if cliNumber(v) {
 			return false
 		}
 	}
 	return false
 }
 
-// tipoNomeCLI: "deploy/x" (a regex só roda em token com "/" que começa com letra minúscula)
-func tipoNomeCLI(v string) []int {
+// cliTypeName: "deploy/x" (a regex só roda em token com "/" que começa com letra minúscula)
+func cliTypeName(v string) []int {
 	i := strings.IndexByte(v, '/')
 	if i < 2 || i > 14 || v[0] < 'a' || v[0] > 'z' {
 		return nil
 	}
-	return reTipoNome.FindStringSubmatchIndex(v)
+	return reTypeName.FindStringSubmatchIndex(v)
 }
 
-func numeroCLI(v string) bool {
+func cliNumber(v string) bool {
 	for i := 0; i < len(v); i++ {
-		if !ehDig(v[i]) && v[i] != '.' && v[i] != ',' {
+		if !isDig(v[i]) && v[i] != '.' && v[i] != ',' {
 			return false
 		}
 	}
 	return v != ""
 }
 
-var reRemoto = regexp.MustCompile(`^(?:([A-Za-z0-9_][\w.-]*)@)?([A-Za-z0-9][\w.-]*):(/[^\s]*)?$`)
+var reRemote = regexp.MustCompile(`^(?:([A-Za-z0-9_][\w.-]*)@)?([A-Za-z0-9][\w.-]*):(/[^\s]*)?$`)
 
-type tokenCLI struct {
+type cliToken struct {
 	a, b int
 }
 
-func acharCLI(s string, add func(ObjAchado)) {
+func findCLI(s string, add func(ObjFinding)) {
 	if strings.IndexByte(s, '-') < 0 && strings.IndexByte(s, '/') < 0 {
 		return
 	}
 	ini := 0
 	for ini < len(s) {
-		fim := strings.IndexByte(s[ini:], '\n')
-		if fim < 0 {
-			fim = len(s)
+		end := strings.IndexByte(s[ini:], '\n')
+		if end < 0 {
+			end = len(s)
 		} else {
-			fim += ini
+			end += ini
 		}
-		linhaCLI(s, ini, fim, add)
-		ini = fim + 1
+		cliLine(s, ini, end, add)
+		ini = end + 1
 	}
 }
 
-// linhaCLI trata uma linha, dividida em comandos por | && || ;
-func linhaCLI(s string, ini, fim int, add func(ObjAchado)) {
-	var toks []tokenCLI
+// cliLine trata uma linha, dividida em comandos por | && || ;
+func cliLine(s string, ini, end int, add func(ObjFinding)) {
+	var toks []cliToken
 	flush := func() {
 		if len(toks) > 0 {
-			comandoCLI(s, toks, add)
+			cliCommand(s, toks, add)
 		}
 		toks = toks[:0]
 	}
-	for i := ini; i < fim; {
-		for i < fim && (s[i] == ' ' || s[i] == '\t') {
+	for i := ini; i < end; {
+		for i < end && (s[i] == ' ' || s[i] == '\t') {
 			i++
 		}
-		if i >= fim {
+		if i >= end {
 			break
 		}
 		if s[i] == '|' || s[i] == ';' || s[i] == '&' {
 			flush()
-			for i < fim && (s[i] == '|' || s[i] == ';' || s[i] == '&') {
+			for i < end && (s[i] == '|' || s[i] == ';' || s[i] == '&') {
 				i++
 			}
 			continue
 		}
 		j := i
-		for j < fim && s[j] != ' ' && s[j] != '\t' && s[j] != '|' && s[j] != ';' {
+		for j < end && s[j] != ' ' && s[j] != '\t' && s[j] != '|' && s[j] != ';' {
 			j++
 		}
 		a, b := i, j
-		b = semFechoSolto(s, a, b)
+		b = noLooseClose(s, a, b)
 		// lista de argumentos (["kubectl", "-n", "x"]) e chamada (exec.Command("kubectl", ...),
 		// ProcessBuilder("kubectl", ...)): o token é a string, sem o que abre a lista ou a chamada
 		if k := strings.LastIndexAny(s[a:b], "[("); k >= 0 && a+k+1 < b && (s[a+k+1] == '"' || s[a+k+1] == '\'') {
@@ -125,15 +125,15 @@ func linhaCLI(s string, ini, fim int, add func(ObjAchado)) {
 		if b-a >= 2 && (s[a] == '"' || s[a] == '\'') && s[b-1] == s[a] { // "valor" entre aspas
 			a, b = a+1, b-1
 		}
-		toks = append(toks, tokenCLI{a, b})
+		toks = append(toks, cliToken{a, b})
 		i = j
 	}
 	flush()
 }
 
-// semFechoSolto: tira do fim do token a pontuação colada que não abriu nele: o fecho da
+// noLooseClose: tira do fim do token a pontuação colada que não abriu nele: o fecho da
 // string ou do objeto em volta (comando dentro de JSON: ...-U x"}), vírgula e ponto final.
-func semFechoSolto(s string, a, b int) int {
+func noLooseClose(s string, a, b int) int {
 	for b-a > 1 {
 		v := s[a : b-1]
 		switch c := s[b-1]; c {
@@ -154,58 +154,58 @@ func semFechoSolto(s string, a, b int) int {
 	return b
 }
 
-func comandoCLI(s string, toks []tokenCLI, add func(ObjAchado)) {
-	type par struct {
+func cliCommand(s string, toks []cliToken, add func(ObjFinding)) {
+	type pair struct {
 		ent  string
 		a, b int
 	}
-	var pares []par
-	curtas := map[string]bool{}
-	temTipoNome, temOperacao := false, false
+	var pairs []pair
+	shortOnes := map[string]bool{}
+	hasTypeName, hasOperation := false, false
 	for k, t := range toks {
 		v := s[t.a:t.b]
 		// "123 ns/op", "benchmark ns/op" (saída de benchmark) não é recurso: o tipo/nome vem
 		// depois de um verbo de operação, de uma opção ou de outro tipo/nome
-		if m := tipoNomeCLI(v); m != nil && k > 0 && depoisDeComando(s, toks, k) {
-			temTipoNome = true
-			ent := entTipoNome[v[m[2]:m[3]]]
+		if m := cliTypeName(v); m != nil && k > 0 && afterCommand(s, toks, k) {
+			hasTypeName = true
+			ent := entTypeName[v[m[2]:m[3]]]
 			if ent == "" {
 				ent = "servico"
 			}
-			if nome := v[m[4]:m[5]]; !publicoDev(nome) && !publicoDevops(nome) {
-				add(ObjAchado{t.a + m[4], t.a + m[5], ent, "linha-de-comando", true})
+			if name := v[m[4]:m[5]]; !publicDev(name) && !publicDevops(name) {
+				add(ObjFinding{t.a + m[4], t.a + m[5], ent, "linha-de-comando", true})
 			}
 			continue
 		}
-		if subcomandosOperacao[v] {
-			temOperacao = true
+		if operationSubcommands[v] {
+			hasOperation = true
 		}
-		if ent, ok := opcaoCurta[v]; ok && k+1 < len(toks) {
+		if ent, ok := shortOption[v]; ok && k+1 < len(toks) {
 			n := toks[k+1]
-			if n.b > n.a && s[n.a] != '-' && valorRecurso(s[n.a:n.b], ent) {
-				pares = append(pares, par{ent, n.a, n.b})
-				curtas[v] = true
+			if n.b > n.a && s[n.a] != '-' && resourceValue(s[n.a:n.b], ent) {
+				pairs = append(pairs, pair{ent, n.a, n.b})
+				shortOnes[v] = true
 			}
 		}
 	}
-	nCurtas := 0
-	for f := range curtas {
+	nShort := 0
+	for f := range shortOnes {
 		if f != "-n" {
-			nCurtas++
+			nShort++
 		}
 	}
-	for _, p := range pares {
+	for _, p := range pairs {
 		if p.ent == "namespace" {
-			if !(temTipoNome || temOperacao || nCurtas >= 1) {
+			if !(hasTypeName || hasOperation || nShort >= 1) {
 				continue
 			}
-		} else if nCurtas < 2 {
+		} else if nShort < 2 {
 			continue
 		}
 		if p.ent == "servidor" {
 			addHost(s, p.a, p.b, "linha-de-comando", true, add)
 		} else {
-			add(ObjAchado{p.a, p.b, p.ent, "linha-de-comando", true})
+			add(ObjFinding{p.a, p.b, p.ent, "linha-de-comando", true})
 		}
 	}
 	// cópia remota: scp/rsync [usuario@]host:/caminho
@@ -214,15 +214,15 @@ func comandoCLI(s string, toks []tokenCLI, add func(ObjAchado)) {
 		if cmd == "scp" || cmd == "rsync" || strings.HasSuffix(cmd, "/scp") || strings.HasSuffix(cmd, "/rsync") {
 			for _, t := range toks[1:] {
 				v := s[t.a:t.b]
-				m := reRemoto.FindStringSubmatchIndex(v)
+				m := reRemote.FindStringSubmatchIndex(v)
 				if m == nil || len(v) < 3 {
 					continue
 				}
-				if m[2] >= 0 && !publicoDev(v[m[2]:m[3]]) {
-					add(ObjAchado{t.a + m[2], t.a + m[3], "usuario", "linha-de-comando", true})
+				if m[2] >= 0 && !publicDev(v[m[2]:m[3]]) {
+					add(ObjFinding{t.a + m[2], t.a + m[3], "usuario", "linha-de-comando", true})
 				}
-				if h := v[m[4]:m[5]]; !publicoDev(h) && !dominioPublico(strings.ToLower(h)) {
-					add(ObjAchado{t.a + m[4], t.a + m[5], "servidor", "linha-de-comando", true})
+				if h := v[m[4]:m[5]]; !publicDev(h) && !publicDomain(strings.ToLower(h)) {
+					add(ObjFinding{t.a + m[4], t.a + m[5], "servidor", "linha-de-comando", true})
 				}
 			}
 		}

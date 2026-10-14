@@ -17,122 +17,122 @@ import (
 
 // Imagens e PDFs: OCR, e cobre de preto o que for sensível.
 
-// Midia trata imagens e PDFs que vão para a API: lê o texto (OCR/pdftotext),
+// Media trata imagens e PDFs que vão para a API: lê o texto (OCR/pdftotext),
 // cobre o que é sensível e devolve blocos seguros. Resultados ficam memorizados
 // (o Claude Code reenvia as mesmas imagens a cada mensagem). O arquivo que não deu para
 // verificar nunca sai: é retirado, e no lugar vai um aviso (ver retirar).
-type Midia struct {
+type Media struct {
 	cfg   config.OCR
 	o     *ocr.OCR
 	m     *mask.Masker
 	lib   []string // domínios liberados (não cobrir em imagens)
 	dom   []string // domínios internos (cobrir mesmo com OCR imperfeito)
 	mu    sync.Mutex
-	memo  map[[32]byte]resMidia
+	memo  map[[32]byte]mediaRes
 	bytes int
-	// Aviso recebe o motivo de cada arquivo retirado (o proxy grava no log)
-	Aviso    func(msg string)
-	avisados map[[32]byte]bool
+	// Warning recebe o motivo de cada arquivo retirado (o proxy grava no log)
+	Warning func(msg string)
+	warned  map[[32]byte]bool
 }
 
-type resMidia struct {
-	blocos []any
-	ents   []mask.Entrada
-	limpa  bool // nada a cobrir: sai o bloco original (que não é guardado, para não segurar RAM)
-	tam    int
+type mediaRes struct {
+	blocks []any
+	ents   []mask.Entry
+	clean  bool // nada a cobrir: sai o bloco original (que não é guardado, para não segurar RAM)
+	size   int
 }
 
 // saida monta os blocos desta requisição. O marcador de cache (cache_control) muda de lugar
 // a cada mensagem; por isso vem sempre do bloco atual e vai no último bloco que o substitui.
-func (r resMidia) saida(b map[string]any) []any {
-	if r.limpa {
+func (r mediaRes) output(b map[string]any) []any {
+	if r.clean {
 		return []any{b}
 	}
 	cc, ok := b["cache_control"]
 	if !ok {
-		return r.blocos
+		return r.blocks
 	}
-	out := append([]any(nil), r.blocos...)
-	ult := copiar(out[len(out)-1].(map[string]any))
-	ult["cache_control"] = cc
-	out[len(out)-1] = ult
+	out := append([]any(nil), r.blocks...)
+	lastPos := copyPath(out[len(out)-1].(map[string]any))
+	lastPos["cache_control"] = cc
+	out[len(out)-1] = lastPos
 	return out
 }
 
-const memoMidiaMax = 128 << 20 // teto dos resultados memorizados; passou disso, recomeça
+const mediaMemoMax = 128 << 20 // teto dos resultados memorizados; passou disso, recomeça
 
-func NovaMidia(cfg config.Config, m *mask.Masker) *Midia {
+func NewMedia(cfg config.Config, m *mask.Masker) *Media {
 	var env []string
 	for k, v := range cfg.OCR.Env {
 		env = append(env, k+"="+v)
 	}
-	return &Midia{cfg: cfg.OCR, m: m, lib: cfg.DominiosEmailLiberados, dom: cfg.DominiosInternos,
-		memo: map[[32]byte]resMidia{}, avisados: map[[32]byte]bool{},
-		o: ocr.Novo(ocr.Config{Tesseract: cfg.OCR.Tesseract, PDFToText: cfg.OCR.PDFToText, PDFToPPM: cfg.OCR.PDFToPPM,
-			Idioma: cfg.OCR.Idioma, Env: env})}
+	return &Media{cfg: cfg.OCR, m: m, lib: cfg.AllowedEmailDomains, dom: cfg.InternalDomains,
+		memo: map[[32]byte]mediaRes{}, warned: map[[32]byte]bool{},
+		o: ocr.New(ocr.Config{Tesseract: cfg.OCR.Tesseract, PDFToText: cfg.OCR.PDFToText, PDFToPPM: cfg.OCR.PDFToPPM,
+			Language: cfg.OCR.Language, Env: env})}
 }
 
-// Processar recebe um bloco image/document em base64 e devolve os blocos que podem sair.
-func (md *Midia) Processar(b map[string]any) ([]any, []mask.Entrada, error) {
+// Process recebe um bloco image/document em base64 e devolve os blocos que podem sair.
+func (md *Media) Process(b map[string]any) ([]any, []mask.Entry, error) {
 	src, _ := b["source"].(map[string]any)
 	if src == nil || src["type"] != "base64" {
 		return []any{b}, nil, nil // url/arquivo já hospedado: não há dado local aqui
 	}
-	tipo, _ := src["media_type"].(string)
-	dados, _ := src["data"].(string)
-	ehPDF := tipo == "application/pdf"
-	if !ehPDF && !strings.HasPrefix(tipo, "image/") {
+	typ, _ := src["media_type"].(string)
+	data, _ := src["data"].(string)
+	isPDF := typ == "application/pdf"
+	if !isPDF && !strings.HasPrefix(typ, "image/") {
 		return []any{b}, nil, nil
 	}
-	switch md.cfg.Modo {
+	switch md.cfg.Mode {
 	case "allow":
 		return []any{b}, nil, nil
 	case "block":
-		return md.retirar(b, ehPDF, "o envio de imagens e PDFs está bloqueado na configuração do llm-dlp (ocr.mode = block). Avise o usuário"), nil, nil
+		return md.removeIt(b, isPDF, "o envio de imagens e PDFs está bloqueado na configuração do llm-dlp (ocr.mode = block). Avise o usuário"), nil, nil
 	}
-	k := sha256.Sum256([]byte(dados))
+	k := sha256.Sum256([]byte(data))
 	md.mu.Lock()
 	if r, ok := md.memo[k]; ok {
 		md.mu.Unlock()
-		return r.saida(b), r.ents, nil
+		return r.output(b), r.ents, nil
 	}
 	md.mu.Unlock()
 
-	bin, err := base64.StdEncoding.DecodeString(dados)
-	var r resMidia
+	bin, err := base64.StdEncoding.DecodeString(data)
+	var r mediaRes
 	if err != nil {
 		err = errors.New("base64 inválido")
-	} else if ehPDF {
+	} else if isPDF {
 		r, err = md.pdf(b, bin)
 	} else {
-		r, err = md.imagem(b, bin)
+		r, err = md.image(b, bin)
 	}
 	if err != nil {
-		md.avisar(k, fmt.Sprintf("%q retirado da requisição, não deu para verificar: %v", tipo, err))
-		motivo := "o llm-dlp não conseguiu verificar se o arquivo tem dado sensível, porque "
-		if ocr.Ausente(err) {
-			motivo += "o OCR não está instalado nesta máquina. Avise o usuário: para enviar imagens e PDFs, instalar o OCR (" +
-				ocr.DicaInstalacao() + ") e mandar o arquivo de novo"
+		md.warn(k, fmt.Sprintf("%q retirado da requisição, não deu para verificar: %v", typ, err))
+		reason := "o llm-dlp não conseguiu verificar se o arquivo tem dado sensível, porque "
+		if ocr.Missing(err) {
+			reason += "o OCR não está instalado nesta máquina. Avise o usuário: para enviar imagens e PDFs, instalar o OCR (" +
+				ocr.InstallHint() + ") e mandar o arquivo de novo"
 		} else {
-			motivo += "a leitura do arquivo falhou. Avise o usuário: o motivo está no log do llm-dlp (llm-dlp.log); se o OCR estiver incompleto: " +
-				ocr.DicaInstalacao()
+			reason += "a leitura do arquivo falhou. Avise o usuário: o motivo está no log do llm-dlp (llm-dlp.log); se o OCR estiver incompleto: " +
+				ocr.InstallHint()
 		}
-		return md.retirar(b, ehPDF, motivo), nil, nil
+		return md.removeIt(b, isPDF, reason), nil, nil
 	}
-	if r.limpa {
-		r.blocos = nil
+	if r.clean {
+		r.blocks = nil
 	}
-	for _, bl := range r.blocos { // o cache_control é de cada requisição, não do resultado memorizado
+	for _, bl := range r.blocks { // o cache_control é de cada requisição, não do resultado memorizado
 		delete(bl.(map[string]any), "cache_control")
 	}
-	saida, ents := r.saida(b), r.ents
+	output, ents := r.output(b), r.ents
 	md.mu.Lock()
-	if md.bytes += r.tam + 64; md.bytes > memoMidiaMax {
-		md.memo, md.bytes = map[[32]byte]resMidia{}, r.tam+64
+	if md.bytes += r.size + 64; md.bytes > mediaMemoMax {
+		md.memo, md.bytes = map[[32]byte]mediaRes{}, r.size+64
 	}
 	md.memo[k] = r
 	md.mu.Unlock()
-	return saida, ents, nil
+	return output, ents, nil
 }
 
 // retirar: a imagem ou o PDF que não deu para verificar (ou que a configuração bloqueia) não
@@ -141,71 +141,71 @@ func (md *Midia) Processar(b map[string]any) ([]any, []mask.Entrada, error) {
 // Code reenvia a cada mensagem. O aviso só tem texto fixo (o detalhe do erro, que pode citar um
 // caminho da máquina, fica no log) e o resultado não é memorizado: com o OCR instalado, a
 // próxima mensagem já leva o arquivo.
-func (md *Midia) retirar(b map[string]any, ehPDF bool, motivo string) []any {
+func (md *Media) removeIt(b map[string]any, isPDF bool, reason string) []any {
 	t := "[llm-dlp] Uma imagem foi retirada daqui e não foi enviada: "
-	if ehPDF {
+	if isPDF {
 		t = "[llm-dlp] Um PDF foi retirado daqui e não foi enviado: "
 	}
-	return resMidia{blocos: []any{map[string]any{"type": "text", "text": t + motivo + "."}}}.saida(b)
+	return mediaRes{blocks: []any{map[string]any{"type": "text", "text": t + reason + "."}}}.output(b)
 }
 
 // avisar grava no log, uma vez por arquivo, por que ele foi retirado.
-func (md *Midia) avisar(k [32]byte, msg string) {
+func (md *Media) warn(k [32]byte, msg string) {
 	md.mu.Lock()
-	ja := md.avisados[k]
-	if len(md.avisados) > 4096 {
-		md.avisados = map[[32]byte]bool{}
+	already := md.warned[k]
+	if len(md.warned) > 4096 {
+		md.warned = map[[32]byte]bool{}
 	}
-	md.avisados[k] = true
+	md.warned[k] = true
 	md.mu.Unlock()
-	if !ja && md.Aviso != nil {
-		md.Aviso(msg)
+	if !already && md.Warning != nil {
+		md.Warning(msg)
 	}
 }
 
-func (md *Midia) imagem(b map[string]any, bin []byte) (resMidia, error) {
-	png, n, ents, err := md.cobrir(bin)
+func (md *Media) image(b map[string]any, bin []byte) (mediaRes, error) {
+	png, n, ents, err := md.cover(bin)
 	if err != nil {
-		return resMidia{}, err
+		return mediaRes{}, err
 	}
 	if n == 0 {
-		return resMidia{blocos: []any{b}, limpa: true}, nil
+		return mediaRes{blocks: []any{b}, clean: true}, nil
 	}
-	novo := copiar(b)
-	dados := base64.StdEncoding.EncodeToString(png)
-	novo["source"] = map[string]any{"type": "base64", "media_type": "image/png", "data": dados}
-	return resMidia{blocos: []any{novo, nota(n, ents, "nesta imagem")}, ents: ents, tam: len(dados)}, nil
+	newOne := copyPath(b)
+	data := base64.StdEncoding.EncodeToString(png)
+	newOne["source"] = map[string]any{"type": "base64", "media_type": "image/png", "data": data}
+	return mediaRes{blocks: []any{newOne, note(n, ents, "nesta imagem")}, ents: ents, size: len(data)}, nil
 }
 
 // cobrir: OCR + detecção; devolve a imagem (PNG) com os trechos cobertos.
-func (md *Midia) cobrir(bin []byte) ([]byte, int, []mask.Entrada, error) {
-	img, linhas, err := md.o.Ler(bin)
+func (md *Media) cover(bin []byte) ([]byte, int, []mask.Entry, error) {
+	img, lines, err := md.o.Read(bin)
 	if err != nil {
 		return nil, 0, nil, err
 	}
-	var caixas []image.Rectangle
-	var ents []mask.Entrada
-	for _, l := range linhas {
-		marcada := make([]bool, len(l.Palavras))
-		for _, a := range md.m.Detectar(l.Texto) {
-			for i, p := range l.Palavras {
-				if l.Ini[i] < a.Fim && l.Ini[i]+len(p.Texto) > a.Ini {
-					marcada[i] = true
+	var caseForms []image.Rectangle
+	var ents []mask.Entry
+	for _, l := range lines {
+		marked := make([]bool, len(l.Words))
+		for _, a := range md.m.Detect(l.Text) {
+			for i, p := range l.Words {
+				if l.Start[i] < a.End && l.Start[i]+len(p.Text) > a.Start {
+					marked[i] = true
 				}
 			}
-			ents = append(ents, mask.Entrada{Pseudo: md.m.Pseudonimo(a.Tipo, a.Real), Real: a.Real, Tipo: a.Tipo})
+			ents = append(ents, mask.Entry{Pseudo: md.m.Pseudonym(a.Type, a.Real), Real: a.Real, Type: a.Type})
 		}
-		for i, p := range l.Palavras {
-			if marcada[i] || md.agressivo(p.Texto) {
-				caixas = append(caixas, image.Rect(p.X, p.Y, p.X+p.W, p.Y+p.H))
+		for i, p := range l.Words {
+			if marked[i] || md.aggressive(p.Text) {
+				caseForms = append(caseForms, image.Rect(p.X, p.Y, p.X+p.W, p.Y+p.H))
 			}
 		}
 	}
-	if len(caixas) == 0 {
+	if len(caseForms) == 0 {
 		return nil, 0, nil, nil
 	}
-	out, err := ocr.Cobrir(img, caixas)
-	return out, len(caixas), dedup(ents), err
+	out, err := ocr.Cover(img, caseForms)
+	return out, len(caseForms), dedup(ents), err
 }
 
 var (
@@ -215,7 +215,7 @@ var (
 
 // agressivo: regras extras para imagem, porque o OCR erra (ex.: lê "@" como "Q").
 // Imagem é rara; aqui vale cobrir a mais.
-func (md *Midia) agressivo(w string) bool {
+func (md *Media) aggressive(w string) bool {
 	w = strings.Trim(w, `()[]{}<>,;:'"`)
 	if strings.Contains(w, "@") {
 		return true
@@ -229,15 +229,15 @@ func (md *Midia) agressivo(w string) bool {
 	if dig >= 8 || reIPOCR.MatchString(w) {
 		return true
 	}
-	baixo := strings.ToLower(w)
+	lower := strings.ToLower(w)
 	for _, d := range md.dom {
-		if len(d) >= 6 && strings.Contains(baixo, strings.ToLower(d[:len(d)-1])) { // tolera 1 letra perdida no fim
+		if len(d) >= 6 && strings.Contains(lower, strings.ToLower(d[:len(d)-1])) { // tolera 1 letra perdida no fim
 			return true
 		}
 	}
 	if len(w) >= 8 && reTLD.MatchString(w) {
 		for _, l := range md.lib {
-			if strings.HasSuffix(baixo, strings.ToLower(l)) {
+			if strings.HasSuffix(lower, strings.ToLower(l)) {
 				return false
 			}
 		}
@@ -246,48 +246,48 @@ func (md *Midia) agressivo(w string) bool {
 	return false
 }
 
-func (md *Midia) pdf(b map[string]any, bin []byte) (resMidia, error) {
-	texto, err := md.o.TextoPDF(bin)
+func (md *Media) pdf(b map[string]any, bin []byte) (mediaRes, error) {
+	text, err := md.o.PDFText(bin)
 	if err != nil {
-		return resMidia{}, err
+		return mediaRes{}, err
 	}
-	if len(strings.TrimSpace(texto)) >= 40 {
-		mas, ents := md.m.Mascarar(texto)
-		if len(ents) == 0 && !md.cfg.PDFEstrito {
-			return resMidia{blocos: []any{b}, limpa: true}, nil
+	if len(strings.TrimSpace(text)) >= 40 {
+		masked, ents := md.m.Mask(text)
+		if len(ents) == 0 && !md.cfg.StrictPDF {
+			return mediaRes{blocks: []any{b}, clean: true}, nil
 		}
-		novo := map[string]any{"type": "document",
-			"source": map[string]any{"type": "text", "media_type": "text/plain", "data": mas}}
-		titulo, _ := b["title"].(string)
-		novo["title"] = strings.TrimSpace(titulo + " (texto extraído do PDF; dados sensíveis mascarados pelo llm-dlp)")
+		newOne := map[string]any{"type": "document",
+			"source": map[string]any{"type": "text", "media_type": "text/plain", "data": masked}}
+		title, _ := b["title"].(string)
+		newOne["title"] = strings.TrimSpace(title + " (texto extraído do PDF; dados sensíveis mascarados pelo llm-dlp)")
 		for _, k := range []string{"context", "citations", "cache_control"} {
 			if v, ok := b[k]; ok {
-				novo[k] = v
+				newOne[k] = v
 			}
 		}
-		return resMidia{blocos: []any{novo}, ents: ents, tam: len(mas)}, nil
+		return mediaRes{blocks: []any{newOne}, ents: ents, size: len(masked)}, nil
 	}
 	// PDF escaneado: cada página vira imagem e passa pelo OCR
-	pags, err := md.o.PaginasPDF(bin, md.cfg.MaxPaginas)
+	pages, err := md.o.PDFPages(bin, md.cfg.MaxPages)
 	if err != nil {
-		return resMidia{}, err
+		return mediaRes{}, err
 	}
 	type res struct {
 		png  []byte
 		n    int
-		ents []mask.Entrada
+		ents []mask.Entry
 		err  error
 	}
-	out := make([]res, len(pags))
+	out := make([]res, len(pages))
 	var wg sync.WaitGroup
-	sem := make(chan struct{}, 4)
-	for i, p := range pags {
+	without := make(chan struct{}, 4)
+	for i, p := range pages {
 		wg.Add(1)
 		go func(i int, p []byte) {
 			defer wg.Done()
-			sem <- struct{}{}
-			defer func() { <-sem }()
-			png, n, ents, err := md.cobrir(p)
+			without <- struct{}{}
+			defer func() { <-without }()
+			png, n, ents, err := md.cover(p)
 			if n == 0 {
 				png = p
 			}
@@ -296,30 +296,30 @@ func (md *Midia) pdf(b map[string]any, bin []byte) (resMidia, error) {
 	}
 	wg.Wait()
 	total := 0
-	var ents []mask.Entrada
+	var ents []mask.Entry
 	for _, r := range out {
 		if r.err != nil {
-			return resMidia{}, r.err
+			return mediaRes{}, r.err
 		}
 		total += r.n
 		ents = append(ents, r.ents...)
 	}
-	if total == 0 && !md.cfg.PDFEstrito {
-		return resMidia{blocos: []any{b}, limpa: true}, nil
+	if total == 0 && !md.cfg.StrictPDF {
+		return mediaRes{blocks: []any{b}, clean: true}, nil
 	}
-	var blocos []any
-	tam := 0
+	var blocks []any
+	size := 0
 	for _, r := range out {
-		dados := base64.StdEncoding.EncodeToString(r.png)
-		tam += len(dados)
-		blocos = append(blocos, map[string]any{"type": "image", "source": map[string]any{"type": "base64", "media_type": "image/png", "data": dados}})
+		data := base64.StdEncoding.EncodeToString(r.png)
+		size += len(data)
+		blocks = append(blocks, map[string]any{"type": "image", "source": map[string]any{"type": "base64", "media_type": "image/png", "data": data}})
 	}
-	blocos = append(blocos, nota(total, dedup(ents), fmt.Sprintf("nas %d páginas acima (PDF escaneado)", len(pags))))
-	return resMidia{blocos: blocos, ents: dedup(ents), tam: tam}, nil
+	blocks = append(blocks, note(total, dedup(ents), fmt.Sprintf("nas %d páginas acima (PDF escaneado)", len(pages))))
+	return mediaRes{blocks: blocks, ents: dedup(ents), size: size}, nil
 }
 
-func nota(n int, ents []mask.Entrada, onde string) map[string]any {
-	t := fmt.Sprintf("[llm-dlp] %d trecho(s) com dado sensível foram cobertos %s.", n, onde)
+func note(n int, ents []mask.Entry, where string) map[string]any {
+	t := fmt.Sprintf("[llm-dlp] %d trecho(s) com dado sensível foram cobertos %s.", n, where)
 	if len(ents) > 0 {
 		var ps []string
 		for _, e := range ents {
@@ -330,19 +330,19 @@ func nota(n int, ents []mask.Entrada, onde string) map[string]any {
 	return map[string]any{"type": "text", "text": t}
 }
 
-func dedup(ents []mask.Entrada) []mask.Entrada {
-	visto := map[string]bool{}
-	var out []mask.Entrada
+func dedup(ents []mask.Entry) []mask.Entry {
+	seen := map[string]bool{}
+	var out []mask.Entry
 	for _, e := range ents {
-		if !visto[e.Pseudo] {
-			visto[e.Pseudo] = true
+		if !seen[e.Pseudo] {
+			seen[e.Pseudo] = true
 			out = append(out, e)
 		}
 	}
 	return out
 }
 
-func copiar(b map[string]any) map[string]any {
+func copyPath(b map[string]any) map[string]any {
 	n := make(map[string]any, len(b))
 	for k, v := range b {
 		n[k] = v

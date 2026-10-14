@@ -2,20 +2,20 @@ package mask
 
 import "strings"
 
-// Freios das regras acima de 2% nas sessões reais (TestMedirSessoesReais, só
+// Freios das regras acima de 2% nas sessões reais (TestMeasureRealSessions, só
 // contagens e formas). Pela forma e pelos vocabulários públicos que já existem.
 
 // Conexão (medido nas sessões: conexão/tnsnames e conexão/uri acima de 2%). Os
 // valores públicos que as regras de conexão aprendiam tinham todos a mesma forma: palavra de
 // tipo ou de atributo seguida de número ou colada a outra ("host1", "user2", "db01", "dbName",
 // "serverHost"). É o nome de modelo de exemplo e de documentação, não nome de recurso. A
-// decisão é pela forma: no máximo dois pedaços, todos do vocabulário que já existe (entPedaco,
-// entAntesDeNome, atributoChave, vocabDev), com ou sem número no fim. Uma palavra só ("host")
+// decisão é pela forma: no máximo dois pedaços, todos do vocabulário que já existe (entPiece,
+// entBeforeName, keyAttribute, vocabDev), com ou sem número no fim. Uma palavra só ("host")
 // já era pública. Vale só na URI de banco e no tnsnames: nas outras regras de conexão e de
-// endereço, "broker1" num bootstrap.servers continua nome (TestLeitorChaveValor).
+// endereço, "broker1" num bootstrap.servers continua nome (TestReaderKeyValue).
 
-// nomeDeModelo: v é palavra(s) de tipo com número ou colada(s), sem nada de próprio.
-func nomeDeModelo(v string) bool {
+// modelName: v é palavra(s) de tipo com número ou colada(s), sem nada de próprio.
+func modelName(v string) bool {
 	base := strings.TrimRight(v, "0123456789")
 	if base == "" || len(v) > 24 {
 		return false
@@ -34,9 +34,9 @@ func nomeDeModelo(v string) bool {
 		return false // uma palavra sem número: as listas públicas de sempre decidem
 	}
 	for _, p := range ps {
-		_, t1 := entPedaco[p]
-		_, t2 := entAntesDeNome[p]
-		if !(t1 || t2 || atributoChave[p] || vocabDev[p]) {
+		_, t1 := entPiece[p]
+		_, t2 := entBeforeName[p]
+		if !(t1 || t2 || keyAttribute[p] || vocabDev[p]) {
 			return false
 		}
 	}

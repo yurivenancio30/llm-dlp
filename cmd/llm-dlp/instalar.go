@@ -17,12 +17,12 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/config"
 	"github.com/yurivenancio30/llm-dlp/internal/mask"
 	"github.com/yurivenancio30/llm-dlp/internal/ocr"
-	"github.com/yurivenancio30/llm-dlp/internal/versao"
+	"github.com/yurivenancio30/llm-dlp/internal/version"
 )
 
-// Comandos instalar, desinstalar e a trava (managed-settings).
+// Commands instalar, desinstalar e a trava (managed-settings).
 
-const arquivoTrava = "/etc/claude-code/managed-settings.json"
+const lockFile = "/etc/claude-code/managed-settings.json"
 
 // regras que o llm-dlp acrescenta nas permissões do Claude Code
 var denyLLMDLP = []string{
@@ -34,18 +34,18 @@ var denyLLMDLP = []string{
 	"Bash(*managed-settings.json*)", // nem mexer na trava
 }
 
-// hooksLLMDLP: o comando de cada hook do Claude Code. hooksAntigos: os nomes de antes da 0.9.0,
+// hooksLLMDLP: o comando de cada hook do Claude Code. oldHooks: os nomes de antes da 0.9.0,
 // que o install troca pelos novos e o uninstall também reconhece.
 var (
-	hooksLLMDLP  = map[string]string{"SessionStart": "ensure", "UserPromptSubmit": "check"}
-	hooksAntigos = map[string]string{"SessionStart": "garantir", "UserPromptSubmit": "verificar"}
+	hooksLLMDLP = map[string]string{"SessionStart": "ensure", "UserPromptSubmit": "check"}
+	oldHooks    = map[string]string{"SessionStart": "garantir", "UserPromptSubmit": "verificar"}
 )
 
-// ehHookLLMDLP: o grupo de hooks (em JSON) chama o llm-dlp, com o nome novo ou o antigo?
-func ehHookLLMDLP(grupo []byte) bool {
-	for _, m := range []map[string]string{hooksLLMDLP, hooksAntigos} {
-		for _, acao := range m {
-			if strings.Contains(string(grupo), "llm-dlp "+acao) {
+// isLLMDLPHook: o grupo de hooks (em JSON) chama o llm-dlp, com o nome novo ou o antigo?
+func isLLMDLPHook(group []byte) bool {
+	for _, m := range []map[string]string{hooksLLMDLP, oldHooks} {
+		for _, action := range m {
+			if strings.Contains(string(group), "llm-dlp "+action) {
 				return true
 			}
 		}
@@ -53,13 +53,13 @@ func ehHookLLMDLP(grupo []byte) bool {
 	return false
 }
 
-type entrada struct {
-	r       *bufio.Reader
-	semPerg bool // --yes: responde "sim" a tudo (para scripts)
+type entry struct {
+	r          *bufio.Reader
+	noQuestion bool // --yes: responde "sim" a tudo (para scripts)
 }
 
-func (e entrada) perguntar(msg string) string {
-	if e.semPerg {
+func (e entry) askIt(msg string) string {
+	if e.noQuestion {
 		return ""
 	}
 	fmt.Print(msg)
@@ -67,31 +67,31 @@ func (e entrada) perguntar(msg string) string {
 	return strings.TrimSpace(l)
 }
 
-func (e entrada) confirmar(msg string) bool {
-	if e.semPerg {
+func (e entry) confirm(msg string) bool {
+	if e.noQuestion {
 		return true
 	}
-	r := strings.ToLower(e.perguntar(msg + " [s/N] "))
+	r := strings.ToLower(e.askIt(msg + " [s/N] "))
 	return r == "s" || r == "sim" || r == "y"
 }
 
-func passo(n int, titulo, porque string) {
-	fmt.Printf("\n[%d/5] %s\n      %s\n", n, titulo, porque)
+func step(n int, title, because string) {
+	fmt.Printf("\n[%d/5] %s\n      %s\n", n, title, because)
 }
 
-// comSudo roda um comando como administrador, ligado ao terminal (o sudo pede a senha).
-func comSudo(args ...string) error {
+// withSudo roda um comando como administrador, ligado ao terminal (o sudo pede a senha).
+func withSudo(args ...string) error {
 	c := exec.Command("sudo", args...)
 	c.Stdin, c.Stdout, c.Stderr = os.Stdin, os.Stdout, os.Stderr
 	return c.Run()
 }
 
 // instalar faz tudo, explicando cada passo. Pode ser rodado de novo sem estragar nada.
-func instalar(args []string) error {
-	in := entrada{r: bufio.NewReader(os.Stdin)}
+func install(args []string) error {
+	in := entry{r: bufio.NewReader(os.Stdin)}
 	for _, a := range args {
 		if a == "--yes" || a == "--sim" {
-			in.semPerg = true
+			in.noQuestion = true
 		}
 	}
 	if os.Geteuid() == 0 {
@@ -102,44 +102,44 @@ func instalar(args []string) error {
 Em dois passos (OCR e trava) ele usa sudo: a sua senha será pedida nessa hora.`)
 
 	// 1. programa
-	passo(1, "Programa", "copia o llm-dlp para ~/.local/bin, para você e o Claude Code poderem chamá-lo de qualquer pasta.")
-	destino := filepath.Join(home, ".local", "bin", "llm-dlp")
-	eu, _ := os.Executable()
-	if eu, _ = filepath.EvalSymlinks(eu); eu != destino {
-		if err := copiarArquivo(eu, destino, 0o755); err != nil {
+	step(1, "Programa", "copia o llm-dlp para ~/.local/bin, para você e o Claude Code poderem chamá-lo de qualquer pasta.")
+	destination := filepath.Join(home, ".local", "bin", "llm-dlp")
+	me, _ := os.Executable()
+	if me, _ = filepath.EvalSymlinks(me); me != destination {
+		if err := copyFile(me, destination, 0o755); err != nil {
 			return err
 		}
-		fmt.Println("      ✓ copiado para", destino)
+		fmt.Println("      ✓ copiado para", destination)
 	} else {
-		fmt.Println("      ✓ já está em", destino)
+		fmt.Println("      ✓ já está em", destination)
 	}
-	if !strings.Contains(":"+os.Getenv("PATH")+":", ":"+filepath.Dir(destino)+":") {
-		fmt.Printf("      ! %s não está no seu PATH. Acrescente ao ~/.bashrc:  export PATH=\"$HOME/.local/bin:$PATH\"\n", filepath.Dir(destino))
+	if !strings.Contains(":"+os.Getenv("PATH")+":", ":"+filepath.Dir(destination)+":") {
+		fmt.Printf("      ! %s não está no seu PATH. Acrescente ao ~/.bashrc:  export PATH=\"$HOME/.local/bin:$PATH\"\n", filepath.Dir(destination))
 	}
 
 	// 2. configuração e chave
-	passo(2, "Configuração e chave", "cria "+config.Dir()+" com a configuração e a chave secreta que gera os pseudônimos.")
-	cfg, err := config.Carregar()
+	step(2, "Configuração e chave", "cria "+config.Dir()+" com a configuração e a chave secreta que gera os pseudônimos.")
+	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("config: %w", err)
 	}
-	mudou := false
-	if len(cfg.DominiosInternos) == 0 {
+	changed := false
+	if len(cfg.InternalDomains) == 0 {
 		fmt.Println("\n      a) Domínio interno: o trecho que aparece no nome dos servidores da empresa.")
 		fmt.Println("         Com \"empresa\", mysql-prd.empresa.intra vira mysql-x7k2.invalid. Sem isso, nomes de")
 		fmt.Println("         servidor saem como estão. (E-mails são mascarados sempre, não precisa informar.)")
-		r := in.perguntar("         Digite um ou mais, separados por vírgula (Enter para pular): ")
+		r := in.askIt("         Digite um ou mais, separados por vírgula (Enter para pular): ")
 		for _, d := range strings.Split(r, ",") {
 			if d = strings.TrimSpace(strings.ToLower(d)); d != "" {
-				cfg.DominiosInternos = append(cfg.DominiosInternos, d)
-				mudou = true
+				cfg.InternalDomains = append(cfg.InternalDomains, d)
+				changed = true
 			}
 		}
 	}
-	if len(cfg.Termos) == 0 {
+	if len(cfg.Terms) == 0 {
 		fmt.Println("\n      b) Nomes que nunca podem sair: o nome da empresa ou cliente, de projetos, de sistemas.")
 		fmt.Println("         São mascarados em qualquer lugar, inclusive em nomes de pasta e arquivo.")
-		r := in.perguntar("         Digite um ou mais, separados por vírgula (Enter para pular): ")
+		r := in.askIt("         Digite um ou mais, separados por vírgula (Enter para pular): ")
 		var vs []string
 		for _, v := range strings.Split(r, ",") {
 			if v = strings.TrimSpace(v); v != "" {
@@ -147,32 +147,32 @@ Em dois passos (OCR e trava) ele usa sudo: a sua senha será pedida nessa hora.`
 			}
 		}
 		if len(vs) > 0 {
-			cfg.Termos = append(cfg.Termos, config.Termo{Rotulo: "nome", Valores: vs})
-			mudou = true
+			cfg.Terms = append(cfg.Terms, config.Term{Label: "nome", Values: vs})
+			changed = true
 		}
 	}
-	if mudou {
-		if err := salvarConfig(cfg); err != nil {
+	if changed {
+		if err := saveConfig(cfg); err != nil {
 			return err
 		}
 	}
-	if _, err := mask.Chave(config.Caminho("chave")); err != nil {
+	if _, err := mask.Key(config.Path("chave")); err != nil {
 		return err
 	}
-	fmt.Printf("\n      ✓ configuração: %s (domínios internos: %d, nomes protegidos: %d)\n", config.Caminho("config.json"), len(cfg.DominiosInternos), contarTermos(cfg))
-	fmt.Printf("      ✓ chave: %s — guarde uma cópia no seu gerenciador de senhas\n", config.Caminho("chave"))
+	fmt.Printf("\n      ✓ configuração: %s (domínios internos: %d, nomes protegidos: %d)\n", config.Path("config.json"), len(cfg.InternalDomains), countTerms(cfg))
+	fmt.Printf("      ✓ chave: %s — guarde uma cópia no seu gerenciador de senhas\n", config.Path("chave"))
 
 	// 3. OCR
-	passo(3, "OCR de imagens e PDFs", "com o OCR, prints e PDFs têm os dados sensíveis cobertos antes de sair. Sem ele, não são enviados (o Claude recebe um aviso no lugar).")
-	if falta := faltaOCR(cfg); falta != "" {
-		cmd := ocr.ComandoInstalacao()
-		fmt.Printf("      falta %s. Comando:  sudo sh -c '%s'\n", falta, cmd)
-		if cmd != "" && !in.semPerg && in.confirmar("      Instalar agora? (pede a senha do sudo)") {
-			if err := comSudo("sh", "-c", cmd); err != nil {
+	step(3, "OCR de imagens e PDFs", "com o OCR, prints e PDFs têm os dados sensíveis cobertos antes de sair. Sem ele, não são enviados (o Claude recebe um aviso no lugar).")
+	if missingOne := missingOCR(cfg); missingOne != "" {
+		cmd := ocr.InstallCommand()
+		fmt.Printf("      falta %s. Comando:  sudo sh -c '%s'\n", missingOne, cmd)
+		if cmd != "" && !in.noQuestion && in.confirm("      Instalar agora? (pede a senha do sudo)") {
+			if err := withSudo("sh", "-c", cmd); err != nil {
 				fmt.Println("      ! a instalação falhou; rode o comando acima à mão e depois rode o llm-dlp install de novo")
 			}
 		}
-		if falta := faltaOCR(cfg); falta != "" {
+		if missingOne := missingOCR(cfg); missingOne != "" {
 			fmt.Println("      ✗ OCR ausente: imagens e PDFs não serão enviados ao Claude (nada vaza; ele recebe um aviso no lugar)")
 		} else {
 			fmt.Println("      ✓ OCR instalado")
@@ -182,14 +182,14 @@ Em dois passos (OCR e trava) ele usa sudo: a sua senha será pedida nessa hora.`
 	}
 
 	// 4. Claude Code
-	passo(4, "Claude Code", "só para quem usa o Claude Code (com o Gemini CLI, o Codex, o opencode ou o Copilot, responda n:\n      eles são apontados à mão, ver o README). Faz o Claude Code passar pelo llm-dlp. Muda o\n      ~/.claude/settings.json (com backup):")
+	step(4, "Claude Code", "só para quem usa o Claude Code (com o Gemini CLI, o Codex, o opencode ou o Copilot, responda n:\n      eles são apontados à mão, ver o README). Faz o Claude Code passar pelo llm-dlp. Muda o\n      ~/.claude/settings.json (com backup):")
 	fmt.Printf(`        • ANTHROPIC_BASE_URL=http://%s  → as mensagens passam pelo llm-dlp
         • ao abrir uma sessão: "llm-dlp ensure"   → sobe o llm-dlp se não estiver no ar
         • a cada mensagem:     "llm-dlp check"  → barra a mensagem se algo estiver errado
         • proíbe o agente de ler/editar ~/.config/llm-dlp e de mexer na emergência e na trava
-`, endereco(cfg))
-	if in.confirmar("      Aplicar?") {
-		bak, err := aplicarClaude(home, destino, cfg)
+`, address(cfg))
+	if in.confirm("      Aplicar?") {
+		bak, err := applyClaude(home, destination, cfg)
 		if err != nil {
 			return err
 		}
@@ -198,16 +198,16 @@ Em dois passos (OCR e trava) ele usa sudo: a sua senha será pedida nessa hora.`
 		} else {
 			fmt.Println("      ✓ aplicado")
 		}
-		if err := garantir(); errors.Is(err, errSemProva) {
+		if err := ensure(); errors.Is(err, errNoProof) {
 			fmt.Println("      ! há outro llm-dlp no ar (de antes desta instalação): feche o Claude Code e rode \"llm-dlp stop\" para este assumir")
 		} else if err != nil {
 			return err
-		} else if info, _ := saude(cfg); info.Commit != versao.Commit || info.Versao != versao.Versao {
+		} else if info, _ := health(cfg); info.Commit != version.Commit || info.Version != version.Version {
 			// uma versão anterior no ar: troca por esta sem tirar o llm-dlp do ar
-			if err := trocarServico(cfg, info, versao.Commit); err != nil {
-				fmt.Printf("      ! a versão anterior (%s) continua no ar: %v. Tente: llm-dlp update\n", info.Versao, err)
+			if err := swapService(cfg, info, version.Commit); err != nil {
+				fmt.Printf("      ! a versão anterior (%s) continua no ar: %v. Tente: llm-dlp update\n", info.Version, err)
 			} else {
-				fmt.Printf("      ✓ llm-dlp no ar (a %s no lugar da %s, sem sair do ar)\n", versao.Versao, info.Versao)
+				fmt.Printf("      ✓ llm-dlp no ar (a %s no lugar da %s, sem sair do ar)\n", version.Version, info.Version)
 			}
 		} else {
 			fmt.Println("      ✓ llm-dlp no ar")
@@ -215,64 +215,64 @@ Em dois passos (OCR e trava) ele usa sudo: a sua senha será pedida nessa hora.`
 	} else {
 		fmt.Println("      – pulado (se você usa o Claude Code, ele NÃO está protegido)")
 	}
-	comClaude := claudeLigado(home, cfg)
+	withClaude := claudeEnabled(home, cfg)
 
 	// 5. trava
-	passo(5, "Trava contra vazamento silencioso (recomendada)",
+	step(5, "Trava contra vazamento silencioso (recomendada)",
 		"se a configuração do passo 4 for apagada, o Claude Code iria direto para a API sem máscara.\n      A trava faz o Claude Code se recusar a funcionar fora do llm-dlp. Fica numa pasta do sistema,\n      que o agente não consegue alterar — por isso precisa de sudo:")
-	if travaInstalada(endereco(cfg)) {
+	if lockInstalled(address(cfg)) {
 		fmt.Println("      ✓ trava já instalada")
-	} else if !comClaude {
+	} else if !withClaude {
 		fmt.Println("      – pulado: a trava é do Claude Code, que não foi ligado no passo 4")
 	} else {
-		if v := versaoClaudeCode(); v != "" && versaoMenor(v, "2.1.285") {
+		if v := claudeCodeVersion(); v != "" && minorVersion(v, "2.1.285") {
 			fmt.Printf("      ! seu Claude Code está na %s; a trava exige a 2.1.285 ou mais nova. Atualize e rode o llm-dlp install de novo.\n", v)
-		} else if !in.semPerg && in.confirmar("      Instalar a trava agora? (pede a senha do sudo)") {
-			if err := comSudo(destino, "instalar-trava"); err != nil {
-				fmt.Println("      ! falhou; rode à mão:  sudo", destino, "instalar-trava")
+		} else if !in.noQuestion && in.confirm("      Instalar a trava agora? (pede a senha do sudo)") {
+			if err := withSudo(destination, "instalar-trava"); err != nil {
+				fmt.Println("      ! falhou; rode à mão:  sudo", destination, "instalar-trava")
 			}
 		}
 	}
 
 	// resumo
-	cfg, _ = config.Carregar()
+	cfg, _ = config.Load()
 	fmt.Println("\nResumo")
-	ok := func(b bool, sim, nao string) {
+	ok := func(b bool, yes, negated string) {
 		if b {
-			fmt.Println("  ✓", sim)
+			fmt.Println("  ✓", yes)
 		} else {
-			fmt.Println("  ✗", nao)
+			fmt.Println("  ✗", negated)
 		}
 	}
-	nada := func(msg string) { fmt.Println("  –", msg) }
+	nothing := func(msg string) { fmt.Println("  –", msg) }
 	switch {
-	case saudavel(cfg):
+	case healthy(cfg):
 		fmt.Println("  ✓ llm-dlp no ar")
-	case comClaude:
-		ok(false, "", "llm-dlp fora do ar: veja "+config.Caminho("llm-dlp.log"))
+	case withClaude:
+		ok(false, "", "llm-dlp fora do ar: veja "+config.Path("llm-dlp.log"))
 	default:
-		nada("llm-dlp ainda não está no ar: com outro cliente, ele sobe com llm-dlp ensure (o README mostra como deixar isso automático)")
+		nothing("llm-dlp ainda não está no ar: com outro cliente, ele sobe com llm-dlp ensure (o README mostra como deixar isso automático)")
 	}
-	if comClaude {
+	if withClaude {
 		ok(true, "Claude Code passa pelo llm-dlp", "")
 	} else {
-		nada("Claude Code não ligado (passo 4 pulado). Se você usa o Claude Code, rode o llm-dlp install de novo e aceite o passo 4")
+		nothing("Claude Code não ligado (passo 4 pulado). Se você usa o Claude Code, rode o llm-dlp install de novo e aceite o passo 4")
 	}
-	ok(faltaOCR(cfg) == "", "OCR de imagens e PDFs", "sem OCR: imagens e PDFs não são enviados (para instalar: "+ocr.DicaInstalacao()+")")
+	ok(missingOCR(cfg) == "", "OCR de imagens e PDFs", "sem OCR: imagens e PDFs não são enviados (para instalar: "+ocr.InstallHint()+")")
 	switch {
-	case travaInstalada(endereco(cfg)):
+	case lockInstalled(address(cfg)):
 		fmt.Println("  ✓ trava instalada")
-	case comClaude:
+	case withClaude:
 		ok(false, "", "sem trava: rode o llm-dlp install de novo e aceite o passo 5")
 	default:
-		nada("sem trava (ela é só do Claude Code)")
+		nothing("sem trava (ela é só do Claude Code)")
 	}
-	if len(cfg.DominiosInternos) > 0 || contarTermos(cfg) > 0 {
+	if len(cfg.InternalDomains) > 0 || countTerms(cfg) > 0 {
 		fmt.Println("  ✓ domínios internos e nomes protegidos configurados")
 	} else {
 		fmt.Println("  – sem domínio interno nem nomes protegidos (opcional: rode o llm-dlp install de novo para informar)")
 	}
-	if comClaude {
+	if withClaude {
 		fmt.Println("\nPara valer: feche e abra o Claude Code (no VS Code, recarregue a janela).")
 	}
 	fmt.Println(`
@@ -283,28 +283,28 @@ seção "Gemini CLI, Codex, opencode e Copilot (beta)".`)
 	return nil
 }
 
-func contarTermos(cfg config.Config) int {
+func countTerms(cfg config.Config) int {
 	n := 0
-	for _, t := range cfg.Termos {
-		n += len(t.Valores)
+	for _, t := range cfg.Terms {
+		n += len(t.Values)
 	}
 	return n
 }
 
-// claudeLigado: o settings.json do Claude Code aponta para o llm-dlp?
-func claudeLigado(home string, cfg config.Config) bool {
-	s, _, err := lerSettings(filepath.Join(home, ".claude", "settings.json"))
+// claudeEnabled: o settings.json do Claude Code aponta para o llm-dlp?
+func claudeEnabled(home string, cfg config.Config) bool {
+	s, _, err := readSettings(filepath.Join(home, ".claude", "settings.json"))
 	if err != nil {
 		return false
 	}
 	env, _ := s["env"].(map[string]any)
-	return env["ANTHROPIC_BASE_URL"] == "http://"+endereco(cfg)
+	return env["ANTHROPIC_BASE_URL"] == "http://"+address(cfg)
 }
 
-func desinstalar(args []string) error {
+func uninstall(args []string) error {
 	home, _ := os.UserHomeDir()
-	alvo := filepath.Join(home, ".claude", "settings.json")
-	s, orig, err := lerSettings(alvo)
+	target := filepath.Join(home, ".claude", "settings.json")
+	s, orig, err := readSettings(target)
 	if err != nil {
 		return err
 	}
@@ -313,25 +313,25 @@ func desinstalar(args []string) error {
 			delete(env, "ANTHROPIC_BASE_URL")
 		}
 	}
-	tirarHooks(s)
+	stripHooks(s)
 	if perms, ok := s["permissions"].(map[string]any); ok {
 		deny, _ := perms["deny"].([]any)
-		var fica []any
+		var stays []any
 		for _, d := range deny {
-			nosso := false
+			ours := false
 			for _, r := range denyLLMDLP {
 				if d == r {
-					nosso = true
+					ours = true
 				}
 			}
-			if !nosso {
-				fica = append(fica, d)
+			if !ours {
+				stays = append(stays, d)
 			}
 		}
-		if len(fica) == 0 {
+		if len(stays) == 0 {
 			delete(perms, "deny")
 		} else {
-			perms["deny"] = fica
+			perms["deny"] = stays
 		}
 	}
 	// não deixa restos vazios que não existiam antes da instalação
@@ -340,7 +340,7 @@ func desinstalar(args []string) error {
 			delete(s, k)
 		}
 	}
-	bak, err := gravarSettings(alvo, s, orig)
+	bak, err := writeSettings(target, s, orig)
 	if err != nil {
 		return err
 	}
@@ -350,8 +350,8 @@ func desinstalar(args []string) error {
 	fmt.Println("✓ removido do Claude Code (backup em " + bak + ").")
 	fmt.Println("  O llm-dlp continua no ar para as sessões que já estão abertas. Feche e abra o Claude Code")
 	fmt.Println("  (ou o VS Code) e depois rode: llm-dlp stop")
-	cfg, _ := config.Carregar()
-	if travaInstalada(endereco(cfg)) {
+	cfg, _ := config.Load()
+	if lockInstalled(address(cfg)) {
 		fmt.Println("! A trava continua instalada: sem o llm-dlp, o Claude Code vai se recusar a funcionar. Remova com:")
 		fmt.Println("      sudo llm-dlp uninstall-lock")
 	}
@@ -359,43 +359,43 @@ func desinstalar(args []string) error {
 	return nil
 }
 
-// instalarTrava grava allowedProviders + ANTHROPIC_BASE_URL no managed-settings (root).
-func instalarTrava(remover bool) error {
+// installLock grava allowedProviders + ANTHROPIC_BASE_URL no managed-settings (root).
+func installLock(remove bool) error {
 	if os.Geteuid() != 0 {
 		return errors.New("precisa de sudo (o arquivo da trava fica numa pasta do sistema)")
 	}
-	porta := 8787
+	port := 8787
 	if u := os.Getenv("SUDO_USER"); u != "" { // usa a porta configurada pelo usuário
 		if uu, err := user.Lookup(u); err == nil {
 			if b, err := os.ReadFile(filepath.Join(uu.HomeDir, ".config", "llm-dlp", "config.json")); err == nil {
 				var c config.Config // (com os nomes novos ou os antigos)
-				if config.Ler(b, &c) == nil && c.Porta > 0 {
-					porta = c.Porta
+				if config.Read(b, &c) == nil && c.Port > 0 {
+					port = c.Port
 				}
 			}
 		}
 	}
-	if err := os.MkdirAll(filepath.Dir(arquivoTrava), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(lockFile), 0o755); err != nil {
 		return err
 	}
-	bak, err := aplicarTrava(arquivoTrava, porta, remover)
+	bak, err := applyLock(lockFile, port, remove)
 	if err != nil {
 		return err
 	}
-	if remover {
-		fmt.Println("✓ trava removida de", arquivoTrava)
+	if remove {
+		fmt.Println("✓ trava removida de", lockFile)
 	} else {
 		if bak != "" {
 			bak = " (backup em " + bak + ")"
 		}
-		fmt.Printf("✓ trava instalada em %s%s\n  O Claude Code só funcionará passando pelo llm-dlp em 127.0.0.1:%d.\n", arquivoTrava, bak, porta)
+		fmt.Printf("✓ trava instalada em %s%s\n  O Claude Code só funcionará passando pelo llm-dlp em 127.0.0.1:%d.\n", lockFile, bak, port)
 	}
 	return nil
 }
 
-// aplicarTrava acrescenta (ou remove) a trava num managed-settings.json, preservando o resto.
-func aplicarTrava(caminho string, porta int, remover bool) (string, error) {
-	s, orig, err := lerSettings(caminho)
+// applyLock acrescenta (ou remove) a trava num managed-settings.json, preservando o resto.
+func applyLock(path string, port int, remove bool) (string, error) {
+	s, orig, err := readSettings(path)
 	if err != nil {
 		return "", err
 	}
@@ -408,29 +408,29 @@ func aplicarTrava(caminho string, porta int, remover bool) (string, error) {
 		perms = map[string]any{}
 	}
 	deny, _ := perms["deny"].([]any)
-	if remover {
+	if remove {
 		delete(s, "allowedProviders")
 		delete(env, "ANTHROPIC_BASE_URL")
-		var fica []any
+		var stays []any
 		for _, d := range deny {
-			nosso := false
+			ours := false
 			for _, r := range denyLLMDLP {
-				nosso = nosso || d == r
+				ours = ours || d == r
 			}
-			if !nosso {
-				fica = append(fica, d)
+			if !ours {
+				stays = append(stays, d)
 			}
 		}
-		deny = fica
+		deny = stays
 	} else {
 		s["allowedProviders"] = []any{"customEndpoint"}
-		env["ANTHROPIC_BASE_URL"] = fmt.Sprintf("http://127.0.0.1:%d", porta)
+		env["ANTHROPIC_BASE_URL"] = fmt.Sprintf("http://127.0.0.1:%d", port)
 		for _, r := range denyLLMDLP {
-			tem := false
+			has := false
 			for _, d := range deny {
-				tem = tem || d == r
+				has = has || d == r
 			}
-			if !tem {
+			if !has {
 				deny = append(deny, r)
 			}
 		}
@@ -450,12 +450,12 @@ func aplicarTrava(caminho string, porta int, remover bool) (string, error) {
 			delete(s, "permissions")
 		}
 	}
-	return gravarSettingsModo(caminho, s, orig, 0o644)
+	return writeSettingsMode(path, s, orig, 0o644)
 }
 
-func aplicarClaude(home, bin string, cfg config.Config) (string, error) {
-	alvo := filepath.Join(home, ".claude", "settings.json")
-	s, orig, err := lerSettings(alvo)
+func applyClaude(home, bin string, cfg config.Config) (string, error) {
+	target := filepath.Join(home, ".claude", "settings.json")
+	s, orig, err := readSettings(target)
 	if err != nil {
 		return "", err
 	}
@@ -467,114 +467,114 @@ func aplicarClaude(home, bin string, cfg config.Config) (string, error) {
 		s[k] = v
 		return v
 	}
-	sub("env")["ANTHROPIC_BASE_URL"] = "http://" + endereco(cfg)
+	sub("env")["ANTHROPIC_BASE_URL"] = "http://" + address(cfg)
 	// os hooks do llm-dlp que já estiverem lá (com o nome novo ou o antigo) saem e entram de
 	// novo: nunca ficam dois
-	tirarHooks(s)
-	porHooks(s, bin, hooksLLMDLP)
+	stripHooks(s)
+	byHooks(s, bin, hooksLLMDLP)
 	perms := sub("permissions")
 	deny, _ := perms["deny"].([]any)
 	for _, r := range denyLLMDLP {
-		tem := false
+		has := false
 		for _, d := range deny {
-			tem = tem || d == r
+			has = has || d == r
 		}
-		if !tem {
+		if !has {
 			deny = append(deny, r)
 		}
 	}
 	perms["deny"] = deny
-	return gravarSettings(alvo, s, orig)
+	return writeSettings(target, s, orig)
 }
 
-// tirarHooks tira do settings.json os hooks do llm-dlp (com o nome novo ou o antigo).
-func tirarHooks(s map[string]any) {
+// stripHooks tira do settings.json os hooks do llm-dlp (com o nome novo ou o antigo).
+func stripHooks(s map[string]any) {
 	hooks, ok := s["hooks"].(map[string]any)
 	if !ok {
 		return
 	}
 	for ev, v := range hooks {
-		lista, _ := v.([]any)
-		var fica []any
-		for _, g := range lista {
-			if b, _ := json.Marshal(g); !ehHookLLMDLP(b) {
-				fica = append(fica, g)
+		list, _ := v.([]any)
+		var stays []any
+		for _, g := range list {
+			if b, _ := json.Marshal(g); !isLLMDLPHook(b) {
+				stays = append(stays, g)
 			}
 		}
-		if len(fica) == 0 {
+		if len(stays) == 0 {
 			delete(hooks, ev)
 		} else {
-			hooks[ev] = fica
+			hooks[ev] = stays
 		}
 	}
 }
 
-// porHooks acrescenta os hooks do llm-dlp, com os nomes de comando dados.
-func porHooks(s map[string]any, bin string, nomes map[string]string) {
+// byHooks acrescenta os hooks do llm-dlp, com os nomes de comando dados.
+func byHooks(s map[string]any, bin string, names map[string]string) {
 	hooks, ok := s["hooks"].(map[string]any)
 	if !ok {
 		hooks = map[string]any{}
 		s["hooks"] = hooks
 	}
-	for _, evento := range []string{"SessionStart", "UserPromptSubmit"} {
-		lista, _ := hooks[evento].([]any)
+	for _, event := range []string{"SessionStart", "UserPromptSubmit"} {
+		list, _ := hooks[event].([]any)
 		// timeout explícito: hook que estoura o tempo é ignorado pelo Claude Code (falharia aberto)
-		hooks[evento] = append(lista, map[string]any{"hooks": []any{
-			map[string]any{"type": "command", "command": bin + " " + nomes[evento], "timeout": timeoutHook}}})
+		hooks[event] = append(list, map[string]any{"hooks": []any{
+			map[string]any{"type": "command", "command": bin + " " + names[event], "timeout": timeoutHook}}})
 	}
 }
 
-// hooksParaVersao: depois de trocar o binário pela versão v, os hooks do Claude Code passam a
+// hooksForVersion: depois de trocar o binário pela versão v, os hooks do Claude Code passam a
 // chamar os nomes de comando que ela conhece: os em inglês desde a 0.9.0, os antigos antes
 // (voltar para uma versão anterior com os nomes novos barraria cada mensagem com "comando
 // desconhecido"). Só mexe no settings.json se ele já chama o llm-dlp e os nomes mudam.
 // Devolve se mudou.
-func hooksParaVersao(home, bin, v string) (bool, error) {
-	alvo := filepath.Join(home, ".claude", "settings.json")
-	s, orig, err := lerSettings(alvo)
+func hooksForVersion(home, bin, v string) (bool, error) {
+	target := filepath.Join(home, ".claude", "settings.json")
+	s, orig, err := readSettings(target)
 	if err != nil {
 		return false, err
 	}
-	nomes := hooksLLMDLP
-	if versaoMenor(v, primeiraEmIngles) {
-		nomes = hooksAntigos
+	names := hooksLLMDLP
+	if minorVersion(v, firstInEnglish) {
+		names = oldHooks
 	}
 	b, _ := json.Marshal(s["hooks"])
-	if !ehHookLLMDLP(b) || strings.Contains(string(b), bin+" "+nomes["UserPromptSubmit"]+`"`) {
+	if !isLLMDLPHook(b) || strings.Contains(string(b), bin+" "+names["UserPromptSubmit"]+`"`) {
 		return false, nil
 	}
-	tirarHooks(s)
-	porHooks(s, bin, nomes)
-	_, err = gravarSettings(alvo, s, orig)
+	stripHooks(s)
+	byHooks(s, bin, names)
+	_, err = writeSettings(target, s, orig)
 	return err == nil, err
 }
 
-func lerSettings(alvo string) (map[string]any, []byte, error) {
+func readSettings(target string) (map[string]any, []byte, error) {
 	s := map[string]any{}
-	orig, err := os.ReadFile(alvo)
+	orig, err := os.ReadFile(target)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return nil, nil, err
 	}
 	if len(strings.TrimSpace(string(orig))) > 0 {
 		if err := json.Unmarshal(orig, &s); err != nil {
-			return nil, nil, fmt.Errorf("%s não é JSON válido: %w", alvo, err)
+			return nil, nil, fmt.Errorf("%s não é JSON válido: %w", target, err)
 		}
 	}
 	return s, orig, nil
 }
 
-func gravarSettings(alvo string, s map[string]any, orig []byte) (string, error) {
-	return gravarSettingsModo(alvo, s, orig, 0o600)
+func writeSettings(target string, s map[string]any, orig []byte) (string, error) {
+	return writeSettingsMode(target, s, orig, 0o600)
 }
 
-func gravarSettingsModo(alvo string, s map[string]any, orig []byte, modo os.FileMode) (string, error) {
+func writeSettingsMode(target string, s map[string]any, orig []byte, mode os.FileMode) (string, error) {
 	bak := ""
 	if len(orig) > 0 {
 		// nome único: nunca sobrescreve um backup anterior (duas execuções no mesmo segundo)
-		base := alvo + ".bak-" + time.Now().Format("20060102-150405")
+		base := target + ".bak-" + time.Now().Format("20060102-150405")
 		bak = base
 		for i := 2; ; i++ {
-			f, err := os.OpenFile(bak, os.O_WRONLY|os.O_CREATE|os.O_EXCL, modo)
+			f, err := os.OpenFile(bak, os.O_WRONLY|os.O_CREATE|os.O_EXCL, mode)
 			if errors.Is(err, os.ErrExist) {
 				bak = fmt.Sprintf("%s-%d", base, i)
 				continue
@@ -592,20 +592,20 @@ func gravarSettingsModo(alvo string, s map[string]any, orig []byte, modo os.File
 			break
 		}
 	}
-	if err := os.MkdirAll(filepath.Dir(alvo), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 		return "", err
 	}
-	novo, _ := json.MarshalIndent(s, "", "  ")
-	return bak, os.WriteFile(alvo, append(novo, '\n'), modo)
+	newOne, _ := json.MarshalIndent(s, "", "  ")
+	return bak, os.WriteFile(target, append(newOne, '\n'), mode)
 }
 
-func salvarConfig(cfg config.Config) error {
+func saveConfig(cfg config.Config) error {
 	b, _ := json.MarshalIndent(cfg, "", "  ")
-	return os.WriteFile(config.Caminho("config.json"), append(b, '\n'), 0o600)
+	return os.WriteFile(config.Path("config.json"), append(b, '\n'), 0o600)
 }
 
-func copiarArquivo(de, para string, modo os.FileMode) error {
-	if err := os.MkdirAll(filepath.Dir(para), 0o755); err != nil {
+func copyFile(de, to string, mode os.FileMode) error {
+	if err := os.MkdirAll(filepath.Dir(to), 0o755); err != nil {
 		return err
 	}
 	f, err := os.Open(de)
@@ -613,8 +613,8 @@ func copiarArquivo(de, para string, modo os.FileMode) error {
 		return err
 	}
 	defer f.Close()
-	tmp := para + ".novo"
-	g, err := os.OpenFile(tmp, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, modo)
+	tmp := to + ".novo"
+	g, err := os.OpenFile(tmp, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode)
 	if err != nil {
 		return err
 	}
@@ -625,24 +625,24 @@ func copiarArquivo(de, para string, modo os.FileMode) error {
 	if err := g.Close(); err != nil {
 		return err
 	}
-	return os.Rename(tmp, para) // troca atômica (funciona mesmo com o binário antigo rodando)
+	return os.Rename(tmp, to) // troca atômica (funciona mesmo com o binário antigo rodando)
 }
 
-func faltaOCR(cfg config.Config) string {
-	var falta []string
+func missingOCR(cfg config.Config) string {
+	var missingOne []string
 	if _, err := exec.LookPath(cfg.OCR.Tesseract); err != nil {
-		falta = append(falta, "tesseract")
+		missingOne = append(missingOne, "tesseract")
 	} else if out, err := exec.Command(cfg.OCR.Tesseract, "--list-langs").CombinedOutput(); err != nil || !strings.Contains(string(out), "\npor") {
-		falta = append(falta, "o idioma português do tesseract")
+		missingOne = append(missingOne, "o idioma português do tesseract")
 	}
 	if _, err := exec.LookPath(cfg.OCR.PDFToText); err != nil {
-		falta = append(falta, "poppler (pdftotext)")
+		missingOne = append(missingOne, "poppler (pdftotext)")
 	}
-	return strings.Join(falta, ", ")
+	return strings.Join(missingOne, ", ")
 }
 
-func travaInstalada(endereco string) bool {
-	b, err := os.ReadFile(arquivoTrava)
+func lockInstalled(address string) bool {
+	b, err := os.ReadFile(lockFile)
 	if err != nil {
 		return false
 	}
@@ -651,30 +651,30 @@ func travaInstalada(endereco string) bool {
 		Env     map[string]string `json:"env"`
 	}
 	return json.Unmarshal(b, &s) == nil && len(s.Allowed) == 1 && s.Allowed[0] == "customEndpoint" &&
-		s.Env["ANTHROPIC_BASE_URL"] == "http://"+endereco
+		s.Env["ANTHROPIC_BASE_URL"] == "http://"+address
 }
 
-var reVersao = regexp.MustCompile(`\d+\.\d+\.\d+`)
+var reVersion = regexp.MustCompile(`\d+\.\d+\.\d+`)
 
-// versaoClaudeCode: a do CLI no PATH ou a maior entre as extensões do VS Code.
-func versaoClaudeCode() string {
+// claudeCodeVersion: a do CLI no PATH ou a maior entre as extensões do VS Code.
+func claudeCodeVersion() string {
 	if out, err := exec.Command("claude", "--version").Output(); err == nil {
-		return reVersao.FindString(string(out))
+		return reVersion.FindString(string(out))
 	}
 	home, _ := os.UserHomeDir()
-	melhor := ""
+	best := ""
 	for _, d := range []string{".vscode-server", ".vscode", ".cursor-server"} {
 		ms, _ := filepath.Glob(filepath.Join(home, d, "extensions", "anthropic.claude-code-*"))
 		for _, m := range ms {
-			if v := reVersao.FindString(filepath.Base(m)); v != "" && (melhor == "" || versaoMenor(melhor, v)) {
-				melhor = v
+			if v := reVersion.FindString(filepath.Base(m)); v != "" && (best == "" || minorVersion(best, v)) {
+				best = v
 			}
 		}
 	}
-	return melhor
+	return best
 }
 
-func versaoMenor(a, b string) bool {
+func minorVersion(a, b string) bool {
 	var x, y [3]int
 	fmt.Sscanf(a, "%d.%d.%d", &x[0], &x[1], &x[2])
 	fmt.Sscanf(b, "%d.%d.%d", &y[0], &y[1], &y[2])

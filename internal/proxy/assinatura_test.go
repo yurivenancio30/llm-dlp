@@ -19,42 +19,42 @@ import (
 // (formato Responses). Nada real chega à API, o envelope e os ids não mudam, e a resposta volta
 // real, em pedaços e inteira.
 
-type pedidoAss struct {
-	caminho, auth string
-	corpo         []byte
+type assistRequest struct {
+	path, auth string
+	body       []byte
 }
 
-// montarAssinaturas: proxy com os provedores "codeassist" e "chatgpt" apontando para uma API falsa.
-func montarAssinaturas(t *testing.T, resp func(p pedidoAss, w http.ResponseWriter)) (*httptest.Server, *[]pedidoAss, *Proxy) {
+// buildSignatures: proxy com os provedores "codeassist" e "chatgpt" apontando para uma API falsa.
+func buildSignatures(t *testing.T, resp func(p assistRequest, w http.ResponseWriter)) (*httptest.Server, *[]assistRequest, *Proxy) {
 	t.Helper()
-	cfg := config.Padrao()
-	cfg.DominiosInternos = []string{"empresa-ficticia"}
-	m, err := mask.NovoMasker(cfg, chaveTeste, nil, nil)
+	cfg := config.Default()
+	cfg.InternalDomains = []string{"empresa-ficticia"}
+	m, err := mask.NewMasker(cfg, testKey, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	pedidos := &[]pedidoAss{}
+	requests := &[]assistRequest{}
 	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		b, _ := io.ReadAll(r.Body)
-		p := pedidoAss{r.URL.RequestURI(), r.Header.Get("authorization"), b}
-		*pedidos = append(*pedidos, p)
+		p := assistRequest{r.URL.RequestURI(), r.Header.Get("authorization"), b}
+		*requests = append(*requests, p)
 		resp(p, w)
 	}))
 	anthropic := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Errorf("a requisição foi para o upstream da Anthropic: %s", r.URL.Path)
 	}))
 	cfg.Upstream = anthropic.URL
-	cfg.Provedores = map[string]config.Provedor{"codeassist": {Upstream: up.URL, Formato: "codeassist"},
-		"chatgpt": {Upstream: up.URL + "/backend-api/codex", Formato: "responses"}}
-	p := Novo(cfg, m, nil, log.New(io.Discard, "", 0))
+	cfg.Providers = map[string]config.Provider{"codeassist": {Upstream: up.URL, Format: "codeassist"},
+		"chatgpt": {Upstream: up.URL + "/backend-api/codex", Format: "responses"}}
+	p := New(cfg, m, nil, log.New(io.Discard, "", 0))
 	px := httptest.NewServer(p)
 	t.Cleanup(func() { up.Close(); anthropic.Close(); px.Close() })
-	return px, pedidos, p
+	return px, requests, p
 }
 
-func sseEventos(w http.ResponseWriter, eventos ...map[string]any) {
+func sseEvents(w http.ResponseWriter, events ...map[string]any) {
 	w.Header().Set("content-type", "text/event-stream")
-	for _, ev := range eventos {
+	for _, ev := range events {
 		b, _ := json.Marshal(ev)
 		if t, ok := ev["type"].(string); ok {
 			fmt.Fprintf(w, "event: %s\n", t)
@@ -68,20 +68,20 @@ func sseEventos(w http.ResponseWriter, eventos ...map[string]any) {
 func codeAssistReq() []byte {
 	b, _ := json.Marshal(map[string]any{"model": "gemini-2.5-pro", "project": "projeto-123", "user_prompt_id": "upi-1",
 		"request": map[string]any{
-			"systemInstruction": map[string]any{"parts": []any{map[string]any{"text": "o dono é " + emailOA}}},
-			"contents": []any{conteudoG("user", parte("text", "faça ping em "+ipOA)),
-				conteudoG("model", parte("functionCall", map[string]any{"name": "run_shell_command", "args": map[string]any{"command": "ping " + ipOA}})),
-				conteudoG("user", parte("functionResponse", map[string]any{"name": "run_shell_command", "response": map[string]any{"output": "ok " + emailOA}}))},
+			"systemInstruction": map[string]any{"parts": []any{map[string]any{"text": "o dono é " + oaEmail}}},
+			"contents": []any{contentG("user", part("text", "faça ping em "+oaIP)),
+				contentG("model", part("functionCall", map[string]any{"name": "run_shell_command", "args": map[string]any{"command": "ping " + oaIP}})),
+				contentG("user", part("functionResponse", map[string]any{"name": "run_shell_command", "response": map[string]any{"output": "ok " + oaEmail}}))},
 			"session_id": "8f14e45f-ceea-467a-9ad7-0b5d1a2c3e4f"}})
 	return b
 }
 
-func TestCodeAssistIdaEVolta(t *testing.T) {
-	px, pedidos, p := montarAssinaturas(t, func(pd pedidoAss, w http.ResponseWriter) {
-		pse := rePseEmail.FindString(string(pd.corpo))
-		if strings.Contains(pd.caminho, "streamGenerateContent") {
+func TestCodeAssistRoundTrip(t *testing.T) {
+	px, requests, p := buildSignatures(t, func(pd assistRequest, w http.ResponseWriter) {
+		pse := rePseEmail.FindString(string(pd.body))
+		if strings.Contains(pd.path, "streamGenerateContent") {
 			// o pseudônimo chega cortado entre dois pedaços, como o Code Assist manda
-			sseEventos(w, map[string]any{"response": map[string]any{"candidates": []any{map[string]any{"content": map[string]any{"role": "model",
+			sseEvents(w, map[string]any{"response": map[string]any{"candidates": []any{map[string]any{"content": map[string]any{"role": "model",
 				"parts": []any{map[string]any{"text": "avise " + pse[:6]}}}}}}, "traceId": "tr-1"},
 				map[string]any{"response": map[string]any{"candidates": []any{map[string]any{"finishReason": "STOP", "content": map[string]any{"role": "model",
 					"parts": []any{map[string]any{"text": pse[6:] + " hoje"}}}}}}, "traceId": "tr-1"})
@@ -93,16 +93,16 @@ func TestCodeAssistIdaEVolta(t *testing.T) {
 				map[string]any{"functionCall": map[string]any{"name": "write_file", "args": map[string]any{"content": pse}}}}}}}}})
 	})
 	_ = p
-	st, b := pedir(t, "POST", px.URL+"/codeassist/v1internal:streamGenerateContent?alt=sse", codeAssistReq(), func(r *http.Request) { r.Header.Set("authorization", "Bearer token-google") })
+	st, b := ask(t, "POST", px.URL+"/codeassist/v1internal:streamGenerateContent?alt=sse", codeAssistReq(), func(r *http.Request) { r.Header.Set("authorization", "Bearer token-google") })
 	if st != 200 {
 		t.Fatalf("status %d", st)
 	}
-	pd := (*pedidos)[0]
-	if pd.caminho != "/v1internal:streamGenerateContent?alt=sse" || pd.auth != "Bearer token-google" {
-		t.Errorf("chegou em %q com %q", pd.caminho, pd.auth)
+	pd := (*requests)[0]
+	if pd.path != "/v1internal:streamGenerateContent?alt=sse" || pd.auth != "Bearer token-google" {
+		t.Errorf("chegou em %q com %q", pd.path, pd.auth)
 	}
-	if bytes.Contains(pd.corpo, []byte(emailOA)) || bytes.Contains(pd.corpo, []byte(ipOA)) {
-		t.Errorf("valor real chegou à API: %s", pd.corpo)
+	if bytes.Contains(pd.body, []byte(oaEmail)) || bytes.Contains(pd.body, []byte(oaIP)) {
+		t.Errorf("valor real chegou à API: %s", pd.body)
 	}
 	var env struct {
 		Model, Project string
@@ -111,11 +111,11 @@ func TestCodeAssistIdaEVolta(t *testing.T) {
 			SessionID string `json:"session_id"`
 		}
 	}
-	json.Unmarshal(pd.corpo, &env)
+	json.Unmarshal(pd.body, &env)
 	if env.Model != "gemini-2.5-pro" || env.Project != "projeto-123" || env.UserPromptID != "upi-1" || env.Request.SessionID != "8f14e45f-ceea-467a-9ad7-0b5d1a2c3e4f" {
 		t.Errorf("o envelope mudou: %+v", env)
 	}
-	var texto strings.Builder
+	var text strings.Builder
 	for _, l := range strings.Split(string(b), "\n") {
 		if d, ok := strings.CutPrefix(l, "data: "); ok {
 			var ev struct {
@@ -129,80 +129,80 @@ func TestCodeAssistIdaEVolta(t *testing.T) {
 			json.Unmarshal([]byte(d), &ev)
 			for _, c := range ev.Response.Candidates {
 				for _, pt := range c.Content.Parts {
-					texto.WriteString(pt.Text)
+					text.WriteString(pt.Text)
 				}
 			}
 		}
 	}
-	if texto.String() != "avise "+emailOA+" hoje" || rePseEmail.Match(b) {
-		t.Errorf("streaming: %q", texto.String())
+	if text.String() != "avise "+oaEmail+" hoje" || rePseEmail.Match(b) {
+		t.Errorf("streaming: %q", text.String())
 	}
 
-	_, b = pedir(t, "POST", px.URL+"/codeassist/v1internal:generateContent", codeAssistReq(), nil)
-	if !bytes.Contains(b, []byte(`"avise `+emailOA+`"`)) || !bytes.Contains(b, []byte(`"content":"`+emailOA+`"`)) || !bytes.Contains(b, []byte(`"traceId":"tr-2"`)) {
+	_, b = ask(t, "POST", px.URL+"/codeassist/v1internal:generateContent", codeAssistReq(), nil)
+	if !bytes.Contains(b, []byte(`"avise `+oaEmail+`"`)) || !bytes.Contains(b, []byte(`"content":"`+oaEmail+`"`)) || !bytes.Contains(b, []byte(`"traceId":"tr-2"`)) {
 		t.Errorf("sem streaming: %s", b)
 	}
 }
 
 // Os métodos da conta (login, cota, experimentos) passam como vieram: não levam conversa, e o
 // projeto e os ids não podem mudar.
-func TestCodeAssistMetodosDaContaPassamComoVieram(t *testing.T) {
-	px, pedidos, _ := montarAssinaturas(t, func(pd pedidoAss, w http.ResponseWriter) {
+func TestCodeAssistAccountMethodsPassAsIs(t *testing.T) {
+	px, requests, _ := buildSignatures(t, func(pd assistRequest, w http.ResponseWriter) {
 		w.Header().Set("content-type", "application/json")
 		w.Write([]byte(`{"currentTier":{"id":"free-tier"}}`))
 	})
-	corpo := []byte(`{"cloudaicompanionProject":"projeto-empresa-ficticia-intra","metadata":{"ideType":"IDE_UNSPECIFIED","platform":"LINUX_AMD64","pluginType":"GEMINI"}}`)
-	for _, metodo := range []string{"loadCodeAssist", "onboardUser", "retrieveUserQuota"} {
-		if st, _ := pedir(t, "POST", px.URL+"/codeassist/v1internal:"+metodo, corpo, nil); st != 200 {
-			t.Fatalf("%s: status %d", metodo, st)
+	body := []byte(`{"cloudaicompanionProject":"projeto-empresa-ficticia-intra","metadata":{"ideType":"IDE_UNSPECIFIED","platform":"LINUX_AMD64","pluginType":"GEMINI"}}`)
+	for _, method := range []string{"loadCodeAssist", "onboardUser", "retrieveUserQuota"} {
+		if st, _ := ask(t, "POST", px.URL+"/codeassist/v1internal:"+method, body, nil); st != 200 {
+			t.Fatalf("%s: status %d", method, st)
 		}
-		if got := (*pedidos)[len(*pedidos)-1].corpo; !bytes.Equal(got, corpo) {
-			t.Errorf("%s: o corpo mudou:\n %s\n %s", metodo, corpo, got)
+		if got := (*requests)[len(*requests)-1].body; !bytes.Equal(got, body) {
+			t.Errorf("%s: o corpo mudou:\n %s\n %s", method, body, got)
 		}
 	}
 }
 
 // ---- Codex (Responses) ------------------------------------------------------------------------
 
-const gramaticaPatch = "start: begin_patch hunk+ end_patch\nbegin_patch: \"*** Begin Patch\" LF"
+const patchGrammar = "start: begin_patch hunk+ end_patch\nbegin_patch: \"*** Begin Patch\" LF"
 
 func responsesReq(stream bool) []byte {
 	b, _ := json.Marshal(map[string]any{"model": "gpt-5-codex", "stream": stream, "store": false,
-		"prompt_cache_key": "0f3c2b1a-9e8d-4c7b-a6f5-e4d3c2b1a090", "instructions": "Você é o Codex. Dono: " + emailOA,
+		"prompt_cache_key": "0f3c2b1a-9e8d-4c7b-a6f5-e4d3c2b1a090", "instructions": "Você é o Codex. Dono: " + oaEmail,
 		"tools": []any{
 			map[string]any{"type": "function", "name": "shell", "description": "roda comandos", "strict": false,
 				"parameters": map[string]any{"type": "object", "properties": map[string]any{"command": map[string]any{"type": "array"}}}},
 			map[string]any{"type": "custom", "name": "apply_patch", "description": "edita arquivos",
-				"format": map[string]any{"type": "grammar", "syntax": "lark", "definition": gramaticaPatch}}},
+				"format": map[string]any{"type": "grammar", "syntax": "lark", "definition": patchGrammar}}},
 		"input": []any{
-			map[string]any{"type": "message", "role": "developer", "content": []any{map[string]any{"type": "input_text", "text": "cwd do cliente " + emailOA}}},
-			map[string]any{"type": "message", "role": "user", "content": []any{map[string]any{"type": "input_text", "text": "corrija o host " + ipOA}}},
+			map[string]any{"type": "message", "role": "developer", "content": []any{map[string]any{"type": "input_text", "text": "cwd do cliente " + oaEmail}}},
+			map[string]any{"type": "message", "role": "user", "content": []any{map[string]any{"type": "input_text", "text": "corrija o host " + oaIP}}},
 			map[string]any{"type": "reasoning", "summary": []any{}, "encrypted_content": "gAAAAB-opaco"},
-			map[string]any{"type": "function_call", "name": "shell", "arguments": `{"command":["bash","-lc","ping ` + ipOA + `"]}`, "call_id": "c1"},
-			map[string]any{"type": "function_call_output", "call_id": "c1", "output": "PING " + ipOA + " ok, avisar " + emailOA},
+			map[string]any{"type": "function_call", "name": "shell", "arguments": `{"command":["bash","-lc","ping ` + oaIP + `"]}`, "call_id": "c1"},
+			map[string]any{"type": "function_call_output", "call_id": "c1", "output": "PING " + oaIP + " ok, avisar " + oaEmail},
 			map[string]any{"type": "function_call", "name": "shell", "arguments": `{ "command" : ["date"] }`, "call_id": "c2"},
 			map[string]any{"type": "function_call_output", "call_id": "c2", "output": "hoje"},
-			map[string]any{"type": "custom_tool_call", "name": "apply_patch", "input": "*** Begin Patch\n+host = " + ipOA + "\n*** End Patch", "call_id": "c3"},
+			map[string]any{"type": "custom_tool_call", "name": "apply_patch", "input": "*** Begin Patch\n+host = " + oaIP + "\n*** End Patch", "call_id": "c3"},
 			map[string]any{"type": "custom_tool_call_output", "call_id": "c3", "output": "Success"},
 		}})
 	return b
 }
 
-func TestResponsesIdaMascarada(t *testing.T) {
-	px, pedidos, _ := montarAssinaturas(t, func(pd pedidoAss, w http.ResponseWriter) {
+func TestResponsesMaskedOutbound(t *testing.T) {
+	px, requests, _ := buildSignatures(t, func(pd assistRequest, w http.ResponseWriter) {
 		w.Header().Set("content-type", "application/json")
 		w.Write([]byte(`{"output":[]}`))
 	})
-	st, _ := pedir(t, "POST", px.URL+"/chatgpt/responses", responsesReq(false), func(r *http.Request) { r.Header.Set("authorization", "Bearer token-chatgpt") })
+	st, _ := ask(t, "POST", px.URL+"/chatgpt/responses", responsesReq(false), func(r *http.Request) { r.Header.Set("authorization", "Bearer token-chatgpt") })
 	if st != 200 {
 		t.Fatalf("status %d", st)
 	}
-	pd := (*pedidos)[0]
-	if pd.caminho != "/backend-api/codex/responses" || pd.auth != "Bearer token-chatgpt" {
-		t.Errorf("chegou em %q com %q", pd.caminho, pd.auth)
+	pd := (*requests)[0]
+	if pd.path != "/backend-api/codex/responses" || pd.auth != "Bearer token-chatgpt" {
+		t.Errorf("chegou em %q com %q", pd.path, pd.auth)
 	}
-	if bytes.Contains(pd.corpo, []byte(emailOA)) || bytes.Contains(pd.corpo, []byte(ipOA)) {
-		t.Fatalf("valor real chegou à API: %s", pd.corpo)
+	if bytes.Contains(pd.body, []byte(oaEmail)) || bytes.Contains(pd.body, []byte(oaIP)) {
+		t.Fatalf("valor real chegou à API: %s", pd.body)
 	}
 	var req struct {
 		Model, Instructions string
@@ -210,16 +210,16 @@ func TestResponsesIdaMascarada(t *testing.T) {
 		Tools               []map[string]any
 		Input               []map[string]any
 	}
-	if err := json.Unmarshal(pd.corpo, &req); err != nil {
+	if err := json.Unmarshal(pd.body, &req); err != nil {
 		t.Fatal(err)
 	}
 	if req.Model != "gpt-5-codex" || req.PromptCacheKey != "0f3c2b1a-9e8d-4c7b-a6f5-e4d3c2b1a090" || len(req.Input) != 9 || len(req.Tools) != 2 {
-		t.Fatalf("a forma mudou: %s", pd.corpo)
+		t.Fatalf("a forma mudou: %s", pd.body)
 	}
 	if !rePseEmail.MatchString(req.Instructions) {
 		t.Errorf("instruções: %q", req.Instructions)
 	}
-	if f, _ := req.Tools[1]["format"].(map[string]any); f["definition"] != gramaticaPatch || req.Tools[1]["name"] != "apply_patch" {
+	if f, _ := req.Tools[1]["format"].(map[string]any); f["definition"] != patchGrammar || req.Tools[1]["name"] != "apply_patch" {
 		t.Errorf("a gramática do apply_patch mudou: %v", req.Tools[1])
 	}
 	if req.Input[2]["encrypted_content"] != "gAAAAB-opaco" {
@@ -232,15 +232,15 @@ func TestResponsesIdaMascarada(t *testing.T) {
 	if req.Input[5]["arguments"] != `{ "command" : ["date"] }` {
 		t.Errorf("argumentos sem dado sensível mudaram: %v", req.Input[5]["arguments"])
 	}
-	if in, _ := req.Input[7]["input"].(string); !strings.HasPrefix(in, "*** Begin Patch\n+host = ") || strings.Contains(in, ipOA) {
+	if in, _ := req.Input[7]["input"].(string); !strings.HasPrefix(in, "*** Begin Patch\n+host = ") || strings.Contains(in, oaIP) {
 		t.Errorf("patch: %q", in)
 	}
 	if out, _ := req.Input[4]["output"].(string); !strings.HasPrefix(out, "PING ") {
 		t.Errorf("resultado: %v", req.Input[4]["output"])
 	}
 	// a mesma requisição de novo sai idêntica (o cache da API depende disso)
-	pedir(t, "POST", px.URL+"/chatgpt/responses", responsesReq(false), nil)
-	if n := len(*pedidos); !bytes.Equal((*pedidos)[0].corpo, (*pedidos)[n-1].corpo) {
+	ask(t, "POST", px.URL+"/chatgpt/responses", responsesReq(false), nil)
+	if n := len(*requests); !bytes.Equal((*requests)[0].body, (*requests)[n-1].body) {
 		t.Errorf("a mesma requisição saiu diferente na segunda vez")
 	}
 }
@@ -248,21 +248,21 @@ func TestResponsesIdaMascarada(t *testing.T) {
 // Em streaming, o texto, os argumentos e o patch chegam em pedaços, com o pseudônimo cortado; o
 // cliente nunca recebe um pedaço de pseudônimo, e tanto os pedaços juntos quanto os eventos com o
 // item inteiro trazem o valor real. Uma ferramenta de internet segue com o pseudônimo.
-func TestResponsesVoltaStreaming(t *testing.T) {
-	px, _, _ := montarAssinaturas(t, func(pd pedidoAss, w http.ResponseWriter) {
-		pse := rePseEmail.FindString(string(pd.corpo))
-		texto := "avise " + pse + " agora"
+func TestResponsesReturnStreaming(t *testing.T) {
+	px, _, _ := buildSignatures(t, func(pd assistRequest, w http.ResponseWriter) {
+		pse := rePseEmail.FindString(string(pd.body))
+		text := "avise " + pse + " agora"
 		args := `{"command":["bash","-lc","echo ` + pse + `"]}`
 		patch := "*** Begin Patch\n+dono = " + pse + "\n*** End Patch"
 		var evs []map[string]any
 		add := func(ev map[string]any) { evs = append(evs, ev) }
 		add(map[string]any{"type": "response.created", "response": map[string]any{"id": "r1"}})
 		add(map[string]any{"type": "response.output_item.added", "output_index": 0, "item": map[string]any{"type": "message", "id": "m1", "role": "assistant", "content": []any{}}})
-		for i := 0; i < len(texto); i += 5 {
-			add(map[string]any{"type": "response.output_text.delta", "item_id": "m1", "output_index": 0, "content_index": 0, "delta": texto[i:min(i+5, len(texto))]})
+		for i := 0; i < len(text); i += 5 {
+			add(map[string]any{"type": "response.output_text.delta", "item_id": "m1", "output_index": 0, "content_index": 0, "delta": text[i:min(i+5, len(text))]})
 		}
-		add(map[string]any{"type": "response.output_text.done", "item_id": "m1", "output_index": 0, "content_index": 0, "text": texto})
-		itemMsg := map[string]any{"type": "message", "id": "m1", "role": "assistant", "content": []any{map[string]any{"type": "output_text", "text": texto}}}
+		add(map[string]any{"type": "response.output_text.done", "item_id": "m1", "output_index": 0, "content_index": 0, "text": text})
+		itemMsg := map[string]any{"type": "message", "id": "m1", "role": "assistant", "content": []any{map[string]any{"type": "output_text", "text": text}}}
 		add(map[string]any{"type": "response.output_item.done", "output_index": 0, "item": itemMsg})
 		add(map[string]any{"type": "response.output_item.added", "output_index": 1, "item": map[string]any{"type": "function_call", "id": "f1", "name": "shell", "call_id": "c9", "arguments": ""}})
 		for i := 0; i < len(args); i += 7 {
@@ -283,39 +283,39 @@ func TestResponsesVoltaStreaming(t *testing.T) {
 		add(map[string]any{"type": "response.function_call_arguments.delta", "item_id": "w1", "output_index": 3, "delta": web})
 		add(map[string]any{"type": "response.function_call_arguments.done", "item_id": "w1", "output_index": 3, "arguments": web})
 		add(map[string]any{"type": "response.completed", "response": map[string]any{"id": "r1", "output": []any{
-			map[string]any{"type": "message", "content": []any{map[string]any{"type": "output_text", "text": texto}}},
+			map[string]any{"type": "message", "content": []any{map[string]any{"type": "output_text", "text": text}}},
 			map[string]any{"type": "function_call", "name": "shell", "arguments": args},
 			map[string]any{"type": "custom_tool_call", "name": "apply_patch", "input": patch}}}})
-		sseEventos(w, evs...)
+		sseEvents(w, evs...)
 	})
-	st, b := pedir(t, "POST", px.URL+"/chatgpt/responses", responsesReq(true), nil)
+	st, b := ask(t, "POST", px.URL+"/chatgpt/responses", responsesReq(true), nil)
 	if st != 200 {
 		t.Fatalf("status %d", st)
 	}
-	var texto, args, patch, web strings.Builder
+	var text, args, patch, web strings.Builder
 	var dones []string
-	nomes := 0
-	for _, bloco := range strings.Split(strings.TrimSpace(string(b)), "\n\n") {
-		var nome, dados string
-		for _, l := range strings.Split(bloco, "\n") {
+	names := 0
+	for _, block := range strings.Split(strings.TrimSpace(string(b)), "\n\n") {
+		var name, data string
+		for _, l := range strings.Split(block, "\n") {
 			if n, ok := strings.CutPrefix(l, "event: "); ok {
-				nome = n
+				name = n
 			} else if d, ok := strings.CutPrefix(l, "data: "); ok {
-				dados = d
+				data = d
 			}
 		}
 		var ev map[string]any
-		if err := json.Unmarshal([]byte(dados), &ev); err != nil {
-			t.Fatalf("evento inválido: %q", bloco)
+		if err := json.Unmarshal([]byte(data), &ev); err != nil {
+			t.Fatalf("evento inválido: %q", block)
 		}
-		if nome != ev["type"] {
-			t.Errorf("o nome do evento (%q) não bate com o tipo (%v)", nome, ev["type"])
+		if name != ev["type"] {
+			t.Errorf("o nome do evento (%q) não bate com o tipo (%v)", name, ev["type"])
 		}
-		nomes++
+		names++
 		d, _ := ev["delta"].(string)
 		switch ev["type"] {
 		case "response.output_text.delta":
-			texto.WriteString(d)
+			text.WriteString(d)
 		case "response.function_call_arguments.delta":
 			if ev["item_id"] == "w1" {
 				web.WriteString(d)
@@ -325,42 +325,42 @@ func TestResponsesVoltaStreaming(t *testing.T) {
 		case "response.custom_tool_call_input.delta":
 			patch.WriteString(d)
 		default:
-			if ev["item_id"] != "w1" && !strings.Contains(dados, "webfetch") {
-				dones = append(dones, dados)
+			if ev["item_id"] != "w1" && !strings.Contains(data, "webfetch") {
+				dones = append(dones, data)
 			}
 		}
-		if ev["item_id"] != "w1" && !strings.Contains(dados, "webfetch") && rePseEmail.MatchString(dados) {
-			t.Errorf("pseudônimo entregue ao cliente: %s", dados)
+		if ev["item_id"] != "w1" && !strings.Contains(data, "webfetch") && rePseEmail.MatchString(data) {
+			t.Errorf("pseudônimo entregue ao cliente: %s", data)
 		}
 	}
-	if texto.String() != "avise "+emailOA+" agora" {
-		t.Errorf("texto: %q", texto.String())
+	if text.String() != "avise "+oaEmail+" agora" {
+		t.Errorf("texto: %q", text.String())
 	}
 	var a struct{ Command []string }
-	if err := json.Unmarshal([]byte(args.String()), &a); err != nil || a.Command[2] != "echo "+emailOA {
+	if err := json.Unmarshal([]byte(args.String()), &a); err != nil || a.Command[2] != "echo "+oaEmail {
 		t.Errorf("argumentos: %q (%v)", args.String(), err)
 	}
-	if patch.String() != "*** Begin Patch\n+dono = "+emailOA+"\n*** End Patch" {
+	if patch.String() != "*** Begin Patch\n+dono = "+oaEmail+"\n*** End Patch" {
 		t.Errorf("patch: %q", patch.String())
 	}
 	if !rePseEmail.MatchString(web.String()) {
 		t.Errorf("a busca na internet devia seguir com o pseudônimo: %q", web.String())
 	}
-	reais := 0
+	reals := 0
 	for _, d := range dones {
-		reais += strings.Count(d, emailOA)
+		reals += strings.Count(d, oaEmail)
 	}
 	// text.done, item da mensagem, arguments.done, item da chamada, input.done, item do patch e os 3
 	// itens do response.completed
-	if reais != 9 {
-		t.Errorf("os eventos com o item inteiro deviam trazer o valor real 9 vezes, vieram %d", reais)
+	if reals != 9 {
+		t.Errorf("os eventos com o item inteiro deviam trazer o valor real 9 vezes, vieram %d", reals)
 	}
 }
 
 // Sem streaming, o texto e as entradas das ferramentas voltam reais.
-func TestResponsesVoltaSemStreaming(t *testing.T) {
-	px, _, _ := montarAssinaturas(t, func(pd pedidoAss, w http.ResponseWriter) {
-		pse := rePseEmail.FindString(string(pd.corpo))
+func TestResponsesReturnWithoutStreaming(t *testing.T) {
+	px, _, _ := buildSignatures(t, func(pd assistRequest, w http.ResponseWriter) {
+		pse := rePseEmail.FindString(string(pd.body))
 		w.Header().Set("content-type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{"id": "r1", "output": []any{
 			map[string]any{"type": "reasoning", "summary": []any{map[string]any{"type": "summary_text", "text": "pensando em " + pse}}},
@@ -368,8 +368,8 @@ func TestResponsesVoltaSemStreaming(t *testing.T) {
 			map[string]any{"type": "function_call", "name": "shell", "arguments": `{"command":["echo","` + pse + `"]}`},
 			map[string]any{"type": "custom_tool_call", "name": "apply_patch", "input": "+dono = " + pse}}})
 	})
-	_, b := pedir(t, "POST", px.URL+"/chatgpt/responses", responsesReq(false), nil)
-	if strings.Count(string(b), emailOA) != 3 {
+	_, b := ask(t, "POST", px.URL+"/chatgpt/responses", responsesReq(false), nil)
+	if strings.Count(string(b), oaEmail) != 3 {
 		t.Errorf("devia voltar o valor real 3 vezes (texto, argumentos, patch): %s", b)
 	}
 	if !bytes.Contains(b, []byte("pensando em p.")) {
@@ -380,10 +380,10 @@ func TestResponsesVoltaSemStreaming(t *testing.T) {
 // O formato vem do provedor, e o caminho decide quando o provedor atende mais de um: /responses é
 // sempre Responses (a chave da OpenAI e a assinatura do ChatGPT), /chat/completions é sempre Chat
 // Completions, e os métodos da conta do Code Assist passam como vieram.
-func TestDestinoPorCaminho(t *testing.T) {
-	cfg := config.Padrao()
+func TestDestinationByPath(t *testing.T) {
+	cfg := config.Default()
 	p := &Proxy{cfg: cfg}
-	for caminho, quer := range map[string]string{
+	for path, wants := range map[string]string{
 		"/v1/messages": "anthropic",
 		"/gemini/v1beta/models/m:streamGenerateContent":  "gemini",
 		"/gemini/v1beta/openai/chat/completions":         "openai",
@@ -393,12 +393,12 @@ func TestDestinoPorCaminho(t *testing.T) {
 		"/xai/v1/chat/completions":                       "openai",
 		"/codeassist/v1internal:streamGenerateContent":   "codeassist",
 		"/codeassist/v1internal:countTokens":             "codeassist",
-		"/codeassist/v1internal:loadCodeAssist":          formatoConta,
+		"/codeassist/v1internal:loadCodeAssist":          accountFormat,
 		"/codeassist/v1internal:recordCodeAssistMetrics": "codeassist",
 	} {
-		r := httptest.NewRequest("POST", "http://127.0.0.1:8787"+caminho, nil)
-		if veio, _, _ := p.destino(r); veio != quer {
-			t.Errorf("%s: formato %q, esperado %q", caminho, veio, quer)
+		r := httptest.NewRequest("POST", "http://127.0.0.1:8787"+path, nil)
+		if came, _, _ := p.destination(r); came != wants {
+			t.Errorf("%s: formato %q, esperado %q", path, came, wants)
 		}
 	}
 }

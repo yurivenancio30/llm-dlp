@@ -3,12 +3,12 @@ package mask
 import "testing"
 
 // Os leitores nunca podem quebrar com entrada estranha (o proxy recusaria a mensagem).
-func FuzzLeitores(f *testing.F) {
+func FuzzReaders(f *testing.F) {
 	for _, s := range []string{"SELECT a FROM `x..y`", "SELECT [", "Server=;Database=", "a|b\n---\n|", "jdbc:oracle:thin:@", "{{ ref('') }}", "urn:li:dataset:(urn:li:dataPlatform:x,,PROD)", "CREATE TABLE \"\" (", "relation \"\" does"} {
 		f.Add(s)
 	}
 	// DevOps
-	for _, s := range []string{manifestoK8s, "apiVersion: v1\nkind: Config\nclusters:\n- name: arn:\n  cluster:\n    server: https://\n",
+	for _, s := range []string{k8sManifest, "apiVersion: v1\nkind: Config\nclusters:\n- name: arn:\n  cluster:\n    server: https://\n",
 		"apiVersion: v1\nkind: Pod\nmetadata: {name: [a, {b: }], namespace: 'x''}\n- - -\n  - image: a.b/\n",
 		`{"apiVersion": "v1", "kind": "X", "metadata": {"name": "a"}, "items": [{"image": "h.x:/"}]]}`,
 		"services:\n  a:\n    image: x.y/z\n    volumes:\n      - :\nvolumes:\n  :\n",
@@ -20,10 +20,10 @@ func FuzzLeitores(f *testing.F) {
 		f.Add(s)
 	}
 	f.Fuzz(func(t *testing.T, s string) {
-		for _, l := range leitoresPadrao() {
-			l.Achar(s, func(o ObjAchado) {
-				if o.Ini < 0 || o.Fim > len(s) || o.Fim < o.Ini {
-					t.Fatalf("%s: trecho fora do texto %d..%d de %d", l.Nome, o.Ini, o.Fim, len(s))
+		for _, l := range defaultReaders() {
+			l.Find(s, func(o ObjFinding) {
+				if o.Start < 0 || o.End > len(s) || o.End < o.Start {
+					t.Fatalf("%s: trecho fora do texto %d..%d de %d", l.Name, o.Start, o.End, len(s))
 				}
 			})
 		}

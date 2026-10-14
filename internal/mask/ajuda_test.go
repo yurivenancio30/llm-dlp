@@ -11,20 +11,20 @@ import (
 
 // Funções de apoio usadas por vários testes.
 
-var chaveTeste = []byte("0123456789abcdef0123456789abcdef")
+var testKey = []byte("0123456789abcdef0123456789abcdef")
 
-func novoTeste(t testing.TB) *Masker {
+func newTest(t testing.TB) *Masker {
 	t.Helper()
-	cfg := config.Padrao()
-	cfg.DominiosInternos = []string{"empresa-ficticia"}
-	cfg.PadroesExtras = []config.PadraoExtra{{Rotulo: "matricula", Regex: `\bMAT\d{6}\b`}}
-	cfg.Termos = []config.Termo{{Rotulo: "projeto", Valores: []string{"Projeto Fenix"}}}
-	ps, _ := CarregarPessoas(t.TempDir() + "/p.json")
-	p := NovoPseudo(chaveTeste)
-	ps.Importar(p, "João Carlos Silva", "joao.silva@empresa-ficticia.com.br", "U1001")
-	ps.Importar(p, "Ana Paula Souza", "", "U2001")
-	vs, _ := CarregarVistos(t.TempDir() + "/v.json")
-	m, err := NovoMasker(cfg, chaveTeste, ps, vs)
+	cfg := config.Default()
+	cfg.InternalDomains = []string{"empresa-ficticia"}
+	cfg.ExtraPatterns = []config.ExtraPattern{{Label: "matricula", Regex: `\bMAT\d{6}\b`}}
+	cfg.Terms = []config.Term{{Label: "projeto", Values: []string{"Projeto Fenix"}}}
+	ps, _ := LoadPeople(t.TempDir() + "/p.json")
+	p := NewPseudo(testKey)
+	ps.Import(p, "João Carlos Silva", "joao.silva@empresa-ficticia.com.br", "U1001")
+	ps.Import(p, "Ana Paula Souza", "", "U2001")
+	vs, _ := LoadSeen(t.TempDir() + "/v.json")
+	m, err := NewMasker(cfg, testKey, ps, vs)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -32,17 +32,17 @@ func novoTeste(t testing.TB) *Masker {
 }
 
 // gera documentos válidos a partir dos dígitos-base, calculando os verificadores
-func gerarCPF(base string) string {
+func genCPF(base string) string {
 	for dv := 0; dv < 100; dv++ {
 		c := fmt.Sprintf("%s%02d", base, dv)
-		if CPFValido(c) {
+		if ValidCPF(c) {
 			return c[:3] + "." + c[3:6] + "." + c[6:9] + "-" + c[9:]
 		}
 	}
 	return ""
 }
 
-func gerarOnze(base string, ok func(string) bool) string {
+func genEleven(base string, ok func(string) bool) string {
 	for dv := 0; dv < 100; dv++ {
 		if c := fmt.Sprintf("%s%02d", base, dv); ok(c) {
 			return c
@@ -57,7 +57,7 @@ func gerarOnze(base string, ok func(string) bool) string {
 }
 
 // gera um número válido completando os dígitos verificadores por tentativa
-func gerarValido(base string, n int, ok func(string) bool) string {
+func genValid(base string, n int, ok func(string) bool) string {
 	for dv := 0; dv < 100; dv++ {
 		for _, c := range []string{fmt.Sprintf("%s%02d", base, dv), fmt.Sprintf("%s%d", base, dv%10)} {
 			if len(c) == n && ok(c) {
@@ -70,38 +70,38 @@ func gerarValido(base string, n int, ok func(string) bool) string {
 
 func sha(s string) [32]byte { return sha256.Sum256([]byte(s)) }
 
-// comoPandas imprime uma tabela como o pandas faz em print(df): índice à esquerda, cada
+// asPandas imprime uma tabela como o pandas faz em print(df): índice à esquerda, cada
 // coluna com a largura do maior valor, tudo alinhado à direita, dois espaços entre colunas.
-func comoPandas(cols []string, linhas [][]string) string {
-	larg := make([]int, len(cols))
+func asPandas(cols []string, lines [][]string) string {
+	wid := make([]int, len(cols))
 	for j, c := range cols {
-		larg[j] = len([]rune(c))
-		for _, l := range linhas {
-			if n := len([]rune(l[j])); n > larg[j] {
-				larg[j] = n
+		wid[j] = len([]rune(c))
+		for _, l := range lines {
+			if n := len([]rune(l[j])); n > wid[j] {
+				wid[j] = n
 			}
 		}
 	}
-	idx := len(fmt.Sprint(len(linhas) - 1))
+	idx := len(fmt.Sprint(len(lines) - 1))
 	var b strings.Builder
-	linha := func(primeiro string, cels []string) {
-		b.WriteString(fmt.Sprintf("%-*s", idx, primeiro))
-		for j, c := range cels {
-			b.WriteString("  " + strings.Repeat(" ", larg[j]-len([]rune(c))) + c)
+	line := func(first string, cells []string) {
+		b.WriteString(fmt.Sprintf("%-*s", idx, first))
+		for j, c := range cells {
+			b.WriteString("  " + strings.Repeat(" ", wid[j]-len([]rune(c))) + c)
 		}
 		b.WriteString("\n")
 	}
-	linha("", cols)
-	for i, l := range linhas {
-		linha(fmt.Sprint(i), l)
+	line("", cols)
+	for i, l := range lines {
+		line(fmt.Sprint(i), l)
 	}
 	return b.String()
 }
 
 // numerar põe o número da linha antes de cada linha, como a ferramenta de leitura do Claude Code.
-func numerar(texto string) string {
+func numberLines(text string) string {
 	var b strings.Builder
-	for i, l := range strings.Split(strings.TrimRight(texto, "\n"), "\n") {
+	for i, l := range strings.Split(strings.TrimRight(text, "\n"), "\n") {
 		fmt.Fprintf(&b, "%d\t%s\n", i+1, l)
 	}
 	return b.String()

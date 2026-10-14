@@ -12,11 +12,11 @@ import (
 // rede, nuvem, IP público e termos embutidos. Dados fictícios.
 
 // lidos: o que o leitor achou em s, como "ent:valor" (+ "!" quando forte), em ordem.
-func lidos(achar func(string, func(ObjAchado)), s string) []string {
+func readOnes(find func(string, func(ObjFinding)), s string) []string {
 	var out []string
-	achar(s, func(o ObjAchado) {
-		v := o.Ent + ":" + s[o.Ini:o.Fim]
-		if o.Forte {
+	find(s, func(o ObjFinding) {
+		v := o.Ent + ":" + s[o.Start:o.End]
+		if o.Strong {
 			v += "!"
 		}
 		out = append(out, v)
@@ -32,30 +32,30 @@ func lidos(achar func(string, func(ObjAchado)), s string) []string {
 	return u
 }
 
-type casoLeitor struct {
-	s    string
-	quer []string // "ent:valor" ou "ent:valor!" (forte)
+type readerCase struct {
+	s     string
+	wants []string // "ent:valor" ou "ent:valor!" (forte)
 }
 
-func conferirLeitor(t *testing.T, nome string, achar func(string, func(ObjAchado)), pub func(string) bool, casos []casoLeitor) {
+func checkReader(t *testing.T, name string, find func(string, func(ObjFinding)), pub func(string) bool, cases []readerCase) {
 	t.Helper()
-	for _, c := range casos {
-		got := lidos(func(s string, add func(ObjAchado)) {
-			achar(s, func(o ObjAchado) {
-				if pub != nil && pub(s[o.Ini:o.Fim]) {
-					return // acharObjetos descarta o vocabulário público
+	for _, c := range cases {
+		got := readOnes(func(s string, add func(ObjFinding)) {
+			find(s, func(o ObjFinding) {
+				if pub != nil && pub(s[o.Start:o.End]) {
+					return // findObjects descarta o vocabulário público
 				}
 				add(o)
 			})
 		}, c.s)
-		if strings.Join(got, " ") != strings.Join(c.quer, " ") {
-			t.Errorf("%s: %q\n   achou %q\n   quer  %q", nome, c.s, got, c.quer)
+		if strings.Join(got, " ") != strings.Join(c.wants, " ") {
+			t.Errorf("%s: %q\n   achou %q\n   quer  %q", name, c.s, got, c.wants)
 		}
 	}
 }
 
-func TestLeitorChaveValor(t *testing.T) {
-	conferirLeitor(t, "chave-valor", acharChaveValor, publicoDev, []casoLeitor{
+func TestReaderKeyValue(t *testing.T) {
+	checkReader(t, "chave-valor", findKeyValue, publicDev, []readerCase{
 		// YAML, JSON, TOML, INI, .env, .properties
 		{"host: db-exemplo-01.interno\nport: 5432\n", []string{"servidor:db-exemplo-01.interno!"}},
 		{"database: vendas_x\nschema: financeiro\n", []string{"database:vendas_x!", "schema:financeiro!"}},
@@ -87,7 +87,7 @@ func TestLeitorChaveValor(t *testing.T) {
 		{"Server: nginx\nUser: alice\n", nil},
 	})
 	// código Go/Python/JS comum: nada
-	conferirLeitor(t, "chave-valor (código)", acharChaveValor, publicoDev, []casoLeitor{
+	checkReader(t, "chave-valor (código)", findKeyValue, publicDev, []readerCase{
 		{"host := cfg.Host\nuser := u.User\n", nil},
 		{"    user = models.ForeignKey(User)\n    host = self.host\n    db = get_db()\n", nil},
 		{"    table = table_name\n    user = request.user\n", nil},
@@ -103,8 +103,8 @@ func TestLeitorChaveValor(t *testing.T) {
 	})
 }
 
-func TestLeitorEnderecos(t *testing.T) {
-	conferirLeitor(t, "endereço", acharEnderecos, publicoDev, []casoLeitor{
+func TestReaderAddresses(t *testing.T) {
+	checkReader(t, "endereço", findAddresses, publicDev, []readerCase{
 		// host interno em URL
 		{"veja http://wiki-interna/pagina e https://grafana.vendas.svc.cluster.local:3000/d/x", []string{"servidor:wiki-interna!"}}, // o DNS do Kubernetes fica com o leitor de Kubernetes
 		{"grpc://svc-pedidos.internal:50051", []string{"servidor:svc-pedidos.internal!"}},
@@ -135,16 +135,16 @@ func TestLeitorEnderecos(t *testing.T) {
 	})
 }
 
-func TestLeitorGitSCP(t *testing.T) {
-	conferirLeitor(t, "git", acharGitSCP, publicoDev, []casoLeitor{
+func TestReaderGitSCP(t *testing.T) {
+	checkReader(t, "git", findGitSCP, publicDev, []readerCase{
 		{"git clone git@github.com:org-exemplo/repo-demo.git", []string{"organizacao:org-exemplo!", "repositorio:repo-demo!"}},
 		{"url = git@gitlab.corp:org-exemplo/repo-demo", []string{"organizacao:org-exemplo!", "repositorio:repo-demo!", "servidor:gitlab.corp!"}},
 		{"e-mail digit@x.com e git@host:22", nil},
 	})
 }
 
-func TestLeitorPacotes(t *testing.T) {
-	conferirLeitor(t, "pacote", acharPacotes, publicoDev, []casoLeitor{
+func TestReaderPackages(t *testing.T) {
+	checkReader(t, "pacote", findPackages, publicDev, []readerCase{
 		{"module git.interno/org-exemplo/svc-pedidos\n\ngo 1.22\n", []string{"pacote:org-exemplo!", "pacote:svc-pedidos!", "servidor:git.interno!"}},
 		{"module go.empresa-ficticia.com.br/vendas/v2\n", []string{"pacote:vendas!"}},
 		{"module github.com/org-exemplo/repo-demo\n", nil},
@@ -157,8 +157,8 @@ func TestLeitorPacotes(t *testing.T) {
 	})
 }
 
-func TestLeitorCaminhos(t *testing.T) {
-	conferirLeitor(t, "caminho", acharCaminhos, publicoDev, []casoLeitor{
+func TestReaderPaths(t *testing.T) {
+	checkReader(t, "caminho", findPaths, publicDev, []readerCase{
 		{"/home/joao_x/projetos/cliente_x9/main.go", []string{"pasta:cliente_x9", "usuario:joao_x!"}},
 		{"/Users/maria.s/Documents/rel_2026/", []string{"pasta:rel_2026", "usuario:maria.s!"}},
 		{`C:\Users\jsilva01\AppData\Local\proj_x\`, []string{"pasta:proj_x", "usuario:jsilva01!"}},
@@ -169,8 +169,8 @@ func TestLeitorCaminhos(t *testing.T) {
 	})
 }
 
-func TestLeitorUsuariosRede(t *testing.T) {
-	conferirLeitor(t, "usuário de rede", acharUsuariosRede, publicoDev, []casoLeitor{
+func TestReaderNetworkUsers(t *testing.T) {
+	checkReader(t, "usuário de rede", findNetworkUsers, publicDev, []readerCase{
 		{`entrou como CORPX\jsilva01 ontem`, []string{"usuario:jsilva01!"}},
 		{`"user": "CORPX\\svc_relatorio"`, []string{"usuario:svc_relatorio!"}},
 		{"ssh -i ~/.ssh/id -p 2222 svc_relatorio@db-exemplo-01 'ls'", []string{"servidor:db-exemplo-01!", "usuario:svc_relatorio!"}},
@@ -182,8 +182,8 @@ func TestLeitorUsuariosRede(t *testing.T) {
 	})
 }
 
-func TestLeitorNuvem(t *testing.T) {
-	conferirLeitor(t, "nuvem", acharNuvem, publicoDev, []casoLeitor{
+func TestReaderCloud(t *testing.T) {
+	checkReader(t, "nuvem", findCloud, publicDev, []readerCase{
 		{"arn:aws:s3:::bkt-relatorios-demo/*", []string{"bucket:bkt-relatorios-demo!"}},
 		{"arn:aws:sqs:us-east-1:210987654321:fila-pedidos-x9", []string{"conta_nuvem:210987654321!", "fila:fila-pedidos-x9!"}},
 		{"arn:aws:dynamodb:sa-east-1:210987654321:table/tb_pedido_x9/stream/2026", []string{"conta_nuvem:210987654321!", "tabela:tb_pedido_x9!"}},
@@ -199,54 +199,54 @@ func TestLeitorNuvem(t *testing.T) {
 	})
 }
 
-func TestLeitorIPPublico(t *testing.T) {
-	conferirLeitor(t, "ip-público", acharIPPublico, nil, []casoLeitor{
+func TestReaderPublicIP(t *testing.T) {
+	checkReader(t, "ip-público", findPublicIP, nil, []readerCase{
 		{"servidor em 34.120.10.5 e 2600:1f18:abcd::12", []string{"servidor:2600:1f18:abcd::12!", "servidor:34.120.10.5!"}},
 		{"10.0.0.1 192.168.1.1 127.0.0.1 8.8.8.8 1.1.1.1 192.0.2.10 ::1 fe80::1 2001:db8::1", nil},
 		{"versão 1.2.3.4.5, hora 12:30:45, mac aa:bb:cc:dd:ee:ff, slice x[1::2], std::vector", nil},
 	})
 	// desligado por padrão
-	if ls := leitoresConfig(config.Padrao()); len(ls) != 0 {
+	if ls := configReaders(config.Default()); len(ls) != 0 {
 		t.Errorf("leitores de configuração ligados por padrão: %d", len(ls))
 	}
-	cfg := config.Padrao()
-	cfg.Objetos.IPPublico = true
-	m, _ := NovoMasker(cfg, chaveTeste, nil, nil)
-	out, _ := m.Mascarar("servidor em 34.120.10.5")
+	cfg := config.Default()
+	cfg.Objects.PublicIP = true
+	m, _ := NewMasker(cfg, testKey, nil, nil)
+	out, _ := m.Mask("servidor em 34.120.10.5")
 	if strings.Contains(out, "34.120.10.5") {
 		t.Errorf("IP público ficou com a opção ligada: %q", out)
 	}
-	m2, _ := NovoMasker(config.Padrao(), chaveTeste, nil, nil)
-	if out, _ := m2.Mascarar("servidor em 34.120.10.5"); !strings.Contains(out, "34.120.10.5") {
+	m2, _ := NewMasker(config.Default(), testKey, nil, nil)
+	if out, _ := m2.Mask("servidor em 34.120.10.5"); !strings.Contains(out, "34.120.10.5") {
 		t.Errorf("IP público mascarado com a opção desligada: %q", out)
 	}
 }
 
-func TestLeitorTermosEmbutidos(t *testing.T) {
+func TestReaderEmbeddedTerms(t *testing.T) {
 	ts := []string{"acmex"}
-	achar := func(s string, add func(ObjAchado)) { acharTermos(s, ts, add) }
-	conferirLeitor(t, "termo-embutido", achar, nil, []casoLeitor{
+	find := func(s string, add func(ObjFinding)) { findTerms(s, ts, add) }
+	checkReader(t, "termo-embutido", find, nil, []readerCase{
 		{"SELECT * FROM acmex_pedidos", []string{"tabela:acmex_pedidos!"}},
 		{"host: dbAcmexVendas01", []string{"servidor:dbAcmexVendas01!"}},
 		{"o job svc-acmex-carga falhou", []string{"servico:svc-acmex-carga!"}},
 		{"a acmex e acmexvendas e macmex_x", nil}, // termo sozinho (outro detector) e pedaço que não é inteiro
 	})
-	cfg := config.Padrao()
-	cfg.Termos = []config.Termo{{Rotulo: "empresa", Valores: []string{"Acmex"}}}
-	m, _ := NovoMasker(cfg, chaveTeste, nil, nil)
-	out, _ := m.Mascarar("o job svc-acmex-carga falhou")
+	cfg := config.Default()
+	cfg.Terms = []config.Term{{Label: "empresa", Values: []string{"Acmex"}}}
+	m, _ := NewMasker(cfg, testKey, nil, nil)
+	out, _ := m.Mask("o job svc-acmex-carga falhou")
 	if strings.Contains(strings.ToLower(out), "acmex") {
 		t.Errorf("termo embutido ficou: %q", out)
 	}
 	// aprendido em posição forte: volta a ser mascarado em prosa
-	if out, _ := m.Mascarar("reinicie o svc-acmex-carga"); strings.Contains(out, "svc-acmex-carga") {
+	if out, _ := m.Mask("reinicie o svc-acmex-carga"); strings.Contains(out, "svc-acmex-carga") {
 		t.Errorf("nome com termo não propagou: %q", out)
 	}
 }
 
 // Ida e volta: o pseudônimo de host, caminho, usuário, bucket e repositório volta ao real.
-func TestLeitoresDevIdaEVolta(t *testing.T) {
-	m := novoTeste(t)
+func TestDevReadersRoundTrip(t *testing.T) {
+	m := newTest(t)
 	for _, s := range []string{
 		"host: db-exemplo-01.interno\nuser: svc_relatorio\n",
 		"abra /home/joao_x/projetos/cliente_x9/ agora",
@@ -255,29 +255,29 @@ func TestLeitoresDevIdaEVolta(t *testing.T) {
 		"ssh svc_relatorio@bastion-x1",
 		"arn:aws:sqs:us-east-1:210987654321:fila-pedidos-x9",
 	} {
-		out, ents := m.Mascarar(s)
+		out, ents := m.Mask(s)
 		if out == s {
 			t.Errorf("nada mascarado: %q", s)
 			continue
 		}
-		if back := NovaTabela(ents).Desmascarar(out, false); back != s {
+		if back := NewTable(ents).Unmask(out, false); back != s {
 			t.Errorf("ida e volta:\n   %q\n-> %q\n-> %q", s, out, back)
 		}
 	}
 }
 
-// Nome aprendido em posição forte é mascarado em prosa e em outro formato.
-func TestLeitoresDevPropagam(t *testing.T) {
-	m := novoTeste(t)
-	m.Mascarar("namespace: vendas-prod-x9\nbucket: bkt-relatorios-demo\n")
-	m.Mascarar("git clone git@github.com:org-exemplo/repo-demo.git")
+// Name aprendido em posição forte é mascarado em prosa e em outro formato.
+func TestDevReadersPropagate(t *testing.T) {
+	m := newTest(t)
+	m.Mask("namespace: vendas-prod-x9\nbucket: bkt-relatorios-demo\n")
+	m.Mask("git clone git@github.com:org-exemplo/repo-demo.git")
 	for _, s := range []string{
 		"o pod caiu no vendas-prod-x9 de novo",
 		`{"destino": "bkt-relatorios-demo"}`,
 		"abra um PR no repo-demo",
 		"| repo-demo | org-exemplo |",
 	} {
-		out, _ := m.Mascarar(s)
+		out, _ := m.Mask(s)
 		for _, v := range []string{"vendas-prod-x9", "bkt-relatorios-demo", "repo-demo", "org-exemplo"} {
 			if strings.Contains(out, v) {
 				t.Errorf("%q não propagou:\n   %q\n-> %q", v, s, out)
@@ -285,24 +285,24 @@ func TestLeitoresDevPropagam(t *testing.T) {
 		}
 	}
 	// palavra simples aprendida não propaga (sem cara de identificador)
-	m.Mascarar("database: vendas\n")
-	if out, _ := m.Mascarar("as vendas subiram"); !strings.Contains(out, "vendas") {
+	m.Mask("database: vendas\n")
+	if out, _ := m.Mask("as vendas subiram"); !strings.Contains(out, "vendas") {
 		t.Errorf("palavra comum propagou: %q", out)
 	}
 }
 
 // Os leitores que dependem da configuração também nunca quebram com entrada estranha.
-func FuzzLeitoresDev(f *testing.F) {
+func FuzzReadersDev(f *testing.F) {
 	for _, s := range []string{"host: ", "--host ", "</host>", "s3://", "git@x:", "arn:aws:", "/subscriptions/x/",
 		"projects/a/b/c", "C:\\Users\\", "A\\b", "ssh a@", "::1:", "module ", "\"name\": \"@a/\"", "acmex_"} {
 		f.Add(s)
 	}
-	ls := leitoresConfig(config.Config{Objetos: config.Objetos{IPPublico: true}, Termos: []config.Termo{{Valores: []string{"acmex"}}}})
+	ls := configReaders(config.Config{Objects: config.Objects{PublicIP: true}, Terms: []config.Term{{Values: []string{"acmex"}}}})
 	f.Fuzz(func(t *testing.T, s string) {
-		for _, l := range append(leitoresPadrao(), ls...) {
-			l.Achar(s, func(o ObjAchado) {
-				if o.Ini < 0 || o.Fim > len(s) || o.Fim < o.Ini {
-					t.Fatalf("%s: trecho fora do texto %d..%d de %d", l.Nome, o.Ini, o.Fim, len(s))
+		for _, l := range append(defaultReaders(), ls...) {
+			l.Find(s, func(o ObjFinding) {
+				if o.Start < 0 || o.End > len(s) || o.End < o.Start {
+					t.Fatalf("%s: trecho fora do texto %d..%d de %d", l.Name, o.Start, o.End, len(s))
 				}
 			})
 		}
@@ -310,22 +310,22 @@ func FuzzLeitoresDev(f *testing.F) {
 }
 
 // Valor seguido de operador é expressão de código, não nome de recurso.
-func TestChaveValorExpressaoNaoENome(t *testing.T) {
-	m := novoTeste(t)
+func TestKeyValueExpressionIsNotName(t *testing.T) {
+	m := newTest(t)
 	for _, s := range []string{"// addr = arg0 + auxInt + aux", "host = base_x1 + sufixo", "server = srv_a1 - 1", "user = u_x1 * 2"} {
-		if out, ents := m.Mascarar(s); len(ents) > 0 {
+		if out, ents := m.Mask(s); len(ents) > 0 {
 			t.Errorf("expressão virou nome:\n   %q\n-> %q", s, out)
 		}
 	}
-	if out, _ := m.Mascarar("host = db-exemplo-01.interno\n"); strings.Contains(out, "db-exemplo-01") {
+	if out, _ := m.Mask("host = db-exemplo-01.interno\n"); strings.Contains(out, "db-exemplo-01") {
 		t.Errorf("valor simples deixou de ser mascarado: %q", out)
 	}
 }
 
 // Bucket e fila de chave explícita e metadata.name de Deployment/Service/StatefulSet
 // são evidência forte: o nome aprendido é mascarado também em outro texto.
-func TestChaveExplicitaEnsina(t *testing.T) {
-	for _, c := range []struct{ ensina, nome string }{
+func TestExplicitKeyTeaches(t *testing.T) {
+	for _, c := range []struct{ teaches, name string }{
 		{"S3_BUCKET=bkt-relatorios-x9\n", "bkt-relatorios-x9"},
 		{"export ORDERS_BUCKET=bkt-pedidos-x9\n", "bkt-pedidos-x9"},
 		{"KAFKA_TOPIC=topico-eventos-x9\n", "topico-eventos-x9"},
@@ -335,12 +335,12 @@ func TestChaveExplicitaEnsina(t *testing.T) {
 		{"apiVersion: v1\nkind: Service\nmetadata:\n  name: svc-cobranca-x9\nspec:\n  type: ClusterIP\n", "svc-cobranca-x9"},
 		{"apiVersion: apps/v1\nkind: StatefulSet\nmetadata:\n  name: pg-cobranca-x9\nspec:\n  serviceName: pg\n", "pg-cobranca-x9"},
 	} {
-		m := novoTeste(t)
-		if out, _ := m.Mascarar(c.ensina); strings.Contains(out, c.nome) {
+		m := newTest(t)
+		if out, _ := m.Mask(c.teaches); strings.Contains(out, c.name) {
 			t.Errorf("na posição: %q", out)
 		}
-		if out, _ := m.Mascarar("depois, em prosa: " + c.nome + " caiu"); strings.Contains(out, c.nome) {
-			t.Errorf("não aprendeu %q: %q", c.nome, out)
+		if out, _ := m.Mask("depois, em prosa: " + c.name + " caiu"); strings.Contains(out, c.name) {
+			t.Errorf("não aprendeu %q: %q", c.name, out)
 		}
 	}
 }

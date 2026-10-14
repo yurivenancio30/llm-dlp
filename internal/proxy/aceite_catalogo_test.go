@@ -19,32 +19,32 @@ import (
 
 var (
 	acSchemas = []string{"fin_contab", "rh_folha", "crm_vendas"}
-	acTabelas = []string{"lanc_diario", "plano_contas", "clientes", "pedidos", "contratos", "saldo_mensal",
+	acTables  = []string{"lanc_diario", "plano_contas", "clientes", "pedidos", "contratos", "saldo_mensal",
 		"faturas", "notas_fiscais", "fornecedores", "titulos_pagar", "titulos_receber", "centros_custo",
 		"funcionarios", "dependentes", "beneficios", "ponto_diario", "ferias", "oportunidades", "campanhas",
 		"leads", "metas_vendas", "comissoes"}
-	acColunas = []string{"cd_cliente", "nm_cliente", "nr_cpf", "dt_nascimento", "ds_email", "nr_telefone",
+	acColumns = []string{"cd_cliente", "nm_cliente", "nr_cpf", "dt_nascimento", "ds_email", "nr_telefone",
 		"vl_saldo", "vl_lancto", "dt_lancto", "cd_conta", "ds_historico", "cd_empresa", "nr_documento",
 		"dt_emissao", "vl_total", "cd_produto", "qt_itens", "cd_funcionario", "nm_funcionario",
 		"dt_admissao", "vl_salario", "cd_cargo", "nome", "valor", "situacao"}
-	acTipos = []string{"VARCHAR(20)", "NUMBER(12,2)", "DATE", "VARCHAR(100)", "INTEGER"}
+	acTypes = []string{"VARCHAR(20)", "NUMBER(12,2)", "DATE", "VARCHAR(100)", "INTEGER"}
 	// as tags do script: palavra -> regex (literais do programa)
 	acTags = [][2]string{{"cpf", `.*cpf.*`}, {"email", `.*email.*`}, {"telefone", `.*telefone.*`},
 		{"nascimento", `.*nascimento.*`}, {"salario", `.*salario.*`}, {"documento", `^nr_documento$`}}
 )
 
-type linhaCat struct{ plat, obj, col, tipo string }
+type catLine struct{ plat, obj, col, typ string }
 
-func catalogoAceite() []linhaCat {
-	var ls []linhaCat
+func acceptanceCatalog() []catLine {
+	var ls []catLine
 	for i := 0; len(ls) < 99; i++ {
-		t := acTabelas[i%len(acTabelas)]
-		s := acSchemas[(i/len(acTabelas)+i)%len(acSchemas)]
+		t := acTables[i%len(acTables)]
+		s := acSchemas[(i/len(acTables)+i)%len(acSchemas)]
 		plat := "snowflake"
 		if i%3 == 0 {
 			plat = "postgres"
 		}
-		ls = append(ls, linhaCat{plat, s + "." + t, acColunas[(i*7)%len(acColunas)], acTipos[i%len(acTipos)]})
+		ls = append(ls, catLine{plat, s + "." + t, acColumns[(i*7)%len(acColumns)], acTypes[i%len(acTypes)]})
 	}
 	return ls
 }
@@ -61,16 +61,16 @@ func scriptTags() string {
 	return b.String()
 }
 
-func TestAceiteCatalogoScript(t *testing.T) {
-	cat := catalogoAceite()
+func TestAcceptanceCatalogScript(t *testing.T) {
+	cat := acceptanceCatalog()
 	var csvB strings.Builder
 	csvB.WriteString("plataforma,objeto,coluna,tipo\n")
 	for _, l := range cat {
-		fmt.Fprintf(&csvB, "%s,%s,%s,%s\n", l.plat, l.obj, l.col, l.tipo)
+		fmt.Fprintf(&csvB, "%s,%s,%s,%s\n", l.plat, l.obj, l.col, l.typ)
 	}
 	head := strings.Join(strings.SplitN(csvB.String(), "\n", 6)[:5], "\n") + "\n"
 	script := scriptTags()
-	var saida strings.Builder
+	var output strings.Builder
 	for i, l := range cat {
 		var rs []string
 		for _, tg := range acTags {
@@ -78,61 +78,61 @@ func TestAceiteCatalogoScript(t *testing.T) {
 				rs = append(rs, tg[1])
 			}
 		}
-		fmt.Fprintf(&saida, "%d | %s | %s | %s | %s | %s\n", i+1, l.plat, l.obj, l.col, l.tipo, strings.Join(rs, " "))
+		fmt.Fprintf(&output, "%d | %s | %s | %s | %s | %s\n", i+1, l.plat, l.obj, l.col, l.typ, strings.Join(rs, " "))
 	}
 	sql := "     1\t-- busca o nome e o valor do cliente pelo codigo\n     2\tSELECT nome, valor FROM fin_contab.clientes WHERE cd_cliente = :id;\n"
 
-	var corpos [][]byte
-	px, _ := montarComMasker(t, &corpos)
-	enviar(t, px, []any{
+	var bodies [][]byte
+	px, _ := buildWithMasker(t, &bodies)
+	send(t, px, []any{
 		msg("user", "gera as tags de dado pessoal do catálogo em dados/catalogo.csv"),
-		msg("assistant", []any{chamadaBash("c1", "head -5 dados/catalogo.csv")}),
-		msg("user", []any{resultado("c1", head)}),
+		msg("assistant", []any{bashCall("c1", "head -5 dados/catalogo.csv")}),
+		msg("user", []any{result("c1", head)}),
 		msg("assistant", []any{map[string]any{"type": "tool_use", "id": "c2", "name": "Write",
 			"input": map[string]any{"file_path": "/home/u/proj/scripts/gerar_tags.py", "content": script}}}),
-		msg("user", []any{resultado("c2", "File created successfully at: /home/u/proj/scripts/gerar_tags.py")}),
-		msg("assistant", []any{chamadaBash("c3", "python3 scripts/gerar_tags.py")}),
-		msg("user", []any{resultado("c3", saida.String())}),
+		msg("user", []any{result("c2", "File created successfully at: /home/u/proj/scripts/gerar_tags.py")}),
+		msg("assistant", []any{bashCall("c3", "python3 scripts/gerar_tags.py")}),
+		msg("user", []any{result("c3", output.String())}),
 		msg("assistant", []any{map[string]any{"type": "tool_use", "id": "c4", "name": "Read",
 			"input": map[string]any{"file_path": "/home/u/proj/sql/consulta.sql"}}}),
-		msg("user", []any{resultado("c4", sql)}),
+		msg("user", []any{result("c4", sql)}),
 	})
-	r := mensagens(t, corpos[len(corpos)-1])
+	r := messages(t, bodies[len(bodies)-1])
 	var out, outSQL string
 	{
 		var v map[string]any
 		json.Unmarshal([]byte(r[6]), &v)
-		out = textoDe(v["content"].([]any)[0].(map[string]any)["content"])
+		out = textOf(v["content"].([]any)[0].(map[string]any)["content"])
 		json.Unmarshal([]byte(r[8]), &v)
-		outSQL = textoDe(v["content"].([]any)[0].(map[string]any)["content"])
+		outSQL = textOf(v["content"].([]any)[0].(map[string]any)["content"])
 	}
 	// palavras do programa (o comando e o script): continuam legíveis, por regra
 	prog := map[string]bool{}
 	for _, w := range regexp.MustCompile(`[A-Za-z_][A-Za-z0-9_]*`).FindAllString(script+" python3 scripts/gerar_tags.py", -1) {
 		prog[w] = true
 	}
-	inteira := func(s, w string) bool {
+	wholeOne := func(s, w string) bool {
 		return regexp.MustCompile(`(^|[^A-Za-z0-9_])` + regexp.QuoteMeta(w) + `($|[^A-Za-z0-9_])`).MatchString(s)
 	}
 	ls := strings.Split(strings.TrimRight(out, "\n"), "\n")
 	if len(ls) != len(cat) {
 		t.Fatalf("saída com %d linhas", len(ls))
 	}
-	colClaro, colTot, tabClaro := 0, 0, map[string]bool{}
+	colClear, colTotal, tabClear := 0, 0, map[string]bool{}
 	regexOK := 0
-	vazou := map[string]int{}
+	leaked := map[string]int{}
 	for i, l := range ls {
 		c := cat[i]
 		if !prog[c.col] {
-			colTot++
-			if inteira(l, c.col) {
-				colClaro++
-				vazou[c.col]++
+			colTotal++
+			if wholeOne(l, c.col) {
+				colClear++
+				leaked[c.col]++
 			}
 		}
 		for _, p := range strings.Split(c.obj, ".") {
-			if inteira(l, p) {
-				tabClaro[p] = true
+			if wholeOne(l, p) {
+				tabClear[p] = true
 			}
 		}
 		ok := true
@@ -152,22 +152,22 @@ func TestAceiteCatalogoScript(t *testing.T) {
 		}
 	}
 	t.Logf("colunas em claro: %d de %d linhas (fora as palavras do programa); tabelas/schemas em claro: %d de %d; regex intactas: %d de %d linhas",
-		colClaro, colTot, len(tabClaro), len(nTab), regexOK, len(ls))
+		colClear, colTotal, len(tabClear), len(nTab), regexOK, len(ls))
 	nHead := 0
-	for c, n := range vazou {
-		emHead := strings.Contains(head, ","+c+",")
+	for c, n := range leaked {
+		inHead := strings.Contains(head, ","+c+",")
 		ident := strings.ContainsAny(c, "_0123456789")
-		if emHead {
+		if inHead {
 			nHead++
 		}
-		t.Logf("coluna vazada: %d vezes, no head=%v, cara de identificador=%v, %d letras", n, emHead, ident, len(c))
+		t.Logf("coluna vazada: %d vezes, no head=%v, cara de identificador=%v, %d letras", n, inHead, ident, len(c))
 	}
-	if colClaro > 0 || len(tabClaro) > 0 {
+	if colClear > 0 || len(tabClear) > 0 {
 		var cs []string
-		for p := range tabClaro {
+		for p := range tabClear {
 			cs = append(cs, p)
 		}
-		t.Errorf("em claro: %d colunas, tabelas %v", colClaro, cs)
+		t.Errorf("em claro: %d colunas, tabelas %v", colClear, cs)
 	}
 	if regexOK != len(ls) {
 		t.Errorf("regex do script trocadas em %d linhas", len(ls)-regexOK)

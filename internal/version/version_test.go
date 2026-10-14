@@ -1,4 +1,4 @@
-package versao
+package version
 
 import (
 	"os"
@@ -8,9 +8,9 @@ import (
 
 // A versão é escrita em dois lugares que uma pessoa lê (versao.go e CHANGELOG.md): têm de dizer
 // o mesmo, e a versão tem de ter uma seção no CHANGELOG antes de ser lançada.
-func TestVersaoBateComOChangelog(t *testing.T) {
-	if !regexp.MustCompile(`^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$`).MatchString(Versao) {
-		t.Fatalf("Versao = %q: o formato é MAIOR.MENOR.CORREÇÃO", Versao)
+func TestVersionMatchesChangelog(t *testing.T) {
+	if !regexp.MustCompile(`^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$`).MatchString(Version) {
+		t.Fatalf("Versao = %q: o formato é MAIOR.MENOR.CORREÇÃO", Version)
 	}
 	b, err := os.ReadFile("../../CHANGELOG.md")
 	if err != nil {
@@ -20,7 +20,7 @@ func TestVersaoBateComOChangelog(t *testing.T) {
 	if m == nil {
 		t.Fatal("CHANGELOG.md sem nenhuma seção de versão (## [X.Y.Z] - AAAA-MM-DD)")
 	}
-	if string(m[1]) != Versao {
-		t.Fatalf("versao.go diz %s e a primeira versão do CHANGELOG.md é %s", Versao, m[1])
+	if string(m[1]) != Version {
+		t.Fatalf("versao.go diz %s e a primeira versão do CHANGELOG.md é %s", Version, m[1])
 	}
 }

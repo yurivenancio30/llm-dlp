@@ -11,80 +11,80 @@ import (
 	"time"
 )
 
-// Vistos: os mesmos valores, guardados em disco só como hash, para valer depois de reiniciar.
+// Seen: os mesmos valores, guardados em disco só como hash, para valer depois de reiniciar.
 
-// Vistos guarda em disco, só como hash (HMAC com a chave), os valores contextuais já
+// Seen guarda em disco, só como hash (HMAC com a chave), os valores contextuais já
 // mascarados e o tipo de cada um.
-type Vistos struct {
-	path string
-	mu   sync.RWMutex
-	ids  map[string]string // id -> tipo
-	tam  map[int]bool      // tamanhos das senhas guardadas (filtro: só testa pedaços desses tamanhos)
-	n    map[string]int    // quantos de cada tipo
-	nObj int               // quantos nomes de objeto
-	sujo bool
-	// semTam: há senhas guardadas sem o tamanho (arquivo antigo)
-	semTam   bool
-	salvo    time.Time
-	agendado bool
+type Seen struct {
+	path  string
+	mu    sync.RWMutex
+	ids   map[string]string // id -> tipo
+	size  map[int]bool      // tamanhos das senhas guardadas (filtro: só testa pedaços desses tamanhos)
+	n     map[string]int    // quantos de cada tipo
+	nObj  int               // quantos nomes de objeto
+	dirty bool
+	// noSize: há senhas guardadas sem o tamanho (arquivo antigo)
+	noSize    bool
+	saved     time.Time
+	scheduled bool
 	// disco: o arquivo como este processo o deixou (leu ou gravou). Se mudou, outro processo
 	// gravou (a versão nova durante a troca, ver atualizar; um comando): o que ele aprendeu é
 	// juntado antes de gravar, e uma gravação não apaga a outra.
-	disco impressaoArquivo
+	disk fileFingerprint
 }
 
-type impressaoArquivo struct {
-	mod time.Time
-	tam int64
+type fileFingerprint struct {
+	mod  time.Time
+	size int64
 }
 
-func impressaoDe(path string) impressaoArquivo {
+func fingerprintOf(path string) fileFingerprint {
 	st, err := os.Stat(path)
 	if err != nil {
-		return impressaoArquivo{}
+		return fileFingerprint{}
 	}
-	return impressaoArquivo{st.ModTime(), st.Size()}
+	return fileFingerprint{st.ModTime(), st.Size()}
 }
 
-// gravarTrocando grava b num arquivo temporário deste processo e troca pelo arquivo (dois
+// writeSwapping grava b num arquivo temporário deste processo e troca pelo arquivo (dois
 // processos gravando ao mesmo tempo não misturam um temporário com o outro). Devolve a
 // impressão do que gravou (a troca de nome não muda data nem tamanho).
-func gravarTrocando(path string, b []byte) (impressaoArquivo, error) {
+func writeSwapping(path string, b []byte) (fileFingerprint, error) {
 	tmp := path + ".tmp-" + strconv.Itoa(os.Getpid())
 	if err := os.WriteFile(tmp, b, 0o600); err != nil {
 		os.Remove(tmp)
-		return impressaoArquivo{}, err
+		return fileFingerprint{}, err
 	}
-	imp := impressaoDe(tmp)
+	imp := fingerprintOf(tmp)
 	if err := os.Rename(tmp, path); err != nil {
 		os.Remove(tmp)
-		return impressaoArquivo{}, err
+		return fileFingerprint{}, err
 	}
 	return imp, nil
 }
 
-// prefTam: os tamanhos vão no mesmo arquivo, como chaves "tam:13"
-const prefTam = "tam:"
+// sizePrefix: os tamanhos vão no mesmo arquivo, como chaves "tam:13"
+const sizePrefix = "tam:"
 
-var intervaloSalvar = 5 * time.Second
+var saveInterval = 5 * time.Second
 
-func (v *Vistos) TemTamanho(n int) bool {
+func (v *Seen) HasSize(n int) bool {
 	v.mu.RLock()
 	defer v.mu.RUnlock()
-	return v.semTam || v.tam[n]
+	return v.noSize || v.size[n]
 }
 
-func (v *Vistos) MarcarTamanho(n int) {
+func (v *Seen) MarkSize(n int) {
 	v.mu.Lock()
-	if !v.tam[n] {
-		v.tam[n], v.sujo = true, true
-		v.ids[prefTam+strconv.Itoa(n)] = "tam"
+	if !v.size[n] {
+		v.size[n], v.dirty = true, true
+		v.ids[sizePrefix+strconv.Itoa(n)] = "tam"
 	}
 	v.mu.Unlock()
 }
 
-func CarregarVistos(path string) (*Vistos, error) {
-	v := &Vistos{path: path, ids: map[string]string{}, n: map[string]int{}, tam: map[int]bool{}}
+func LoadSeen(path string) (*Seen, error) {
+	v := &Seen{path: path, ids: map[string]string{}, n: map[string]int{}, size: map[int]bool{}}
 	b, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
 		return v, nil
@@ -92,100 +92,100 @@ func CarregarVistos(path string) (*Vistos, error) {
 	if err != nil {
 		return nil, err
 	}
-	v.disco = impressaoDe(path)
+	v.disk = fingerprintOf(path)
 	if json.Unmarshal(b, &v.ids) != nil {
 		v.ids = map[string]string{} // formato antigo (lista): recomeça; os valores são reaprendidos
 	}
 	for id, t := range v.ids {
-		v.contar(id, t)
+		v.tally(id, t)
 	}
 	// arquivo de antes de os tamanhos serem guardados: sem o filtro (testa todos os pedaços)
-	v.semTam = v.n["segredo"] > 0 && len(v.tam) == 0
+	v.noSize = v.n["segredo"] > 0 && len(v.size) == 0
 	return v, nil
 }
 
 // contar põe nos contadores e no filtro de tamanhos uma entrada que já está em v.ids.
-func (v *Vistos) contar(id, t string) {
-	if n, err := strconv.Atoi(strings.TrimPrefix(id, prefTam)); err == nil && strings.HasPrefix(id, prefTam) {
-		v.tam[n] = true
+func (v *Seen) tally(id, t string) {
+	if n, err := strconv.Atoi(strings.TrimPrefix(id, sizePrefix)); err == nil && strings.HasPrefix(id, sizePrefix) {
+		v.size[n] = true
 		return
 	}
-	v.n[tipoBase(t)]++
+	v.n[baseType(t)]++
 	if strings.HasPrefix(t, "obj.") {
 		v.nObj++
 	}
 }
 
-// juntarDoDisco (com v.mu travado): se outro processo gravou o arquivo depois deste, traz o
+// mergeFromDisk (com v.mu travado): se outro processo gravou o arquivo depois deste, traz o
 // que só ele aprendeu. Uma entrada que este processo podou (teto) pode voltar assim; a próxima
 // poda a tira de novo.
-func (v *Vistos) juntarDoDisco() {
-	if impressaoDe(v.path) == v.disco {
+func (v *Seen) mergeFromDisk() {
+	if fingerprintOf(v.path) == v.disk {
 		return
 	}
 	b, err := os.ReadFile(v.path)
 	if err != nil {
 		return
 	}
-	var outro map[string]string
-	if json.Unmarshal(b, &outro) != nil {
+	var other map[string]string
+	if json.Unmarshal(b, &other) != nil {
 		return
 	}
-	for id, t := range outro {
+	for id, t := range other {
 		if _, ok := v.ids[id]; !ok {
 			v.ids[id] = t
-			v.contar(id, t)
+			v.tally(id, t)
 		}
 	}
 }
 
-func (v *Vistos) Vazio() bool { v.mu.RLock(); defer v.mu.RUnlock(); return len(v.ids) == 0 }
+func (v *Seen) IsEmpty() bool { v.mu.RLock(); defer v.mu.RUnlock(); return len(v.ids) == 0 }
 
-func (v *Vistos) Tipo(id string) (string, bool) {
+func (v *Seen) Type(id string) (string, bool) {
 	v.mu.RLock()
 	defer v.mu.RUnlock()
 	t, ok := v.ids[id]
 	return t, ok
 }
 
-// Tem diz se há algum valor desse tipo guardado.
-func (v *Vistos) Tem(tipo string) bool {
+// Has diz se há algum valor desse tipo guardado.
+func (v *Seen) Has(typ string) bool {
 	v.mu.RLock()
 	defer v.mu.RUnlock()
-	return v.n[tipo] > 0
+	return v.n[typ] > 0
 }
 
-// Objetos (ver objetos.go): o valor guarda o tipo e duas datas, em dias desde 1970:
+// Objects (ver objetos.go): o valor guarda o tipo e duas datas, em dias desde 1970:
 // "obj.tabela|<aprendido>|<visto pela última vez>". O teto é separado, para os nomes de
 // objeto não expulsarem senhas e documentos.
-const maxObjetos = 500_000
+const maxObjects = 500_000
 
-func tipoBase(t string) string {
+func baseType(t string) string {
 	if i := strings.IndexByte(t, '|'); i >= 0 {
 		return t[:i]
 	}
 	return t
 }
 
-func (v *Vistos) TemObj() bool {
+func (v *Seen) HasObj() bool {
 	v.mu.RLock()
 	defer v.mu.RUnlock()
 	return v.nObj > 0
 }
 
 // Obj devolve o tipo de entidade e o dia em que o nome foi visto pela última vez.
-func (v *Vistos) Obj(id string) (ent string, visto int, ok bool) {
+func (v *Seen) Obj(id string) (ent string, seen int, ok bool) {
 	v.mu.RLock()
 	t, ok := v.ids[id]
 	v.mu.RUnlock()
 	if !ok {
 		return "", 0, false
 	}
-	ent, _, visto, ok = lerObj(t)
-	return ent, visto, ok
+	ent, _, seen, ok = readObj(t)
+	return ent, seen, ok
 }
 
-func lerObj(t string) (ent string, aprendido, visto int, ok bool) {
+func readObj(t string) (ent string, learned, seen int, ok bool) {
 	p := strings.Split(t, "|")
 	if len(p) != 3 || !strings.HasPrefix(p[0], "obj.") {
 		return "", 0, 0, false
@@ -195,38 +195,38 @@ func lerObj(t string) (ent string, aprendido, visto int, ok bool) {
 	return p[0][4:], a, b, e1 == nil && e2 == nil
 }
 
-// MarcarObj guarda o nome (ou atualiza o dia em que foi visto, no máximo uma vez por dia).
-func (v *Vistos) MarcarObj(id, ent string, dia int) {
+// MarkObj guarda o nome (ou atualiza o dia em que foi visto, no máximo uma vez por dia).
+func (v *Seen) MarkObj(id, ent string, day int) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	if t, ok := v.ids[id]; ok {
-		e, a, visto, ok := lerObj(t)
-		if !ok || visto >= dia {
+		e, a, seen, ok := readObj(t)
+		if !ok || seen >= day {
 			return
 		}
-		v.ids[id], v.sujo = "obj."+e+"|"+strconv.Itoa(a)+"|"+strconv.Itoa(dia), true
+		v.ids[id], v.dirty = "obj."+e+"|"+strconv.Itoa(a)+"|"+strconv.Itoa(day), true
 		return
 	}
-	if v.nObj >= maxObjetos {
-		v.podarObj()
+	if v.nObj >= maxObjects {
+		v.pruneObj()
 	}
-	v.ids[id], v.sujo = "obj."+ent+"|"+strconv.Itoa(dia)+"|"+strconv.Itoa(dia), true
+	v.ids[id], v.dirty = "obj."+ent+"|"+strconv.Itoa(day)+"|"+strconv.Itoa(day), true
 	v.n["obj."+ent]++
 	v.nObj++
 }
 
-// podarObj tira o décimo dos nomes de objeto vistos há mais tempo (com v.mu travado).
-func (v *Vistos) podarObj() {
-	dias := make([]int, 0, v.nObj)
+// pruneObj tira o décimo dos nomes de objeto vistos há mais tempo (com v.mu travado).
+func (v *Seen) pruneObj() {
+	days := make([]int, 0, v.nObj)
 	for _, t := range v.ids {
-		if _, _, d, ok := lerObj(t); ok {
-			dias = append(dias, d)
+		if _, _, d, ok := readObj(t); ok {
+			days = append(days, d)
 		}
 	}
-	sort.Ints(dias)
-	corte := dias[len(dias)/10]
+	sort.Ints(days)
+	cut := days[len(days)/10]
 	for id, t := range v.ids {
-		if e, _, d, ok := lerObj(t); ok && d <= corte {
+		if e, _, d, ok := readObj(t); ok && d <= cut {
 			delete(v.ids, id)
 			v.n["obj."+e]--
 			v.nObj--
@@ -234,24 +234,24 @@ func (v *Vistos) podarObj() {
 	}
 }
 
-// maxVistos: teto dos hashes guardados (~40 bytes cada). Passou disso, um décimo sai, ao
+// maxSeen: teto dos hashes guardados (~40 bytes cada). Passou disso, um décimo sai, ao
 // acaso; esses valores voltam a depender da palavra ao lado até serem vistos de novo.
-const maxVistos = 500_000
+const maxSeen = 500_000
 
-func (v *Vistos) Marcar(id, tipo string) {
+func (v *Seen) Mark(id, typ string) {
 	v.mu.Lock()
 	if _, ok := v.ids[id]; !ok {
-		if len(v.ids)-v.nObj >= maxVistos {
-			novo, n := make(map[string]string, maxVistos), map[string]int{}
+		if len(v.ids)-v.nObj >= maxSeen {
+			newOne, n := make(map[string]string, maxSeen), map[string]int{}
 			for k, t := range v.ids { // a ordem de um mapa em Go é aleatória
-				if strings.HasPrefix(k, prefTam) || strings.HasPrefix(t, "obj.") {
-					novo[k] = t
+				if strings.HasPrefix(k, sizePrefix) || strings.HasPrefix(t, "obj.") {
+					newOne[k] = t
 					continue
 				}
-				if len(novo) >= maxVistos*9/10 {
+				if len(newOne) >= maxSeen*9/10 {
 					continue
 				}
-				novo[k] = t
+				newOne[k] = t
 				n[t]++
 			}
 			for k, c := range v.n {
@@ -259,55 +259,55 @@ func (v *Vistos) Marcar(id, tipo string) {
 					n[k] = c
 				}
 			}
-			v.ids, v.n = novo, n
+			v.ids, v.n = newOne, n
 		}
-		v.ids[id], v.sujo = tipo, true
-		v.n[tipo]++
+		v.ids[id], v.dirty = typ, true
+		v.n[typ]++
 	}
 	v.mu.Unlock()
 }
 
-// SalvarSeSujo grava o arquivo se houve novidade desde a última gravação.
+// SaveIfDirty grava o arquivo se houve novidade desde a última gravação.
 // Com muitos hashes a gravação custa (≈0,3 s com 250 mil), então acontece no máximo uma
-// vez a cada intervaloSalvar; o que ficou pendente é gravado por um temporizador.
-func (v *Vistos) SalvarSeSujo() error {
+// vez a cada saveInterval; o que ficou pendente é gravado por um temporizador.
+func (v *Seen) SaveIfDirty() error {
 	v.mu.Lock()
-	if !v.sujo {
+	if !v.dirty {
 		v.mu.Unlock()
 		return nil
 	}
-	if falta := intervaloSalvar - time.Since(v.salvo); falta > 0 {
-		if !v.agendado {
-			v.agendado = true
-			time.AfterFunc(falta, func() {
+	if missingOne := saveInterval - time.Since(v.saved); missingOne > 0 {
+		if !v.scheduled {
+			v.scheduled = true
+			time.AfterFunc(missingOne, func() {
 				v.mu.Lock()
-				v.agendado = false
+				v.scheduled = false
 				v.mu.Unlock()
-				v.SalvarSeSujo()
+				v.SaveIfDirty()
 			})
 		}
 		v.mu.Unlock()
 		return nil
 	}
-	v.salvo = time.Now()
-	v.juntarDoDisco()
+	v.saved = time.Now()
+	v.mergeFromDisk()
 	b, _ := json.Marshal(v.ids)
-	v.sujo = false
+	v.dirty = false
 	v.mu.Unlock()
-	imp, err := gravarTrocando(v.path, b)
+	imp, err := writeSwapping(v.path, b)
 	if err != nil {
 		return err
 	}
 	v.mu.Lock()
-	v.disco = imp
+	v.disk = imp
 	v.mu.Unlock()
 	return nil
 }
 
-// SalvarAgora grava já o que estiver pendente, sem esperar o intervalo (na saída do proxy).
-func (v *Vistos) SalvarAgora() error {
+// SaveNow grava já o que estiver pendente, sem esperar o intervalo (na saída do proxy).
+func (v *Seen) SaveNow() error {
 	v.mu.Lock()
-	v.salvo = time.Time{}
+	v.saved = time.Time{}
 	v.mu.Unlock()
-	return v.SalvarSeSujo()
+	return v.SaveIfDirty()
 }

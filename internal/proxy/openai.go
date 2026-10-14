@@ -12,12 +12,12 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/mask"
 )
 
-// Formato da OpenAI (Chat Completions): o que o Copilot (provedor próprio), o opencode e a
+// Format da OpenAI (Chat Completions): o que o Copilot (provedor próprio), o opencode e a
 // maioria dos clientes mandam para a OpenAI, a xAI (Grok), o OpenRouter e o endereço compatível
 // do Gemini. Vale para todo caminho terminado em /chat/completions, de qualquer provedor.
 //
 // Como no Gemini (gemini.go), a ida não tem um mascarador próprio: a requisição é vista na forma
-// da Anthropic (ponteOpenAI) e passa pelo mesmo caminho de /v1/messages. O que muda de nome:
+// da Anthropic (openAIBridge) e passa pelo mesmo caminho de /v1/messages. O que muda de nome:
 //
 //	messages[] com role "system"/"developer"   -> system
 //	tools[].function                           -> tools (descrição e schema)
@@ -27,62 +27,62 @@ import (
 //	reasoning_content / reasoning              -> não muda (o modelo só viu pseudônimos)
 
 // parâmetros da OpenAI que não levam dado do usuário (ou que não podem mudar)
-var paramsOpenAI = map[string]bool{"messages": true, "tools": true, "model": true, "stream": true, "stream_options": true,
+var openAIParams = map[string]bool{"messages": true, "tools": true, "model": true, "stream": true, "stream_options": true,
 	"tool_choice": true, "parallel_tool_calls": true, "temperature": true, "top_p": true, "n": true, "max_tokens": true,
 	"max_completion_tokens": true, "presence_penalty": true, "frequency_penalty": true, "logit_bias": true, "logprobs": true,
 	"top_logprobs": true, "seed": true, "stop": true, "reasoning_effort": true, "reasoning": true, "service_tier": true,
 	"store": true, "modalities": true, "verbosity": true, "prompt_cache_key": true, "safety_identifier": true}
 
-// marcaChamada: no tool_use criado pela ponte, o índice da chamada (tool_calls) de onde ele veio.
-const marcaChamada = "\x00chamada"
+// callMark: no tool_use criado pela ponte, o índice da chamada (tool_calls) de onde ele veio.
+const callMark = "\x00chamada"
 
-const notaArquivoOpenAI = "[llm-dlp] Um arquivo anexado foi retirado daqui e não foi enviado: o llm-dlp só consegue verificar imagem e PDF. Avise o usuário."
+const openAIFileNote = "[llm-dlp] Um arquivo anexado foi retirado daqui e não foi enviado: o llm-dlp só consegue verificar imagem e PDF. Avise o usuário."
 
 // dataURL separa "data:<tipo>;base64,<dados>".
-func dataURL(u string) (tipo, dados string, ok bool) {
-	resto, ok := strings.CutPrefix(u, "data:")
+func dataURL(u string) (typ, data string, ok bool) {
+	rest, ok := strings.CutPrefix(u, "data:")
 	if !ok {
 		return "", "", false
 	}
-	cab, dados, ok := strings.Cut(resto, ",")
-	if !ok || !strings.HasSuffix(cab, ";base64") {
+	hdr, data, ok := strings.Cut(rest, ",")
+	if !ok || !strings.HasSuffix(hdr, ";base64") {
 		return "", "", false
 	}
-	return strings.TrimSuffix(cab, ";base64"), dados, true
+	return strings.TrimSuffix(hdr, ";base64"), data, true
 }
 
-// blocosOpenAI: o conteúdo de uma mensagem (texto ou lista de partes) como blocos da Anthropic.
+// openAIBlocks: o conteúdo de uma mensagem (texto ou lista de partes) como blocos da Anthropic.
 // partes: as partes de onde os blocos vieram (nil quando o conteúdo era um texto só).
-func blocosOpenAI(conteudo any) (blocos []any, partes []map[string]any) {
-	blocos = []any{}
-	switch c := conteudo.(type) {
+func openAIBlocks(content any) (blocks []any, parts []map[string]any) {
+	blocks = []any{}
+	switch c := content.(type) {
 	case string:
 		return []any{map[string]any{"type": "text", "text": c}}, nil
 	case []any:
-		partes = []map[string]any{}
+		parts = []map[string]any{}
 		for _, x := range c {
 			pm, _ := x.(map[string]any)
 			if pm == nil {
 				continue
 			}
-			b := map[string]any{marcaParte: len(partes)}
-			partes = append(partes, pm)
-			midia := func(u string) {
-				tipo, dados, ok := dataURL(u)
+			b := map[string]any{partMark: len(parts)}
+			parts = append(parts, pm)
+			media := func(u string) {
+				typ, data, ok := dataURL(u)
 				switch {
 				case !ok:
 					b["type"] = "server_tool_use" // endereço ou arquivo já do lado da API: não muda
 					return
-				case tipo == "application/pdf":
+				case typ == "application/pdf":
 					b["type"] = "document"
-				case strings.HasPrefix(tipo, "image/"):
+				case strings.HasPrefix(typ, "image/"):
 					b["type"] = "image"
 				default:
-					delete(b, marcaParte)
-					b["type"], b["text"] = "text", notaArquivoOpenAI
+					delete(b, partMark)
+					b["type"], b["text"] = "text", openAIFileNote
 					return
 				}
-				b["source"] = map[string]any{"type": "base64", "media_type": tipo, "data": dados}
+				b["source"] = map[string]any{"type": "base64", "media_type": typ, "data": data}
 			}
 			switch pm["type"] {
 			case "text", "input_text", "output_text":
@@ -90,29 +90,29 @@ func blocosOpenAI(conteudo any) (blocos []any, partes []map[string]any) {
 			case "image_url":
 				im, _ := pm["image_url"].(map[string]any)
 				u, _ := im["url"].(string)
-				midia(u)
+				media(u)
 			case "file":
 				fm, _ := pm["file"].(map[string]any)
 				u, _ := fm["file_data"].(string)
-				midia(u)
+				media(u)
 			case "input_audio", "audio":
-				delete(b, marcaParte) // áudio: não há como verificar; não sai (falha fechada)
-				b["type"], b["text"] = "text", notaArquivoOpenAI
+				delete(b, partMark) // áudio: não há como verificar; não sai (falha fechada)
+				b["type"], b["text"] = "text", openAIFileNote
 			default:
 				b["type"], b["parte"] = "parte desconhecida", pm // mascara todo texto dela, por precaução
 			}
-			blocos = append(blocos, b)
+			blocks = append(blocks, b)
 		}
 	}
-	return blocos, partes
+	return blocks, parts
 }
 
-// conteudoOpenAI: os blocos já mascarados, de volta como o conteúdo de uma mensagem da OpenAI.
+// openAIContent: os blocos já mascarados, de volta como o conteúdo de uma mensagem da OpenAI.
 // O bloco que veio de uma parte atualiza a própria parte; o bloco novo (a nota do llm-dlp, a
 // página de um PDF) vira uma parte de texto nova. Com partes == nil o conteúdo era um texto.
-func conteudoOpenAI(blocos any, partes []map[string]any) any {
-	bs, _ := blocos.([]any)
-	if partes == nil {
+func openAIContent(blocks any, parts []map[string]any) any {
+	bs, _ := blocks.([]any)
+	if parts == nil {
 		var ts []string
 		for _, x := range bs {
 			if b, _ := x.(map[string]any); b != nil && b["type"] == "text" {
@@ -129,8 +129,8 @@ func conteudoOpenAI(blocos any, partes []map[string]any) any {
 			continue
 		}
 		var pm map[string]any
-		if i, ok := b[marcaParte].(int); ok && i < len(partes) {
-			pm = partes[i]
+		if i, ok := b[partMark].(int); ok && i < len(parts) {
+			pm = parts[i]
 		}
 		src, _ := b["source"].(map[string]any)
 		switch b["type"] {
@@ -142,8 +142,8 @@ func conteudoOpenAI(blocos any, partes []map[string]any) any {
 		case "image", "document":
 			if src["type"] != "base64" { // PDF que virou texto mascarado
 				t, _ := src["data"].(string)
-				if titulo, _ := b["title"].(string); titulo != "" {
-					t = titulo + "\n\n" + t
+				if title, _ := b["title"].(string); title != "" {
+					t = title + "\n\n" + t
 				}
 				pm = map[string]any{"type": "text", "text": t}
 				break
@@ -169,17 +169,17 @@ func conteudoOpenAI(blocos any, partes []map[string]any) any {
 	return out
 }
 
-// ponteOpenAI devolve a requisição da OpenAI na forma da Anthropic e a função que, depois de
+// openAIBridge devolve a requisição da OpenAI na forma da Anthropic e a função que, depois de
 // mascarada, copia o resultado de volta para a requisição original. ok = false: não é uma
 // requisição com "messages" (cai no modo genérico, que mascara todo texto).
-func ponteOpenAI(v any) (map[string]any, func(), bool) {
+func openAIBridge(v any) (map[string]any, func(), bool) {
 	req, _ := v.(map[string]any)
-	lista, ok := req["messages"].([]any)
+	list, ok := req["messages"].([]any)
 	if !ok {
 		return nil, nil, false
 	}
 	anth := map[string]any{}
-	var voltas []func()
+	var returns []func()
 
 	if ts, _ := req["tools"].([]any); ts != nil {
 		tools := []any{}
@@ -192,43 +192,43 @@ func ponteOpenAI(v any) (map[string]any, func(), bool) {
 		anth["tools"] = tools
 	}
 
-	sistema := []any{}
+	system := []any{}
 	msgs := []any{}
-	for _, x := range lista {
+	for _, x := range list {
 		mm, _ := x.(map[string]any)
 		if mm == nil {
 			continue
 		}
-		papel, _ := mm["role"].(string)
-		blocos, partes := blocosOpenAI(mm["content"])
-		temConteudo := mm["content"] != nil
-		switch papel {
+		hostRole, _ := mm["role"].(string)
+		blocks, parts := openAIBlocks(mm["content"])
+		hasContent := mm["content"] != nil
+		switch hostRole {
 		case "system", "developer":
 			// instruções do cliente: cada texto é mascarado no lugar
-			for _, bx := range blocos {
+			for _, bx := range blocks {
 				b := bx.(map[string]any)
 				if b["type"] != "text" {
 					continue
 				}
-				sistema = append(sistema, b)
-				if partes == nil {
-					voltas = append(voltas, func() { mm["content"] = b["text"] })
-				} else if i, ok := b[marcaParte].(int); ok {
-					pm := partes[i]
-					voltas = append(voltas, func() { pm["text"] = b["text"] })
+				system = append(system, b)
+				if parts == nil {
+					returns = append(returns, func() { mm["content"] = b["text"] })
+				} else if i, ok := b[partMark].(int); ok {
+					pm := parts[i]
+					returns = append(returns, func() { pm["text"] = b["text"] })
 				}
 			}
 			continue
 		case "tool", "function":
 			id, _ := mm["tool_call_id"].(string)
-			res := map[string]any{"type": "tool_result", "tool_use_id": id, "content": blocos}
+			res := map[string]any{"type": "tool_result", "tool_use_id": id, "content": blocks}
 			am := map[string]any{"role": "user", "content": []any{res}}
 			msgs = append(msgs, am)
-			if temConteudo {
-				voltas = append(voltas, func() {
+			if hasContent {
+				returns = append(returns, func() {
 					if bs, _ := am["content"].([]any); len(bs) > 0 {
 						if r, _ := bs[0].(map[string]any); r != nil {
-							mm["content"] = conteudoOpenAI(r["content"], partes)
+							mm["content"] = openAIContent(r["content"], parts)
 						}
 					}
 				})
@@ -236,11 +236,11 @@ func ponteOpenAI(v any) (map[string]any, func(), bool) {
 			continue
 		}
 		am := map[string]any{"role": "user"}
-		if papel == "assistant" {
+		if hostRole == "assistant" {
 			am["role"] = "assistant"
 		}
-		var chamadas []map[string]any
-		var antes [][]byte
+		var calls []map[string]any
+		var before [][]byte
 		tcs, _ := mm["tool_calls"].([]any)
 		for _, t := range tcs {
 			tm, _ := t.(map[string]any)
@@ -248,58 +248,58 @@ func ponteOpenAI(v any) (map[string]any, func(), bool) {
 			if fm == nil {
 				continue
 			}
-			var entrada any = map[string]any{}
+			var entry any = map[string]any{}
 			if args, _ := fm["arguments"].(string); strings.TrimSpace(args) != "" {
-				if dec, ok := decodificar([]byte(args)); ok {
-					entrada = dec
+				if dec, ok := decode([]byte(args)); ok {
+					entry = dec
 				} else {
-					entrada = map[string]any{"\x00cru": args} // não é JSON: mascara o texto como veio
+					entry = map[string]any{"\x00cru": args} // não é JSON: mascara o texto como veio
 				}
 			}
-			blocos = append(blocos, map[string]any{"type": "tool_use", "id": tm["id"], "name": fm["name"], "input": entrada, marcaChamada: len(chamadas)})
-			chamadas = append(chamadas, fm)
-			antes = append(antes, codificar(entrada))
+			blocks = append(blocks, map[string]any{"type": "tool_use", "id": tm["id"], "name": fm["name"], "input": entry, callMark: len(calls)})
+			calls = append(calls, fm)
+			before = append(before, encode(entry))
 		}
-		am["content"] = blocos
+		am["content"] = blocks
 		msgs = append(msgs, am)
-		voltas = append(voltas, func() {
+		returns = append(returns, func() {
 			bs, _ := am["content"].([]any)
-			resto := make([]any, 0, len(bs))
+			rest := make([]any, 0, len(bs))
 			for _, bx := range bs {
 				b, _ := bx.(map[string]any)
-				i, ehChamada := b[marcaChamada].(int)
-				if !ehChamada || i >= len(chamadas) {
-					resto = append(resto, bx)
+				i, isCall := b[callMark].(int)
+				if !isCall || i >= len(calls) {
+					rest = append(rest, bx)
 					continue
 				}
 				// só reescreve os argumentos que mudaram (o texto original fica como o cliente mandou)
-				if novo := codificar(b["input"]); !bytes.Equal(novo, antes[i]) {
+				if newOne := encode(b["input"]); !bytes.Equal(newOne, before[i]) {
 					if m, _ := b["input"].(map[string]any); m != nil && len(m) == 1 && m["\x00cru"] != nil {
-						chamadas[i]["arguments"] = m["\x00cru"]
+						calls[i]["arguments"] = m["\x00cru"]
 					} else {
-						chamadas[i]["arguments"] = string(novo)
+						calls[i]["arguments"] = string(newOne)
 					}
 				}
 			}
-			if temConteudo {
-				mm["content"] = conteudoOpenAI(resto, partes)
+			if hasContent {
+				mm["content"] = openAIContent(rest, parts)
 			}
 		})
 	}
-	if len(sistema) > 0 {
-		anth["system"] = sistema
+	if len(system) > 0 {
+		anth["system"] = system
 	}
 	anth["messages"] = msgs
 
-	for _, k := range chaves(req) {
-		if !paramsOpenAI[k] { // campo que não conheço: mascara por precaução, como na Anthropic
+	for _, k := range keys(req) {
+		if !openAIParams[k] { // campo que não conheço: mascara por precaução, como na Anthropic
 			k := k
 			anth["openai:"+k] = req[k]
-			voltas = append(voltas, func() { req[k] = anth["openai:"+k] })
+			returns = append(returns, func() { req[k] = anth["openai:"+k] })
 		}
 	}
 	return anth, func() {
-		for _, f := range voltas {
+		for _, f := range returns {
 			f()
 		}
 	}, true
@@ -307,43 +307,43 @@ func ponteOpenAI(v any) (map[string]any, func(), bool) {
 
 // ---- volta --------------------------------------------------------------------------------
 
-// voltaOpenAI desmascara a resposta em streaming. O texto de cada escolha (choice) passa por um
-// Fluxo, que segura o pseudônimo cortado entre dois pedaços; os argumentos de cada chamada de
-// ferramenta chegam em pedaços de JSON e passam por um Fluxo próprio (o valor real é escapado).
-type voltaOpenAI struct {
-	p      *Proxy
-	tab    *mask.Tabela
-	textos map[int]*fluxoOpenAI
-	args   map[[2]int]*fluxoOpenAI // (escolha, índice da chamada)
+// openAIReturn desmascara a resposta em streaming. O texto de cada escolha (choice) passa por um
+// Stream, que segura o pseudônimo cortado entre dois pedaços; os argumentos de cada chamada de
+// ferramenta chegam em pedaços de JSON e passam por um Stream próprio (o valor real é escapado).
+type openAIReturn struct {
+	p     *Proxy
+	tab   *mask.Table
+	texts map[int]*openAIStream
+	args  map[[2]int]*openAIStream // (escolha, índice da chamada)
 	// cabecalho: os campos de fora do último pedaço (id, model...), para um pedaço a mais no fim
-	cabecalho map[string]any
+	header map[string]any
 }
 
-type fluxoOpenAI struct {
-	f    *mask.Fluxo
-	orig strings.Builder
-	cru  bool // ferramenta que vai para a internet: os argumentos seguem com os pseudônimos
+type openAIStream struct {
+	f        *mask.Stream
+	orig     strings.Builder
+	rawValue bool // ferramenta que vai para a internet: os argumentos seguem com os pseudônimos
 }
 
-func (p *Proxy) novaVoltaOpenAI(tab *mask.Tabela) *voltaOpenAI {
-	return &voltaOpenAI{p: p, tab: tab, textos: map[int]*fluxoOpenAI{}, args: map[[2]int]*fluxoOpenAI{}}
+func (p *Proxy) newOpenAIReturn(tab *mask.Table) *openAIReturn {
+	return &openAIReturn{p: p, tab: tab, texts: map[int]*openAIStream{}, args: map[[2]int]*openAIStream{}}
 }
 
-func (g *voltaOpenAI) reg(s string) string { return g.p.m.RegistrarResposta(s, g.tab) }
+func (g *openAIReturn) reg(s string) string { return g.p.m.RecordResponse(s, g.tab) }
 
-// soltarTexto: o texto que o fluxo da escolha ainda segurava, e registra o que a API escreveu.
-func (g *voltaOpenAI) soltarTexto(i int) string {
-	fx := g.textos[i]
+// releaseText: o texto que o fluxo da escolha ainda segurava, e registra o que a API escreveu.
+func (g *openAIReturn) releaseText(i int) string {
+	fx := g.texts[i]
 	if fx == nil {
 		return ""
 	}
-	delete(g.textos, i)
+	delete(g.texts, i)
 	g.reg(fx.orig.String())
-	return fx.f.Fechar()
+	return fx.f.Close()
 }
 
-// soltarArgs: o que os fluxos das chamadas da escolha ainda seguravam, como pedaços de tool_calls.
-func (g *voltaOpenAI) soltarArgs(i int) []any {
+// releaseArgs: o que os fluxos das chamadas da escolha ainda seguravam, como pedaços de tool_calls.
+func (g *openAIReturn) releaseArgs(i int) []any {
 	var ks [][2]int
 	for k := range g.args {
 		if k[0] == i {
@@ -355,32 +355,32 @@ func (g *voltaOpenAI) soltarArgs(i int) []any {
 	for _, k := range ks {
 		fx := g.args[k]
 		delete(g.args, k)
-		if fx.cru {
+		if fx.rawValue {
 			continue
 		}
-		registrarBloco("tool_use", fx.orig.String(), g.reg)
-		if resto := fx.f.Fechar(); resto != "" {
-			out = append(out, map[string]any{"index": k[1], "function": map[string]any{"arguments": resto}})
+		recordBlock("tool_use", fx.orig.String(), g.reg)
+		if rest := fx.f.Close(); rest != "" {
+			out = append(out, map[string]any{"index": k[1], "function": map[string]any{"arguments": rest}})
 		}
 	}
 	return out
 }
 
 // pedaco desmascara um pedaço do streaming, no lugar.
-func (g *voltaOpenAI) pedaco(resp map[string]any) {
-	g.cabecalho = map[string]any{}
+func (g *openAIReturn) piece(resp map[string]any) {
+	g.header = map[string]any{}
 	for _, k := range []string{"id", "object", "created", "model", "system_fingerprint"} {
 		if v, ok := resp[k]; ok {
-			g.cabecalho[k] = v
+			g.header[k] = v
 		}
 	}
-	escolhas, _ := resp["choices"].([]any)
-	for pos, c := range escolhas {
+	choices, _ := resp["choices"].([]any)
+	for pos, c := range choices {
 		cm, _ := c.(map[string]any)
 		if cm == nil {
 			continue
 		}
-		i := intDe(cm["index"])
+		i := intOf(cm["index"])
 		if i < 0 {
 			i = pos
 		}
@@ -390,19 +390,19 @@ func (g *voltaOpenAI) pedaco(resp map[string]any) {
 		}
 		tcs, _ := d["tool_calls"].([]any)
 		if t, ok := d["content"].(string); ok {
-			fx := g.textos[i]
+			fx := g.texts[i]
 			if fx == nil {
-				fx = &fluxoOpenAI{f: g.tab.NovoFluxo(false)}
-				g.textos[i] = fx
+				fx = &openAIStream{f: g.tab.NewStream(false)}
+				g.texts[i] = fx
 			}
 			fx.orig.WriteString(t)
-			d["content"] = fx.f.Empurrar(t)
+			d["content"] = fx.f.Push(t)
 		}
-		fim := cm["finish_reason"] != nil
-		if len(tcs) > 0 || fim { // o texto acabou: entrega o que estava segurado
-			if resto := g.soltarTexto(i); resto != "" {
+		end := cm["finish_reason"] != nil
+		if len(tcs) > 0 || end { // o texto acabou: entrega o que estava segurado
+			if rest := g.releaseText(i); rest != "" {
 				t, _ := d["content"].(string)
-				d["content"] = t + resto
+				d["content"] = t + rest
 				cm["delta"] = d
 			}
 		}
@@ -412,22 +412,22 @@ func (g *voltaOpenAI) pedaco(resp map[string]any) {
 			if fm == nil {
 				continue
 			}
-			k := [2]int{i, max(intDe(tm["index"]), 0)}
+			k := [2]int{i, max(intOf(tm["index"]), 0)}
 			fx := g.args[k]
 			if fx == nil {
-				fx = &fluxoOpenAI{f: g.tab.NovoFluxo(true)}
+				fx = &openAIStream{f: g.tab.NewStream(true)}
 				g.args[k] = fx
 			}
-			if nome, _ := fm["name"].(string); nome != "" && g.p.semDesmascararPonte(nome) {
-				fx.cru = true
+			if name, _ := fm["name"].(string); name != "" && g.p.bridgeNoUnmask(name) {
+				fx.rawValue = true
 			}
-			if a, ok := fm["arguments"].(string); ok && !fx.cru {
+			if a, ok := fm["arguments"].(string); ok && !fx.rawValue {
 				fx.orig.WriteString(a)
-				fm["arguments"] = fx.f.Empurrar(a)
+				fm["arguments"] = fx.f.Push(a)
 			}
 		}
-		if fim {
-			if extra := g.soltarArgs(i); len(extra) > 0 {
+		if end {
+			if extra := g.releaseArgs(i); len(extra) > 0 {
 				d["tool_calls"] = append(tcs, extra...)
 				cm["delta"] = d
 			}
@@ -436,68 +436,68 @@ func (g *voltaOpenAI) pedaco(resp map[string]any) {
 }
 
 // resto: o que ficou segurado quando o streaming acaba sem finish_reason, como um pedaço a mais.
-func (g *voltaOpenAI) resto() map[string]any {
+func (g *openAIReturn) rest() map[string]any {
 	idx := map[int]bool{}
-	for i := range g.textos {
+	for i := range g.texts {
 		idx[i] = true
 	}
 	for k := range g.args {
 		idx[k[0]] = true
 	}
-	ordem := make([]int, 0, len(idx))
+	order := make([]int, 0, len(idx))
 	for i := range idx {
-		ordem = append(ordem, i)
+		order = append(order, i)
 	}
-	sort.Ints(ordem)
-	var escolhas []any
-	for _, i := range ordem {
+	sort.Ints(order)
+	var choices []any
+	for _, i := range order {
 		d := map[string]any{}
-		if s := g.soltarTexto(i); s != "" {
+		if s := g.releaseText(i); s != "" {
 			d["content"] = s
 		}
-		if extra := g.soltarArgs(i); len(extra) > 0 {
+		if extra := g.releaseArgs(i); len(extra) > 0 {
 			d["tool_calls"] = extra
 		}
 		if len(d) > 0 {
-			escolhas = append(escolhas, map[string]any{"index": i, "delta": d, "finish_reason": nil})
+			choices = append(choices, map[string]any{"index": i, "delta": d, "finish_reason": nil})
 		}
 	}
-	if escolhas == nil {
+	if choices == nil {
 		return nil
 	}
-	m := map[string]any{"choices": escolhas}
-	for k, v := range g.cabecalho {
+	m := map[string]any{"choices": choices}
+	for k, v := range g.header {
 		m[k] = v
 	}
 	return m
 }
 
-// desmascararSSEOpenAI: streaming. Cada linha "data:" é um pedaço; a última é "data: [DONE]".
-func (p *Proxy) desmascararSSEOpenAI(w http.ResponseWriter, body io.Reader, tab *mask.Tabela) error {
+// unmaskSSEOpenAI: streaming. Cada linha "data:" é um pedaço; a última é "data: [DONE]".
+func (p *Proxy) unmaskSSEOpenAI(w http.ResponseWriter, body io.Reader, tab *mask.Table) error {
 	fl, _ := w.(http.Flusher)
 	rd := bufio.NewReaderSize(body, 64<<10)
-	g := p.novaVoltaOpenAI(tab)
-	sobra := func() {
-		if m := g.resto(); m != nil {
-			fmt.Fprintf(w, "data: %s\n\n", codificar(m))
+	g := p.newOpenAIReturn(tab)
+	leftover := func() {
+		if m := g.rest(); m != nil {
+			fmt.Fprintf(w, "data: %s\n\n", encode(m))
 		}
 	}
 	for {
-		linha, err := rd.ReadString('\n')
-		l := strings.TrimRight(linha, "\r\n")
-		if dados, ok := strings.CutPrefix(l, "data:"); ok && !tab.Vazia() {
-			if strings.TrimSpace(dados) == "[DONE]" {
-				sobra()
-			} else if v, ok := decodificar([]byte(dados)); ok {
+		line, err := rd.ReadString('\n')
+		l := strings.TrimRight(line, "\r\n")
+		if data, ok := strings.CutPrefix(l, "data:"); ok && !tab.Empty() {
+			if strings.TrimSpace(data) == "[DONE]" {
+				leftover()
+			} else if v, ok := decode([]byte(data)); ok {
 				if m, _ := v.(map[string]any); m != nil {
-					g.pedaco(m)
-					linha = "data: " + string(codificar(m)) + linha[len(l):]
+					g.piece(m)
+					line = "data: " + string(encode(m)) + line[len(l):]
 				}
 			}
 		}
-		io.WriteString(w, linha)
+		io.WriteString(w, line)
 		if err != nil {
-			sobra()
+			leftover()
 			if fl != nil {
 				fl.Flush()
 			}
@@ -512,17 +512,17 @@ func (p *Proxy) desmascararSSEOpenAI(w http.ResponseWriter, body io.Reader, tab 
 	}
 }
 
-// desmascararOpenAIJSON: resposta sem streaming. O texto de cada escolha e os argumentos de cada
+// unmaskOpenAIJSON: resposta sem streaming. O texto de cada escolha e os argumentos de cada
 // chamada de ferramenta voltam reais; o raciocínio (reasoning_content) não muda.
-func (p *Proxy) desmascararOpenAIJSON(b []byte, tab *mask.Tabela) []byte {
-	v, ok := decodificar(b)
+func (p *Proxy) unmaskOpenAIJSON(b []byte, tab *mask.Table) []byte {
+	v, ok := decode(b)
 	resp, _ := v.(map[string]any)
 	if !ok || resp == nil {
 		return b
 	}
-	reg := func(s string) string { return p.m.RegistrarResposta(s, tab) }
-	escolhas, _ := resp["choices"].([]any)
-	for _, c := range escolhas {
+	reg := func(s string) string { return p.m.RecordResponse(s, tab) }
+	choices, _ := resp["choices"].([]any)
+	for _, c := range choices {
 		cm, _ := c.(map[string]any)
 		msg, _ := cm["message"].(map[string]any)
 		if msg == nil {
@@ -544,17 +544,17 @@ func (p *Proxy) desmascararOpenAIJSON(b []byte, tab *mask.Tabela) []byte {
 		for _, t := range tcs {
 			tm, _ := t.(map[string]any)
 			fm, _ := tm["function"].(map[string]any)
-			nome, _ := fm["name"].(string)
+			name, _ := fm["name"].(string)
 			args, ok := fm["arguments"].(string)
-			if fm == nil || !ok || p.semDesmascararPonte(nome) {
+			if fm == nil || !ok || p.bridgeNoUnmask(name) {
 				continue
 			}
-			if dec, ok := decodificar([]byte(args)); ok {
-				fm["arguments"] = string(codificar(registrarTudo(dec, reg)))
+			if dec, ok := decode([]byte(args)); ok {
+				fm["arguments"] = string(encode(recordAll(dec, reg)))
 			} else {
-				fm["arguments"] = tab.Desmascarar(args, true)
+				fm["arguments"] = tab.Unmask(args, true)
 			}
 		}
 	}
-	return codificar(resp)
+	return encode(resp)
 }

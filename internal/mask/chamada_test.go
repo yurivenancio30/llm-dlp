@@ -6,70 +6,70 @@ import (
 	"testing"
 )
 
-// Chamada de ferramenta (chamada.go, chamada_decisor.go): proveniência,
-// identidade, eco, tipo do pedido. Nomes inventados, vários de palavra comum.
+// Call de ferramenta (chamada.go, chamada_decisor.go): proveniência,
+// identidade, eco, tipo do pedido. Names inventados, vários de palavra comum.
 
-// passoConversa: uma mensagem do usuário (opcional), a chamada e a saída dela.
-type passoConversa struct {
-	usuario string
-	cmd     string
-	saida   string
-	trad    []PalavraTraduzida
+// conversationStep: uma mensagem do usuário (opcional), a chamada e a saída dela.
+type conversationStep struct {
+	user   string
+	cmd    string
+	output string
+	trans  []TranslatedWord
 }
 
-// saidaMascarada: o resultado de um passo (texto mascarado, decisões, entrada mascarada).
-type saidaMascarada struct {
-	texto, entrada string
-	dec            []Decisao
-	decUso         []Decisao
+// maskedOutput: o resultado de um passo (texto mascarado, decisões, entrada mascarada).
+type maskedOutput struct {
+	text, entry string
+	dec         []Decision
+	decUsage    []Decision
 }
 
-// rodarConversa: os passos em ordem, como o proxy (dicasDosComandos + walker) faz.
-func rodarConversa(t *testing.T, m *Masker, ps []passoConversa) []saidaMascarada {
+// runConversation: os passos em ordem, como o proxy (commandHints + walker) faz.
+func runConversation(t *testing.T, m *Masker, ps []conversationStep) []maskedOutput {
 	t.Helper()
-	cs := NovosComandos()
+	cs := NewCommands()
 	for _, p := range ps {
-		cs.Argumentos(p.cmd)
+		cs.ArgumentText(p.cmd)
 	}
-	var out []saidaMascarada
+	var out []maskedOutput
 	for _, p := range ps {
-		if p.usuario != "" {
-			cs.Usuario(p.usuario)
+		if p.user != "" {
+			cs.User(p.user)
 		}
-		ch := cs.Uso(p.cmd, p.trad)
-		var sm saidaMascarada
-		dicaUso := ComExtensao("", ch.ExtUso())
-		ru, _ := m.mascararD(p.cmd, true, dicaUso)
-		sm.entrada, sm.decUso = ru.texto, ru.decididos
-		cs.FimTurno()
-		dica := ComExtensao(cs.Dica(p.cmd, p.saida), cs.Resultado(ch, p.saida))
-		r, _ := m.mascararD(p.saida, true, dica)
-		sm.texto, sm.dec = r.texto, r.decididos
+		ch := cs.Usage(p.cmd, p.trans)
+		var sm maskedOutput
+		usageHint := WithExtension("", ch.UsageExt())
+		ru, _ := m.maskD(p.cmd, true, usageHint)
+		sm.entry, sm.decUsage = ru.text, ru.decidedSet
+		cs.EndTurn()
+		hint := WithExtension(cs.Hint(p.cmd, p.output), cs.Result(ch, p.output))
+		r, _ := m.maskD(p.output, true, hint)
+		sm.text, sm.dec = r.text, r.decidedSet
 		out = append(out, sm)
 	}
 	return out
 }
 
-func palavraInteira(s, w string) bool {
+func wholeWord(s, w string) bool {
 	return regexp.MustCompile(`(^|[^\pL\pN_])` + regexp.QuoteMeta(w) + `($|[^\pL\pN_])`).MatchString(s)
 }
 
-// memoriaSimples: o que a memória da conversa faz com as decisões, de forma simples:
+// simpleMemory: o que a memória da conversa faz com as decisões, de forma simples:
 // a palavra inteira vira o pseudônimo do tipo decidido.
-func memoriaSimples(m *Masker, s string, ds []Decisao) string {
+func simpleMemory(m *Masker, s string, ds []Decision) string {
 	for _, d := range ds {
-		if d.Generica {
+		if d.Generic {
 			continue
 		}
-		re := regexp.MustCompile(`(^|[^\pL\pN_])` + regexp.QuoteMeta(d.Nome) + `($|[^\pL\pN_])`)
-		ps := m.Pseudonimo(prefTipoObj+d.Ent, d.Nome)
+		re := regexp.MustCompile(`(^|[^\pL\pN_])` + regexp.QuoteMeta(d.Name) + `($|[^\pL\pN_])`)
+		ps := m.Pseudonym(objTypePrefix+d.Ent, d.Name)
 		s = re.ReplaceAllString(s, "${1}"+ps+"${2}")
 	}
 	return s
 }
 
-// seisFormatos: o mesmo nome solto em 6 formatos.
-func seisFormatos(n string) []string {
+// sixFormats: o mesmo nome solto em 6 formatos.
+func sixFormats(n string) []string {
 	return []string{
 		"o " + n + " parou de responder hoje cedo",
 		"(" + n + ", 3)",
@@ -81,12 +81,12 @@ func seisFormatos(n string) []string {
 }
 
 type areaT2 struct {
-	nome    string
-	usuario string
-	cmd     string
-	saida   string
-	nomes   []string // os nomes (palavra comum) que a saída traz
-	tipo    string   // o tipo esperado ("" = qualquer)
+	name   string
+	user   string
+	cmd    string
+	output string
+	names  []string // os nomes (palavra comum) que a saída traz
+	typ    string   // o tipo esperado ("" = qualquer)
 }
 
 var areasT2 = []areaT2{
@@ -122,19 +122,19 @@ var areasT2 = []areaT2{
 }
 
 // Para cada área, a saída do inventário é mascarada e cada nome fica decidido (sem
-// Generica); com a memória da conversa (simulada aqui), o mesmo nome solto em 6 formatos fica
+// Generic); com a memória da conversa (simulada aqui), o mesmo nome solto em 6 formatos fica
 // 0 em claro.
-func TestT2InventarioPalavraComum(t *testing.T) {
+func TestT2InventoryCommonWord(t *testing.T) {
 	for _, ar := range areasT2 {
-		t.Run(ar.nome, func(t *testing.T) {
-			m := novoTeste(t)
-			r := rodarConversa(t, m, []passoConversa{{usuario: ar.usuario, cmd: ar.cmd, saida: ar.saida}})[0]
-			dec := map[string]Decisao{}
+		t.Run(ar.name, func(t *testing.T) {
+			m := newTest(t)
+			r := runConversation(t, m, []conversationStep{{user: ar.user, cmd: ar.cmd, output: ar.output}})[0]
+			dec := map[string]Decision{}
 			for _, d := range r.dec {
-				dec[d.Nome] = d
+				dec[d.Name] = d
 			}
-			for _, n := range ar.nomes {
-				if palavraInteira(r.texto, n) {
+			for _, n := range ar.names {
+				if wholeWord(r.text, n) {
 					t.Errorf("%s em claro na saída do inventário", n)
 				}
 				d, ok := dec[n]
@@ -142,15 +142,15 @@ func TestT2InventarioPalavraComum(t *testing.T) {
 					t.Errorf("%s não ficou nas decisões", n)
 					continue
 				}
-				if d.Generica {
+				if d.Generic {
 					t.Errorf("%s marcado como genérico", n)
 				}
-				if ar.tipo != "" && d.Ent != ar.tipo {
-					t.Errorf("%s: tipo %q, esperado %q", n, d.Ent, ar.tipo)
+				if ar.typ != "" && d.Ent != ar.typ {
+					t.Errorf("%s: tipo %q, esperado %q", n, d.Ent, ar.typ)
 				}
-				for _, f := range seisFormatos(n) {
-					o, _ := m.Mascarar(f)
-					if o = memoriaSimples(m, o, r.dec); palavraInteira(o, n) {
+				for _, f := range sixFormats(n) {
+					o, _ := m.Mask(f)
+					if o = simpleMemory(m, o, r.dec); wholeWord(o, n) {
 						t.Errorf("%s em claro em %q", n, f)
 					}
 				}
@@ -162,9 +162,9 @@ func TestT2InventarioPalavraComum(t *testing.T) {
 // O experimento do catálogo. O CSV (inventado) é lido com head e depois por um script
 // Python que imprime "a | b | c" sem cabeçalho; o script traz as tags e as regex como literais.
 // Colunas e tabelas saem mascaradas; tags e regex continuam legíveis.
-func TestT1Catalogo(t *testing.T) {
-	type linha struct{ tag, ordem, regex, tabela, coluna, tipo string }
-	ls := []linha{
+func TestT1Catalog(t *testing.T) {
+	type line struct{ tag, order, regex, table, column, typ string }
+	ls := []line{
 		{"cpf", "1", "^(cpf|nr_cpf)$", "dim_cliente", "documento", "VARCHAR"},
 		{"email", "2", "^e?mail$", "dim_cliente", "contato", "VARCHAR"},
 		{"nascimento", "3", "^dt_nasc", "dim_cliente", "aniversario", "DATE"},
@@ -174,11 +174,11 @@ func TestT1Catalogo(t *testing.T) {
 		{"saldo", "7", "saldo", "cad_conta", "disponivel", "NUMBER"},
 		{"telefone", "8", "^(tel|fone)", "carteira", "celular", "VARCHAR"},
 	}
-	var csv, saida strings.Builder
+	var csv, output strings.Builder
 	csv.WriteString("tag,ordem,regex,plataforma,tabela,coluna,tipo\n")
 	for _, l := range ls {
-		csv.WriteString(l.tag + "," + l.ordem + "," + l.regex + ",snowflake," + l.tabela + "," + l.coluna + "," + l.tipo + "\n")
-		saida.WriteString(l.tag + " | " + l.ordem + " | " + l.regex + " | snowflake | " + l.tabela + " | " + l.coluna + " | " + l.tipo + "\n")
+		csv.WriteString(l.tag + "," + l.order + "," + l.regex + ",snowflake," + l.table + "," + l.column + "," + l.typ + "\n")
+		output.WriteString(l.tag + " | " + l.order + " | " + l.regex + " | snowflake | " + l.table + " | " + l.column + " | " + l.typ + "\n")
 	}
 	var script strings.Builder
 	script.WriteString("python3 - <<'EOF'\nimport csv\nTAGS = [")
@@ -196,33 +196,33 @@ func TestT1Catalogo(t *testing.T) {
 		"    if r['tag'] in TAGS:\n" +
 		"        print(f\"{r['tag']} | {r['ordem']} | {REGEX[r['tag']]} | {r['plataforma']} | {r['tabela']} | {r['coluna']} | {r['tipo']}\")\nEOF")
 
-	m := novoTeste(t)
-	rs := rodarConversa(t, m, []passoConversa{
-		{cmd: "head -20 dados/catalogo.csv", saida: csv.String()},
-		{cmd: script.String(), saida: saida.String()},
+	m := newTest(t)
+	rs := runConversation(t, m, []conversationStep{
+		{cmd: "head -20 dados/catalogo.csv", output: csv.String()},
+		{cmd: script.String(), output: output.String()},
 	})
-	var dec []Decisao
+	var dec []Decision
 	for _, r := range rs {
 		dec = append(dec, r.dec...)
 	}
-	py := rs[1].texto
+	py := rs[1].text
 	// a parte desta trilha, sem a memória da conversa: as colunas (identidade + proveniência)
 	// e as tabelas com cara de identificador (aprendidas no head)
 	for _, l := range ls {
-		if palavraInteira(py, l.coluna) {
-			t.Errorf("coluna %s em claro na saída do script", l.coluna)
+		if wholeWord(py, l.column) {
+			t.Errorf("coluna %s em claro na saída do script", l.column)
 		}
-		if l.tabela != "carteira" && palavraInteira(py, l.tabela) {
-			t.Errorf("tabela %s em claro na saída do script", l.tabela)
+		if l.table != "carteira" && wholeWord(py, l.table) {
+			t.Errorf("tabela %s em claro na saída do script", l.table)
 		}
 	}
 	// com a memória da conversa (simulada): também a tabela de palavra comum
-	if o := memoriaSimples(m, py, dec); palavraInteira(o, "carteira") {
+	if o := simpleMemory(m, py, dec); wholeWord(o, "carteira") {
 		t.Errorf("tabela de palavra comum em claro com a memória da conversa")
 	}
 	// tags e regex: literais do programa, continuam legíveis
 	for _, l := range ls {
-		if !palavraInteira(py, l.tag) {
+		if !wholeWord(py, l.tag) {
 			t.Errorf("tag %s foi mascarada", l.tag)
 		}
 		if !strings.Contains(py, l.regex) {
@@ -233,37 +233,37 @@ func TestT1Catalogo(t *testing.T) {
 
 // Negativos: saídas comuns de ls, ps, git log e pip list (com a extensão da dica, como o proxy
 // manda) continuam sem nada mascarado.
-func TestChamadaNegativos(t *testing.T) {
-	casos := []passoConversa{
-		{usuario: "o build quebrou, veja o que tem na pasta", cmd: "ls -la",
-			saida: "total 48\ndrwxr-xr-x  6 dev dev 4096 Oct  6 10:01 .\ndrwxr-xr-x 30 dev dev 4096 Oct  1 09:00 ..\n" +
+func TestCallNegatives(t *testing.T) {
+	cases := []conversationStep{
+		{user: "o build quebrou, veja o que tem na pasta", cmd: "ls -la",
+			output: "total 48\ndrwxr-xr-x  6 dev dev 4096 Oct  6 10:01 .\ndrwxr-xr-x 30 dev dev 4096 Oct  1 09:00 ..\n" +
 				"drwxr-xr-x  2 dev dev 4096 Oct  6 10:01 docs\ndrwxr-xr-x  4 dev dev 4096 Oct  5 18:22 internal\n" +
 				"drwxr-xr-x  2 dev dev 4096 Oct  2 11:40 scripts\n-rw-r--r--  1 dev dev 1203 Oct  6 10:01 README.md\n" +
 				"-rw-r--r--  1 dev dev  311 Oct  3 08:15 Makefile\n"},
-		{cmd: "ls", saida: "docs\ninternal\nscripts\nREADME.md\nMakefile\ngo.mod\n"},
+		{cmd: "ls", output: "docs\ninternal\nscripts\nREADME.md\nMakefile\ngo.mod\n"},
 		{cmd: "ps aux",
-			saida: "USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND\n" +
+			output: "USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND\n" +
 				"root           1  0.0  0.1 167432 11000 ?        Ss   Oct05   0:03 /sbin/init\n" +
 				"dev         1834  0.2  1.5 912344 120000 pts/0   Sl   10:01   0:12 node server.js\n" +
 				"dev         2290  0.0  0.0  10072  3300 pts/1    Ss   10:05   0:00 bash\n" +
 				"dev         2301  0.0  0.0  12000  3500 pts/1    R+   10:06   0:00 ps aux\n"},
 		{cmd: "git log -3",
-			saida: "commit 3f2a9c1d8e7b6a5f4e3d2c1b0a9f8e7d6c5b4a3f\nAuthor: Dev <dev@exemplo.invalid>\nDate:   Mon Oct 6 10:00:00 2026 -0300\n\n" +
+			output: "commit 3f2a9c1d8e7b6a5f4e3d2c1b0a9f8e7d6c5b4a3f\nAuthor: Dev <dev@exemplo.invalid>\nDate:   Mon Oct 6 10:00:00 2026 -0300\n\n" +
 				"    corrige o leitor de tabela\n\ncommit 1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b\nAuthor: Dev <dev@exemplo.invalid>\nDate:   Sun Oct 5 18:00:00 2026 -0300\n\n" +
 				"    ajusta testes\n"},
 		{cmd: "pip list",
-			saida: "Package    Version\n---------- -------\ncertifi    2024.2.2\nidna       3.6\nrequests   2.31.0\nurllib3    2.2.1\nsetuptools 69.0.3\n"},
-		{cmd: "git status --short", saida: " M internal/mask/chamada.go\n M internal/proxy/requisicao.go\n?? notas.txt\n"},
+			output: "Package    Version\n---------- -------\ncertifi    2024.2.2\nidna       3.6\nrequests   2.31.0\nurllib3    2.2.1\nsetuptools 69.0.3\n"},
+		{cmd: "git status --short", output: " M internal/mask/chamada.go\n M internal/proxy/requisicao.go\n?? notas.txt\n"},
 	}
-	for _, p := range casos {
-		m := novoTeste(t)
-		r := rodarConversa(t, m, []passoConversa{p})[0]
-		base, _ := m.mascararD(p.saida, true, "")
-		if r.texto != base.texto {
-			t.Errorf("%s: as regras de chamada mascararam a mais:\n%s", p.cmd, r.texto)
+	for _, p := range cases {
+		m := newTest(t)
+		r := runConversation(t, m, []conversationStep{p})[0]
+		base, _ := m.maskD(p.output, true, "")
+		if r.text != base.text {
+			t.Errorf("%s: as regras de chamada mascararam a mais:\n%s", p.cmd, r.text)
 		}
 		for _, d := range r.dec {
-			if d.Regra != "leitor" {
+			if d.Rule != "leitor" {
 				t.Errorf("%s: decisão %+v", p.cmd, d)
 			}
 		}
@@ -271,38 +271,38 @@ func TestChamadaNegativos(t *testing.T) {
 }
 
 // B6: o pedido do usuário vale só para as chamadas da resposta seguinte.
-func TestPedidoDoUsuarioSoNaRespostaSeguinte(t *testing.T) {
-	m := novoTeste(t)
-	lista := "docs\ninternal\nscripts\nferramentas\n"
-	rs := rodarConversa(t, m, []passoConversa{
-		{usuario: "lista os namespaces do cluster", cmd: "kubectl get ns -o name", saida: "namespace/pagamentos\nnamespace/cobranca\nnamespace/vitrine\n"},
-		{cmd: "ls", saida: lista},
+func TestUserRequestOnlyInNextResponse(t *testing.T) {
+	m := newTest(t)
+	list := "docs\ninternal\nscripts\nferramentas\n"
+	rs := runConversation(t, m, []conversationStep{
+		{user: "lista os namespaces do cluster", cmd: "kubectl get ns -o name", output: "namespace/pagamentos\nnamespace/cobranca\nnamespace/vitrine\n"},
+		{cmd: "ls", output: list},
 	})
-	if palavraInteira(rs[0].texto, "cobranca") {
+	if wholeWord(rs[0].text, "cobranca") {
 		t.Errorf("inventário pedido pelo usuário não mascarou")
 	}
-	if rs[1].texto != lista {
-		t.Errorf("o pedido do usuário valeu para a chamada de outro turno: %q", rs[1].texto)
+	if rs[1].text != list {
+		t.Errorf("o pedido do usuário valeu para a chamada de outro turno: %q", rs[1].text)
 	}
 	for _, f := range []string{"lista os grupos com acesso ao banco", "show me all the queues", "Liste as tabelas do schema"} {
-		if _, ok := tipoNaProsa(f); !ok {
+		if _, ok := typeInProse(f); !ok {
 			t.Errorf("sem tipo em %q", f)
 		}
 	}
 	for _, f := range []string{"o build quebrou", "mostra o arquivo", "quais tabelas existem?", "veja a lista"} {
-		if e, ok := tipoNaProsa(f); ok {
+		if e, ok := typeInProse(f); ok {
 			t.Errorf("tipo %q em %q", e, f)
 		}
 	}
 }
 
 // B5: o substantivo do verbo de enumeração, em qualquer convenção.
-func TestTipoDoComando(t *testing.T) {
-	casos := map[string]string{
+func TestCommandType(t *testing.T) {
+	cases := map[string]string{
 		"kubectl get ns":                                   "namespace",
 		"kubectl get pods -n x":                            "servico",
 		"gh repo list acme":                                "repositorio",
-		"python3 sdk.py list_findings":                     entGenerica,
+		"python3 sdk.py list_findings":                     genericEnt,
 		"Get-ADGroup -Filter *":                            "",
 		"aws s3api list-buckets":                           "bucket",
 		"curl -X GET https://h/api/queues":                 "fila",
@@ -312,15 +312,15 @@ func TestTipoDoComando(t *testing.T) {
 		"client.listBuckets()":                             "bucket",
 		"aws ec2 describe-instances":                       "",
 	}
-	for cmd, esp := range casos {
-		e, ok := tipoDoComando(cmd)
-		if !ok || esp != "" && e != esp {
-			t.Errorf("%q: %q %v, esperado %q", cmd, e, ok, esp)
+	for cmd, spc := range cases {
+		e, ok := commandType(cmd)
+		if !ok || spc != "" && e != spc {
+			t.Errorf("%q: %q %v, esperado %q", cmd, e, ok, spc)
 		}
 	}
 	for _, cmd := range []string{"ls -la", "ps aux", "git log -3", "pip list", "git branch -a", "log = logging.getLogger(x)",
 		"select nome from clientes", "cat notas.txt", "docker ps"} {
-		if e, ok := tipoDoComando(cmd); ok {
+		if e, ok := commandType(cmd); ok {
 			t.Errorf("%q: tipo %q", cmd, e)
 		}
 	}
@@ -328,88 +328,88 @@ func TestTipoDoComando(t *testing.T) {
 
 // B4: a palavra de uma saída anterior que volta como argumento é nome (na entrada do tool_use).
 // B1 exceção: a palavra que o proxy traduziu de um pseudônimo é nome também na saída.
-func TestEcoETraduzidas(t *testing.T) {
-	m := novoTeste(t)
-	rs := rodarConversa(t, m, []passoConversa{
-		{cmd: "cat ambientes.txt", saida: "pagamentos\ncobranca\nvitrine\n"},
-		{cmd: "kubectl logs -n cobranca deploy/api --tail 20 && curl -s https://h.exemplo/api/ambientes/vitrine", saida: "iniciando cobranca\npronto\n"},
+func TestEchoAndTranslated(t *testing.T) {
+	m := newTest(t)
+	rs := runConversation(t, m, []conversationStep{
+		{cmd: "cat ambientes.txt", output: "pagamentos\ncobranca\nvitrine\n"},
+		{cmd: "kubectl logs -n cobranca deploy/api --tail 20 && curl -s https://h.exemplo/api/ambientes/vitrine", output: "iniciando cobranca\npronto\n"},
 	})
-	if rs[0].texto != "pagamentos\ncobranca\nvitrine\n" {
-		t.Errorf("lista sem pedido mascarada: %q", rs[0].texto)
+	if rs[0].text != "pagamentos\ncobranca\nvitrine\n" {
+		t.Errorf("lista sem pedido mascarada: %q", rs[0].text)
 	}
-	if palavraInteira(rs[1].entrada, "cobranca") {
-		t.Errorf("eco não mascarado na entrada: %q", rs[1].entrada)
+	if wholeWord(rs[1].entry, "cobranca") {
+		t.Errorf("eco não mascarado na entrada: %q", rs[1].entry)
 	}
-	if palavraInteira(rs[1].entrada, "vitrine") {
-		t.Errorf("eco no caminho REST não mascarado: %q", rs[1].entrada)
+	if wholeWord(rs[1].entry, "vitrine") {
+		t.Errorf("eco no caminho REST não mascarado: %q", rs[1].entry)
 	}
-	achou := false
-	for _, d := range rs[1].decUso {
-		achou = achou || d.Nome == "vitrine" && d.Regra == "eco"
+	foundIt := false
+	for _, d := range rs[1].decUsage {
+		foundIt = foundIt || d.Name == "vitrine" && d.Rule == "eco"
 	}
-	if !achou {
-		t.Errorf("eco não decidido: %+v", rs[1].decUso)
+	if !foundIt {
+		t.Errorf("eco não decidido: %+v", rs[1].decUsage)
 	}
 
 	// o modelo escreveu o pseudônimo; o proxy traduziu; a saída traz a palavra
-	m2 := novoTeste(t)
-	ps := m2.Pseudonimo(prefTipoObj+"namespace", "pagamentos")
-	tab := NovaTabela([]Entrada{{ps, "pagamentos", prefTipoObj + "namespace"}})
-	des := m2.RegistrarResposta("kubectl logs -n "+ps+" deploy/api", tab)
-	trad := m2.PalavrasTraduzidas(des)
-	if len(trad) != 1 || trad[0].Nome != "pagamentos" || trad[0].Ent != "namespace" {
-		t.Fatalf("palavras traduzidas: %+v", trad)
+	m2 := newTest(t)
+	ps := m2.Pseudonym(objTypePrefix+"namespace", "pagamentos")
+	tab := NewTable([]Entry{{ps, "pagamentos", objTypePrefix + "namespace"}})
+	des := m2.RecordResponse("kubectl logs -n "+ps+" deploy/api", tab)
+	trans := m2.TranslatedWords(des)
+	if len(trans) != 1 || trans[0].Name != "pagamentos" || trans[0].Ent != "namespace" {
+		t.Fatalf("palavras traduzidas: %+v", trans)
 	}
-	r := rodarConversa(t, m2, []passoConversa{{cmd: des, trad: trad, saida: "conectado a pagamentos\nfila vazia\n"}})[0]
-	if palavraInteira(r.texto, "pagamentos") || palavraInteira(r.entrada, "pagamentos") {
-		t.Errorf("palavra traduzida em claro: %q / %q", r.entrada, r.texto)
+	r := runConversation(t, m2, []conversationStep{{cmd: des, trans: trans, output: "conectado a pagamentos\nfila vazia\n"}})[0]
+	if wholeWord(r.text, "pagamentos") || wholeWord(r.entry, "pagamentos") {
+		t.Errorf("palavra traduzida em claro: %q / %q", r.entry, r.text)
 	}
-	if !strings.Contains(r.texto, ps) {
-		t.Errorf("deveria usar o mesmo pseudônimo (%s): %q", ps, r.texto)
+	if !strings.Contains(r.text, ps) {
+		t.Errorf("deveria usar o mesmo pseudônimo (%s): %q", ps, r.text)
 	}
 }
 
 // B4: segmento de um nome já mascarado que aparece solto no mesmo texto.
-func TestSegmentoDeNomeMascarado(t *testing.T) {
-	m := novoTeste(t)
-	r := rodarConversa(t, m, []passoConversa{{cmd: "kubectl get pods -A",
-		saida: "NAMESPACE    NAME                       READY   STATUS    RESTARTS   AGE\n" +
+func TestNameSegmentMasked(t *testing.T) {
+	m := newTest(t)
+	r := runConversation(t, m, []conversationStep{{cmd: "kubectl get pods -A",
+		output: "NAMESPACE    NAME                       READY   STATUS    RESTARTS   AGE\n" +
 			"tesouraria   tesouraria-api-7d9f8c6b5   1/1     Running   0          3d\n" +
 			"tesouraria   tesouraria-job-5c4b3a2d1   1/1     Running   2          3d\n" +
 			"vitrine      vitrine-web-6b5a4c3d2      1/1     Running   0          9d\n"}})[0]
 	for _, n := range []string{"tesouraria", "vitrine", "tesouraria-api-7d9f8c6b5"} {
-		if palavraInteira(r.texto, n) {
-			t.Errorf("%s em claro: %s", n, r.texto)
+		if wholeWord(r.text, n) {
+			t.Errorf("%s em claro: %s", n, r.text)
 		}
 	}
 }
 
 // Os negativos da matriz como saída de comando (com a extensão da dica, sem tipo pedido):
 // continuam sem nada mascarado.
-func TestMatrizNegativosComoSaida(t *testing.T) {
+func TestMatrixNegativesAsOutput(t *testing.T) {
 	if testing.Short() {
 		t.Skip("matriz grande")
 	}
-	n, ruins := 0, 0
-	for _, c := range negativosMatriz {
-		for _, d := range desenhosMatriz {
-			if d.propagado {
+	n, bad := 0, 0
+	for _, c := range matrixNegatives {
+		for _, d := range matrixLayouts {
+			if d.propagated {
 				continue
 			}
-			for _, tr := range transportes {
-				m := novoTeste(t)
-				m.cfg.DominiosInternos = nil
-				m.cfg.Termos = nil
+			for _, tr := range transports {
+				m := newTest(t)
+				m.cfg.InternalDomains = nil
+				m.cfg.Terms = nil
 				txt := tr.f(d.f(c.cols, c.rows))
 				n++
-				cs := NovosComandos()
-				ch := cs.Uso("python3 relatorio.py", nil)
-				if r, _ := m.mascararD(txt, true, ComExtensao("", cs.Resultado(ch, txt))); r.texto != txt {
-					ruins++
-					t.Errorf("%s / %s / %s: mascarou\n%s", c.nome, d.nome, tr.nome, r.texto)
+				cs := NewCommands()
+				ch := cs.Usage("python3 relatorio.py", nil)
+				if r, _ := m.maskD(txt, true, WithExtension("", cs.Result(ch, txt))); r.text != txt {
+					bad++
+					t.Errorf("%s / %s / %s: mascarou\n%s", c.name, d.name, tr.name, r.text)
 				}
 			}
 		}
 	}
-	t.Logf("negativos como saída de comando: %d células, %d com máscara", n, ruins)
+	t.Logf("negativos como saída de comando: %d células, %d com máscara", n, bad)
 }

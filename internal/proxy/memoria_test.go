@@ -16,68 +16,68 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/mask"
 )
 
-// Memória da conversa e quem escreveu, de ponta a ponta. Nomes inventados,
+// Memória da conversa e quem escreveu, de ponta a ponta. Names inventados,
 // de palavra comum, montados por partes.
 
 var (
-	nsPalavra = "pag" + "amentos"
-	rePseNS   = regexp.MustCompile(`\bns_[a-z2-7]{8}\b`)
+	nsWord  = "pag" + "amentos"
+	rePseNS = regexp.MustCompile(`\bns_[a-z2-7]{8}\b`)
 	// o inventário: o leitor de linha de comando decide o namespace
-	inventario = "kubectl logs -n " + nsPalavra + " deploy/web --tail 10"
+	inventory = "kubectl logs -n " + nsWord + " deploy/web --tail 10"
 )
 
 // resposta da API falsa, montada a partir do corpo que ela recebeu
-type respFalsa func(corpo []byte, w http.ResponseWriter)
+type fakeResp func(body []byte, w http.ResponseWriter)
 
-// montarMem: proxy com vistos e enviados.log em dir (o mesmo dir = o mesmo disco depois de um
+// buildMem: proxy com vistos e enviados.log em dir (o mesmo dir = o mesmo disco depois de um
 // "reinício"). Cada corpo que chega à API vai para *corpos.
-func montarMem(t *testing.T, dir string, corpos *[][]byte, resp respFalsa) *httptest.Server {
+func buildMem(t *testing.T, dir string, bodies *[][]byte, resp fakeResp) *httptest.Server {
 	t.Helper()
-	cfg := config.Padrao()
-	chave := []byte("0123456789abcdef0123456789abcdef")
-	vs, err := mask.CarregarVistos(dir + "/vistos.json")
+	cfg := config.Default()
+	key := []byte("0123456789abcdef0123456789abcdef")
+	vs, err := mask.LoadSeen(dir + "/vistos.json")
 	if err != nil {
 		t.Fatal(err)
 	}
-	m, err := mask.NovoMasker(cfg, chave, nil, vs)
+	m, err := mask.NewMasker(cfg, key, nil, vs)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := m.UsarEnviados(dir+"/enviados.log", "teste"); err != nil {
+	if err := m.UseSent(dir+"/enviados.log", "teste"); err != nil {
 		t.Fatal(err)
 	}
 	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		b, _ := io.ReadAll(r.Body)
-		*corpos = append(*corpos, b)
+		*bodies = append(*bodies, b)
 		resp(b, w)
 	}))
 	cfg.Upstream = up.URL
-	px := httptest.NewServer(Novo(cfg, m, vs, log.New(io.Discard, "", 0)))
+	px := httptest.NewServer(New(cfg, m, vs, log.New(io.Discard, "", 0)))
 	t.Cleanup(func() { up.Close(); px.Close() })
 	return px
 }
 
-// respTexto: um bloco de texto (com o pseudônimo do namespace no lugar de %s), em streaming
+// respText: um bloco de texto (com o pseudônimo do namespace no lugar de %s), em streaming
 // picotado ou em JSON.
-func respTexto(stream bool, molde string) respFalsa {
-	return func(corpo []byte, w http.ResponseWriter) {
-		texto := strings.ReplaceAll(molde, "%s", rePseNS.FindString(string(corpo)))
+func respText(stream bool, template string) fakeResp {
+	return func(body []byte, w http.ResponseWriter) {
+		text := strings.ReplaceAll(template, "%s", rePseNS.FindString(string(body)))
 		if stream {
 			w.Header().Set("content-type", "text/event-stream")
-			sse(w, texto, `{"command":"true"}`, "pensando", 3)
+			sse(w, text, `{"command":"true"}`, "pensando", 3)
 			return
 		}
 		w.Header().Set("content-type", "application/json")
 		b, _ := json.Marshal(map[string]any{"type": "message", "role": "assistant",
-			"content": []any{map[string]any{"type": "text", "text": texto}}})
+			"content": []any{map[string]any{"type": "text", "text": text}}})
 		w.Write(b)
 	}
 }
 
-// respComando: uma chamada de ferramenta com o comando (o pseudônimo no lugar de %s).
-func respComando(stream bool, molde string) respFalsa {
-	return func(corpo []byte, w http.ResponseWriter) {
-		cmd := strings.ReplaceAll(molde, "%s", rePseNS.FindString(string(corpo)))
+// commandResp: uma chamada de ferramenta com o comando (o pseudônimo no lugar de %s).
+func commandResp(stream bool, template string) fakeResp {
+	return func(body []byte, w http.ResponseWriter) {
+		cmd := strings.ReplaceAll(template, "%s", rePseNS.FindString(string(body)))
 		arg, _ := json.Marshal(map[string]string{"command": cmd})
 		if stream {
 			w.Header().Set("content-type", "text/event-stream")
@@ -91,9 +91,9 @@ func respComando(stream bool, molde string) respFalsa {
 	}
 }
 
-// enviarLer: manda a conversa e devolve o que o Claude Code recebeu: o texto e a entrada da
+// sendRead: manda a conversa e devolve o que o Claude Code recebeu: o texto e a entrada da
 // ferramenta (desmascarados).
-func enviarLer(t *testing.T, px *httptest.Server, stream bool, msgs []any) (texto, entrada string) {
+func sendRead(t *testing.T, px *httptest.Server, stream bool, msgs []any) (text, entry string) {
 	t.Helper()
 	b, _ := json.Marshal(map[string]any{"model": "x", "max_tokens": 10, "stream": stream, "messages": msgs})
 	resp, err := http.Post(px.URL+"/v1/messages", "application/json", bytes.NewReader(b))
@@ -113,9 +113,9 @@ func enviarLer(t *testing.T, px *httptest.Server, stream bool, msgs []any) (text
 		}
 		json.NewDecoder(resp.Body).Decode(&r)
 		for _, c := range r.Content {
-			texto += c.Text
+			text += c.Text
 			if c.Type == "tool_use" {
-				entrada = string(c.Input)
+				entry = string(c.Input)
 			}
 		}
 		return
@@ -130,21 +130,21 @@ func enviarLer(t *testing.T, px *httptest.Server, stream bool, msgs []any) (text
 		json.Unmarshal([]byte(l[6:]), &e)
 		if d, ok := e["delta"].(map[string]any); ok {
 			if s, ok := d["text"].(string); ok {
-				texto += s
+				text += s
 			}
 			if s, ok := d["partial_json"].(string); ok {
-				entrada += s
+				entry += s
 			}
 		}
 	}
 	return
 }
 
-func comandoDaEntrada(t *testing.T, entrada string) string {
+func inputCommand(t *testing.T, entry string) string {
 	t.Helper()
 	var in map[string]string
-	if err := json.Unmarshal([]byte(entrada), &in); err != nil {
-		t.Fatalf("entrada inválida: %q", entrada)
+	if err := json.Unmarshal([]byte(entry), &in); err != nil {
+		t.Fatalf("entrada inválida: %q", entry)
 	}
 	return in["command"]
 }
@@ -152,36 +152,36 @@ func comandoDaEntrada(t *testing.T, entrada string) string {
 // O modelo usa o pseudônimo num comando, o proxy traduz para o nome; quando a chamada
 // volta no histórico, ela sai com o pseudônimo, a palavra traduzida entra na memória e a saída
 // seguinte com a palavra sai mascarada (numa conversa sem o inventário: só a tradução ensina).
-func TestMemoriaTraduzidaNoComando(t *testing.T) {
+func TestMemoryTranslatedInCommand(t *testing.T) {
 	for _, stream := range []bool{true, false} {
-		var corpos [][]byte
-		px := montarMem(t, t.TempDir(), &corpos, respComando(stream, "echo %s pronto"))
-		_, entrada := enviarLer(t, px, stream, []any{msg("user", inventario)})
-		cmd := comandoDaEntrada(t, entrada)
-		ps := rePseNS.FindString(string(corpos[0]))
-		if ps == "" || cmd != "echo "+nsPalavra+" pronto" {
+		var bodies [][]byte
+		px := buildMem(t, t.TempDir(), &bodies, commandResp(stream, "echo %s pronto"))
+		_, entry := sendRead(t, px, stream, []any{msg("user", inventory)})
+		cmd := inputCommand(t, entry)
+		ps := rePseNS.FindString(string(bodies[0]))
+		if ps == "" || cmd != "echo "+nsWord+" pronto" {
 			t.Fatalf("stream=%v: premissa: pseudônimo %q, comando %q", stream, ps, cmd)
 		}
-		saida := nsPalavra + " pronto\n"
-		conversa := []any{
+		output := nsWord + " pronto\n"
+		conversation := []any{
 			msg("user", "roda o eco"),
 			msg("assistant", []any{map[string]any{"type": "tool_use", "id": "t1", "name": "Bash", "input": map[string]any{"command": cmd}}}),
-			msg("user", []any{map[string]any{"type": "tool_result", "tool_use_id": "t1", "content": saida}}),
+			msg("user", []any{map[string]any{"type": "tool_result", "tool_use_id": "t1", "content": output}}),
 		}
-		enviarLer(t, px, stream, conversa)
-		ms := mensagens(t, corpos[1])
+		sendRead(t, px, stream, conversation)
+		ms := messages(t, bodies[1])
 		if !strings.Contains(ms[1], "echo "+ps+" pronto") {
 			t.Errorf("stream=%v: a chamada não voltou como a API mandou: %s", stream, ms[1])
 		}
-		if strings.Contains(ms[2], nsPalavra) || !strings.Contains(ms[2], ps) {
+		if strings.Contains(ms[2], nsWord) || !strings.Contains(ms[2], ps) {
 			t.Errorf("stream=%v: a saída com a palavra traduzida saiu em claro: %s", stream, ms[2])
 		}
 
 		// sem registro (outro processo): comportamento atual, a palavra comum passa
-		var outros [][]byte
-		px2 := montarMem(t, t.TempDir(), &outros, respTexto(false, "ok"))
-		enviarLer(t, px2, false, conversa)
-		if ms := mensagens(t, outros[0]); !strings.Contains(ms[2], nsPalavra) {
+		var othersSet [][]byte
+		px2 := buildMem(t, t.TempDir(), &othersSet, respText(false, "ok"))
+		sendRead(t, px2, false, conversation)
+		if ms := messages(t, othersSet[0]); !strings.Contains(ms[2], nsWord) {
 			t.Errorf("stream=%v: sem registro, a palavra comum foi mascarada: %s", stream, ms[2])
 		}
 	}
@@ -192,77 +192,77 @@ func TestMemoriaTraduzidaNoComando(t *testing.T) {
 // usuário a palavra comum fica como palavra (o contágio não leva palavra comum para a prosa:
 // mask/vocab_palavras.go). Vale também depois de um reinício (o registro está no
 // enviados.log, só com HMAC e pseudônimos).
-func TestMemoriaQuemEscreveuPontaAPonta(t *testing.T) {
-	molde := "o namespace %s tem logs; " + nsPalavra + " tambem e uma palavra comum" // ASCII: o picote de 3 bytes não parte um caractere
+func TestMemoryWhoWroteEndToEnd(t *testing.T) {
+	template := "o namespace %s tem logs; " + nsWord + " tambem e uma palavra comum" // ASCII: o picote de 3 bytes não parte um caractere
 	for _, stream := range []bool{true, false} {
-		for _, reinicio := range []bool{false, true} {
+		for _, restartN := range []bool{false, true} {
 			dir := t.TempDir()
-			var corpos [][]byte
-			px := montarMem(t, dir, &corpos, respTexto(stream, molde))
-			texto, _ := enviarLer(t, px, stream, []any{msg("user", inventario)})
-			ps := rePseNS.FindString(string(corpos[0]))
-			original := strings.ReplaceAll(molde, "%s", ps)
-			if ps == "" || texto != strings.ReplaceAll(molde, "%s", nsPalavra) {
-				t.Fatalf("premissa: %q %q", ps, texto)
+			var bodies [][]byte
+			px := buildMem(t, dir, &bodies, respText(stream, template))
+			text, _ := sendRead(t, px, stream, []any{msg("user", inventory)})
+			ps := rePseNS.FindString(string(bodies[0]))
+			original := strings.ReplaceAll(template, "%s", ps)
+			if ps == "" || text != strings.ReplaceAll(template, "%s", nsWord) {
+				t.Fatalf("premissa: %q %q", ps, text)
 			}
-			if reinicio {
+			if restartN {
 				px.Close()
-				px = montarMem(t, dir, &corpos, respTexto(stream, "ok"))
+				px = buildMem(t, dir, &bodies, respText(stream, "ok"))
 			}
-			conversa := []any{msg("user", inventario), msg("assistant", []any{
+			conversation := []any{msg("user", inventory), msg("assistant", []any{
 				map[string]any{"type": "thinking", "thinking": "pensando", "signature": "S"},
-				map[string]any{"type": "text", "text": texto}}),
-				msg("user", "e o "+nsPalavra+" agora?")}
-			enviarLer(t, px, stream, conversa)
-			ms := mensagens(t, corpos[len(corpos)-1])
+				map[string]any{"type": "text", "text": text}}),
+				msg("user", "e o "+nsWord+" agora?")}
+			sendRead(t, px, stream, conversation)
+			ms := messages(t, bodies[len(bodies)-1])
 			var a struct {
 				Content []struct{ Type, Text, Thinking string }
 			}
 			json.Unmarshal([]byte(ms[1]), &a)
-			caso := map[bool]string{true: "stream", false: "json"}[stream] + map[bool]string{true: " depois do reinício", false: ""}[reinicio]
+			tc := map[bool]string{true: "stream", false: "json"}[stream] + map[bool]string{true: " depois do reinício", false: ""}[restartN]
 			if len(a.Content) != 2 || a.Content[1].Text != original || a.Content[0].Thinking != "pensando" {
-				t.Errorf("%s: o texto do assistente não voltou como a API mandou:\n%s\nesperado %q", caso, ms[1], original)
+				t.Errorf("%s: o texto do assistente não voltou como a API mandou:\n%s\nesperado %q", tc, ms[1], original)
 			}
-			if !strings.Contains(ms[2], nsPalavra) {
-				t.Errorf("%s: palavra comum trocada na mensagem nova do usuário: %s", caso, ms[2])
+			if !strings.Contains(ms[2], nsWord) {
+				t.Errorf("%s: palavra comum trocada na mensagem nova do usuário: %s", tc, ms[2])
 			}
-			if strings.Contains(ms[0], nsPalavra) {
-				t.Errorf("%s: o inventário saiu em claro: %s", caso, ms[0])
+			if strings.Contains(ms[0], nsWord) {
+				t.Errorf("%s: o inventário saiu em claro: %s", tc, ms[0])
 			}
 		}
 	}
 }
 
 // Outra conversa, sem o inventário, não mascara a palavra comum (no mesmo processo).
-func TestMemoriaOutraConversa(t *testing.T) {
-	var corpos [][]byte
-	px := montarMem(t, t.TempDir(), &corpos, respTexto(false, "ok"))
-	enviarLer(t, px, false, []any{msg("user", inventario),
+func TestMemoryOtherConversation(t *testing.T) {
+	var bodies [][]byte
+	px := buildMem(t, t.TempDir(), &bodies, respText(false, "ok"))
+	sendRead(t, px, false, []any{msg("user", inventory),
 		msg("assistant", []any{map[string]any{"type": "tool_use", "id": "t5", "name": "Bash", "input": map[string]any{"command": "kubectl logs deploy/web --tail 5"}}}),
-		msg("user", []any{map[string]any{"type": "tool_result", "tool_use_id": "t5", "content": "o " + nsPalavra + " caiu"}})})
-	if ms := mensagens(t, corpos[0]); strings.Contains(ms[2], nsPalavra) {
+		msg("user", []any{map[string]any{"type": "tool_result", "tool_use_id": "t5", "content": "o " + nsWord + " caiu"}})})
+	if ms := messages(t, bodies[0]); strings.Contains(ms[2], nsWord) {
 		t.Fatalf("premissa: com o inventário, a palavra devia sair mascarada na saída: %s", ms[2])
 	}
-	enviarLer(t, px, false, []any{msg("user", "o "+nsPalavra+" caiu")})
-	if ms := mensagens(t, corpos[1]); !strings.Contains(ms[0], nsPalavra) {
+	sendRead(t, px, false, []any{msg("user", "o "+nsWord+" caiu")})
+	if ms := messages(t, bodies[1]); !strings.Contains(ms[0], nsWord) {
 		t.Fatalf("outra conversa: a palavra comum foi mascarada: %s", ms[0])
 	}
 }
 
 // O que já foi enviado continua idêntico, byte a byte, depois que a memória passa a
 // conhecer o nome; os textos novos do mesmo pedido usam a memória.
-func TestMemoriaNaoReescreveOPassadoPontaAPonta(t *testing.T) {
-	var corpos [][]byte
-	px := montarMem(t, t.TempDir(), &corpos, respTexto(false, "entendi"))
-	velha := "o " + nsPalavra + " caiu ontem"
-	conversa := []any{msg("user", velha)}
-	texto, _ := enviarLer(t, px, false, conversa)
-	conversa = append(conversa, msg("assistant", texto), msg("user", inventario+"\ne o "+nsPalavra+" hoje?"))
-	enviarLer(t, px, false, conversa)
-	conversa = append(conversa, msg("assistant", "certo"), msg("user", "de novo: "+nsPalavra))
-	enviarLer(t, px, false, conversa)
-	r := [][]string{mensagens(t, corpos[0]), mensagens(t, corpos[1]), mensagens(t, corpos[2])}
-	if r[1][0] != r[0][0] || r[2][0] != r[0][0] || !strings.Contains(r[2][0], nsPalavra) {
+func TestMemoryDoesNotRewritePastEndToEnd(t *testing.T) {
+	var bodies [][]byte
+	px := buildMem(t, t.TempDir(), &bodies, respText(false, "entendi"))
+	oldOne := "o " + nsWord + " caiu ontem"
+	conversation := []any{msg("user", oldOne)}
+	text, _ := sendRead(t, px, false, conversation)
+	conversation = append(conversation, msg("assistant", text), msg("user", inventory+"\ne o "+nsWord+" hoje?"))
+	sendRead(t, px, false, conversation)
+	conversation = append(conversation, msg("assistant", "certo"), msg("user", "de novo: "+nsWord))
+	sendRead(t, px, false, conversation)
+	r := [][]string{messages(t, bodies[0]), messages(t, bodies[1]), messages(t, bodies[2])}
+	if r[1][0] != r[0][0] || r[2][0] != r[0][0] || !strings.Contains(r[2][0], nsWord) {
 		t.Fatalf("texto enviado mudou:\n%s\n%s\n%s", r[0][0], r[1][0], r[2][0])
 	}
 	for j := range r[1] {
@@ -272,7 +272,7 @@ func TestMemoriaNaoReescreveOPassadoPontaAPonta(t *testing.T) {
 	}
 	// o inventário colado no texto novo continua nome (o leitor decide ali); a palavra comum na
 	// prosa fica como palavra (mask/vocab_palavras.go)
-	if strings.Contains(r[1][2], "-n "+nsPalavra) || !strings.Contains(r[2][4], nsPalavra) {
+	if strings.Contains(r[1][2], "-n "+nsWord) || !strings.Contains(r[2][4], nsWord) {
 		t.Fatalf("texto novo: %s | %s", r[1][2], r[2][4])
 	}
 }

@@ -11,7 +11,7 @@ import (
 // Alvo: 0 em claro. (Na prosa da mensagem do usuário a palavra comum fica como palavra:
 // mask/vocab_palavras.go.)
 
-func seisFormatosP(n string) []string {
+func sixFormatsP(n string) []string {
 	return []string{
 		"o " + n + " parou de responder hoje cedo",
 		"(" + n + ", 3)",
@@ -23,12 +23,12 @@ func seisFormatosP(n string) []string {
 }
 
 type areaT2P struct {
-	nome    string
-	usuario string
-	cmd     string
-	saida   string
-	nomes   []string // os nomes (palavra comum) que a saída traz
-	tipo    string   // o tipo esperado ("" = qualquer)
+	name   string
+	user   string
+	cmd    string
+	output string
+	names  []string // os nomes (palavra comum) que a saída traz
+	typ    string   // o tipo esperado ("" = qualquer)
 }
 
 var areasT2P = []areaT2P{
@@ -63,38 +63,38 @@ var areasT2P = []areaT2P{
 		[]string{"notificacoes", "conciliacoes", "reprocessamento"}, ""},
 }
 
-func TestT2PontaAPonta(t *testing.T) {
-	total, claro := 0, 0
+func TestT2EndToEnd(t *testing.T) {
+	total, plain := 0, 0
 	for _, ar := range areasT2P {
-		var corpos [][]byte
-		px, _ := montarComMasker(t, &corpos)
-		pedido := ar.usuario
-		if pedido == "" {
-			pedido = "vamos ver o ambiente"
+		var bodies [][]byte
+		px, _ := buildWithMasker(t, &bodies)
+		request := ar.user
+		if request == "" {
+			request = "vamos ver o ambiente"
 		}
 		var fs []string
-		for _, n := range ar.nomes {
-			fs = append(fs, seisFormatosP(n)...)
+		for _, n := range ar.names {
+			fs = append(fs, sixFormatsP(n)...)
 		}
-		enviar(t, px, []any{
-			msg("user", pedido),
-			msg("assistant", []any{chamadaBash("c1", ar.cmd)}),
-			msg("user", []any{resultado("c1", ar.saida)}),
-			msg("assistant", []any{chamadaBash("c2", "kubectl logs deploy/web --tail 50")}),
-			msg("user", []any{resultado("c2", strings.Join(fs, "\n"))}),
+		send(t, px, []any{
+			msg("user", request),
+			msg("assistant", []any{bashCall("c1", ar.cmd)}),
+			msg("user", []any{result("c1", ar.output)}),
+			msg("assistant", []any{bashCall("c2", "kubectl logs deploy/web --tail 50")}),
+			msg("user", []any{result("c2", strings.Join(fs, "\n"))}),
 		})
-		r := mensagens(t, corpos[len(corpos)-1])
-		for _, n := range ar.nomes {
+		r := messages(t, bodies[len(bodies)-1])
+		for _, n := range ar.names {
 			re := regexp.MustCompile(`(^|[^A-Za-z0-9_])` + regexp.QuoteMeta(n) + `($|[^A-Za-z0-9_])`)
 			total += 6
 			if k := len(re.FindAllString(r[4], -1)); k > 0 {
-				claro += k
-				t.Errorf("%s: %s em claro %d vez(es) nos 6 formatos", ar.nome, n, k)
+				plain += k
+				t.Errorf("%s: %s em claro %d vez(es) nos 6 formatos", ar.name, n, k)
 			}
 			if re.MatchString(r[2]) {
-				t.Errorf("%s: %s em claro no inventário", ar.nome, n)
+				t.Errorf("%s: %s em claro no inventário", ar.name, n)
 			}
 		}
 	}
-	t.Logf("ponta a ponta: %d de %d ocorrências em claro depois do inventário", claro, total)
+	t.Logf("ponta a ponta: %d de %d ocorrências em claro depois do inventário", plain, total)
 }

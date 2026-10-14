@@ -11,11 +11,11 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/mask"
 )
 
-// Formato Responses da OpenAI (/v1/responses): o do Codex CLI, com a chave de API da OpenAI e com
+// Format Responses da OpenAI (/v1/responses): o do Codex CLI, com a chave de API da OpenAI e com
 // a assinatura do ChatGPT (chatgpt.com/backend-api/codex/responses). Vale para todo caminho
 // terminado em /responses, de qualquer provedor.
 //
-// Como no Gemini e no Chat Completions, a ida é vista na forma da Anthropic (ponteResponses) e
+// Como no Gemini e no Chat Completions, a ida é vista na forma da Anthropic (responsesBridge) e
 // passa pelo mesmo caminho de /v1/messages. O que muda de nome:
 //
 //	instructions e mensagens "system"/"developer"     -> system
@@ -29,78 +29,78 @@ import (
 //	input[] "reasoning", "web_search_call" e afins     -> não mudam (o modelo só viu pseudônimos)
 
 // parâmetros do Responses que não levam dado do usuário (ou que não podem mudar)
-var paramsResponses = map[string]bool{"model": true, "input": true, "instructions": true, "tools": true,
+var responsesParams = map[string]bool{"model": true, "input": true, "instructions": true, "tools": true,
 	"tool_choice": true, "parallel_tool_calls": true, "reasoning": true, "store": true, "stream": true,
 	"include": true, "prompt_cache_key": true, "text": true, "service_tier": true, "max_output_tokens": true,
 	"temperature": true, "top_p": true, "truncation": true, "previous_response_id": true, "background": true,
 	"top_logprobs": true, "safety_identifier": true, "prompt_cache_retention": true}
 
 // itens que já estão do lado da API, ou que o modelo escreveu a partir de pseudônimos: não mudam
-var itensIntactosResponses = map[string]bool{"reasoning": true, "web_search_call": true, "image_generation_call": true,
+var intactResponsesItems = map[string]bool{"reasoning": true, "web_search_call": true, "image_generation_call": true,
 	"compaction": true, "compaction_summary": true, "context_compaction": true, "compaction_trigger": true,
 	"item_reference": true, "configuration_update": true, "tool_search_call": true, "tool_search_output": true,
 	"file_search_call": true, "code_interpreter_call": true, "mcp_list_tools": true}
 
-// blocosResponses: o conteúdo de uma mensagem (texto ou lista de partes) como blocos da Anthropic.
-func blocosResponses(conteudo any) (blocos []any, partes []map[string]any) {
-	blocos = []any{}
-	switch c := conteudo.(type) {
+// responsesBlocks: o conteúdo de uma mensagem (texto ou lista de partes) como blocos da Anthropic.
+func responsesBlocks(content any) (blocks []any, parts []map[string]any) {
+	blocks = []any{}
+	switch c := content.(type) {
 	case string:
 		return []any{map[string]any{"type": "text", "text": c}}, nil
 	case []any:
-		partes = []map[string]any{}
+		parts = []map[string]any{}
 		for _, x := range c {
 			pm, _ := x.(map[string]any)
 			if pm == nil {
 				continue
 			}
-			b := map[string]any{marcaParte: len(partes)}
-			partes = append(partes, pm)
-			midia := func(u string) {
-				tipo, dados, ok := dataURL(u)
+			b := map[string]any{partMark: len(parts)}
+			parts = append(parts, pm)
+			media := func(u string) {
+				typ, data, ok := dataURL(u)
 				switch {
 				case !ok:
 					b["type"] = "server_tool_use" // endereço ou arquivo já do lado da API: não muda
 					return
-				case tipo == "application/pdf":
+				case typ == "application/pdf":
 					b["type"] = "document"
-				case strings.HasPrefix(tipo, "image/"):
+				case strings.HasPrefix(typ, "image/"):
 					b["type"] = "image"
 				default:
-					delete(b, marcaParte)
-					b["type"], b["text"] = "text", notaArquivoOpenAI
+					delete(b, partMark)
+					b["type"], b["text"] = "text", openAIFileNote
 					return
 				}
-				b["source"] = map[string]any{"type": "base64", "media_type": tipo, "data": dados}
+				b["source"] = map[string]any{"type": "base64", "media_type": typ, "data": data}
 			}
 			switch pm["type"] {
 			case "input_text", "output_text", "text", "summary_text":
 				b["type"], b["text"] = "text", pm["text"]
 			case "input_image":
 				u, _ := pm["image_url"].(string)
-				midia(u)
+				media(u)
 			case "input_file":
 				u, _ := pm["file_data"].(string)
-				midia(u)
+				media(u)
 			case "input_audio":
-				delete(b, marcaParte) // áudio: não há como verificar; não sai (falha fechada)
-				b["type"], b["text"] = "text", notaArquivoOpenAI
+				delete(b, partMark) // áudio: não há como verificar; não sai (falha fechada)
+				b["type"], b["text"] = "text", openAIFileNote
 			case "refusal":
 				b["type"] = "server_tool_use" // recusa do próprio modelo: não muda
 			default:
 				b["type"], b["parte"] = "parte desconhecida", pm // mascara todo texto dela, por precaução
 			}
-			blocos = append(blocos, b)
+			blocks = append(blocks, b)
 		}
 	}
-	return blocos, partes
+	return blocks, parts
 }
 
-// conteudoResponses: os blocos já mascarados, de volta como o conteúdo de uma mensagem do
+// responsesContent: os blocos já mascarados, de volta como o conteúdo de uma mensagem do
 // Responses. Com partes == nil o conteúdo era um texto.
-func conteudoResponses(blocos any, partes []map[string]any) any {
-	bs, _ := blocos.([]any)
-	if partes == nil {
+func responsesContent(blocks any, parts []map[string]any) any {
+	bs, _ := blocks.([]any)
+	if parts == nil {
 		var ts []string
 		for _, x := range bs {
 			if b, _ := x.(map[string]any); b != nil && b["type"] == "text" {
@@ -117,8 +117,8 @@ func conteudoResponses(blocos any, partes []map[string]any) any {
 			continue
 		}
 		var pm map[string]any
-		if i, ok := b[marcaParte].(int); ok && i < len(partes) {
-			pm = partes[i]
+		if i, ok := b[partMark].(int); ok && i < len(parts) {
+			pm = parts[i]
 		}
 		src, _ := b["source"].(map[string]any)
 		switch b["type"] {
@@ -130,8 +130,8 @@ func conteudoResponses(blocos any, partes []map[string]any) any {
 		case "image", "document":
 			if src["type"] != "base64" { // PDF que virou texto mascarado
 				t, _ := src["data"].(string)
-				if titulo, _ := b["title"].(string); titulo != "" {
-					t = titulo + "\n\n" + t
+				if title, _ := b["title"].(string); title != "" {
+					t = title + "\n\n" + t
 				}
 				pm = map[string]any{"type": "input_text", "text": t}
 				break
@@ -153,17 +153,17 @@ func conteudoResponses(blocos any, partes []map[string]any) any {
 	return out
 }
 
-// ponteResponses devolve a requisição do Responses na forma da Anthropic e a função que, depois de
+// responsesBridge devolve a requisição do Responses na forma da Anthropic e a função que, depois de
 // mascarada, copia o resultado de volta. ok = false: não é uma requisição com "input" (cai no modo
 // genérico, que mascara todo texto).
-func ponteResponses(v any) (map[string]any, func(), bool) {
+func responsesBridge(v any) (map[string]any, func(), bool) {
 	req, _ := v.(map[string]any)
-	entrada, ok := req["input"]
+	entry, ok := req["input"]
 	if !ok {
 		return nil, nil, false
 	}
 	anth := map[string]any{}
-	var voltas []func()
+	var returns []func()
 
 	if ts, _ := req["tools"].([]any); ts != nil {
 		tools := []any{}
@@ -175,103 +175,103 @@ func ponteResponses(v any) (map[string]any, func(), bool) {
 		anth["tools"] = tools
 	}
 
-	sistema := []any{}
+	system := []any{}
 	if s, ok := req["instructions"].(string); ok {
 		b := map[string]any{"type": "text", "text": s}
-		sistema = append(sistema, b)
-		voltas = append(voltas, func() { req["instructions"] = b["text"] })
+		system = append(system, b)
+		returns = append(returns, func() { req["instructions"] = b["text"] })
 	}
 
-	var itens []any
-	switch x := entrada.(type) {
+	var items []any
+	switch x := entry.(type) {
 	case string:
 		m := map[string]any{"type": "message", "role": "user", "content": x}
-		itens = []any{m}
-		voltas = append(voltas, func() { req["input"] = m["content"] })
+		items = []any{m}
+		returns = append(returns, func() { req["input"] = m["content"] })
 	case []any:
-		itens = x
+		items = x
 	}
 
 	msgs := []any{}
-	for _, x := range itens {
+	for _, x := range items {
 		it, _ := x.(map[string]any)
 		if it == nil {
 			continue
 		}
-		tipo, _ := it["type"].(string)
-		if tipo == "" && it["role"] != nil {
-			tipo = "message"
+		typ, _ := it["type"].(string)
+		if typ == "" && it["role"] != nil {
+			typ = "message"
 		}
 		switch {
-		case itensIntactosResponses[tipo]:
+		case intactResponsesItems[typ]:
 			continue
-		case tipo == "message":
-			papel, _ := it["role"].(string)
-			blocos, partes := blocosResponses(it["content"])
-			if papel == "system" || papel == "developer" {
+		case typ == "message":
+			hostRole, _ := it["role"].(string)
+			blocks, parts := responsesBlocks(it["content"])
+			if hostRole == "system" || hostRole == "developer" {
 				// instruções do cliente: cada texto é mascarado no lugar
-				for _, bx := range blocos {
+				for _, bx := range blocks {
 					b, _ := bx.(map[string]any)
 					if b == nil || b["type"] != "text" {
 						continue
 					}
-					sistema = append(sistema, b)
-					if partes == nil {
-						voltas = append(voltas, func() { it["content"] = b["text"] })
-					} else if i, ok := b[marcaParte].(int); ok {
-						pm := partes[i]
-						voltas = append(voltas, func() { pm["text"] = b["text"] })
+					system = append(system, b)
+					if parts == nil {
+						returns = append(returns, func() { it["content"] = b["text"] })
+					} else if i, ok := b[partMark].(int); ok {
+						pm := parts[i]
+						returns = append(returns, func() { pm["text"] = b["text"] })
 					}
 				}
 				continue
 			}
-			am := map[string]any{"role": "user", "content": blocos}
-			if papel == "assistant" {
+			am := map[string]any{"role": "user", "content": blocks}
+			if hostRole == "assistant" {
 				am["role"] = "assistant"
 			}
 			msgs = append(msgs, am)
-			voltas = append(voltas, func() { it["content"] = conteudoResponses(am["content"], partes) })
-		case tipo == "function_call":
+			returns = append(returns, func() { it["content"] = responsesContent(am["content"], parts) })
+		case typ == "function_call":
 			args, _ := it["arguments"].(string)
-			var entrada any = map[string]any{}
+			var entry any = map[string]any{}
 			if strings.TrimSpace(args) != "" {
-				if dec, ok := decodificar([]byte(args)); ok {
-					entrada = dec
+				if dec, ok := decode([]byte(args)); ok {
+					entry = dec
 				} else {
-					entrada = map[string]any{"\x00cru": args} // não é JSON: mascara o texto como veio
+					entry = map[string]any{"\x00cru": args} // não é JSON: mascara o texto como veio
 				}
 			}
-			antes := codificar(entrada)
-			b := map[string]any{"type": "tool_use", "id": it["call_id"], "name": it["name"], "input": entrada}
+			before := encode(entry)
+			b := map[string]any{"type": "tool_use", "id": it["call_id"], "name": it["name"], "input": entry}
 			msgs = append(msgs, map[string]any{"role": "assistant", "content": []any{b}})
-			voltas = append(voltas, func() {
+			returns = append(returns, func() {
 				// só reescreve os argumentos que mudaram (o texto original fica como o cliente mandou)
-				if novo := codificar(b["input"]); string(novo) != string(antes) {
+				if newOne := encode(b["input"]); string(newOne) != string(before) {
 					if m, _ := b["input"].(map[string]any); m != nil && len(m) == 1 && m["\x00cru"] != nil {
 						it["arguments"] = m["\x00cru"]
 					} else {
-						it["arguments"] = string(novo)
+						it["arguments"] = string(newOne)
 					}
 				}
 			})
-		case tipo == "custom_tool_call":
+		case typ == "custom_tool_call":
 			b := map[string]any{"type": "tool_use", "id": it["call_id"], "name": it["name"], "input": map[string]any{"input": it["input"]}}
 			msgs = append(msgs, map[string]any{"role": "assistant", "content": []any{b}})
-			voltas = append(voltas, func() {
+			returns = append(returns, func() {
 				if m, _ := b["input"].(map[string]any); m != nil {
 					it["input"] = m["input"]
 				}
 			})
-		case tipo == "local_shell_call":
+		case typ == "local_shell_call":
 			b := map[string]any{"type": "tool_use", "id": it["call_id"], "name": "local_shell", "input": it["action"]}
 			msgs = append(msgs, map[string]any{"role": "assistant", "content": []any{b}})
-			voltas = append(voltas, func() { it["action"] = b["input"] })
-		case tipo == "function_call_output" || tipo == "custom_tool_call_output" || tipo == "local_shell_call_output":
-			blocos, partes := blocosResponses(it["output"])
-			res := map[string]any{"type": "tool_result", "tool_use_id": it["call_id"], "content": blocos}
+			returns = append(returns, func() { it["action"] = b["input"] })
+		case typ == "function_call_output" || typ == "custom_tool_call_output" || typ == "local_shell_call_output":
+			blocks, parts := responsesBlocks(it["output"])
+			res := map[string]any{"type": "tool_result", "tool_use_id": it["call_id"], "content": blocks}
 			msgs = append(msgs, map[string]any{"role": "user", "content": []any{res}})
 			if it["output"] != nil {
-				voltas = append(voltas, func() { it["output"] = conteudoResponses(res["content"], partes) })
+				returns = append(returns, func() { it["output"] = responsesContent(res["content"], parts) })
 			}
 		default:
 			// item que não conheço: mascara todo texto dele, por precaução
@@ -279,20 +279,20 @@ func ponteResponses(v any) (map[string]any, func(), bool) {
 			msgs = append(msgs, map[string]any{"role": "user", "content": []any{b}})
 		}
 	}
-	if len(sistema) > 0 {
-		anth["system"] = sistema
+	if len(system) > 0 {
+		anth["system"] = system
 	}
 	anth["messages"] = msgs
 
-	for _, k := range chaves(req) {
-		if !paramsResponses[k] { // campo que não conheço: mascara por precaução, como na Anthropic
+	for _, k := range keys(req) {
+		if !responsesParams[k] { // campo que não conheço: mascara por precaução, como na Anthropic
 			k := k
 			anth["responses:"+k] = req[k]
-			voltas = append(voltas, func() { req[k] = anth["responses:"+k] })
+			returns = append(returns, func() { req[k] = anth["responses:"+k] })
 		}
 	}
 	return anth, func() {
-		for _, f := range voltas {
+		for _, f := range returns {
 			f()
 		}
 	}, true
@@ -300,61 +300,64 @@ func ponteResponses(v any) (map[string]any, func(), bool) {
 
 // ---- volta --------------------------------------------------------------------------------
 
-// voltaResponses desmascara a resposta do Responses. Em streaming, o texto, os argumentos de uma
+// responsesReturn desmascara a resposta do Responses. Em streaming, o texto, os argumentos de uma
 // chamada (pedaços de um JSON) e a entrada de uma ferramenta custom (o patch do apply_patch)
-// chegam em pedaços e passam cada um por um Fluxo, que segura o pseudônimo cortado entre dois
+// chegam em pedaços e passam cada um por um Stream, que segura o pseudônimo cortado entre dois
 // pedaços. Os eventos que trazem o item inteiro (*.done, output_item.done, response.completed)
 // são desmascarados inteiros: o cliente pode usar tanto os pedaços quanto o item.
-type voltaResponses struct {
-	p      *Proxy
-	tab    *mask.Tabela
-	fluxos map[string]*fluxoResponses // por item (e parte, no texto)
+type responsesReturn struct {
+	p       *Proxy
+	tab     *mask.Table
+	streams map[string]*responsesStream // por item (e parte, no texto)
 }
 
-type fluxoResponses struct {
-	f        *mask.Fluxo
-	evento   string         // o tipo do evento de pedaço, para o pedaço a mais no fim
-	campos   map[string]any // item_id, output_index, content_index
-	campo    string         // "delta"
-	cru      bool           // ferramenta que vai para a internet: segue com os pseudônimos
-	ehTexto  bool
-	ehJSON   bool
+type responsesStream struct {
+	f        *mask.Stream
+	event    string         // o tipo do evento de pedaço, para o pedaço a mais no fim
+	fields   map[string]any // item_id, output_index, content_index
+	field    string         // "delta"
+	rawValue bool           // ferramenta que vai para a internet: segue com os pseudônimos
+	isText   bool
+	isJSON   bool
 	original strings.Builder
 }
 
-func (p *Proxy) novaVoltaResponses(tab *mask.Tabela) *voltaResponses {
-	return &voltaResponses{p: p, tab: tab, fluxos: map[string]*fluxoResponses{}}
+func (p *Proxy) newResponsesReturn(tab *mask.Table) *responsesReturn {
+	return &responsesReturn{p: p, tab: tab, streams: map[string]*responsesStream{}}
 }
 
-func (g *voltaResponses) reg(s string) string { return g.p.m.RegistrarResposta(s, g.tab) }
+func (g *responsesReturn) reg(s string) string { return g.p.m.RecordResponse(s, g.tab) }
 
 // cru: o item é de uma ferramenta que vai para a internet (segue com os pseudônimos).
-func (g *voltaResponses) cru(k string) bool { fx := g.fluxos[k]; return fx != nil && fx.cru }
+func (g *responsesReturn) rawValue(k string) bool {
+	fx := g.streams[k]
+	return fx != nil && fx.rawValue
+}
 
-func chaveItem(ev map[string]any) string {
+func itemKey(ev map[string]any) string {
 	id, _ := ev["item_id"].(string)
 	if id == "" {
-		id = fmt.Sprint("i", intDe(ev["output_index"]))
+		id = fmt.Sprint("i", intOf(ev["output_index"]))
 	}
 	return id
 }
 
-// desmascararArgs: os argumentos (um JSON em texto) com os valores reais, no mesmo formato em que
+// unmaskArgs: os argumentos (um JSON em texto) com os valores reais, no mesmo formato em que
 // vieram; cada string é registrada (quem escreveu).
-func (g *voltaResponses) desmascararArgs(args string) string {
-	if dec, ok := decodificar([]byte(args)); ok {
-		registrarTudo(dec, g.reg)
+func (g *responsesReturn) unmaskArgs(args string) string {
+	if dec, ok := decode([]byte(args)); ok {
+		recordAll(dec, g.reg)
 	}
-	return g.tab.Desmascarar(args, true)
+	return g.tab.Unmask(args, true)
 }
 
 // item: desmascara um item inteiro da saída, no lugar.
-func (g *voltaResponses) item(it map[string]any) {
-	nome, _ := it["name"].(string)
+func (g *responsesReturn) item(it map[string]any) {
+	name, _ := it["name"].(string)
 	switch it["type"] {
 	case "message":
-		partes, _ := it["content"].([]any)
-		for _, x := range partes {
+		parts, _ := it["content"].([]any)
+		for _, x := range parts {
 			if pm, _ := x.(map[string]any); pm != nil {
 				if t, ok := pm["text"].(string); ok && pm["type"] != "refusal" {
 					pm["text"] = g.reg(t)
@@ -362,37 +365,37 @@ func (g *voltaResponses) item(it map[string]any) {
 			}
 		}
 	case "function_call":
-		if a, ok := it["arguments"].(string); ok && !g.p.semDesmascararPonte(nome) {
-			it["arguments"] = g.desmascararArgs(a)
+		if a, ok := it["arguments"].(string); ok && !g.p.bridgeNoUnmask(name) {
+			it["arguments"] = g.unmaskArgs(a)
 		}
 	case "custom_tool_call":
-		if s, ok := it["input"].(string); ok && !g.p.semDesmascararPonte(nome) {
+		if s, ok := it["input"].(string); ok && !g.p.bridgeNoUnmask(name) {
 			it["input"] = g.reg(s)
 		}
 	case "local_shell_call":
-		it["action"] = registrarTudo(it["action"], g.reg)
+		it["action"] = recordAll(it["action"], g.reg)
 	}
 }
 
 // soltar: o que os fluxos de um item ainda seguravam, como eventos de pedaço a mais.
-func (g *voltaResponses) soltar(prefixo string) []map[string]any {
+func (g *responsesReturn) release(prefixP string) []map[string]any {
 	var ks []string
-	for k := range g.fluxos {
-		if k == prefixo || strings.HasPrefix(k, prefixo+"|") || prefixo == "" {
+	for k := range g.streams {
+		if k == prefixP || strings.HasPrefix(k, prefixP+"|") || prefixP == "" {
 			ks = append(ks, k)
 		}
 	}
 	sort.Strings(ks)
 	var out []map[string]any
 	for _, k := range ks {
-		fx := g.fluxos[k]
-		delete(g.fluxos, k)
-		if fx.cru {
+		fx := g.streams[k]
+		delete(g.streams, k)
+		if fx.rawValue {
 			continue
 		}
-		if resto := fx.f.Fechar(); resto != "" {
-			ev := map[string]any{"type": fx.evento, fx.campo: resto}
-			for c, v := range fx.campos {
+		if rest := fx.f.Close(); rest != "" {
+			ev := map[string]any{"type": fx.event, fx.field: rest}
+			for c, v := range fx.fields {
 				ev[c] = v
 			}
 			out = append(out, ev)
@@ -403,149 +406,149 @@ func (g *voltaResponses) soltar(prefixo string) []map[string]any {
 
 // evento desmascara um evento do streaming, no lugar. Devolve os eventos de pedaço a mais que
 // têm de sair antes dele (o resto que um fluxo segurava quando o item acabou).
-func (g *voltaResponses) evento(ev map[string]any) []map[string]any {
-	tipo, _ := ev["type"].(string)
-	pedaco := func(ehJSON bool, k string) {
-		fx := g.fluxos[k]
+func (g *responsesReturn) event(ev map[string]any) []map[string]any {
+	typ, _ := ev["type"].(string)
+	piece := func(isJSON bool, k string) {
+		fx := g.streams[k]
 		if fx == nil {
-			fx = &fluxoResponses{f: g.tab.NovoFluxo(ehJSON), evento: tipo, campo: "delta", ehJSON: ehJSON, campos: map[string]any{}}
+			fx = &responsesStream{f: g.tab.NewStream(isJSON), event: typ, field: "delta", isJSON: isJSON, fields: map[string]any{}}
 			for _, c := range []string{"item_id", "output_index", "content_index"} {
 				if v, ok := ev[c]; ok {
-					fx.campos[c] = v
+					fx.fields[c] = v
 				}
 			}
-			g.fluxos[k] = fx
+			g.streams[k] = fx
 		}
 		s, ok := ev["delta"].(string)
-		if !ok || fx.cru {
+		if !ok || fx.rawValue {
 			return
 		}
 		fx.original.WriteString(s)
-		ev["delta"] = fx.f.Empurrar(s)
+		ev["delta"] = fx.f.Push(s)
 	}
-	switch tipo {
+	switch typ {
 	case "response.output_text.delta":
-		pedaco(false, chaveItem(ev)+"|"+fmt.Sprint(intDe(ev["content_index"])))
+		piece(false, itemKey(ev)+"|"+fmt.Sprint(intOf(ev["content_index"])))
 	case "response.function_call_arguments.delta":
-		pedaco(true, chaveItem(ev))
+		piece(true, itemKey(ev))
 	case "response.custom_tool_call_input.delta":
-		pedaco(false, chaveItem(ev))
+		piece(false, itemKey(ev))
 	case "response.output_text.done":
-		extra := g.soltar(chaveItem(ev) + "|" + fmt.Sprint(intDe(ev["content_index"])))
+		extra := g.release(itemKey(ev) + "|" + fmt.Sprint(intOf(ev["content_index"])))
 		if t, ok := ev["text"].(string); ok {
 			ev["text"] = g.reg(t)
 		}
 		return extra
 	case "response.function_call_arguments.done":
-		cru := g.cru(chaveItem(ev))
-		extra := g.soltar(chaveItem(ev))
-		if a, ok := ev["arguments"].(string); ok && !cru {
-			ev["arguments"] = g.desmascararArgs(a)
+		rawValue := g.rawValue(itemKey(ev))
+		extra := g.release(itemKey(ev))
+		if a, ok := ev["arguments"].(string); ok && !rawValue {
+			ev["arguments"] = g.unmaskArgs(a)
 		}
 		return extra
 	case "response.custom_tool_call_input.done":
-		cru := g.cru(chaveItem(ev))
-		extra := g.soltar(chaveItem(ev))
-		if s, ok := ev["input"].(string); ok && !cru {
+		rawValue := g.rawValue(itemKey(ev))
+		extra := g.release(itemKey(ev))
+		if s, ok := ev["input"].(string); ok && !rawValue {
 			ev["input"] = g.reg(s)
 		}
 		return extra
 	case "response.content_part.added", "response.content_part.done":
 		if pm, _ := ev["part"].(map[string]any); pm != nil {
 			if t, ok := pm["text"].(string); ok && pm["type"] != "refusal" {
-				pm["text"] = g.tab.Desmascarar(t, false)
+				pm["text"] = g.tab.Unmask(t, false)
 			}
 		}
 	case "response.output_item.added", "response.output_item.done":
 		it, _ := ev["item"].(map[string]any)
 		var extra []map[string]any
-		if tipo == "response.output_item.done" {
+		if typ == "response.output_item.done" {
 			id, _ := it["id"].(string)
 			if id == "" {
-				id = fmt.Sprint("i", intDe(ev["output_index"]))
+				id = fmt.Sprint("i", intOf(ev["output_index"]))
 			}
-			extra = g.soltar(id)
+			extra = g.release(id)
 		}
 		if it != nil {
-			nome, _ := it["name"].(string)
-			if tipo == "response.output_item.added" && g.p.semDesmascararPonte(nome) {
+			name, _ := it["name"].(string)
+			if typ == "response.output_item.added" && g.p.bridgeNoUnmask(name) {
 				// os pedaços dos argumentos de uma ferramenta de internet seguem com os pseudônimos
 				id, _ := it["id"].(string)
-				g.fluxos[id] = &fluxoResponses{f: g.tab.NovoFluxo(true), cru: true}
+				g.streams[id] = &responsesStream{f: g.tab.NewStream(true), rawValue: true}
 			}
 			g.item(it)
 		}
 		return extra
 	case "response.completed", "response.done", "response.incomplete", "response.failed":
 		r, _ := ev["response"].(map[string]any)
-		saida, _ := r["output"].([]any)
-		for _, x := range saida {
+		output, _ := r["output"].([]any)
+		for _, x := range output {
 			if it, _ := x.(map[string]any); it != nil {
 				g.item(it)
 			}
 		}
-		return g.soltar("")
+		return g.release("")
 	}
 	return nil
 }
 
-// desmascararSSEResponses: streaming ("event: ..." e "data: {...}", um evento por bloco).
-func (p *Proxy) desmascararSSEResponses(w http.ResponseWriter, body io.Reader, tab *mask.Tabela) error {
+// unmaskSSEResponses: streaming ("event: ..." e "data: {...}", um evento por bloco).
+func (p *Proxy) unmaskSSEResponses(w http.ResponseWriter, body io.Reader, tab *mask.Table) error {
 	fl, _ := w.(http.Flusher)
 	rd := bufio.NewReaderSize(body, 64<<10)
-	g := p.novaVoltaResponses(tab)
-	escrever := func(ev map[string]any) {
+	g := p.newResponsesReturn(tab)
+	writeIt := func(ev map[string]any) {
 		if t, _ := ev["type"].(string); t != "" {
 			fmt.Fprintf(w, "event: %s\n", t)
 		}
-		fmt.Fprintf(w, "data: %s\n\n", codificar(ev))
+		fmt.Fprintf(w, "data: %s\n\n", encode(ev))
 	}
-	var linhas []string
-	processar := func() {
-		if len(linhas) == 0 {
+	var lines []string
+	process := func() {
+		if len(lines) == 0 {
 			return
 		}
-		defer func() { linhas = linhas[:0] }()
-		dados := ""
-		for _, l := range linhas {
+		defer func() { lines = lines[:0] }()
+		data := ""
+		for _, l := range lines {
 			if d, ok := strings.CutPrefix(l, "data:"); ok {
-				dados = strings.TrimPrefix(d, " ")
+				data = strings.TrimPrefix(d, " ")
 			}
 		}
 		var ev map[string]any
-		if v, ok := decodificar([]byte(dados)); ok && !tab.Vazia() {
+		if v, ok := decode([]byte(data)); ok && !tab.Empty() {
 			ev, _ = v.(map[string]any)
 		}
 		if ev == nil { // sem nada para desmascarar: passa como veio
-			io.WriteString(w, strings.Join(linhas, "\n")+"\n\n")
+			io.WriteString(w, strings.Join(lines, "\n")+"\n\n")
 			return
 		}
-		for _, extra := range g.evento(ev) {
-			escrever(extra)
+		for _, extra := range g.event(ev) {
+			writeIt(extra)
 		}
 		// o nome do evento continua o que veio (o cliente lê o "type" de dentro dos dados)
-		for _, l := range linhas {
+		for _, l := range lines {
 			if !strings.HasPrefix(l, "data:") {
 				io.WriteString(w, l+"\n")
 			}
 		}
-		fmt.Fprintf(w, "data: %s\n\n", codificar(ev))
+		fmt.Fprintf(w, "data: %s\n\n", encode(ev))
 	}
 	for {
-		linha, err := rd.ReadString('\n')
-		l := strings.TrimRight(linha, "\r\n")
-		if l == "" && linha != "" {
-			processar()
+		line, err := rd.ReadString('\n')
+		l := strings.TrimRight(line, "\r\n")
+		if l == "" && line != "" {
+			process()
 			if fl != nil {
 				fl.Flush()
 			}
 		} else if l != "" {
-			linhas = append(linhas, l)
+			lines = append(lines, l)
 		}
 		if err != nil {
-			processar()
-			for _, extra := range g.soltar("") {
-				escrever(extra)
+			process()
+			for _, extra := range g.release("") {
+				writeIt(extra)
 			}
 			if fl != nil {
 				fl.Flush()
@@ -558,20 +561,20 @@ func (p *Proxy) desmascararSSEResponses(w http.ResponseWriter, body io.Reader, t
 	}
 }
 
-// desmascararResponsesJSON: resposta sem streaming. O texto de cada mensagem e a entrada de cada
+// unmaskResponsesJSON: resposta sem streaming. O texto de cada mensagem e a entrada de cada
 // chamada de ferramenta voltam reais; o raciocínio não muda.
-func (p *Proxy) desmascararResponsesJSON(b []byte, tab *mask.Tabela) []byte {
-	v, ok := decodificar(b)
+func (p *Proxy) unmaskResponsesJSON(b []byte, tab *mask.Table) []byte {
+	v, ok := decode(b)
 	resp, _ := v.(map[string]any)
 	if !ok || resp == nil {
 		return b
 	}
-	g := p.novaVoltaResponses(tab)
-	saida, _ := resp["output"].([]any)
-	for _, x := range saida {
+	g := p.newResponsesReturn(tab)
+	output, _ := resp["output"].([]any)
+	for _, x := range output {
 		if it, _ := x.(map[string]any); it != nil {
 			g.item(it)
 		}
 	}
-	return codificar(resp)
+	return encode(resp)
 }

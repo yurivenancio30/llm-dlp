@@ -18,36 +18,36 @@ import (
 // que deixar uma senha passar. Só fica de fora o que claramente é código ou marcador.
 var (
 	// chave = valor   (senha: X, DB_PASSWORD=X, "password": "X", pwd => X)
-	reSenhaAtrib = regexp.MustCompile("(?i)(?:senha|passw(?:or)?d|pwd|secret|segredo)([\\w.\\-]*)[\"']?\\s*(?:=>|:=|=|:)\\s*[\"'`]?([^\\s\"'`,;]{4,})")
+	rePasswordAttr = regexp.MustCompile("(?i)(?:senha|passw(?:or)?d|pwd|secret|segredo)([\\w.\\-]*)[\"']?\\s*(?:=>|:=|=|:)\\s*[\"'`]?([^\\s\"'`,;]{4,})")
 	// frase   (a senha do sistema é X, the password is X)
-	reSenhaFrase = regexp.MustCompile("(?i)\\b(?:senha|password)\\b(?:[ \\t]+[\\p{L}_\\-]+){0,4}?[ \\t]+(?:é|eh|is|era|será)[ \\t]+[\"'`]?([^\\s\"'`,;]{6,})")
+	rePasswordSentence = regexp.MustCompile("(?i)\\b(?:senha|password)\\b(?:[ \\t]+[\\p{L}_\\-]+){0,4}?[ \\t]+(?:é|eh|is|era|será)[ \\t]+[\"'`]?([^\\s\"'`,;]{6,})")
 	// palavra e valor entre crases ou aspas, sem ":" nem "=" (senha `X`, password "X")
-	reSenhaCitada = regexp.MustCompile("(?i)\\b(?:senha|password|passwd|pwd)\\b(?:[ \\t]+[\\p{L}_\\-]+){0,3}?[ \\t]+[`\"']([^\\s`\"']{4,})[`\"']")
+	reQuotedPassword = regexp.MustCompile("(?i)\\b(?:senha|password|passwd|pwd)\\b(?:[ \\t]+[\\p{L}_\\-]+){0,3}?[ \\t]+[`\"']([^\\s`\"']{4,})[`\"']")
 	// usuário:senha@ numa URL
-	reSenhaURL = regexp.MustCompile("[a-zA-Z][a-zA-Z0-9+.\\-]*://[^\\s:/@]+:([^\\s@/]{3,})@")
+	rePasswordURL = regexp.MustCompile("[a-zA-Z][a-zA-Z0-9+.\\-]*://[^\\s:/@]+:([^\\s@/]{3,})@")
 	// linha de comando
-	reSenhaCLI = regexp.MustCompile("(?:\\b(?:mysql|mysqldump|mysqladmin|mariadb)\\b[^\\n|;&]*?\\s-p|\\bsshpass\\s+-p\\s*|--password[= ]+|\\bcurl\\b[^\\n|;&]*?\\s(?:-u|--user)\\s+[^\\s:]+:)[\"']?([^\\s\"'`]{4,})")
+	rePasswordCLI = regexp.MustCompile("(?:\\b(?:mysql|mysqldump|mysqladmin|mariadb)\\b[^\\n|;&]*?\\s-p|\\bsshpass\\s+-p\\s*|--password[= ]+|\\bcurl\\b[^\\n|;&]*?\\s(?:-u|--user)\\s+[^\\s:]+:)[\"']?([^\\s\"'`]{4,})")
 )
 
-var reSufixoArquivo = regexp.MustCompile(`\.\w{1,5}$`)
+var reFileSuffix = regexp.MustCompile(`\.\w{1,5}$`)
 
-var naoESenha = map[string]bool{"null": true, "none": true, "nil": true, "true": true, "false": true, "undefined": true,
+var notPassword = map[string]bool{"null": true, "none": true, "nil": true, "true": true, "false": true, "undefined": true,
 	"string": true, "str": true, "varchar": true, "text": true, "required": true, "optional": true}
 
-// pareceSenha separa um valor literal de um pedaço de código (variável, chamada, tipo).
+// looksLikePassword separa um valor literal de um pedaço de código (variável, chamada, tipo).
 // fraca=true aceita qualquer literal (posições em que só cabe uma senha, como numa URL).
 
-func pareceSenha(v string, fraca bool) bool {
-	if naoESenha[strings.ToLower(v)] || strings.ContainsAny(v[:1], "$<{%*|=") || strings.ContainsAny(v, "()[]") {
+func looksLikePassword(v string, weak bool) bool {
+	if notPassword[strings.ToLower(v)] || strings.ContainsAny(v[:1], "$<{%*|=") || strings.ContainsAny(v, "()[]") {
 		return false
 	}
 	if strings.HasPrefix(v, "SEGREDO-") || strings.Trim(v, "*x.#-") == "" {
 		return false // já mascarado, ou "*****"
 	}
-	if fraca {
+	if weak {
 		return true
 	}
-	if d := soDigitos(v); len(d) < 6 && len(strings.Trim(v, "0123456789-")) == 0 {
+	if d := digitsOnly(v); len(d) < 6 && len(strings.Trim(v, "0123456789-")) == 0 {
 		return false // número curto: linha de arquivo, porta, código
 	}
 	// pelo menos um dígito ou símbolo: "self.password", "args.senha" e "obrigatória" não contam
@@ -59,32 +59,32 @@ func pareceSenha(v string, fraca bool) bool {
 	return false
 }
 
-func (m *Masker) acharSenhas(s, baixo string, add func(ini, fim int, tipo string)) {
-	olhar := func(re *regexp.Regexp, fraca bool) {
+func (m *Masker) findPasswords(s, lower string, add func(ini, end int, typ string)) {
+	look := func(re *regexp.Regexp, weak bool) {
 		for _, ix := range re.FindAllStringSubmatchIndex(s, -1) {
-			ini, fim := ix[len(ix)-2], ix[len(ix)-1]
-			if re == reSenhaAtrib && reSufixoArquivo.MatchString(s[ix[2]:ix[3]]) {
+			ini, end := ix[len(ix)-2], ix[len(ix)-1]
+			if re == rePasswordAttr && reFileSuffix.MatchString(s[ix[2]:ix[3]]) {
 				continue // nome de arquivo: "PasswordEncoder.java:123", "secrets.yaml: ..."
 			}
 			// pontuação da frase, não da senha. Na URL, não: a senha vai até o "@" (Senha!@host)
-			for re != reSenhaURL && fim > ini && strings.ContainsRune(".,;:!?)]}", rune(s[fim-1])) {
-				fim--
+			for re != rePasswordURL && end > ini && strings.ContainsRune(".,;:!?)]}", rune(s[end-1])) {
+				end--
 			}
-			if fim-ini >= 3 && pareceSenha(s[ini:fim], fraca) {
-				add(ini, fim, "segredo")
+			if end-ini >= 3 && looksLikePassword(s[ini:end], weak) {
+				add(ini, end, "segredo")
 			}
 		}
 	}
-	if strings.Contains(baixo, "senha") || strings.Contains(baixo, "passw") || strings.Contains(baixo, "pwd") ||
-		strings.Contains(baixo, "secret") || strings.Contains(baixo, "segredo") {
-		olhar(reSenhaAtrib, false)
-		olhar(reSenhaFrase, false)
-		olhar(reSenhaCitada, false)
-		olhar(reSenhaCLI, false)
+	if strings.Contains(lower, "senha") || strings.Contains(lower, "passw") || strings.Contains(lower, "pwd") ||
+		strings.Contains(lower, "secret") || strings.Contains(lower, "segredo") {
+		look(rePasswordAttr, false)
+		look(rePasswordSentence, false)
+		look(reQuotedPassword, false)
+		look(rePasswordCLI, false)
 	} else if strings.Contains(s, " -p") || strings.Contains(s, " -u ") || strings.Contains(s, "--user ") {
-		olhar(reSenhaCLI, false)
+		look(rePasswordCLI, false)
 	}
 	if strings.Contains(s, "://") {
-		olhar(reSenhaURL, true)
+		look(rePasswordURL, true)
 	}
 }

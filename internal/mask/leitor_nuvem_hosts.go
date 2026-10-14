@@ -19,7 +19,7 @@ import "strings"
 // https://docs.databricks.com/workspace/workspace-details.html)
 
 // sufixo do host -> tipo do rótulo do cliente (o primeiro rótulo do host)
-var hostsNuvem = []struct{ suf, ent string }{
+var cloudHosts = []struct{ suf, ent string }{
 	{".rds.amazonaws.com", "servidor"},
 	{".redshift.amazonaws.com", "servidor"},
 	{".redshift-serverless.amazonaws.com", "servidor"},
@@ -44,14 +44,14 @@ var hostsNuvem = []struct{ suf, ent string }{
 }
 
 // rótulos que fazem parte da forma do host, não do nome do cliente
-var rotulosProvedor = map[string]bool{"s3": true, "s3-website": true, "dkr": true, "ecr": true, "www": true,
+var providerLabels = map[string]bool{"s3": true, "s3-website": true, "dkr": true, "ecr": true, "www": true,
 	"postgres": true, "mysql": true, "mariadb": true, "privatelink": true}
 
-func acharHostsNuvem(s string, add func(ObjAchado)) {
-	for _, h := range hostsNuvem {
+func findCloudHosts(s string, add func(ObjFinding)) {
+	for _, h := range cloudHosts {
 		for i := strings.Index(s, h.suf); i >= 0; {
-			if a, b, ok := rotuloCliente(s, i); ok && (h.suf != ".execute-api." || strings.Contains(s[i:min(len(s), i+80)], ".amazonaws.com")) {
-				add(ObjAchado{a, b, h.ent, "nuvem-host", true})
+			if a, b, ok := clientLabel(s, i); ok && (h.suf != ".execute-api." || strings.Contains(s[i:min(len(s), i+80)], ".amazonaws.com")) {
+				add(ObjFinding{a, b, h.ent, "nuvem-host", true})
 			}
 			j := strings.Index(s[i+1:], h.suf)
 			if j < 0 {
@@ -60,14 +60,14 @@ func acharHostsNuvem(s string, add func(ObjAchado)) {
 			i += 1 + j
 		}
 	}
-	acharS3Virtual(s, add)
-	acharECRHost(s, add)
+	findS3Virtual(s, add)
+	findECRHost(s, add)
 }
 
-// rotuloCliente: o primeiro rótulo do host que termina em s[i] (o começo do sufixo).
-func rotuloCliente(s string, i int) (int, int, bool) {
+// clientLabel: o primeiro rótulo do host que termina em s[i] (o começo do sufixo).
+func clientLabel(s string, i int) (int, int, bool) {
 	a := i
-	for a > 0 && i-a < 253 && (ehAlnum(s[a-1]) || s[a-1] == '-' || s[a-1] == '.') {
+	for a > 0 && i-a < 253 && (isAlnum(s[a-1]) || s[a-1] == '-' || s[a-1] == '.') {
 		a--
 	}
 	for a < i && s[a] == '.' {
@@ -78,7 +78,7 @@ func rotuloCliente(s string, i int) (int, int, bool) {
 	}
 	b := a + strings.IndexByte(s[a:i]+".", '.')
 	v := s[a:b]
-	if v == "" || rotulosProvedor[strings.ToLower(v)] || reRegiao.MatchString(strings.ToLower(v)) || publicoDev(v) {
+	if v == "" || providerLabels[strings.ToLower(v)] || reRegion.MatchString(strings.ToLower(v)) || publicDev(v) {
 		return 0, 0, false
 	}
 	return a, b, true
@@ -87,18 +87,18 @@ func rotuloCliente(s string, i int) (int, int, bool) {
 // S3 com endereço virtual: <bucket>.s3.amazonaws.com, <bucket>.s3.<região>.amazonaws.com,
 // <bucket>.s3-<região>.amazonaws.com, <bucket>.s3-website[.-]<região>.amazonaws.com. O bucket
 // pode ter pontos: é tudo antes de ".s3".
-func acharS3Virtual(s string, add func(ObjAchado)) {
+func findS3Virtual(s string, add func(ObjFinding)) {
 	for i := strings.Index(s, ".s3"); i >= 0; {
-		resto := s[i+3 : min(len(s), i+64)]
-		if (strings.HasPrefix(resto, ".") || strings.HasPrefix(resto, "-")) && strings.Contains(resto, "amazonaws.com") {
+		rest := s[i+3 : min(len(s), i+64)]
+		if (strings.HasPrefix(rest, ".") || strings.HasPrefix(rest, "-")) && strings.Contains(rest, "amazonaws.com") {
 			// o host vai até amazonaws.com sem espaço nem barra
-			if k := strings.Index(resto, "amazonaws.com"); k >= 0 && strings.IndexAny(resto[:k], " /\n\t\"'") < 0 {
+			if k := strings.Index(rest, "amazonaws.com"); k >= 0 && strings.IndexAny(rest[:k], " /\n\t\"'") < 0 {
 				a := i
-				for a > 0 && (ehAlnum(s[a-1]) || s[a-1] == '-' || s[a-1] == '.') {
+				for a > 0 && (isAlnum(s[a-1]) || s[a-1] == '-' || s[a-1] == '.') {
 					a--
 				}
-				if v := s[a:i]; len(v) >= 3 && !publicoDev(v) {
-					add(ObjAchado{a, i, "bucket", "nuvem-host", true})
+				if v := s[a:i]; len(v) >= 3 && !publicDev(v) {
+					add(ObjFinding{a, i, "bucket", "nuvem-host", true})
 				}
 			}
 		}
@@ -111,10 +111,10 @@ func acharS3Virtual(s string, add func(ObjAchado)) {
 }
 
 // <conta>.dkr.ecr.<região>.amazonaws.com: a conta da AWS (12 dígitos).
-func acharECRHost(s string, add func(ObjAchado)) {
+func findECRHost(s string, add func(ObjFinding)) {
 	for i := strings.Index(s, ".dkr.ecr."); i >= 0; {
-		if i >= 12 && todoDigitos(s[i-12:i]) && (i == 12 || !ehAlnum(s[i-13])) {
-			add(ObjAchado{i - 12, i, "conta_nuvem", "nuvem-host", true})
+		if i >= 12 && allDigits(s[i-12:i]) && (i == 12 || !isAlnum(s[i-13])) {
+			add(ObjFinding{i - 12, i, "conta_nuvem", "nuvem-host", true})
 		}
 		j := strings.Index(s[i+1:], ".dkr.ecr.")
 		if j < 0 {

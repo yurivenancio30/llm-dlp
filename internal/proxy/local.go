@@ -19,10 +19,10 @@ import (
 //
 //   - Local: só atende quem chama pelo endereço local e não é uma página da web;
 //   - a última conversa só sai com a prova de quem lê a chave (o dono da pasta do llm-dlp);
-//   - o llm-dlp prova que é ele (Prova) a quem pergunta se está no ar: outro programa que
+//   - o llm-dlp prova que é ele (Proof) a quem pergunta se está no ar: outro programa que
 //     pegue a porta não se passa por ele, e não recebe a conversa sem máscara.
 
-func enderecoLocal(h string) bool {
+func localAddress(h string) bool {
 	return h == "127.0.0.1" || h == "localhost" || h == "::1"
 }
 
@@ -39,51 +39,51 @@ func Local(r *http.Request) bool {
 	if hh, _, err := net.SplitHostPort(h); err == nil {
 		h = hh
 	}
-	if !enderecoLocal(strings.Trim(h, "[]")) {
+	if !localAddress(strings.Trim(h, "[]")) {
 		return false
 	}
-	if u, err := url.Parse(r.Header.Get("Origin")); err == nil && (u.Scheme == "http" || u.Scheme == "https") && !enderecoLocal(u.Hostname()) {
+	if u, err := url.Parse(r.Header.Get("Origin")); err == nil && (u.Scheme == "http" || u.Scheme == "https") && !localAddress(u.Hostname()) {
 		return false
 	}
 	return true
 }
 
-// SoLocal recusa (403) o que não passa em Local, antes de chegar ao handler.
-func SoLocal(h http.Handler) http.Handler {
+// LocalOnly recusa (403) o que não passa em Local, antes de chegar ao handler.
+func LocalOnly(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !Local(r) {
-			recusarNaoLocal(w)
+			refuseNonLocal(w)
 			return
 		}
 		h.ServeHTTP(w, r)
 	})
 }
 
-func recusarNaoLocal(w http.ResponseWriter) {
+func refuseNonLocal(w http.ResponseWriter) {
 	w.Header().Set("content-type", "application/json")
 	w.WriteHeader(http.StatusForbidden)
 	w.Write([]byte(`{"type":"error","error":{"type":"llm_dlp_error","message":"llm-dlp: só atende programas desta máquina, pelo endereço 127.0.0.1."}}` + "\n"))
 }
 
-// Prova: o que só quem lê a chave do llm-dlp consegue calcular para um uso ("ultima", ou
+// Proof: o que só quem lê a chave do llm-dlp consegue calcular para um uso ("ultima", ou
 // "saude" mais o desafio de quem pergunta). Não é a chave nem deixa chegar nela, e é separada
 // dos pseudônimos pelo prefixo.
-func Prova(chave []byte, uso string) string {
-	h := hmac.New(sha256.New, chave)
-	h.Write([]byte("llm-dlp/porta-local/v1\x00" + uso))
+func Proof(key []byte, usage string) string {
+	h := hmac.New(sha256.New, key)
+	h.Write([]byte("llm-dlp/porta-local/v1\x00" + usage))
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-// ProvaConfere compara em tempo constante.
-func ProvaConfere(chave []byte, uso, prova string) bool {
-	return len(chave) > 0 && hmac.Equal([]byte(prova), []byte(Prova(chave, uso)))
+// ProofMatches compara em tempo constante.
+func ProofMatches(key []byte, usage, proof string) bool {
+	return len(key) > 0 && hmac.Equal([]byte(proof), []byte(Proof(key, usage)))
 }
 
-// CabecalhoProva: o cabeçalho com que "llm-dlp last" se apresenta.
-const CabecalhoProva = "X-Llm-Dlp-Prova"
+// ProofHeader: o cabeçalho com que "llm-dlp last" se apresenta.
+const ProofHeader = "X-Llm-Dlp-Prova"
 
-// desafioValido: 16 a 64 dígitos hexadecimais (o llm-dlp não assina texto livre).
-func desafioValido(d string) bool {
+// validChallenge: 16 a 64 dígitos hexadecimais (o llm-dlp não assina texto livre).
+func validChallenge(d string) bool {
 	if len(d) < 16 || len(d) > 64 {
 		return false
 	}
@@ -97,7 +97,7 @@ func desafioValido(d string) bool {
 
 // limpo: s sem caracteres de controle, para o log (um caminho com quebra de linha não forja
 // outra linha).
-func limpo(s string) string {
+func cleaned(s string) string {
 	if len(s) > 200 {
 		s = s[:200] + "…"
 	}
@@ -109,5 +109,5 @@ func limpo(s string) string {
 	}, s)
 }
 
-// Limpo: como limpo, para quem escreve no mesmo log fora deste pacote.
-func Limpo(s string) string { return limpo(s) }
+// Clean: como limpo, para quem escreve no mesmo log fora deste pacote.
+func Clean(s string) string { return cleaned(s) }

@@ -5,7 +5,7 @@ import "testing"
 // Nada mascarado a mais em texto comum (prosa em português e inglês, código Go e Python,
 // YAML público, logs comuns, saídas de ps, ls e git log), com e sem a extensão da dica de uma
 // saída de comando.
-var negativosT8 = []struct{ nome, texto string }{
+var t8Negatives = []struct{ name, text string }{
 	{"prosa pt", "Hoje revisei o relatório de vendas com a equipe e combinamos de rodar a carga de novo amanhã cedo.\nO resultado ficou melhor que o da semana passada.\n"},
 	{"prosa en", "We reviewed the quarterly report with the team and agreed to rerun the load tomorrow morning.\nThe numbers look better than last week.\n"},
 	{"go", "package main\n\nimport (\n\t\"fmt\"\n\t\"strings\"\n)\n\nfunc main() {\n\tnomes := []string{\"a\", \"b\"}\n\tfmt.Println(strings.Join(nomes, \",\"))\n}\n"},
@@ -17,14 +17,14 @@ var negativosT8 = []struct{ nome, texto string }{
 	{"git log", "a1b2c3d corrige o cabeçalho do relatório\ne4f5a6b acrescenta a carga mensal\n0c9d8e7 atualiza dependências\n"},
 }
 
-func TestT8Negativos(t *testing.T) {
-	for _, c := range negativosT8 {
-		for _, dica := range []string{"", ComExtensao("", "s;p=1")} {
-			m := novoTeste(t)
-			m.cfg.DominiosInternos, m.cfg.Termos = nil, nil
-			r, _ := m.mascararD(c.texto, true, dica)
-			if r.texto != c.texto {
-				t.Errorf("%s (dica %q): mascarou\n%s", c.nome, dica, r.texto)
+func TestT8Negatives(t *testing.T) {
+	for _, c := range t8Negatives {
+		for _, hint := range []string{"", WithExtension("", "s;p=1")} {
+			m := newTest(t)
+			m.cfg.InternalDomains, m.cfg.Terms = nil, nil
+			r, _ := m.maskD(c.text, true, hint)
+			if r.text != c.text {
+				t.Errorf("%s (dica %q): mascarou\n%s", c.name, hint, r.text)
 			}
 		}
 	}

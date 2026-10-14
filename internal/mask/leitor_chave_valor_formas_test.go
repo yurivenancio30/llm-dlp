@@ -4,9 +4,9 @@ import "testing"
 
 // A regra "o nome ao lado diz o tipo" em todas as sintaxes de chave → valor.
 
-var casosChaveValor = []struct {
-	nome, texto string
-	nomes       []string
+var keyValueCases = []struct {
+	name, text string
+	names      []string
 }{
 	{"JSON coluna", `{"coluna": "vl_lancto", "column_name": "cd_conta", "fieldPath": "dt_lancto"}`, []string{"vl_lancto", "cd_conta", "dt_lancto"}},
 	{"JSON lista", `{"tables": ["lanc_diario", "plano_contas"], "schema": "fin_contab"}`, []string{"lanc_diario", "plano_contas", "fin_contab"}},
@@ -55,25 +55,25 @@ public class Lancamento {
 	{"name em objeto", `{"dataset": {"name": "erp_fin.fin_contab.lanc_diario", "owner": "joana_fin"}}`, []string{"erp_fin", "fin_contab", "lanc_diario", "joana_fin"}},
 }
 
-func TestChaveValorFormas(t *testing.T) {
-	for _, c := range casosChaveValor {
-		for _, tr := range transportes {
-			m := novoTeste(t)
-			txt := tr.f(c.texto)
-			if ok, tot := conferirMascarado(t, m, c.nome+"/"+tr.nome, txt, c.nomes); ok != tot {
-				out, _ := m.Mascarar(txt)
-				t.Errorf("%s / %s: %d/%d\n%s", c.nome, tr.nome, ok, tot, out)
+func TestKeyValueForms(t *testing.T) {
+	for _, c := range keyValueCases {
+		for _, tr := range transports {
+			m := newTest(t)
+			txt := tr.f(c.text)
+			if ok, tot := checkMasked(t, m, c.name+"/"+tr.name, txt, c.names); ok != tot {
+				out, _ := m.Mask(txt)
+				t.Errorf("%s / %s: %d/%d\n%s", c.name, tr.name, ok, tot, out)
 			}
 		}
 	}
 }
 
-func TestEntChaveNormalizada(t *testing.T) {
+func TestEntNormalizedKey(t *testing.T) {
 	for k, e := range map[string]string{"dbname": "database", "dbName": "database", "db_name": "database", "database_name": "database",
 		"tableName": "tabela", "schemaname": "schema", "rolename": "usuario", "warehousename": "servico", "accountname": "conta_nuvem",
 		"HostName": "servidor", "fieldPath": "coluna", "column_name": "coluna", "COLUMN": "coluna", "role": "usuario", "serviceAccountName": "usuario"} {
-		if g, forte := entChave(k); g != e || !forte {
-			t.Errorf("%s: %q forte=%v, esperado %q", k, g, forte, e)
+		if g, strong := entKey(k); g != e || !strong {
+			t.Errorf("%s: %q forte=%v, esperado %q", k, g, strong, e)
 		}
 	}
 }
