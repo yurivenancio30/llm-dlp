@@ -109,9 +109,9 @@ Where each switch is applied:
 | Stage | `mask` | `propagate` |
 |---|---|---|
 | Decision on each span returned by the readers, before the replacement | a span of a type that is off is discarded and the text stays as it is | — |
-| Learning (memory and `vistos.json`) | a type that is off is not stored | a type that is off is stored only for the structural position, with no propagation mark |
+| Learning (memory and `seen.json`) | a type that is off is not stored | a type that is off is stored only for the structural position, with no propagation mark |
 | Search for learned names in new text | — | only the names of a type that is on, and only the ones that passed the guards (below) |
-| Record of what already went out (`enviados.log`) | changing the switch restarts the record (the cache is rewritten once) | same |
+| Record of what already went out (`sent.log`) | changing the switch restarts the record (the cache is rewritten once) | same |
 
 Limit: if the same name is a table (on) in one place and a column (off) in another, it stays
 readable where it appears as a column, and that reveals the table name.
@@ -135,17 +135,17 @@ A doubtful reading (the origin rule, any table header) masks in place, but does 
 ### One name, one type
 
 The same real name always keeps the same type and therefore the same pseudonym. If it was
-already learned (in RAM or in `vistos.json`) with a type, the finding of another rule uses
+already learned (in RAM or in `seen.json`) with a type, the finding of another rule uses
 that type (the path `/srv/x/` after `deployment/x` becomes `svc_…`, not `dir_…`), also after
 a restart. In a text where two rules disagree and nothing was learned, the type of the first
-occurrence wins. A dotted name (`fila.eventos`) is also looked up in `vistos.json` with the
+occurrence wins. A dotted name (`fila.eventos`) is also looked up in `seen.json` with the
 following pieces joined by dots (up to 4 pieces), so it is recognized in prose after the
 restart.
 
 ### Validity
 
 A name not seen for **90 days** stops being propagated (it stays masked in the structural
-position). `vistos.json` stores, along with the hash, the day the name was last seen (2 more
+position). `seen.json` stores, along with the hash, the day the name was last seen (2 more
 bytes per name).
 
 ## Check of the phase 1 [VERIFY] items
@@ -815,7 +815,7 @@ the URN), otherwise the model loses the link between the texts.
 
 ### 8. Storage and queues: what is implemented (the `endereço` reader)
 
-Code: `internal/mask/reader_addresses.go` (`urlEm`). Database URIs stay with the `conexão`
+Code: `internal/mask/reader_addresses.go` (`urlIn`). Database URIs stay with the `conexão`
 reader; these are the storage and queue ones:
 
 | Scheme | Position | Entity | Strong? |
@@ -856,7 +856,7 @@ spaces do not count on lines with code punctuation (`{ } ; := // == ( `, ` = `):
 code with gaps is not a table.
 
 The type of each column comes from the header: the catalog names (`table_schema`, `relname`...) or
-a type word in any spelling (the same rule as the key-value reader, `entChave`).
+a type word in any spelling (the same rule as the key-value reader, `entKey`).
 `name` is a table when there is a schema column, takes the type of the section title when the line above is
 a type word (`Buckets`), and is a column when there is a `type` next to it with data types
 (DESCRIBE). A header cell with more than one word only counts in a `|`, TAB or dash table, and
@@ -1075,7 +1075,7 @@ lines, or 1 with the footer `dtype: object`), decided by the type and not by the
 annotation is indented and does not count), `string name = 1;` (protobuf) and a `name | type` table with data
 types in the `type` column. The vocabulary is only that of data types (SQL, pandas/numpy, Arrow,
 Polars, Spark, Avro, Protobuf, R: `vocab_types.go`). In YAML/JSON, `name` counts by its container
-(the YAML/JSON engine, `acharNomePorContexto`): under `columns`/`fields` it is a column (dbt
+(the YAML/JSON engine, `findNameByContext`): under `columns`/`fields` it is a column (dbt
 `schema.yml`, Avro), under `tables`/`models`/`seeds`/`views` it is a table, under `sources`/`datasets`
 it is a schema, and under a key that is a type word (`table`, `dataset`, `database`...) it is of that
 type; `owner` is a user; a qualified value (`db.schema.table`) is split into its parts.
@@ -1314,7 +1314,7 @@ Avro: `"namespace": "vendas_x.pedidos"` → `"DB_dqrsyg6b.SCH_3wl5qkpz"`, `"name
 - URI (DSN/JDBC): https://www.rfc-editor.org/rfc/rfc3986
 
 
-### 8. What is implemented (the `chave-valor` reader)
+### 8. What is implemented (the `key-value` reader)
 
 Code: `internal/mask/reader_key_value.go`. A single reader, without a parser for each format: it finds the
 separator (`:` or `=`), the key before it and the value after it. It works for YAML, JSON, TOML, INI,
@@ -2733,11 +2733,11 @@ Script and shell output has no fixed format. Four generic mechanisms apply, none
 tool (the tool names below are examples of where the shape appears):
 
 **1. The command says what the output is** (`call_command.go`; the proxy links the `tool_use` to the `tool_result`
-of the same id in `request.go`, `dicasDosComandos`). The tool input (the shell
+of the same id in `request.go`, `commandHints`). The tool input (the shell
 `command`, or the strings of the input, without the description) becomes a *hint* with the type of the columns of the
 output, which goes along with the text in the key of the result memory. The hint is only evidence for the
-table reader (`classificarTabelaD`, in hint mode: only the columns the header does not type) and
-for headerless output (`linhasDica`: every line with the same number of cells, by `|`,
+table reader (`classifyTableD`, in hint mode: only the columns the header does not type) and
+for headerless output (`hintLines`: every line with the same number of cells, by `|`,
 TAB, `,`, `;` or space; one line outside the shape undoes everything; the footer `(N rows)` and the line that
 repeats the header are left out; `uniq -c` has the count stripped). Shapes:
 - SQL in the command: the last `SELECT ... FROM` gives the type of each column in order and by name
@@ -2757,7 +2757,7 @@ repeats the header are left out; `uniq -c` has the count stripped). Shapes:
   looks like an identifier outside the devops vocabulary (`kube-system`, `bridge` stay).
 
 **2. Qualified name after a type word, in any sentence** (the error reader,
-`acharTipoQualificado`, extended from "type word + name between quotes" to an unquoted
+`findQualifiedType`, extended from "type word + name between quotes" to an unquoted
 name): `tabela fin.t_x: 1200 linhas`, `Loading table a.b.c`, `created sql table model
 fin.t_x` (one lowercase word fits in the middle, and then the evidence is weak). Type words
 in English and Portuguese (`tabela`, `esquema`, `banco`, `objeto`...). Unquoted, only a qualified
@@ -3005,7 +3005,7 @@ Comprehend PII has no type for host, database, table or column (it has `USERNAME
 
 ### 8. What is implemented
 
-The key-value fallback is the `chave-valor` reader (see the section JSON, YAML, TOML..., §8). Besides
+The key-value fallback is the `key-value` reader (see the section JSON, YAML, TOML..., §8). Besides
 it, two generic readers with no format:
 
 **Internal host in a URL and loose address** (the `endereço` reader, rules `url-interna` and
@@ -3170,8 +3170,8 @@ all public documentation). Measured on 2 MB of `.md` from Go modules: 6 names in
 | Group | List | Source |
 |---|---|---|
 | Go module hosts | `github.com`, `gitlab.com`, `bitbucket.org`, `golang.org`, `google.golang.org`, `gopkg.in`, `go.uber.org`, `k8s.io`, `sigs.k8s.io`, `example.com/org/net` | the most common module hosts; `example.*` reserved (RFC 2606) |
-| groupId prefixes | `org.apache`, `org.springframework`, `com.google`, `io.*`, `javax`, `jakarta`, `org.jetbrains`, `org.junit`, `junit`, `org.slf4j`, `ch.qos`, `com.fasterxml`, `org.hibernate`, `org.projectlombok`, `org.mockito`, `org.eclipse`, `com.amazonaws`, `software.amazon`, `com.microsoft`, `com.azure`, `org.postgresql`, `com.mysql`, `com.oracle`, `com.h2database`, `org.yaml`, `com.squareup`, `org.codehaus`, `org.gradle`, `com.android`, `androidx`, `org.jboss`, `org.testcontainers`, `org.flywaydb`, `org.liquibase`, `commons-*`, `com.github`, `org.example`, `com.example`... (complete list in `gruposPublicos`) | Maven Central coordinates (central.sonatype.org) and most used groups (mvnrepository.com/popular) |
-| npm scopes | `@types`, `@angular`, `@babel`, `@vue`, `@nestjs`, `@aws-sdk`, `@google-cloud`, `@azure`, `@mui`, `@testing-library`, `@typescript-eslint`, `@storybook`, `@tanstack`, `@octokit`, `@sentry`... (list in `escoposNpmPublicos`) | most downloaded scopes of the npm registry |
+| groupId prefixes | `org.apache`, `org.springframework`, `com.google`, `io.*`, `javax`, `jakarta`, `org.jetbrains`, `org.junit`, `junit`, `org.slf4j`, `ch.qos`, `com.fasterxml`, `org.hibernate`, `org.projectlombok`, `org.mockito`, `org.eclipse`, `com.amazonaws`, `software.amazon`, `com.microsoft`, `com.azure`, `org.postgresql`, `com.mysql`, `com.oracle`, `com.h2database`, `org.yaml`, `com.squareup`, `org.codehaus`, `org.gradle`, `com.android`, `androidx`, `org.jboss`, `org.testcontainers`, `org.flywaydb`, `org.liquibase`, `commons-*`, `com.github`, `org.example`, `com.example`... (complete list in `publicGroups`) | Maven Central coordinates (central.sonatype.org) and most used groups (mvnrepository.com/popular) |
+| npm scopes | `@types`, `@angular`, `@babel`, `@vue`, `@nestjs`, `@aws-sdk`, `@google-cloud`, `@azure`, `@mui`, `@testing-library`, `@typescript-eslint`, `@storybook`, `@tanstack`, `@octokit`, `@sentry`... (list in `publicNpmScopes`) | most downloaded scopes of the npm registry |
 | Path users | `user`, `runner` (GitHub Actions), `ubuntu`, `ec2-user`, `azureuser`, `opc`, `vagrant`, `jovyan` (Jupyter), `linuxbrew` (Homebrew), `node`, `gopher`, `Shared`, `Public`, `Default`... | default users of cloud and CI images |
 | Folders | `node_modules`, `site-packages`, `dist-packages`, `__pycache__`, `AppData`, `LocalLow`, `OneDrive`, `IdeaProjects`, `PycharmProjects`, `go-build*`, tool+version (`python3.10`, `go1.22.0`), hidden folders (`.config`, `.venv`) | Windows Known Folders, macOS layout, Python, Node, Go, JetBrains |
 
@@ -3387,20 +3387,20 @@ what `kubectl`, `aws`, `psql` or `gh` is. Every decision comes from grammar, str
 or uniqueness. The only vocabulary is the closed grammar of the enumeration and query verbs
 (`list`, `get`, `describe`, `show`, `ls`, `search`, `find`, `query`, `select`, `scan`, `enum`,
 `dump`, `export`, `fetch`, `inspect`, `info`, in any convention: `get_x`, `listX`, `Get-X`,
-`GET /x`), the types of `EntObjeto`, the public vocabularies that already existed and the public
+`GET /x`), the types of `ObjectPrefixes`, the public vocabularies that already existed and the public
 reference derived by measurement (below).
 
 ### The pieces (decision.go)
 
 - **Decision:** a name decided in a text, with the name, the type and the rule that decided it
   (`Decisao{Nome, Ent, Regra, Generica}`). The object names found by the readers enter
-  as decisions of the rule `leitor`; the new rules enter with their own name.
+  as decisions of the rule `reader`; the new rules enter with their own name.
 - **Decider:** a rule that looks at the whole text and at what was already found in it, and decides names
   (`TextoCtx.Decidir` masks in place and records). The deciders run after the readers, only
   on new text; the rest comes from the memo.
 - The decisions stay in the memo result, in RAM, along with the masked text. **They do not go to
-  `vistos.json`**: the format, the 90-day validity, the cap and the learning rules of
-  `vistos.json` are the same as before.
+  `seen.json`**: the format, the 90-day validity, the cap and the learning rules of
+  `seen.json` are the same as before.
 - The command hint (what the proxy knows about the `tool_use` that produced a `tool_result`) may carry
   an extension after the separator `\x1e`; the table reader reads only the old part, the
   deciders receive the extension. The whole hint enters the memo key.
@@ -3500,7 +3500,7 @@ An identifier-looking word follows the earlier rules. A common word becomes a na
 
 **Type of the pseudonym:** the noun the enumeration verb of the request points to
 (`list_findings` → `finding`, `Get-ADGroup` → `group`, `GET /queues` → `queue`). If it matches
-a type of `EntObjeto`, that prefix is used; otherwise, the generic prefix that already existed. The
+a type of `ObjectPrefixes`, that prefix is used; otherwise, the generic prefix that already existed. The
 user's message is also a request: "list the groups with access to the database" gives the type of the next
 output, by the same grammar.
 
@@ -3513,7 +3513,7 @@ HCL). A common word is only a candidate if it is the **whole** literal or value,
 (a literal with a sentence is prose); a code identifier (variable, function, import) never is;
 a comment is prose. The candidate becomes a name with one more hint:
 
-- the key contains a type of `EntObjeto` (`namespace:`, `bucket=`, `table_name=`);
+- the key contains a type of `ObjectPrefixes` (`namespace:`, `bucket=`, `table_name=`);
 - anchor: another value of the same block is already a known name;
 - echo;
 - the word also appears as data in a command output of the conversation.
@@ -3560,18 +3560,18 @@ other rules, `broker1` in a `bootstrap.servers` is still a name.
 
 ### Derived public reference
 
-`public_ref.txt` and `language_types.txt` are **generated** by `TestGerarRefPublica`
+`public_ref.txt` and `language_types.txt` are **generated** by `TestGeneratePublicRef`
 (`vocab_generate_test.go`) from the public material of the machine (the directories of
 `LLM_DLP_CORPUS`: Go modules, Python libraries, `/usr/share/doc`), never written by hand. The
 header of each file says from where, when and with which criterion it was generated:
 
 ```
 LLM_DLP_GEN_REF=1 LLM_DLP_CORPUS=~/go/pkg/mod:/usr/lib/python3.10:/usr/share/doc:... \
-  go test ./internal/mask -run TestGerarRefPublica -v
+  go test ./internal/mask -run TestGeneratePublicRef -v
 ```
 
 - **public_ref.txt:** a word in a name position in at least 8 distinct projects. Name
-  position, by the grammar: the value of a type key (`entChave`) or `name` in YAML, JSON, TOML,
+  position, by the grammar: the value of a type key (`entKey`) or `name` in YAML, JSON, TOML,
   INI, .env and a named argument (in code, only a text literal); a `--type` option; the name after
   `FROM`/`JOIN`/`INTO`/`UPDATE`/`TABLE`/`SCHEMA`/`DATABASE` (in lowercase, only a qualified
   name); the first label of the host and the first piece of the path of a URL. A project is the
@@ -3585,7 +3585,7 @@ LLM_DLP_GEN_REF=1 LLM_DLP_CORPUS=~/go/pkg/mod:/usr/lib/python3.10:/usr/share/doc
   folders of the public repository `docker-library/docs` that have `content.md` and `metadata.json`
   (one per image). Generated along with the others, when that repository is in the corpus.
 - **public_software.txt and vendors.txt:** name and owner of each public GitHub repository
-  with at least 3000 stars (`TestGerarSoftwarePublico`, with `LLM_DLP_GITHUB_TOP` pointing
+  with at least 3000 stars (`TestGeneratePublicSoftware`, with `LLM_DLP_GITHUB_TOP` pointing
   to the JSONL list `{"r": "owner/name", "s": stars}`). The list comes from the API search,
   sliced by star range because each query returns at most 1000
   (`gh api -X GET search/repositories -f q='stars:A..B fork:false' -f per_page=100 -f page=N`,
@@ -3597,7 +3597,7 @@ LLM_DLP_GEN_REF=1 LLM_DLP_CORPUS=~/go/pkg/mod:/usr/lib/python3.10:/usr/share/doc
   of 30 Brazilian companies tested owns a repository with 3000 stars; 0 of the 45
   secrets of the battery is in the list.
 
-`ehGenerica` consults the reference. A word of the reference decided by any rule is
+`isGeneric` consults the reference. A word of the reference decided by any rule is
 masked in place, with `Decisao.Generica = true`, and does not enter the conversation memory.
 
 ### Public only with proof
@@ -3606,7 +3606,7 @@ A rule that leaves a name in the clear has a leak as its worst case. So every ru
 of this kind requires a guarantee of shape (one distinctive piece blocks it) and is measured against the
 secrets of the battery and the names of the labelled set that must be masked. When in doubt, mask.
 
-- **Value with no owner** (`semDono`, `vocab_dev.go`): a placeholder and a role name (`my_bucket`,
+- **Value with no owner** (`ownerless`, `vocab_dev.go`): a placeholder and a role name (`my_bucket`,
   `stub-user`, `source_db`, `XXXXXXXX`, `000000000000`) stay in the clear; one piece outside the
   vocabulary of role, type and entity is enough for the name to be the owner's (`stub-vendashx` is
   masked). An example account number only with digits repeated in equal blocks and up to 3 letters.
@@ -3621,7 +3621,7 @@ secrets of the battery and the names of the labelled set that must be masked. Wh
   `build:`). An unknown piece blocks, on purpose: `confluentinc/cp-kafka` stays
   masked because of `cp`, because a short acronym is precisely what distinguishes a client
   name. A vendor registry (`registry.k8s.io`, `mcr.microsoft.com`) stays whole.
-- **Service named after the software** (`softwareDoTexto`): the service, host or namespace with the
+- **Service named after the software** (`textSoftware`): the service, host or namespace with the
   name of an image the text itself runs stays in the clear only if the image is official
   (`image: redis:7` → service `redis`) or from an organization equal to the name and public
   (`minio/minio`). `image: yudao-server` without an organization is a local image: the name is the owner's.

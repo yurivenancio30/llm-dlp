@@ -21,7 +21,7 @@ The version has three numbers: `MAJOR.MINOR.PATCH`.
 |---|---|---|---|
 | PATCH (`0.2.0` → `0.2.1`) | A fix that does not change on purpose what is masked: bug, performance, message, documentation, packaging | A command that failed, a text that took too long | Nothing |
 | MINOR (`0.2.1` → `0.3.0`) | Changes what is masked (new rule or reader, regenerated list) or adds a command or a configuration field | A new format starts being read | Nothing. The CHANGELOG is worth reading |
-| MAJOR (`0.x` → `1.0`) | Breaks compatibility: the format of `config.json`, of the files on disk (`vistos.json`, `enviados.log`, `pessoas.json`) or of the pseudonyms; a removed command | The old `config.json` is no longer accepted | Follow what the CHANGELOG says |
+| MAJOR (`0.x` → `1.0`) | Breaks compatibility: the format of `config.json`, of the files on disk (`seen.json`, `sent.log`, `people.json`) or of the pseudonyms; a removed command | The old `config.json` is no longer accepted | Follow what the CHANGELOG says |
 
 Features marked **beta** (today, the [other clients and APIs](configuration.md#other-clients-and-apis-beta))
 are outside this table: they may change in a MINOR version, even in a way that asks you to
@@ -50,7 +50,7 @@ and a `SHA256SUMS` file.
 ## How to release a version
 
 The number lives in a single place, `internal/version/version.go`. The git tag and the
-CHANGELOG must say the same, and a test (`TestVersaoBateComOChangelog`) and `make release`
+CHANGELOG must say the same, and a test (`TestVersionMatchesChangelog`) and `make release`
 check it.
 
 1. On the `main` branch, with everything committed, choose the number from the table above.

@@ -40,12 +40,18 @@ apareceu, confira o `config.json`.
 
 | Arquivo | Conteúdo |
 |---|---|
-| `chave` | A chave secreta. Não compartilhe; guarde uma cópia |
+| `key` | A chave secreta. Não compartilhe; guarde uma cópia |
 | `config.json` | A configuração |
-| `pessoas.json` | Hashes de nomes, e-mails e códigos de pessoas |
-| `vistos.json` | Hashes de valores já mascarados |
-| `enviados.log` | De cada texto já enviado: hashes, posições, tipos e pseudônimos, nunca valores |
+| `people.json` | Hashes de nomes, e-mails e códigos de pessoas |
+| `seen.json` | Hashes de valores já mascarados |
+| `sent.log` | De cada texto já enviado: hashes, posições, tipos e pseudônimos, nunca valores |
 | `llm-dlp.log` | Uma linha por requisição: contagens, tempos e os pseudônimos que voltaram sem virar o valor real, nunca valores. No máximo ~20 MB |
+
+Até a 0.9 esses arquivos tinham nomes em português (`chave`, `pessoas.json`, `vistos.json`,
+`enviados.log`). A primeira vez que uma versão a partir da 0.10 precisa de um deles, ela copia o
+antigo para o nome novo (a chave é a mesma, então os pseudônimos mantêm os identificadores). Os antigos ficam, para o caso
+de voltar para uma versão anterior; o `enviados.log` é apagado, porque o registro recomeça a cada
+versão de qualquer jeito.
 
 ## A porta local
 
@@ -55,8 +61,8 @@ chegam nesse endereço. O que cada um consegue:
 | Quem tenta | O que acontece |
 |---|---|
 | Uma página aberta no navegador, que aponta o próprio domínio para `127.0.0.1` (DNS rebinding) ou manda a requisição de outro site | Recusada (403). Só é atendido quem chama pelo endereço local (`127.0.0.1`, `localhost`) e não é uma página da web. Nada vai para a API |
-| Outro usuário da máquina querendo ler a sua última conversa (mascarada) | Não lê: ela só sai com uma prova que só quem lê a sua `chave` calcula. É o que o comando `llm-dlp last` faz |
-| Outro programa que ocupa a porta enquanto o llm-dlp está fora do ar, para receber a conversa sem máscara e a credencial da API | A cada mensagem, o Claude Code pergunta à porta se é o llm-dlp e exige a resposta a um desafio novo, que só quem lê a `chave` calcula. Sem a prova, a mensagem é barrada |
+| Outro usuário da máquina querendo ler a sua última conversa (mascarada) | Não lê: ela só sai com uma prova que só quem lê a sua chave (`key`) calcula. É o que o comando `llm-dlp last` faz |
+| Outro programa que ocupa a porta enquanto o llm-dlp está fora do ar, para receber a conversa sem máscara e a credencial da API | A cada mensagem, o Claude Code pergunta à porta se é o llm-dlp e exige a resposta a um desafio novo, que só quem lê a chave (`key`) calcula. Sem a prova, a mensagem é barrada |
 
 Quem roda com o **seu** usuário lê a chave e passa pelas três barreiras (ver "O que não
 protege", acima).

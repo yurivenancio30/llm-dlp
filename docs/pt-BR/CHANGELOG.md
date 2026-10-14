@@ -17,6 +17,11 @@ manual do Pix do Banco Central, FEBRABAN, UPU, CNJ, IBGE, Ministério da Saúde,
 endereços inventados em IPv4, IPv6, rotas e nomes de máquina, e com documentos e frases
 inventados: o que vazava está listado abaixo.
 
+O llm-dlp passa a ser todo em inglês: nomes de tipo e de detector, rótulos dos pseudônimos,
+arquivos de dados, linhas do log e mensagens. O que ele detecta não muda: as palavras em
+português que as regras procuram no texto são as mesmas, e o identificador de cada pseudônimo
+também.
+
 ### Mascaramento
 
 - IPv4 interno também na faixa compartilhada dos provedores `100.64.0.0/10` (RFC 6598, CGNAT;
@@ -41,9 +46,9 @@ inventados: o que vazava está listado abaixo.
   pseudônimo que já tinha dentro de um ARN.
 - Boleto (linha digitável de 47 dígitos), conta de consumo e tributo (48 dígitos) e o código de
   barras de 44, com os dígitos verificadores da FEBRABAN. Nome do detector: `boleto`.
-- Código de rastreio (`RR473124829BR`), com o DV da norma S10 da UPU. Nome do detector: `rastreio`.
+- Código de rastreio (`RR473124829BR`), com o DV da norma S10 da UPU. Nome do detector: `tracking`.
 - Matrícula de certidão do registro civil (nascimento, casamento, óbito; 32 dígitos), pela
-  estrutura (o DV do CNJ não é publicado). Nome do detector: `certidao`.
+  estrutura (o DV do CNJ não é publicado). Nome do detector: `certificate`.
 - Dado sensível da LGPD (art. 5º, II) no meio do texto, só o valor e só depois de uma expressão
   que o liga a alguém: cor ou raça (`se declara parda`, `mulher negra`), religião (`é
   evangélico`, `membro da Assembleia de Deus`), orientação sexual e identidade de gênero (`é
@@ -51,7 +56,7 @@ inventados: o que vazava está listado abaixo.
   PT`), sindicato (`sindicalizado no Sindicato dos …`), código da CID-10 depois de `CID` ou
   `diagnóstico` (`CID F32.1, F41.0`) e template de impressão digital (ISO/IEC 19794-2 em base64).
   Valores das listas oficiais (IBGE, Ministério da Saúde, TSE). `a tela é preta`, `a igreja
-  católica do bairro`, `o PL 2630` ficam. Nome do detector: `sensivel`.
+  católica do bairro`, `o PL 2630` ficam. Nome do detector: `sensitive`.
 - Pelo nome do campo, também `identidade de gênero`, `filiação partidária`, `opinião política`,
   `convicção religiosa`, `vida sexual`, `impressão digital`, `raça/cor`, `race`,
   `comorbidades`.
@@ -69,14 +74,39 @@ inventados: o que vazava está listado abaixo.
 
 ### Programa
 
+- Nomes em inglês: detectores e tipos no `config.json` (`segredo` → `secret`, `telefone` →
+  `phone`, `tabela` → `table`, `quase` → `quasi`...; a lista está em
+  [configuration.md](configuration.md)), rótulos dos pseudônimos (`TELEFONE-6x6fjtkg` →
+  `PHONE-6x6fjtkg`, `Pessoa …` → `Person …`), os arquivos de `~/.config/llm-dlp` (`chave` → `key`,
+  `pessoas.json` → `people.json`, `vistos.json` → `seen.json`, `enviados.log` → `sent.log`), as
+  linhas do log (`substituições` → `replacements`, `RECUSADO` → `REFUSED`...), as mensagens e a
+  palavra que o `sudo llm-dlp emergency` pede (`LIBERAR` → `UNLOCK`).
+- Os nomes antigos continuam funcionando. Um `config.json` com os nomes de tipo antigos é lido
+  como está, e o `llm-dlp update` o regrava (e de volta, ao ir para uma versão anterior). A
+  primeira subida copia `chave`, `pessoas.json` e `vistos.json` para os nomes novos e deixa os
+  antigos para uma versão anterior. O `llm-dlp audit` lê as linhas do log das duas versões. Com
+  os rótulos novos, a primeira mensagem de cada conversa regrava o cache uma vez, como depois de
+  qualquer atualização.
 - A linha de cada requisição no log diz também quantos valores de cada tipo foram mascarados
-  (`tipos: cpf 2, tabela 5`) e, quando acontece, os pseudônimos que chegaram ao cliente sem
-  voltar a ser o valor real (`NÃO DESFEITOS`) e os que colidiram (`colididos`). Só contagens e
+  (`types: cpf 2, table 5`) e, quando acontece, os pseudônimos que chegaram ao cliente sem
+  voltar a ser o valor real (`NOT UNDONE`) e os que colidiram (`collided`). Só contagens e
   pseudônimos.
 - Comando novo `llm-dlp audit [24h|7d]`: resume o log de um período (o que foi mascarado por
   tipo, pseudônimos que voltaram, envios sem máscara, recusas, erros da API).
 - O log troca de arquivo aos 10 MB também com o llm-dlp no ar (antes, só quando ele subia): no
   máximo ~20 MB no disco.
+
+### Código
+
+- Identificadores, comentários, nomes de arquivo e mensagens dos testes em inglês. As variáveis
+  de ambiente dos testes também: `LLM_DLP_STRESS`, `LLM_DLP_SAMPLE`, `LLM_DLP_GEN_REF`,
+  `LLM_DLP_SESSIONS`, `LLM_DLP_VECTORS`, e `LLM_DLP_DEBUG` (`LLM_DLP_DEPURAR` continua valendo).
+- O `pseudonym_golden_test.go` grava os pseudônimos de uma chave fixa: falha se uma mudança no
+  código mudar algum deles. O domínio da HMAC de cada tipo continua sendo o nome dele até a 0.9
+  (`hmacDomain`).
+- Os nomes que uma versão usa para falar com outra durante a atualização (`servir`,
+  `supervisionar`, `/__llm-dlp/saude`...) continuam em português, porque a atualização a partir
+  da 0.9 roda o código da 0.9. A lista está em `swap.go`.
 
 ## [0.9.2] - 2026-10-13
 

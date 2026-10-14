@@ -12,6 +12,12 @@ Eles continuam sendo lidos, e o `llm-dlp update` regrava o arquivo com os nomes 
 o anterior em `config.json.bak-DATA`). Voltar para uma versão anterior com
 `llm-dlp update --version` converte o arquivo de volta, já que ela ignoraria os nomes novos.
 
+Até a 0.9 os nomes de detectores e tipos também eram em português (`segredo`, `tabela`...), em
+`disabled_detectors`, `optional_detectors`, `extra_fields` e `objects`. Eles continuam sendo
+lidos, e o `llm-dlp update` regrava com os nomes abaixo (e de volta, ao ir para uma versão
+anterior). O identificador de cada pseudônimo não muda; só o rótulo dos tipos de dado pessoal passou para
+o inglês (`TELEFONE-6x6fjtkg` vira `PHONE-6x6fjtkg`, `Pessoa …` vira `Person …`).
+
 Enquanto a configuração tirar proteção (`fail_closed` desligado, `ocr.mode` em
 `allow`, `objects` desligado, algum detector desligado) ou o `upstream` não for a API da
 Anthropic, o Claude Code mostra um aviso a cada mensagem (ver
@@ -27,23 +33,24 @@ Anthropic, o Claude Code mostra um aviso a cada mensagem (ver
 | `extra_patterns` | Regex próprias | vazio |
 | `terms` | Palavras exatas a mascarar | vazio |
 | `disabled_detectors` | Detectores a desligar (lista abaixo) | vazio |
-| `optional_detectors` | Detectores a ligar. Hoje só `quase`: sexo, idade, estado civil, profissão, nacionalidade, renda, latitude/longitude | vazio |
+| `optional_detectors` | Detectores a ligar. Hoje só `quasi`: sexo, idade, estado civil, profissão, nacionalidade, renda, latitude/longitude | vazio |
 | `tools_never_unmasked` | Ferramentas da web: recebem só pseudônimos, e o que trazem não é lembrado. Os conectores do claude.ai (`mcp__claude_ai_*`) recebem só pseudônimos sempre, fora desta lista | `WebFetch`, `WebSearch` |
 | `documents_without_context` | Mascara CPF e CNPJ só com dígitos mesmo sem a palavra "cpf"/"cnpj" por perto, se o dígito verificador conferir. Cerca de 1 em 100 números aleatórios desse tamanho também confere e é mascarado a mais | `true` |
 | `fail_closed` | Recusa o que não sabe mascarar. Desligado, uma falha ao mascarar manda a requisição **sem máscara** (só fica um aviso no log). Imagem e PDF que não deu para verificar nunca saem, com qualquer valor deste campo. Não recomendado desligar | `true` |
 | `ocr` | `mode` (`mask`, `block` ou `allow`: mascarar, bloquear ou permitir), `language`, `max_pages`, caminhos do tesseract e do poppler. Em `block`, e em `mask` quando não dá para verificar o arquivo (falta o OCR, arquivo ilegível), ele é retirado da requisição e o modelo recebe um aviso no lugar | `mask`, `por`, 30 |
-| `objects` | Nomes de recursos internos (ver [O que é detectado](detection.md#5-nomes-de-recursos-internos-pela-estrutura)). `enabled` (ligado); `mask` (mascarar) e `propagate` (propagar): mapas tipo → `true`/`false` (tipos: `servidor`, `database`, `schema`, `tabela`, `coluna`, `procedure`, `indice`, `usuario`, `namespace`, `servico`, `bucket`, `fila`). Ex.: `{"mask": {"coluna": false}}` deixa as colunas legíveis | ligado; mascara todos; propaga todos menos `coluna` e `indice` |
+| `objects` | Nomes de recursos internos (ver [O que é detectado](detection.md#5-nomes-de-recursos-internos-pela-estrutura)). `enabled` (ligado); `mask` (mascarar) e `propagate` (propagar): mapas tipo → `true`/`false` (tipos: `server` (servidor), `database`, `schema`, `table` (tabela), `column` (coluna), `procedure`, `index` (índice), `user` (usuário), `namespace`, `service` (serviço), `bucket`, `queue` (fila)). Ex.: `{"mask": {"column": false}}` deixa as colunas legíveis | ligado; mascara todos; propaga todos menos `column` e `index` |
 | `objects.public_ip` | Mascara também IPv4 público e IPv6 público como nome de servidor (`HOST_...`), também dentro do nome público de uma máquina da AWS (`ec2-52-14-88-21…`) e no DNS reverso. Ficam `::1`, faixas de documentação e os DNS públicos (`8.8.8.8`, `1.1.1.1`, `9.9.9.9`...). O IP interno é sempre mascarado: IPv4 privado e compartilhado pelo detector `ip`, IPv6 local único e link-local como nome de servidor | desligado |
 | `port` | Porta local do proxy | 8787 |
 | `upstream` | Endereço da API | `https://api.anthropic.com` |
 | `providers` | **Beta.** Outras APIs atendidas na mesma porta, pelo caminho `/<nome>` (ver [Outros clientes e APIs](#outros-clientes-e-apis-beta)). Cada uma tem `upstream` e `format` (`gemini`, `openai` ou `anthropic`; outro valor cai no modo genérico) | `gemini`, `openai` e `xai`, cada um com o endereço da sua API |
 
-Nomes aceitos em `disabled_detectors`: `segredo`, `email`, `ip`, `host`, `cpf`, `cnpj`,
-`pis`, `cnh`, `rg`, `telefone`, `cep`, `cartao`, `conta`, `pix`, `endereco`, `nascimento`,
-`nome`, `campo` (detecção pelo nome do campo), `usuario`, `doc`, `iban`, `processo`, `mac`,
-`nfe` (chave de acesso de nota fiscal eletrônica), `boleto` (boleto, conta e código de barras),
-`rastreio` (código de rastreio), `certidao` (matrícula de certidão), `sensivel` (código da CID-10,
-dado sensível da LGPD no texto, template de impressão digital).
+Nomes aceitos em `disabled_detectors`: `secret` (segredo), `email`, `ip`, `host`, `cpf`, `cnpj`,
+`pis`, `cnh`, `rg`, `phone` (telefone), `cep`, `card` (cartão), `account` (conta bancária), `pix`,
+`address` (endereço), `birthdate` (data de nascimento), `name` (nome), `field` (detecção pelo nome
+do campo), `user` (usuário), `doc`, `iban`, `lawsuit` (número de processo), `mac`, `nfe` (chave de
+acesso de nota fiscal eletrônica), `boleto` (boleto, conta e código de barras), `tracking` (código
+de rastreio), `certificate` (matrícula de certidão), `sensitive` (código da CID-10, dado sensível da
+LGPD no texto, template de impressão digital).
 
 ## Outros clientes e APIs (beta)
 

@@ -23,19 +23,19 @@ resultado de cada texto. Só o que é novo é examinado.
 | Valor real | O que a API vê |
 |---|---|
 | `joao.silva@empresa.com.br` | `p.mxvotcyt@didl3.invalid` |
-| `Joao Carlos Silva` / `JOAO CARLOS SILVA` | `Pessoa mxvotcyt` / `PESSOA MXVOTCYT` (mesmo identificador do e-mail, se for a mesma pessoa; a caixa segue a do nome, e cada grafia volta como estava) |
-| `B123456` (código do João) | `USUARIO-mxvotcyt` (`usuario-mxvotcyt` para `b123456`: como no nome, a caixa segue a do valor) |
+| `Joao Carlos Silva` / `JOAO CARLOS SILVA` | `Person mxvotcyt` / `PERSON MXVOTCYT` (mesmo identificador do e-mail, se for a mesma pessoa; a caixa segue a do nome, e cada grafia volta como estava) |
+| `B123456` (código do João) | `USER-mxvotcyt` (`user-mxvotcyt` para `b123456`: como no nome, a caixa segue a do valor) |
 | `10.42.7.15` | `250.153.31.15` (mesma sub-rede vira a mesma sub-rede falsa) |
 | `mysql-dh.empresa.intra` | `mysql-x7k2.invalid` |
 | `529.982.247-25` | `CPF-irvikcpk` |
-| token ou senha | `SEGREDO-…` |
+| token ou senha | `SECRET-…` |
 
 - São derivados de uma **chave secreta de 256 bits** (HMAC-SHA256). Sem a chave, não dá para
   saber quem é quem, nem testando listas de candidatos.
 - O mesmo valor vira sempre o mesmo pseudônimo, entre mensagens e entre sessões.
 - **Perder a chave não perde dado**, porque os seus arquivos são reais. Uma nova é gerada e
   os pseudônimos mudam dali em diante. Mesmo assim, guarde uma cópia de
-  `~/.config/llm-dlp/chave`.
+  `~/.config/llm-dlp/key`.
 
 ## O que é lembrado
 
@@ -46,8 +46,8 @@ qualquer lugar: na saída de um comando, num arquivo lido mais tarde, sem a pist
 | Onde | O que guarda |
 |---|---|
 | Memória | O valor real, enquanto o llm-dlp estiver no ar |
-| Disco (`vistos.json`, `pessoas.json`) | **Só o hash**, feito com a chave. Serve para reconhecer depois de reiniciar. Para nomes de recursos internos (tabela, servidor...), também o tipo e o dia em que foi aprendido e visto pela última vez (para a validade de 90 dias) |
-| Disco (`enviados.log`) | Para cada texto já enviado: um hash do ponto da conversa em que ele está e, de cada trecho trocado, onde ele fica no texto, o tipo e o pseudônimo. Serve para o texto sair igual depois de reiniciar (ver abaixo) |
+| Disco (`seen.json`, `people.json`) | **Só o hash**, feito com a chave. Serve para reconhecer depois de reiniciar. Para nomes de recursos internos (tabela, servidor...), também o tipo e o dia em que foi aprendido e visto pela última vez (para a validade de 90 dias) |
+| Disco (`sent.log`) | Para cada texto já enviado: um hash do ponto da conversa em que ele está e, de cada trecho trocado, onde ele fica no texto, o tipo e o pseudônimo. Serve para o texto sair igual depois de reiniciar (ver abaixo) |
 
 Nenhum valor real e nenhum texto mascarado é gravado em disco pelo llm-dlp.
 
@@ -56,7 +56,7 @@ mensagem, e o cache da API só vale se o começo for idêntico ao da vez anterio
 a conversa é reenviada, um texto que já saiu sai igual, mesmo que depois o llm-dlp aprenda um
 valor que aparece nele: mudá-lo não protegeria nada (ele já foi enviado assim) e faria a
 conversa inteira ser regravada no cache. Isso vale também depois de reiniciar, graças ao
-`enviados.log`.
+`sent.log`.
 
 O congelamento é do texto **naquele ponto da conversa** (o mesmo começo de requisição até
 ele), não do texto em si: o mesmo texto numa mensagem nova, ou noutra conversa (o mesmo
@@ -168,7 +168,7 @@ CPU por hora; em disco, de 30 a 60 MB. Não precisa de GPU nem de rede própria.
 | Memória | 25 MB ao subir; 40–100 MB em uso (95 MB na sessão real acima) | Estabiliza em 150–210 MB com 60 mil textos todos diferentes, porque tudo que é lembrado tem teto ([a tabela](development.md#o-que-fica-guardado)) | Quantidade de texto e de valores diferentes na sessão |
 | Memória do supervisor | ~23 MB (o processo que religa o llm-dlp se ele cair) | Igual | Nada |
 | Disco: programa | 14 MB (`~/.local/bin/llm-dlp`) | Igual | Nada |
-| Disco: dados | ~20 MB depois de uma semana de uso (`~/.config/llm-dlp`) | `enviados.log` guarda até 400 mil textos; `llm-dlp.log`, até 20 MB (troca aos 10 MB e guarda um anterior); `vistos.json`, até ~40 MB (1 milhão de hashes) | Quantidade de texto enviado |
+| Disco: dados | ~20 MB depois de uma semana de uso (`~/.config/llm-dlp`) | `sent.log` guarda até 400 mil textos; `llm-dlp.log`, até 20 MB (troca aos 10 MB e guarda um anterior); `seen.json`, até ~40 MB (1 milhão de hashes) | Quantidade de texto enviado |
 | Tempo por mensagem | 5–30 ms | Arquivo novo: mediana de 6,5 ms; 1 em 10 passa de 65 ms; 1 em 100 passa de 300 ms | Tamanho do texto novo |
 | Subida | 0,1 s | Igual | Nada |
 | Rede | Nenhuma própria: só repassa o que o Claude Code enviaria | Igual | Nada |
@@ -192,25 +192,28 @@ Cada requisição gera uma linha em `~/.config/llm-dlp/llm-dlp.log`, com contage
 pseudônimos (nunca valores):
 
 ```
-POST /v1/messages -> 200 | 245 substituições | 0 colisões | mascarar 9ms | total 2.97s | tipos: tabela 120, servidor 31, cpf 2
+POST /v1/messages -> 200 | 245 replacements | 0 collisions | mask 9ms | total 2.97s | types: table 120, server 31, cpf 2
 ```
 
 | Campo | Significado |
 |---|---|
-| `-> 200` | Resposta da API. `RECUSADO` quer dizer que o llm-dlp barrou a requisição (falha fechada) |
-| `substituições` | Quantos valores foram trocados por pseudônimos nessa requisição (a conversa inteira é reenviada a cada mensagem, então esse número cresce com ela) |
-| `colisões` | Pseudônimos que valeriam para dois valores reais diferentes. Os pseudônimos são curtos, então isso é raro, mas possível, e mais comum em IPs (a sub-rede falsa tem poucas combinações). A ida continua mascarada; só a volta daquele pseudônimo não é feita, para não trocar pelo valor errado. No pior caso, você vê um pseudônimo numa resposta |
-| `mascarar` | Tempo gasto pelo llm-dlp |
+| `-> 200` | Resposta da API. `REFUSED` quer dizer que o llm-dlp barrou a requisição (falha fechada) |
+| `replacements` | Quantos valores foram trocados por pseudônimos nessa requisição (a conversa inteira é reenviada a cada mensagem, então esse número cresce com ela) |
+| `collisions` | Pseudônimos que valeriam para dois valores reais diferentes. Os pseudônimos são curtos, então isso é raro, mas possível, e mais comum em IPs (a sub-rede falsa tem poucas combinações). A ida continua mascarada; só a volta daquele pseudônimo não é feita, para não trocar pelo valor errado. No pior caso, você vê um pseudônimo numa resposta |
+| `mask` | Tempo gasto pelo llm-dlp |
 | `total` | Tempo total, dominado pela resposta do modelo |
-| `tipos` | Quantos valores diferentes de cada tipo foram mascarados nessa requisição (`cpf 2`: dois CPFs diferentes). Só contagens |
-| `colididos: …` | Só quando acontece: os pseudônimos que colidiram (`240.1.2.x` é uma rede /24 falsa inteira). A forma de cada um diz o tipo do dado. Duas grafias da mesma pessoa importada (nome completo e primeiro + último nome) dividem o pseudônimo e não são colisão |
-| `NÃO DESFEITOS n: …` | Só quando acontece: pseudônimos gerados pelo llm-dlp que chegaram ao cliente na resposta sem voltar a ser o valor real (o modelo mudou ou cortou um, ou citou um de outra conversa; também um endereço da faixa falsa de IP). O que o cliente gravou em arquivo nessa resposta ficou com o pseudônimo. Os pseudônimos vão listados, para dar para procurá-los |
-| `API: tipo: mensagem` | Só quando a API responde com erro: o tipo e o começo da mensagem dela, como ela mandou (ela só recebeu pseudônimos). É o que distingue, por exemplo, um 429 de limite da conta de um 429 de requisição recusada |
+| `types` | Quantos valores diferentes de cada tipo foram mascarados nessa requisição (`cpf 2`: dois CPFs diferentes). Só contagens |
+| `collided: …` | Só quando acontece: os pseudônimos que colidiram (`240.1.2.x` é uma rede /24 falsa inteira). A forma de cada um diz o tipo do dado. Duas grafias da mesma pessoa importada (nome completo e primeiro + último nome) dividem o pseudônimo e não são colisão |
+| `NOT UNDONE n: …` | Só quando acontece: pseudônimos gerados pelo llm-dlp que chegaram ao cliente na resposta sem voltar a ser o valor real (o modelo mudou ou cortou um, ou citou um de outra conversa; também um endereço da faixa falsa de IP). O que o cliente gravou em arquivo nessa resposta ficou com o pseudônimo. Os pseudônimos vão listados, para dar para procurá-los |
+| `API: type: message` | Só quando a API responde com erro: o tipo e o começo da mensagem dela, como ela mandou (ela só recebeu pseudônimos). É o que distingue, por exemplo, um 429 de limite da conta de um 429 de requisição recusada |
 
-Uma linha `AVISO` diz por que uma imagem ou um PDF foi retirado de uma requisição.
+Uma linha `WARNING` diz por que uma imagem ou um PDF foi retirado de uma requisição.
 
 O log troca de arquivo aos 10 MB a qualquer momento, também com o llm-dlp no ar há semanas, e
 guarda um anterior (`llm-dlp.log.1`): no máximo ~20 MB no disco.
+
+Até a 0.9 as linhas eram em português (`substituições`, `RECUSADO`, `AVISO`...). O `llm-dlp audit`
+lê os dois formatos, então um período que pega a atualização sai somado.
 
 `llm-dlp audit` resume o log de um período (`24h` por padrão; também `90m`, `7d`): requisições
 e erros da API, o que foi mascarado por tipo, os pseudônimos que voltaram sem virar o valor
@@ -220,11 +223,11 @@ aconteceu sem guardar o conteúdo.
 
 ```
 $ llm-dlp audit 24h
-llm-dlp: log das últimas 24h (desde 13/10 15:04)
-  requisições: 152
-  substituições: 31877; colisões (pseudônimo que ficou sem desmascarar): 0
-  mascarados por tipo (valores distintos de cada requisição, somados): tabela 9120, servidor 2210, cpf 14
-  pseudônimos que voltaram sem virar o valor real: nenhum
-  enviadas sem máscara: nenhuma
+llm-dlp: log of the last 24h (since 13/10 15:04)
+  requests: 152 (status HTTP: 200 152)
+  replacements: 31877; collisions (pseudonym left masked): 0
+  masked by type (distinct values of each request, added up): table 9120, server 2210, cpf 14
+  pseudonyms that came back without turning into the real value: none
+  sent unmasked: none
 ```
 

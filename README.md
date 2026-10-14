@@ -41,7 +41,7 @@ And this is what leaves your machine, the only thing the model's API ever sees:
 DB_HOST=hkdzp7s4a.invalid
 DB_NAME=db_nr3b5hpi
 DB_USER=usr_xyxhy7ug
-DB_PASSWORD=SEGREDO-vqxz5dvy
+DB_PASSWORD=SECRET-vqxz5dvy
 SUPPORT_EMAIL=p.ouhiojea@ds373.invalid
 ```
 
@@ -59,7 +59,7 @@ pg_dump -h pg-prd.acme.intra -U app_crm -d crm_clientes -f backup.sql       # wh
 | `pg-prd.acme.intra` | `hkdzp7s4a.invalid` | a server (`.invalid` is a domain that never exists: nothing can ever be sent to it) |
 | `crm_clientes` | `db_nr3b5hpi` | a database |
 | `app_crm` | `usr_xyxhy7ug` | a user |
-| `Pr0dS3nha2024` | `SEGREDO-vqxz5dvy` | a password (*segredo* is "secret") |
+| `Pr0dS3nha2024` | `SECRET-vqxz5dvy` | a password (*segredo* is "secret") |
 | `maria.lopes@acme.com.br` | `p.ouhiojea@ds373.invalid` | an e-mail |
 | `529.982.247-25` | `CPF-5qwopr5x` | a CPF (Brazilian taxpayer number) |
 
@@ -164,7 +164,7 @@ git clone https://github.com/yurivenancio30/llm-dlp.git && cd llm-dlp && make bu
 
 </details>
 
-`install` asks what it needs, in 5 steps (in Portuguese; answer `s` for yes, `n` for no):
+`install` asks what it needs, in 5 steps (answer `y` for yes, `n` for no):
 
 | Step | What happens | You answer |
 |---|---|---|

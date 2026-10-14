@@ -17,6 +17,10 @@ PIX manual, FEBRABAN, UPU, CNJ, IBGE, Ministry of Health, TSE). Tested with made
 in IPv4, IPv6, routes and hostnames, and with made-up Brazilian documents and sentences: what
 was leaking is listed below.
 
+llm-dlp is now in English throughout: type and detector names, pseudonym labels, data files,
+log lines and messages. What it detects does not change: the Portuguese words the rules look for
+in the text are the same, and so is the identifier of each pseudonym.
+
 ### Masking
 
 - Internal IPv4 also in the providers' shared range `100.64.0.0/10` (RFC 6598, CGNAT; used by
@@ -40,9 +44,9 @@ was leaking is listed below.
   same pseudonym it already got inside an ARN.
 - Bank slip (boleto, 47-digit typed line), utility and tax bill (48 digits) and their 44-digit
   barcode, with the FEBRABAN check digits. Detector name: `boleto`.
-- Postal tracking code (`RR473124829BR`), with the UPU S10 check digit. Detector name: `rastreio`.
+- Postal tracking code (`RR473124829BR`), with the UPU S10 check digit. Detector name: `tracking`.
 - Civil registry certificate number (birth, marriage, death; 32 digits), by its structure (the
-  CNJ check digit is not published). Detector name: `certidao`.
+  CNJ check digit is not published). Detector name: `certificate`.
 - LGPD sensitive data (art. 5, II) in the text, only the value and only after an expression that
   ties it to someone: race or colour (`se declara parda`, `mulher negra`), religion (`é
   evangélico`, `membro da Assembleia de Deus`), sexual orientation and gender identity (`é
@@ -50,7 +54,7 @@ was leaking is listed below.
   PT`), trade union (`sindicalizado no Sindicato dos …`), ICD-10 code after `CID` or
   `diagnóstico` (`CID F32.1, F41.0`) and a fingerprint template (ISO/IEC 19794-2 in base64).
   Values from official lists (IBGE, Ministry of Health, TSE). `a tela é preta`, `a igreja
-  católica do bairro`, `o PL 2630` stay. Detector name: `sensivel`.
+  católica do bairro`, `o PL 2630` stay. Detector name: `sensitive`.
 - By the field name, also `identidade de gênero`, `filiação partidária`, `opinião política`,
   `convicção religiosa`, `vida sexual`, `impressão digital`, `raça/cor`, `race`,
   `comorbidades`.
@@ -67,14 +71,38 @@ was leaking is listed below.
 
 ### Program
 
+- Names in English: detectors and types in `config.json` (`segredo` → `secret`, `telefone` →
+  `phone`, `tabela` → `table`, `quase` → `quasi`...; the list is in
+  [docs/configuration.md](docs/configuration.md)), pseudonym labels (`TELEFONE-6x6fjtkg` →
+  `PHONE-6x6fjtkg`, `Pessoa …` → `Person …`), the files in `~/.config/llm-dlp` (`chave` → `key`,
+  `pessoas.json` → `people.json`, `vistos.json` → `seen.json`, `enviados.log` → `sent.log`), the
+  log lines (`substituições` → `replacements`, `RECUSADO` → `REFUSED`...), the messages, and the
+  word `sudo llm-dlp emergency` asks for (`LIBERAR` → `UNLOCK`).
+- The old names keep working. A `config.json` with the old type names is read as it is, and
+  `llm-dlp update` rewrites it (and back, when going to an older version). The first start copies
+  `chave`, `pessoas.json` and `vistos.json` to the new names and leaves the old ones for an older
+  version. `llm-dlp audit` reads the log lines of both versions. With the new labels, the first
+  message of each conversation rewrites the cache once, as after any update.
 - The log line of each request also says how many values of each type were masked
-  (`tipos: cpf 2, tabela 5`) and, when it happens, the pseudonyms that reached the client
-  without becoming the real value again (`NÃO DESFEITOS`) and those that collided
-  (`colididos`). Counts and pseudonyms only.
+  (`types: cpf 2, table 5`) and, when it happens, the pseudonyms that reached the client
+  without becoming the real value again (`NOT UNDONE`) and those that collided
+  (`collided`). Counts and pseudonyms only.
 - New command `llm-dlp audit [24h|7d]`: sums up the log of a period (what was masked by type,
   pseudonyms that came back, requests sent without masking, refused ones, API errors).
 - The log rotates at 10 MB also while llm-dlp is running (before, only when it started): at most
   ~20 MB on disk.
+
+### Code
+
+- Identifiers, comments, file names and test messages in English. The test environment
+  variables too: `LLM_DLP_STRESS`, `LLM_DLP_SAMPLE`, `LLM_DLP_GEN_REF`, `LLM_DLP_SESSIONS`,
+  `LLM_DLP_VECTORS`, and `LLM_DLP_DEBUG` (`LLM_DLP_DEPURAR` still works).
+- `pseudonym_golden_test.go` records the pseudonyms of a fixed key: it fails if a change to the
+  code changes any of them. The HMAC domain of each type stays its name up to 0.9
+  (`hmacDomain`).
+- The names one version uses to talk to another during an update (`servir`, `supervisionar`,
+  `/__llm-dlp/saude`...) stay in Portuguese, since an update from 0.9 runs the 0.9 code. The
+  list is in `swap.go`.
 
 ## [0.9.2] - 2026-10-13
 

@@ -105,9 +105,9 @@ Onde cada chave é aplicada:
 | Etapa | `mask` | `propagate` |
 |---|---|---|
 | Decisão de cada trecho devolvido pelos leitores, antes da troca | trecho de tipo desligado é descartado e o texto fica como está | — |
-| Aprendizado (memória e `vistos.json`) | tipo desligado não é guardado | tipo desligado é guardado só para a posição estrutural, sem marca de propagação |
+| Aprendizado (memória e `seen.json`) | tipo desligado não é guardado | tipo desligado é guardado só para a posição estrutural, sem marca de propagação |
 | Busca de nomes aprendidos em texto novo | — | só os nomes de tipo ligado, e só os que passaram nos freios (abaixo) |
-| Registro do que já saiu (`enviados.log`) | mudar a chave recomeça o registro (o cache é regravado uma vez) | idem |
+| Registro do que já saiu (`sent.log`) | mudar a chave recomeça o registro (o cache é regravado uma vez) | idem |
 
 Limite: se um mesmo nome é tabela (ligada) num lugar e coluna (desligada) em outro, ele fica
 legível onde aparece como coluna, e isso revela o nome da tabela.
@@ -131,16 +131,16 @@ ensina.
 ### Um nome, um tipo
 
 O mesmo nome real fica sempre com o mesmo tipo e, portanto, o mesmo pseudônimo. Se já foi
-aprendido (em RAM ou no `vistos.json`) com um tipo, o achado de outra regra usa esse tipo (o
+aprendido (em RAM ou no `seen.json`) com um tipo, o achado de outra regra usa esse tipo (o
 caminho `/srv/x/` depois de `deployment/x` vira `svc_…`, não `dir_…`), também depois de um
 reinício. Num texto em que duas regras discordam e nada foi aprendido, vale o tipo da primeira
-ocorrência. Nome com ponto (`fila.eventos`) é procurado no `vistos.json` também com os pedaços
+ocorrência. Nome com ponto (`fila.eventos`) é procurado no `seen.json` também com os pedaços
 seguintes unidos por ponto (até 4 pedaços), então é reconhecido em prosa depois do reinício.
 
 ### Validade
 
 um nome não visto há **90 dias** deixa de ser propagado (continua mascarado na
-  posição estrutural). O `vistos.json` guarda, junto do hash, o dia da última vez que o nome
+  posição estrutural). O `seen.json` guarda, junto do hash, o dia da última vez que o nome
   foi visto (2 bytes a mais por nome).
 
 ## Conferência dos pontos [VERIFICAR] da 1ª fase
@@ -809,7 +809,7 @@ URN), senão o modelo perde a ligação entre os textos.
 
 ### 8. Armazenamento e filas: o que está implementado (leitor `endereço`)
 
-Código: `internal/mask/reader_addresses.go` (`urlEm`). As URIs de banco continuam com o leitor
+Código: `internal/mask/reader_addresses.go` (`urlIn`). As URIs de banco continuam com o leitor
 `conexão`; estas são as de armazenamento e de fila:
 
 | Esquema | Posição | Entidade | Forte? |
@@ -850,7 +850,7 @@ espaços não valem em linhas com pontuação de código (`{ } ; := // == ( `, `
 recuado com vãos não é tabela.
 
 O tipo de cada coluna vem do cabeçalho: os nomes de catálogo (`table_schema`, `relname`...) ou
-uma palavra de tipo em qualquer grafia (a mesma regra do leitor de chave-valor, `entChave`).
+uma palavra de tipo em qualquer grafia (a mesma regra do leitor de chave-valor, `entKey`).
 `name` é tabela quando há coluna de schema, é do tipo do título da seção quando a linha acima é
 uma palavra de tipo (`Buckets`), e é coluna quando ao lado há `type` com tipos de dado
 (DESCRIBE). Célula de cabeçalho com mais de uma palavra só em tabela de `|`, TAB ou traços, e
@@ -1069,7 +1069,7 @@ linhas, ou 1 com o rodapé `dtype: object`), decidido pelo tipo e não pelo recu
 código é recuada e não conta), `string nome = 1;` (protobuf) e tabela `name | type` com tipos
 de dado na coluna `type`. O vocabulário é só o de tipos de dado (SQL, pandas/numpy, Arrow,
 Polars, Spark, Avro, Protobuf, R: `vocab_types.go`). Em YAML/JSON, `name` vale pelo contêiner
-(o motor de YAML/JSON, `acharNomePorContexto`): sob `columns`/`fields` é coluna (dbt
+(o motor de YAML/JSON, `findNameByContext`): sob `columns`/`fields` é coluna (dbt
 `schema.yml`, Avro), sob `tables`/`models`/`seeds`/`views` é tabela, sob `sources`/`datasets`
 é schema, e sob uma chave que é palavra de tipo (`table`, `dataset`, `database`...) é desse
 tipo; `owner` é usuário; valor qualificado (`db.schema.tabela`) é dividido nas partes.
@@ -1308,7 +1308,7 @@ Avro: `"namespace": "vendas_x.pedidos"` → `"DB_dqrsyg6b.SCH_3wl5qkpz"`, `"name
 - URI (DSN/JDBC): https://www.rfc-editor.org/rfc/rfc3986
 
 
-### 8. O que está implementado (leitor `chave-valor`)
+### 8. O que está implementado (leitor `key-value`)
 
 Código: `internal/mask/reader_key_value.go`. Um leitor só, sem parser de cada formato: acha o
 separador (`:` ou `=`), a chave antes dele e o valor depois. Vale para YAML, JSON, TOML, INI,
@@ -2727,11 +2727,11 @@ Saída de script e de shell não tem formato fixo. Valem quatro mecanismos gené
 ferramenta (os nomes de ferramenta abaixo são exemplos de onde a forma aparece):
 
 **1. O comando diz o que a saída é** (`call_command.go`; o proxy liga o `tool_use` ao `tool_result`
-do mesmo id em `request.go`, `dicasDosComandos`). A entrada da ferramenta (o `command` do
+do mesmo id em `request.go`, `commandHints`). A entrada da ferramenta (o `command` do
 shell, ou as strings da entrada, sem a descrição) vira uma *dica* com o tipo das colunas da
 saída, que vai junto do texto na chave da memória de resultados. A dica só é evidência para o
-leitor de tabela (`classificarTabelaD`, em modo dica: só as colunas que o cabeçalho não tipa) e
-para a saída sem cabeçalho (`linhasDica`: toda linha com o mesmo número de células, por `|`,
+leitor de tabela (`classifyTableD`, em modo dica: só as colunas que o cabeçalho não tipa) e
+para a saída sem cabeçalho (`hintLines`: toda linha com o mesmo número de células, por `|`,
 TAB, `,`, `;` ou espaço; uma linha fora da forma desfaz tudo; o rodapé `(N rows)` e a linha que
 repete o cabeçalho ficam de fora; `uniq -c` tem a contagem tirada). Formas:
 - SQL no comando: a última `SELECT ... FROM` dá o tipo de cada coluna em ordem e pelo nome
@@ -2751,7 +2751,7 @@ repete o cabeçalho ficam de fora; `uniq -c` tem a contagem tirada). Formas:
   cara de identificador fora do vocabulário de devops (`kube-system`, `bridge` ficam).
 
 **2. Nome qualificado depois de palavra de tipo, em qualquer frase** (leitor de erro,
-`acharTipoQualificado`, estendido de "palavra de tipo + nome entre aspas" para nome sem
+`findQualifiedType`, estendido de "palavra de tipo + nome entre aspas" para nome sem
 aspas): `tabela fin.t_x: 1200 linhas`, `Loading table a.b.c`, `created sql table model
 fin.t_x` (uma palavra em minúsculas cabe no meio, e então a evidência é fraca). Palavras de
 tipo em inglês e português (`tabela`, `esquema`, `banco`, `objeto`...). Sem aspas, só nome
@@ -2999,7 +2999,7 @@ Comprehend PII não tem tipo para host, database, tabela ou coluna (tem `USERNAM
 
 ### 8. O que está implementado
 
-A reserva de chave-valor é o leitor `chave-valor` (ver a seção JSON, YAML, TOML..., §8). Além
+A reserva de chave-valor é o leitor `key-value` (ver a seção JSON, YAML, TOML..., §8). Além
 dele, dois leitores genéricos sem formato:
 
 **Host interno em URL e endereço solto** (leitor `endereço`, regras `url-interna` e
@@ -3164,8 +3164,8 @@ toda documentação pública). Medido em 2 MB de `.md` de módulos Go: 6 nomes e
 | Grupo | Lista | Fonte |
 |---|---|---|
 | Hosts de módulo Go | `github.com`, `gitlab.com`, `bitbucket.org`, `golang.org`, `google.golang.org`, `gopkg.in`, `go.uber.org`, `k8s.io`, `sigs.k8s.io`, `example.com/org/net` | os hosts de módulo mais comuns; `example.*` reservado (RFC 2606) |
-| Prefixos de groupId | `org.apache`, `org.springframework`, `com.google`, `io.*`, `javax`, `jakarta`, `org.jetbrains`, `org.junit`, `junit`, `org.slf4j`, `ch.qos`, `com.fasterxml`, `org.hibernate`, `org.projectlombok`, `org.mockito`, `org.eclipse`, `com.amazonaws`, `software.amazon`, `com.microsoft`, `com.azure`, `org.postgresql`, `com.mysql`, `com.oracle`, `com.h2database`, `org.yaml`, `com.squareup`, `org.codehaus`, `org.gradle`, `com.android`, `androidx`, `org.jboss`, `org.testcontainers`, `org.flywaydb`, `org.liquibase`, `commons-*`, `com.github`, `org.example`, `com.example`... (lista completa em `gruposPublicos`) | coordenadas do Maven Central (central.sonatype.org) e grupos mais usados (mvnrepository.com/popular) |
-| Escopos npm | `@types`, `@angular`, `@babel`, `@vue`, `@nestjs`, `@aws-sdk`, `@google-cloud`, `@azure`, `@mui`, `@testing-library`, `@typescript-eslint`, `@storybook`, `@tanstack`, `@octokit`, `@sentry`... (lista em `escoposNpmPublicos`) | escopos mais baixados do registro npm |
+| Prefixos de groupId | `org.apache`, `org.springframework`, `com.google`, `io.*`, `javax`, `jakarta`, `org.jetbrains`, `org.junit`, `junit`, `org.slf4j`, `ch.qos`, `com.fasterxml`, `org.hibernate`, `org.projectlombok`, `org.mockito`, `org.eclipse`, `com.amazonaws`, `software.amazon`, `com.microsoft`, `com.azure`, `org.postgresql`, `com.mysql`, `com.oracle`, `com.h2database`, `org.yaml`, `com.squareup`, `org.codehaus`, `org.gradle`, `com.android`, `androidx`, `org.jboss`, `org.testcontainers`, `org.flywaydb`, `org.liquibase`, `commons-*`, `com.github`, `org.example`, `com.example`... (lista completa em `publicGroups`) | coordenadas do Maven Central (central.sonatype.org) e grupos mais usados (mvnrepository.com/popular) |
+| Escopos npm | `@types`, `@angular`, `@babel`, `@vue`, `@nestjs`, `@aws-sdk`, `@google-cloud`, `@azure`, `@mui`, `@testing-library`, `@typescript-eslint`, `@storybook`, `@tanstack`, `@octokit`, `@sentry`... (lista em `publicNpmScopes`) | escopos mais baixados do registro npm |
 | Usuários de caminho | `user`, `runner` (GitHub Actions), `ubuntu`, `ec2-user`, `azureuser`, `opc`, `vagrant`, `jovyan` (Jupyter), `linuxbrew` (Homebrew), `node`, `gopher`, `Shared`, `Public`, `Default`... | usuários padrão das imagens de nuvem e de CI |
 | Pastas | `node_modules`, `site-packages`, `dist-packages`, `__pycache__`, `AppData`, `LocalLow`, `OneDrive`, `IdeaProjects`, `PycharmProjects`, `go-build*`, ferramenta+versão (`python3.10`, `go1.22.0`), pastas ocultas (`.config`, `.venv`) | Known Folders do Windows, layout do macOS, Python, Node, Go, JetBrains |
 
@@ -3381,20 +3381,20 @@ que é `kubectl`, `aws`, `psql` ou `gh`. Toda decisão vem de gramática, estrut
 ou unicidade. O único vocabulário é a gramática fechada dos verbos de enumeração e consulta
 (`list`, `get`, `describe`, `show`, `ls`, `search`, `find`, `query`, `select`, `scan`, `enum`,
 `dump`, `export`, `fetch`, `inspect`, `info`, em qualquer convenção: `get_x`, `listX`, `Get-X`,
-`GET /x`), os tipos de `EntObjeto`, os vocabulários públicos que já existiam e a referência
+`GET /x`), os tipos de `ObjectPrefixes`, os vocabulários públicos que já existiam e a referência
 pública derivada por medição (abaixo).
 
 ### As peças (decision.go)
 
 - **Decisão:** um nome decidido num texto, com o nome, o tipo e a regra que decidiu
   (`Decisao{Nome, Ent, Regra, Generica}`). Os nomes de objeto achados pelos leitores entram
-  como decisões da regra `leitor`; as regras novas entram com o próprio nome.
+  como decisões da regra `reader`; as regras novas entram com o próprio nome.
 - **Decisor:** uma regra que olha o texto inteiro e o que já foi achado nele, e decide nomes
   (`TextoCtx.Decidir` mascara no lugar e registra). Os decisores rodam depois dos leitores, só
   no texto novo; o resto vem do memo.
 - As decisões ficam no resultado do memo, em RAM, junto do texto mascarado. **Não vão para o
-  `vistos.json`**: o formato, a validade de 90 dias, o teto e as regras de aprendizado do
-  `vistos.json` são os mesmos de antes.
+  `seen.json`**: o formato, a validade de 90 dias, o teto e as regras de aprendizado do
+  `seen.json` são os mesmos de antes.
 - A dica do comando (o que o proxy sabe do `tool_use` que produziu um `tool_result`) pode levar
   uma extensão depois do separador `\x1e`; o leitor de tabela lê só a parte antiga, os
   decisores recebem a extensão. A dica inteira entra na chave do memo.
@@ -3495,7 +3495,7 @@ Palavra com cara de identificador segue as regras de antes. Palavra comum vira n
 
 **Tipo do pseudônimo:** o substantivo que o verbo de enumeração do pedido aponta
 (`list_findings` → `finding`, `Get-ADGroup` → `group`, `GET /queues` → `queue`). Se casar
-com um tipo de `EntObjeto`, usa esse prefixo; senão, o prefixo genérico que já existia. A
+com um tipo de `ObjectPrefixes`, usa esse prefixo; senão, o prefixo genérico que já existia. A
 mensagem do usuário também é pedido: "lista os grupos com acesso ao banco" dá o tipo da saída
 seguinte, pela mesma gramática.
 
@@ -3508,7 +3508,7 @@ HCL). Palavra comum só é candidata se for o literal ou o valor **inteiro**, se
 (literal com frase é prosa); identificador de código (variável, função, import) nunca é;
 comentário é prosa. A candidata vira nome com mais uma pista:
 
-- a chave contém um tipo de `EntObjeto` (`namespace:`, `bucket=`, `table_name=`);
+- a chave contém um tipo de `ObjectPrefixes` (`namespace:`, `bucket=`, `table_name=`);
 - âncora: outro valor do mesmo bloco já é nome conhecido;
 - eco;
 - a palavra também aparece como dado numa saída de comando da conversa.
@@ -3555,18 +3555,18 @@ outras regras, `broker1` num `bootstrap.servers` continua nome.
 
 ### Referência pública derivada
 
-`public_ref.txt` e `language_types.txt` são **gerados** por `TestGerarRefPublica`
+`public_ref.txt` e `language_types.txt` são **gerados** por `TestGeneratePublicRef`
 (`vocab_generate_test.go`) no material público da máquina (os diretórios de
 `LLM_DLP_CORPUS`: módulos Go, bibliotecas Python, `/usr/share/doc`), nunca escritos à mão. O
 cabeçalho de cada arquivo diz de onde, quando e com que critério foi gerado:
 
 ```
 LLM_DLP_GEN_REF=1 LLM_DLP_CORPUS=~/go/pkg/mod:/usr/lib/python3.10:/usr/share/doc:... \
-  go test ./internal/mask -run TestGerarRefPublica -v
+  go test ./internal/mask -run TestGeneratePublicRef -v
 ```
 
 - **public_ref.txt:** palavra em posição de nome em pelo menos 8 projetos distintos. Posição
-  de nome, pela gramática: valor de chave de tipo (`entChave`) ou `name` em YAML, JSON, TOML,
+  de nome, pela gramática: valor de chave de tipo (`entKey`) ou `name` em YAML, JSON, TOML,
   INI, .env e argumento nomeado (em código, só literal de texto); opção `--tipo`; nome depois
   de `FROM`/`JOIN`/`INTO`/`UPDATE`/`TABLE`/`SCHEMA`/`DATABASE` (em minúsculas, só nome
   qualificado); primeiro rótulo do host e primeiro pedaço do caminho de uma URL. Projeto é o
@@ -3580,7 +3580,7 @@ LLM_DLP_GEN_REF=1 LLM_DLP_CORPUS=~/go/pkg/mod:/usr/lib/python3.10:/usr/share/doc
   pastas do repositório público `docker-library/docs` que têm `content.md` e `metadata.json`
   (uma por imagem). Gerado junto, quando esse repositório está no corpus.
 - **public_software.txt e vendors.txt:** nome e dono de cada repositório público do GitHub
-  com pelo menos 3000 estrelas (`TestGerarSoftwarePublico`, com `LLM_DLP_GITHUB_TOP` apontando
+  com pelo menos 3000 estrelas (`TestGeneratePublicSoftware`, com `LLM_DLP_GITHUB_TOP` apontando
   para a lista em JSONL `{"r": "dono/nome", "s": estrelas}`). A lista vem da busca da API,
   fatiada por faixa de estrelas porque cada consulta devolve no máximo 1000
   (`gh api -X GET search/repositories -f q='stars:A..B fork:false' -f per_page=100 -f page=N`,
@@ -3592,7 +3592,7 @@ LLM_DLP_GEN_REF=1 LLM_DLP_CORPUS=~/go/pkg/mod:/usr/lib/python3.10:/usr/share/doc
   de 30 empresas brasileiras testadas é dona de repositório com 3000 estrelas; 0 dos 45
   segredos da bateria está na lista.
 
-`ehGenerica` consulta a referência. Uma palavra da referência decidida por qualquer regra é
+`isGeneric` consulta a referência. Uma palavra da referência decidida por qualquer regra é
 mascarada no lugar, com `Decisao.Generica = true`, e não entra na memória da conversa.
 
 ### Público só com prova
@@ -3601,7 +3601,7 @@ Uma regra que deixa um nome em claro tem como pior caso um vazamento. Por isso t
 desse tipo pede uma garantia de forma (um pedaço distintivo a bloqueia) e é medida contra os
 segredos da bateria e os nomes do gabarito que devem ser mascarados. Na dúvida, mascara.
 
-- **Valor sem dono** (`semDono`, `vocab_dev.go`): placeholder e nome de papel (`my_bucket`,
+- **Valor sem dono** (`ownerless`, `vocab_dev.go`): placeholder e nome de papel (`my_bucket`,
   `stub-user`, `source_db`, `XXXXXXXX`, `000000000000`) ficam em claro; basta um pedaço fora do
   vocabulário de papel, de tipo e de entidade para o nome ser do dono (`stub-vendashx` é
   mascarado). Número de conta de exemplo só com dígitos repetidos em blocos iguais e até 3 letras.
@@ -3616,7 +3616,7 @@ segredos da bateria e os nomes do gabarito que devem ser mascarados. Na dúvida,
   `build:`). Um pedaço desconhecido bloqueia, de propósito: `confluentinc/cp-kafka` fica
   mascarado por causa de `cp`, porque sigla curta é justamente o que distingue nome de
   cliente. Registro de fornecedor (`registry.k8s.io`, `mcr.microsoft.com`) fica inteiro.
-- **Serviço com o nome do software** (`softwareDoTexto`): o serviço, host ou namespace com o
+- **Serviço com o nome do software** (`textSoftware`): o serviço, host ou namespace com o
   nome de uma imagem que o próprio texto roda fica em claro só se a imagem é oficial
   (`image: redis:7` → serviço `redis`) ou de organização igual ao nome e pública
   (`minio/minio`). `image: yudao-server` sem organização é imagem local: o nome é do dono.

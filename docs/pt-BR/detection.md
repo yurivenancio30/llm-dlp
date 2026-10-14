@@ -61,13 +61,13 @@ coluna), mas vem com o nome do campo ao lado. O nome do campo decide o que fazer
 
 | Campo com nome de... | Exemplo de nome | O valor vira |
 |---|---|---|
-| Nome de pessoa | `NOM_CLIENTE`, `nome_mae`, `full_name`, `Data Owner`, `Cliente` | `Pessoa …` |
-| Código, login, matrícula | `COD_USU_OWNER`, `matricula`, `login`, `user_id`, `id_cliente` | `USUARIO-…` |
+| Nome de pessoa | `NOM_CLIENTE`, `nome_mae`, `full_name`, `Data Owner`, `Cliente` | `Person …` |
+| Código, login, matrícula | `COD_USU_OWNER`, `matricula`, `login`, `user_id`, `id_cliente` | `USER-…` |
 | Documento | `CPF`, `NUM_CNPJ`, `rg`, `cnh`, `titulo_eleitor`, `passaporte`, `placa` | `CPF-…`, `DOC-…` |
-| Contato e endereço | `telefone`, `celular`, `endereco`, `logradouro`, `cep` | `TELEFONE-…`, `ENDERECO-…` |
-| Nascimento | `DT_NASCIMENTO`, `birth_date` | `NASCIMENTO-…` |
-| Conta e cartão | `account_number`, `conta_corrente`, `credit_card_number`, `iban` | `CONTA-…`, `CARTAO-…` |
-| Dado pessoal sensível (LGPD) | `religiao`, `raca_cor`, `orientacao_sexual`, `tipo_sanguineo`, `deficiencia`, `sindicato`, `doenca` | `SENSIVEL-…` |
+| Contato e endereço | `telefone`, `celular`, `endereco`, `logradouro`, `cep` | `PHONE-…`, `ADDRESS-…` |
+| Nascimento | `DT_NASCIMENTO`, `birth_date` | `BIRTHDATE-…` |
+| Conta e cartão | `account_number`, `conta_corrente`, `credit_card_number`, `iban` | `ACCOUNT-…`, `CARD-…` |
+| Dado pessoal sensível (LGPD) | `religiao`, `raca_cor`, `orientacao_sexual`, `tipo_sanguineo`, `deficiencia`, `sindicato`, `doenca` | `SENSITIVE-…` |
 
 O valor não é o prefixo de um literal do Python (`r'...'`, `b"..."`, `f'...'`, `u'...'`: vale o
 que está entre as aspas), nem 1 ou 2 letras soltas, nem um padrão de regex (`(?!...)`, `\d+`) ou
@@ -221,16 +221,16 @@ Para ensinar os que faltam, no `config.json`:
 
 ```json
 "extra_fields": [
-  {"type": "usuario", "words": ["chapa", "re"]},
-  {"type": "pessoa",  "words": ["cooperado", "segurado"]}
+  {"type": "user",   "words": ["chapa", "re"]},
+  {"type": "person", "words": ["cooperado", "segurado"]}
 ]
 ```
 
 | Tipo | Significado |
 |---|---|
-| `cpf`, `cnpj`, `rg`, `cnh`, `pis`, `doc`, `nascimento`, `telefone`, `cep`, `endereco`, `usuario`, `conta`, `cartao`, `sensivel`, `nome` | A palavra diz que dado o campo guarda |
-| `pessoa` | A palavra diz de quem é o campo (`cooperado` faz `NOME_COOPERADO` valer) |
-| `neutra` | A palavra não muda o que o campo guarda (`bco`, `sis`) |
+| `cpf`, `cnpj`, `rg`, `cnh`, `pis`, `doc`, `birthdate`, `phone`, `cep`, `address`, `user`, `account`, `card`, `sensitive`, `name` | A palavra diz que dado o campo guarda |
+| `person` | A palavra diz de quem é o campo (`cooperado` faz `NOME_COOPERADO` valer) |
+| `neutral` | A palavra não muda o que o campo guarda (`bco`, `sis`) |
 
 ### Códigos e termos próprios
 

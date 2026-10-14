@@ -23,19 +23,19 @@ result for each text. Only what is new is examined.
 | Real value | What the API sees |
 |---|---|
 | `joao.silva@empresa.com.br` | `p.mxvotcyt@didl3.invalid` |
-| `Joao Carlos Silva` / `JOAO CARLOS SILVA` | `Pessoa mxvotcyt` / `PESSOA MXVOTCYT` (same identifier as the e-mail, if it is the same person; the case follows the name, and each spelling comes back as it was) |
-| `B123456` (João's user code) | `USUARIO-mxvotcyt` (`usuario-mxvotcyt` for `b123456`: as with a name, the case follows the value) |
+| `Joao Carlos Silva` / `JOAO CARLOS SILVA` | `Person mxvotcyt` / `PERSON MXVOTCYT` (same identifier as the e-mail, if it is the same person; the case follows the name, and each spelling comes back as it was) |
+| `B123456` (João's user code) | `USER-mxvotcyt` (`user-mxvotcyt` for `b123456`: as with a name, the case follows the value) |
 | `10.42.7.15` | `250.153.31.15` (the same subnet becomes the same fake subnet) |
 | `mysql-dh.empresa.intra` | `mysql-x7k2.invalid` |
 | `529.982.247-25` | `CPF-irvikcpk` |
-| token or password | `SEGREDO-…` |
+| token or password | `SECRET-…` |
 
 - They are derived from a **256-bit secret key** (HMAC-SHA256). Without the key there is no
   way to tell who is who, not even by trying lists of candidates.
 - The same value always becomes the same pseudonym, across messages and across sessions.
 - **Losing the key does not lose data**, because your files are real. A new one is generated
   and the pseudonyms change from then on. Even so, keep a copy of
-  `~/.config/llm-dlp/chave`.
+  `~/.config/llm-dlp/key`.
 
 ## What is remembered
 
@@ -46,8 +46,8 @@ anywhere: in a command's output, in a file read afterwards, with no hint nearby.
 | Where | What it stores |
 |---|---|
 | Memory | The real value, while llm-dlp is running |
-| Disk (`vistos.json`, `pessoas.json`) | **Only the hash**, made with the key. It is used to recognize the value after a restart. For internal resource names (table, server...), also the type and the day it was learned and last seen (for the 90-day validity) |
-| Disk (`enviados.log`) | For each text already sent: a hash of the point of the conversation where it sits and, for each replaced span, where it is in the text, the type and the pseudonym. It makes the text go out identical after a restart (see below) |
+| Disk (`seen.json`, `people.json`) | **Only the hash**, made with the key. It is used to recognize the value after a restart. For internal resource names (table, server...), also the type and the day it was learned and last seen (for the 90-day validity) |
+| Disk (`sent.log`) | For each text already sent: a hash of the point of the conversation where it sits and, for each replaced span, where it is in the text, the type and the pseudonym. It makes the text go out identical after a restart (see below) |
 
 No real value and no masked text is written to disk by llm-dlp.
 
@@ -56,7 +56,7 @@ every message, and the API cache is only valid if the beginning is identical to 
 time. So when the conversation is resent, a text that already went out goes out the same,
 even if llm-dlp later learns a value that appears in it: changing it would protect nothing
 (it was already sent that way) and would make the whole conversation be rewritten in the
-cache. This also holds after a restart, thanks to `enviados.log`.
+cache. This also holds after a restart, thanks to `sent.log`.
 
 What is frozen is the text **at that point of the conversation** (the same beginning of the
 request up to it), not the text itself: the same text in a new message, or in another
@@ -170,7 +170,7 @@ CPU per hour; on disk, 30 to 60 MB. It needs no GPU and no network of its own.
 | Memory | 25 MB at startup; 40–100 MB in use (95 MB in the real session above) | Levels off at 150–210 MB with 60 thousand texts that are all different, because everything remembered has a cap ([the table](development.md#what-is-stored)) | Amount of text and of different values in the session |
 | Supervisor memory | ~23 MB (the process that restarts llm-dlp if it goes down) | Same | Nothing |
 | Disk: program | 14 MB (`~/.local/bin/llm-dlp`) | Same | Nothing |
-| Disk: data | ~20 MB after a week of use (`~/.config/llm-dlp`) | `enviados.log` keeps up to 400 thousand texts; `llm-dlp.log`, up to 20 MB (rotates at 10 MB and keeps one previous file); `vistos.json`, up to ~40 MB (1 million hashes) | Amount of text sent |
+| Disk: data | ~20 MB after a week of use (`~/.config/llm-dlp`) | `sent.log` keeps up to 400 thousand texts; `llm-dlp.log`, up to 20 MB (rotates at 10 MB and keeps one previous file); `seen.json`, up to ~40 MB (1 million hashes) | Amount of text sent |
 | Time per message | 5–30 ms | New file: median of 6.5 ms; 1 in 10 goes over 65 ms; 1 in 100 goes over 300 ms | Size of the new text |
 | Startup | 0.1 s | Same | Nothing |
 | Network | None of its own: it only forwards what Claude Code would send | Same | Nothing |
@@ -195,25 +195,28 @@ Each request produces one line in `~/.config/llm-dlp/llm-dlp.log`, with counts, 
 pseudonyms (never values):
 
 ```
-POST /v1/messages -> 200 | 245 substituições | 0 colisões | mascarar 9ms | total 2.97s | tipos: tabela 120, servidor 31, cpf 2
+POST /v1/messages -> 200 | 245 replacements | 0 collisions | mask 9ms | total 2.97s | types: table 120, server 31, cpf 2
 ```
 
 | Field | Meaning |
 |---|---|
-| `-> 200` | The API's response. `RECUSADO` means llm-dlp blocked the request (fail-closed) |
-| `substituições` | How many values were replaced with pseudonyms in that request (the whole conversation is resent with every message, so this number grows with it) |
-| `colisões` | Pseudonyms that would stand for two different real values. Pseudonyms are short, so this is rare but possible, and more common with IPs (the fake subnet has few combinations). The outbound text stays masked; only the swap back of that pseudonym is not made, so it is not replaced with the wrong value. At worst, you see a pseudonym in a response |
-| `mascarar` | Time spent by llm-dlp |
+| `-> 200` | The API's response. `REFUSED` means llm-dlp blocked the request (fail-closed) |
+| `replacements` | How many values were replaced with pseudonyms in that request (the whole conversation is resent with every message, so this number grows with it) |
+| `collisions` | Pseudonyms that would stand for two different real values. Pseudonyms are short, so this is rare but possible, and more common with IPs (the fake subnet has few combinations). The outbound text stays masked; only the swap back of that pseudonym is not made, so it is not replaced with the wrong value. At worst, you see a pseudonym in a response |
+| `mask` | Time spent by llm-dlp |
 | `total` | Total time, dominated by the model's response |
-| `tipos` | How many different values of each type were masked in that request (`cpf 2`: two different CPFs). Counts only |
-| `colididos: …` | Only when it happens: the pseudonyms that collided (`240.1.2.x` is a whole fake /24 network). The form of each one tells the type of the data. Two spellings of the same imported person (full name and first + last name) share the pseudonym and are not a collision |
-| `NÃO DESFEITOS n: …` | Only when it happens: pseudonyms generated by llm-dlp that reached the client in the response without becoming the real value again (the model changed or cut one, or quoted one from another conversation; also an address of the fake IP range). Whatever the client wrote to a file in that response kept the pseudonym. The pseudonyms themselves are listed, so you can search for them |
+| `types` | How many different values of each type were masked in that request (`cpf 2`: two different CPFs). Counts only |
+| `collided: …` | Only when it happens: the pseudonyms that collided (`240.1.2.x` is a whole fake /24 network). The form of each one tells the type of the data. Two spellings of the same imported person (full name and first + last name) share the pseudonym and are not a collision |
+| `NOT UNDONE n: …` | Only when it happens: pseudonyms generated by llm-dlp that reached the client in the response without becoming the real value again (the model changed or cut one, or quoted one from another conversation; also an address of the fake IP range). Whatever the client wrote to a file in that response kept the pseudonym. The pseudonyms themselves are listed, so you can search for them |
 | `API: type: message` | Only when the API answers with an error: its type and the beginning of its message, as it came (the API only received pseudonyms). It is what tells, for example, a 429 for the account limit from a 429 for a rejected request |
 
-An `AVISO` line says why an image or a PDF was removed from a request.
+A `WARNING` line says why an image or a PDF was removed from a request.
 
 The log rotates at 10 MB at any time, also with llm-dlp running for weeks, and keeps one
 previous file (`llm-dlp.log.1`): at most ~20 MB on disk.
+
+Up to 0.9 the lines were in Portuguese (`substituições`, `RECUSADO`, `AVISO`...). `llm-dlp audit`
+reads both formats, so a period that spans the update is added up.
 
 `llm-dlp audit` sums up the log of a period (`24h` by default; also `90m`, `7d`): requests and
 API errors, what was masked by type, the pseudonyms that came back without becoming the real
@@ -223,10 +226,10 @@ what happened can be checked later without keeping the content.
 
 ```
 $ llm-dlp audit 24h
-llm-dlp: log das últimas 24h (desde 13/10 15:04)
-  requisições: 152
-  substituições: 31877; colisões (pseudônimo que ficou sem desmascarar): 0
-  mascarados por tipo (valores distintos de cada requisição, somados): tabela 9120, servidor 2210, cpf 14
-  pseudônimos que voltaram sem virar o valor real: nenhum
-  enviadas sem máscara: nenhuma
+llm-dlp: log of the last 24h (since 13/10 15:04)
+  requests: 152 (status HTTP: 200 152)
+  replacements: 31877; collisions (pseudonym left masked): 0
+  masked by type (distinct values of each request, added up): table 9120, server 2210, cpf 14
+  pseudonyms that came back without turning into the real value: none
+  sent unmasked: none
 ```

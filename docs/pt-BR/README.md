@@ -41,7 +41,7 @@ E isto é o que sai da sua máquina, a única coisa que a API do modelo vê:
 DB_HOST=hkdzp7s4a.invalid
 DB_NAME=db_nr3b5hpi
 DB_USER=usr_xyxhy7ug
-DB_PASSWORD=SEGREDO-vqxz5dvy
+DB_PASSWORD=SECRET-vqxz5dvy
 SUPPORT_EMAIL=p.ouhiojea@ds373.invalid
 ```
 
@@ -59,7 +59,7 @@ pg_dump -h pg-prd.acme.intra -U app_crm -d crm_clientes -f backup.sql       # o 
 | `pg-prd.acme.intra` | `hkdzp7s4a.invalid` | um servidor (`.invalid` é um domínio que nunca existe: nada pode ser enviado para ele) |
 | `crm_clientes` | `db_nr3b5hpi` | um banco |
 | `app_crm` | `usr_xyxhy7ug` | um usuário |
-| `Pr0dS3nha2024` | `SEGREDO-vqxz5dvy` | uma senha |
+| `Pr0dS3nha2024` | `SECRET-vqxz5dvy` | uma senha |
 | `maria.lopes@acme.com.br` | `p.ouhiojea@ds373.invalid` | um e-mail |
 | `529.982.247-25` | `CPF-5qwopr5x` | um CPF |
 
@@ -159,7 +159,7 @@ git clone https://github.com/yurivenancio30/llm-dlp.git && cd llm-dlp && make bu
 
 </details>
 
-O `install` pergunta o que precisa, em 5 passos (responda `s` para sim, `n` para não):
+O `install` pergunta o que precisa, em 5 passos (responda `y` para sim, `n` para não; `s` também vale):
 
 | Passo | O que acontece | Você responde |
 |---|---|---|

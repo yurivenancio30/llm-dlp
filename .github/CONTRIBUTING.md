@@ -38,7 +38,7 @@ A leak is worse than masking too much: **when in doubt, mask**.
   are listed under "Public only with proof" in [docs/structures.md](../docs/structures.md).
 - Compare before and after on the same texts: what the previous version masked and yours
   leaves in the clear is what matters most.
-- If the change costs time, run the benchmarks (`go test ./internal/mask -bench Frio`).
+- If the change costs time, run the benchmarks (`go test ./internal/mask -bench Cold`).
 
 ## Languages
 

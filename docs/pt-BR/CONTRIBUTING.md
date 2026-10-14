@@ -38,7 +38,7 @@ Vazar é pior do que mascarar a mais: **na dúvida, mascara**.
   quê, estão em "Público só com prova", em [structures.md](structures.md).
 - Compare o antes e o depois nos mesmos textos: o que a versão anterior mascarava e a sua
   deixa em claro é o que mais importa.
-- Se a mudança custa tempo, rode os benchmarks (`go test ./internal/mask -bench Frio`).
+- Se a mudança custa tempo, rode os benchmarks (`go test ./internal/mask -bench Cold`).
 
 ## Idiomas
 

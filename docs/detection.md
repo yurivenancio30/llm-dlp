@@ -66,13 +66,13 @@ the value.
 
 | Field named after... | Example name | The value becomes |
 |---|---|---|
-| A person's name | `NOM_CLIENTE`, `nome_mae`, `full_name`, `Data Owner`, `Cliente` | `Pessoa …` |
-| Code, login, employee ID | `COD_USU_OWNER`, `matricula`, `login`, `user_id`, `id_cliente` | `USUARIO-…` |
+| A person's name | `NOM_CLIENTE`, `nome_mae`, `full_name`, `Data Owner`, `Cliente` | `Person …` |
+| Code, login, employee ID | `COD_USU_OWNER`, `matricula`, `login`, `user_id`, `id_cliente` | `USER-…` |
 | Document | `CPF`, `NUM_CNPJ`, `rg`, `cnh`, `titulo_eleitor`, `passaporte`, `placa` | `CPF-…`, `DOC-…` |
-| Contact and address | `telefone`, `celular`, `endereco`, `logradouro`, `cep` | `TELEFONE-…`, `ENDERECO-…` |
-| Birth | `DT_NASCIMENTO`, `birth_date` | `NASCIMENTO-…` |
-| Account and card | `account_number`, `conta_corrente`, `credit_card_number`, `iban` | `CONTA-…`, `CARTAO-…` |
-| Sensitive personal data (LGPD) | `religiao`, `raca_cor`, `orientacao_sexual`, `tipo_sanguineo`, `deficiencia`, `sindicato`, `doenca` | `SENSIVEL-…` |
+| Contact and address | `telefone`, `celular`, `endereco`, `logradouro`, `cep` | `PHONE-…`, `ADDRESS-…` |
+| Birth | `DT_NASCIMENTO`, `birth_date` | `BIRTHDATE-…` |
+| Account and card | `account_number`, `conta_corrente`, `credit_card_number`, `iban` | `ACCOUNT-…`, `CARD-…` |
+| Sensitive personal data (LGPD) | `religiao`, `raca_cor`, `orientacao_sexual`, `tipo_sanguineo`, `deficiencia`, `sindicato`, `doenca` | `SENSITIVE-…` |
 
 The value is not the prefix of a Python literal (`r'...'`, `b"..."`, `f'...'`, `u'...'`: what
 counts is what is between the quotes), nor 1 or 2 loose letters, nor a regex pattern
@@ -229,16 +229,16 @@ To teach the missing ones, in `config.json`:
 
 ```json
 "extra_fields": [
-  {"type": "usuario", "words": ["chapa", "re"]},
-  {"type": "pessoa",  "words": ["cooperado", "segurado"]}
+  {"type": "user",   "words": ["chapa", "re"]},
+  {"type": "person", "words": ["cooperado", "segurado"]}
 ]
 ```
 
 | Type (`type`) | Meaning |
 |---|---|
-| `cpf`, `cnpj`, `rg`, `cnh`, `pis`, `doc`, `nascimento`, `telefone`, `cep`, `endereco`, `usuario`, `conta`, `cartao`, `sensivel`, `nome` | The word says which data the field holds |
-| `pessoa` | The word says whose field it is (`cooperado` makes `NOME_COOPERADO` count) |
-| `neutra` | The word does not change what the field holds (`bco`, `sis`) |
+| `cpf`, `cnpj`, `rg`, `cnh`, `pis`, `doc`, `birthdate`, `phone`, `cep`, `address`, `user`, `account`, `card`, `sensitive`, `name` | The word says which data the field holds |
+| `person` | The word says whose field it is (`cooperado` makes `NOME_COOPERADO` count) |
+| `neutral` | The word does not change what the field holds (`bco`, `sis`) |
 
 ### Your own codes and terms
 

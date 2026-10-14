@@ -21,7 +21,7 @@ A versão tem três números: `MAIOR.MENOR.CORREÇÃO`.
 |---|---|---|---|
 | CORREÇÃO (`0.2.0` → `0.2.1`) | Conserto que não muda de propósito o que é mascarado: erro, desempenho, mensagem, documentação, empacotamento | Um comando que falhava, um texto que demorava | Nada |
 | MENOR (`0.2.1` → `0.3.0`) | Muda o que é mascarado (regra ou leitor novo, lista regenerada) ou acrescenta comando ou campo de configuração | Um formato novo passa a ser lido | Nada. Vale ler o CHANGELOG |
-| MAIOR (`0.x` → `1.0`) | Quebra compatibilidade: formato do `config.json`, dos arquivos em disco (`vistos.json`, `enviados.log`, `pessoas.json`) ou dos pseudônimos; comando removido | O `config.json` antigo não é mais aceito | Seguir o que o CHANGELOG mandar |
+| MAIOR (`0.x` → `1.0`) | Quebra compatibilidade: formato do `config.json`, dos arquivos em disco (`seen.json`, `sent.log`, `people.json`) ou dos pseudônimos; comando removido | O `config.json` antigo não é mais aceito | Seguir o que o CHANGELOG mandar |
 
 Os recursos marcados como **beta** (hoje, os [outros clientes e APIs](configuration.md#outros-clientes-e-apis-beta))
 ficam fora desta tabela: podem mudar numa versão MENOR, até de um jeito que peça para refazer
@@ -49,7 +49,7 @@ binário solto e um arquivo `SHA256SUMS`.
 ## Como lançar uma versão
 
 O número fica num lugar só, `internal/version/version.go`. A tag do git e o CHANGELOG têm de
-dizer o mesmo, e um teste (`TestVersaoBateComOChangelog`) e o `make release` conferem.
+dizer o mesmo, e um teste (`TestVersionMatchesChangelog`) e o `make release` conferem.
 
 1. Na branch `main`, com tudo commitado, escolha o número pela tabela acima.
 2. Edite `internal/version/version.go` e acrescente a seção da versão no topo do

@@ -40,12 +40,18 @@ nothing and the warning showed up, check `config.json`.
 
 | File | Content |
 |---|---|
-| `chave` | The secret key. Do not share it; keep a copy |
+| `key` | The secret key. Do not share it; keep a copy |
 | `config.json` | The configuration |
-| `pessoas.json` | Hashes of people's names, e-mails and codes |
-| `vistos.json` | Hashes of values already masked |
-| `enviados.log` | For each text already sent: hashes, positions, types and pseudonyms, never values |
+| `people.json` | Hashes of people's names, e-mails and codes |
+| `seen.json` | Hashes of values already masked |
+| `sent.log` | For each text already sent: hashes, positions, types and pseudonyms, never values |
 | `llm-dlp.log` | One line per request: counts, times and the pseudonyms that came back without becoming the real value, never values. At most ~20 MB |
+
+Up to 0.9 these files had Portuguese names (`chave`, `pessoas.json`, `vistos.json`,
+`enviados.log`). The first time a version from 0.10 on needs one of them, it copies the old file
+to the new name (the key is the same, so the pseudonyms keep their identifiers). The old files stay, in case you go back
+to an older version; `enviados.log` is deleted, since the record starts over with each version
+anyway.
 
 ## The local port
 
@@ -55,7 +61,7 @@ reach that address. What each one can do:
 | Who tries | What happens |
 |---|---|
 | A page open in the browser that points its own domain to `127.0.0.1` (DNS rebinding) or sends the request from another site | Refused (403). Only a caller that uses the local address (`127.0.0.1`, `localhost`) and is not a web page is served. Nothing goes to the API |
-| Another user of the machine who wants to read your last (masked) conversation | Cannot read it: it only goes out with a proof that only whoever reads your `chave` (the key) can compute. That is what the `llm-dlp last` command does |
+| Another user of the machine who wants to read your last (masked) conversation | Cannot read it: it only goes out with a proof that only whoever reads your key (`key`) can compute. That is what the `llm-dlp last` command does |
 | Another program that takes the port while llm-dlp is down, to receive the unmasked conversation and the API credential | On every message, Claude Code asks the port whether it is llm-dlp and requires the answer to a fresh challenge, which only whoever reads the key can compute. Without the proof, the message is blocked |
 
 Whoever runs as **your** user reads the key and gets through the three barriers (see "What it

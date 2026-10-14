@@ -2,9 +2,6 @@
 
 [← back to the README](../README.md) · [Português](pt-BR/configuration.md)
 
-The field names of `config.json` and the command names are in Portuguese; the tables below
-say what each one is for.
-
 ## Configuration
 
 File `~/.config/llm-dlp/config.json`. After changing it, run `llm-dlp reload`: it applies
@@ -14,6 +11,12 @@ Up to 0.8.0 the fields had Portuguese names (`porta`, `dominios_internos`, `term
 are still read, and `llm-dlp update` rewrites the file with the names below (keeping the previous
 one as `config.json.bak-DATE`). Going back to an older version with `llm-dlp update --version`
 converts the file back, since an older version would ignore the new names.
+
+Up to 0.9 the names of detectors and types were in Portuguese too (`segredo`, `tabela`...), in
+`disabled_detectors`, `optional_detectors`, `extra_fields` and `objects`. They are still read, and
+`llm-dlp update` rewrites them with the names below (and back, when going to an older version).
+The identifier in each pseudonym does not change; only the label of the personal data types is
+now in English (`TELEFONE-6x6fjtkg` becomes `PHONE-6x6fjtkg`, `Pessoa …` becomes `Person …`).
 
 While the configuration removes protection (`fail_closed` off, `ocr.mode` set to
 `allow`, `objects` off, any detector turned off) or `upstream` is not the Anthropic API,
@@ -30,23 +33,23 @@ does not go to the API.
 | `extra_patterns` | Your own regexes | empty |
 | `terms` | Exact words to mask | empty |
 | `disabled_detectors` | Detectors to turn off (list below) | empty |
-| `optional_detectors` | Detectors to turn on. Today only `quase`: sex, age, marital status, occupation, nationality, income, latitude/longitude | empty |
+| `optional_detectors` | Detectors to turn on. Today only `quasi`: sex, age, marital status, occupation, nationality, income, latitude/longitude | empty |
 | `tools_never_unmasked` | Web tools: they receive pseudonyms only, and what they bring is not remembered. The claude.ai connectors (`mcp__claude_ai_*`) always receive pseudonyms only, regardless of this list | `WebFetch`, `WebSearch` |
 | `documents_without_context` | Masks digit-only CPF and CNPJ even without the word "cpf"/"cnpj" nearby, if the check digit matches. About 1 in 100 random numbers of that length also matches and is masked needlessly | `true` |
 | `fail_closed` | Refuses what it does not know how to mask. When off, a failure while masking sends the request **unmasked** (only a warning is logged). An image or PDF that could not be verified never goes out, whatever the value of this field. Turning it off is not recommended | `true` |
 | `ocr` | `mode` (`mask`, `block` or `allow`), `language`, `max_pages` (maximum pages), paths of tesseract and poppler. With `block`, and with `mask` when the file cannot be verified (OCR missing, unreadable file), it is removed from the request and the model gets a note in its place | `mask`, `por`, 30 |
-| `objects` | Internal resource names (see [What is detected](detection.md#5-internal-resource-names-by-structure)). `enabled`; `mask` and `propagate`: maps type → `true`/`false` (types: `servidor`, `database`, `schema`, `tabela`, `coluna`, `procedure`, `indice`, `usuario`, `namespace`, `servico`, `bucket`, `fila`). E.g. `{"mask": {"coluna": false}}` leaves the columns readable | on; masks all; propagates all except `coluna` and `indice` |
+| `objects` | Internal resource names (see [What is detected](detection.md#5-internal-resource-names-by-structure)). `enabled`; `mask` and `propagate`: maps type → `true`/`false` (types: `server`, `database`, `schema`, `table`, `column`, `procedure`, `index`, `user`, `namespace`, `service`, `bucket`, `queue`). E.g. `{"mask": {"column": false}}` leaves the columns readable | on; masks all; propagates all except `column` and `index` |
 | `objects.public_ip` | Also masks public IPv4 and public IPv6 as a server name (`HOST_...`), also inside an AWS public hostname (`ec2-52-14-88-21…`) and in reverse DNS. `::1`, documentation ranges and the public DNS servers (`8.8.8.8`, `1.1.1.1`, `9.9.9.9`...) stay. Internal IPs are always masked: private and shared IPv4 by the `ip` detector, unique-local and link-local IPv6 as a server name | off |
 | `port` | Local port of the proxy | 8787 |
 | `upstream` | Address of the API | `https://api.anthropic.com` |
 | `providers` | **Beta.** Other APIs served on the same port, under the path `/<name>` (see [Other clients and APIs](#other-clients-and-apis-beta)). Each one has `upstream` and `format` (`gemini`, `openai` or `anthropic`; any other value falls into the generic mode) | `gemini`, `openai` and `xai`, each with the address of its API |
 
-Names accepted in `disabled_detectors`: `segredo`, `email`, `ip`, `host`, `cpf`, `cnpj`,
-`pis`, `cnh`, `rg`, `telefone`, `cep`, `cartao`, `conta`, `pix`, `endereco`, `nascimento`,
-`nome`, `campo` (detection by the field name), `usuario`, `doc`, `iban`, `processo`, `mac`,
-`nfe` (electronic invoice access key), `boleto` (bank slip, bill and barcode), `rastreio` (postal
-tracking code), `certidao` (civil registry certificate), `sensivel` (ICD-10 code, LGPD sensitive data
-in the text, fingerprint template).
+Names accepted in `disabled_detectors`: `secret`, `email`, `ip`, `host`, `cpf`, `cnpj`,
+`pis`, `cnh`, `rg`, `phone`, `cep`, `card`, `account`, `pix`, `address`, `birthdate`,
+`name`, `field` (detection by the field name), `user`, `doc`, `iban`, `lawsuit` (court case
+number), `mac`, `nfe` (electronic invoice access key), `boleto` (bank slip, bill and barcode),
+`tracking` (postal tracking code), `certificate` (civil registry certificate), `sensitive` (ICD-10
+code, LGPD sensitive data in the text, fingerprint template).
 
 ## Other clients and APIs (beta)
 
