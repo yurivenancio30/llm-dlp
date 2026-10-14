@@ -5,16 +5,16 @@ import (
 	"strings"
 )
 
-// Detectores de credencial em cabeçalho HTTP, IBAN, processo judicial e documentos que
-// dependem da palavra por perto (título de eleitor, cartão SUS, RENAVAM...).
+// Detectors of credentials in HTTP headers, IBAN, court case numbers and documents that depend on a
+// nearby word (voter ID, SUS card, RENAVAM...).
 
 var (
-	// processo judicial (numeração única do CNJ): NNNNNNN-DD.AAAA.J.TR.OOOO
+	// court case (CNJ unique numbering): NNNNNNN-DD.AAAA.J.TR.OOOO
 	reCNJ = regexp.MustCompile(`\b\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}\b`)
-	// CNPJ alfanumérico com a pontuação
+	// alphanumeric CNPJ with punctuation
 	reCNPJAlfa = regexp.MustCompile(`\b[A-Za-z0-9]{2}\.[A-Za-z0-9]{3}\.[A-Za-z0-9]{3}/[A-Za-z0-9]{4}-\d{2}\b`)
 
-	// documentos que só contam com a palavra por perto
+	// documents that only count with the word nearby
 	reVoterID  = regexp.MustCompile(`(?i)(?:t[ií]tulo(?: de eleitor| eleitoral)?|eleitor)\D{0,20}(\d{4}\s?\d{4}\s?\d{4})\b`)
 	reCNS      = regexp.MustCompile(`(?i)(?:\bcns\b|cart[aã]o (?:nacional de sa[uú]de|do sus|sus))\D{0,20}(\d{3}\s?\d{4}\s?\d{4}\s?\d{4})\b`)
 	reRenavam  = regexp.MustCompile(`(?i)renavam\D{0,20}(\d{9,11})\b`)
@@ -22,33 +22,33 @@ var (
 	rePlate    = regexp.MustCompile(`(?i)\bplaca\W{0,20}([A-Za-z]{3}-?\d[A-Za-z0-9]\d{2})\b`)
 	reChassis  = regexp.MustCompile(`(?i)(?:chassi|\bvin\b)\W{0,20}([A-HJ-NPR-Za-hj-npr-z0-9]{17})\b`)
 	reIMEI     = regexp.MustCompile(`(?i)\bimei\D{0,20}(\d{15})\b`)
-	// GUID que é o valor de um campo terminado em "id" (workspace_id: X, "lakehouseId": "X",
-	// tenant_id=X, "id": "X"): identifica um recurso do cliente (workspace, tenant, assinatura)
+	// a GUID that is the value of a field ending in "id" (workspace_id: X, "lakehouseId": "X",
+	// tenant_id=X, "id": "X"): it identifies a client resource (workspace, tenant, subscription)
 	reGUIDDeID = regexp.MustCompile(`(?i)([a-z0-9_.-]*id)["']?\s*[:=]\s*["']?([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b`)
-	// o id do aplicativo OAuth não é segredo (RFC 6749, 2.2): vai na URL de login do navegador
+	// the OAuth application id is not a secret (RFC 6749, 2.2): it goes in the browser login URL
 	publicOAuthID = setOf("clientid", "appid", "applicationid")
 
-	// credenciais em cabeçalho HTTP (saída de curl -v, HAR, log de proxy)
+	// credentials in an HTTP header (curl -v output, HAR, proxy log)
 	reAuthHTTP = regexp.MustCompile("(?i)\\b(?:proxy-)?authorization[\"']?\\s*[:=]\\s*[\"']?(?:basic|bearer|digest|token|negotiate|apikey)\\s+([^\\s\"',;]{8,})")
 	reCookie   = regexp.MustCompile("(?i)\\b(?:set-)?cookie[\"']?\\s*[:=]\\s*[\"']?([^\\n\"']{6,})")
 )
 
 var cookieAttribute = setOf("path", "domain", "expires", "max-age", "samesite", "httponly", "secure", "priority", "partitioned")
 
-// findExtras roda os detectores deste arquivo.
+// findExtras runs the detectors of this file.
 func (m *Masker) findExtras(s, lower string, longNum bool, add func(ini, end int, typ string)) {
 	on := func(d string) bool { return !m.cfg.Disabled(d) }
 	if on("segredo") {
 		if strings.Contains(lower, "authorization") {
 			for _, ix := range reAuthHTTP.FindAllStringSubmatchIndex(s, -1) {
-				if !strings.ContainsAny(s[ix[2]:ix[2]+1], "$<{%*") { // ${TOKEN}, <seu-token>: marcador, não credencial
+				if !strings.ContainsAny(s[ix[2]:ix[2]+1], "$<{%*") { // ${TOKEN}, <your-token>: a marker, not a credential
 					add(ix[2], ix[3], "segredo")
 				}
 			}
 		}
 		if strings.Contains(lower, "cookie") {
 			for _, ix := range reCookie.FindAllStringSubmatchIndex(s, -1) {
-				// cada "nome=valor;": mascara o valor, menos os atributos (Path, Expires...)
+				// each "name=value;": masks the value, except the attributes (Path, Expires...)
 				for p := ix[2]; p < ix[3]; {
 					q := p
 					for q < ix[3] && s[q] != ';' {
@@ -157,8 +157,8 @@ func (m *Masker) findExtras(s, lower string, longNum bool, add func(ini, end int
 	}
 }
 
-// findIBAN procura, sem regex, palavras com cara de IBAN (AA99 + letras e dígitos, com ou
-// sem espaços a cada 4) e confere o mod 97.
+// findIBAN looks, without regex, for IBAN-shaped words (AA99 + letters and digits, with or without
+// spaces every 4) and checks mod 97.
 func findIBAN(s string, add func(ini, end int, typ string)) {
 	capital := func(b byte) bool { return b >= 'A' && b <= 'Z' }
 	dig := func(b byte) bool { return b >= '0' && b <= '9' }
@@ -166,7 +166,7 @@ func findIBAN(s string, add func(ini, end int, typ string)) {
 		if !capital(s[i]) || !capital(s[i+1]) || !dig(s[i+2]) || !dig(s[i+3]) || (i > 0 && isAlnum(s[i-1])) {
 			continue
 		}
-		// junta até 34 caracteres, aceitando um espaço entre grupos
+		// joins up to 34 characters, accepting one space between groups
 		j, n := i, 0
 		for j < len(s) && n < 34 {
 			if capital(s[j]) || dig(s[j]) {
@@ -181,7 +181,7 @@ func findIBAN(s string, add func(ini, end int, typ string)) {
 		if j < len(s) && isAlnum(s[j]) {
 			continue
 		}
-		// o IBAN pode acabar antes do fim do que foi juntado (texto colado logo depois)
+		// the IBAN may end before the end of what was joined (text glued right after)
 		for end := j; end-i >= 15; end-- {
 			if s[end-1] == ' ' {
 				continue
@@ -192,7 +192,7 @@ func findIBAN(s string, add func(ini, end int, typ string)) {
 				break
 			}
 			if !strings.Contains(s[i:end], " ") {
-				break // sem espaços, só vale a palavra inteira
+				break // without spaces, only the whole word counts
 			}
 		}
 	}

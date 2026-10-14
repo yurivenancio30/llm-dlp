@@ -8,16 +8,16 @@ import (
 	"sync/atomic"
 )
 
-// Mask: a porta de entrada. Memoriza resultados, porque o Claude Code reenvia a conversa
-// inteira a cada mensagem.
+// Mask: the entry point. It memoizes results, because Claude Code resends the whole conversation
+// with every message.
 
-// Mask e a memória de resultados (o Claude Code reenvia a conversa inteira a cada mensagem).
+// Mask and the result memory (Claude Code resends the whole conversation with every message).
 
-const memoMax = 64 << 20 // teto (aproximado) do texto memorizado, somando as duas gerações
+const memoMax = 64 << 20 // (approximate) ceiling of the memoized text, adding both generations
 
-// Mask troca o dado sensível de s por pseudônimos e devolve as entradas usadas.
-// Resultados são memorizados: o Claude Code reenvia a conversa inteira a cada mensagem.
-// O proxy usa um Batch, que além disso congela o que saiu, por posição (ver memory_sent.go).
+// Mask swaps the sensitive data of s for pseudonyms and returns the entries used. Results are
+// memoized: Claude Code resends the whole conversation with every message. The proxy uses a Batch,
+// which also freezes what went out, by position (see memory_sent.go).
 func (m *Masker) Mask(s string) (string, []Entry) {
 	r, _ := m.maskIt(s, true)
 	return r.text, r.entries
@@ -27,7 +27,7 @@ func (m *Masker) maskIt(s string, learn bool) (result, [32]byte) {
 	return m.maskD(s, learn, "")
 }
 
-// maskD: com a dica do comando que produziu o texto (ver call_command.go; "" = sem dica).
+// maskD: with the hint of the command that produced the text (see call_command.go; "" = no hint).
 func (m *Masker) maskD(s string, learn bool, hint string) (result, [32]byte) {
 	if len(s) < 4 {
 		return result{text: s}, [32]byte{}
@@ -36,8 +36,8 @@ func (m *Masker) maskD(s string, learn bool, hint string) (result, [32]byte) {
 	return m.maskKE(s, k, learn, readHint(hint), hint), k
 }
 
-// memoKey: a chave do texto na memória de resultados (com a dica, se houver: o mesmo texto
-// pode sair de comandos diferentes).
+// memoKey: the key of the text in the result memory (with the hint, if any: the same text may come
+// out of different commands).
 func memoKey(s, hint string) [32]byte {
 	if hint == "" {
 		return sha256.Sum256([]byte(s))
@@ -50,29 +50,29 @@ func memoKey(s, hint string) [32]byte {
 	return k
 }
 
-// maskK: com o hash do texto já calculado (k).
+// maskK: with the text hash already computed (k).
 func (m *Masker) maskK(s string, k [32]byte, learn bool, d *outputHint) result {
 	return m.maskKE(s, k, learn, d, "")
 }
 
-// maskKE: com a dica crua (a extensão dela vai para os decisores).
+// maskKE: with the raw hint (its extension goes to the deciders).
 func (m *Masker) maskKE(s string, k [32]byte, learn bool, d *outputHint, hint string) result {
 	m.mu.Lock()
 	r, ok := m.memo[k]
 	if !ok {
 		if r, ok = m.stale[k]; ok {
-			r = m.store(k, r) // ainda em uso: volta para a geração atual do memo
+			r = m.store(k, r) // still in use: goes back to the current generation of the memo
 		}
 	}
 	m.mu.Unlock()
 	g := m.known.generation()
 	if ok && !(learn && r.noLearn) {
-		// Vale, a não ser que contenha um valor aprendido DEPOIS (por outro texto, por exemplo).
+		// Valid, unless it contains a value learned AFTERWARDS (by another text, for example).
 		if r.gen == g {
 			return r
 		}
 		if !m.known.containsSince(s, r.gen) {
-			r.gen = g // conferido até aqui: da próxima vez não confere de novo
+			r.gen = g // checked up to here: next time it does not check again
 			m.mu.Lock()
 			r = m.store(k, r)
 			m.mu.Unlock()
@@ -83,11 +83,11 @@ func (m *Masker) maskKE(s string, k [32]byte, learn bool, d *outputHint, hint st
 	findings, decidedSet := m.detectDE(s, learn, d, ext)
 	m.recordSoftware(s)
 
-	// Até que geração este resultado vale? Se nada foi aprendido durante a detecção, até g.
-	// Se algo foi aprendido (por este texto ou por outro, em paralelo), confere: todo valor
-	// novo que aparece em s já está entre os achados? Então vale até a geração atual. Se
-	// algum ficou de fora (aprendido por outro texto depois que este já tinha sido varrido),
-	// fica marcado com g, e a próxima consulta refaz.
+	// Up to which generation is this result valid? If nothing was learned during detection, up to
+	// g. If something was learned (by this text or by another, in parallel), it checks: is every
+	// new value that appears in s already among the findings? Then it is valid up to the current
+	// generation. If some was left out (learned by another text after this one had already been
+	// scanned), it stays marked with g, and the next lookup redoes it.
 	if g1 := m.known.generation(); g1 != g {
 		covered := make(map[[2]int]bool, len(findings))
 		for _, a := range findings {
@@ -104,7 +104,7 @@ func (m *Masker) maskKE(s string, k [32]byte, learn bool, d *outputHint, hint st
 	}
 	text, entries, ts := m.applyT(s, findings)
 	if decidedSet == nil {
-		decidedSet = []Decision{} // calculado, sem decisões (nil = não se sabe: ver Batch.Memory)
+		decidedSet = []Decision{} // computed, without decisions (nil = unknown: see Batch.Memory)
 	}
 
 	m.mu.Lock()
@@ -113,11 +113,12 @@ func (m *Masker) maskKE(s string, k [32]byte, learn bool, d *outputHint, hint st
 	return r
 }
 
-// posID: como um texto numa posição é guardado em disco (HMAC da chave de posição).
+// posID: how a text at a position is kept on disk (HMAC of the position key).
 func (m *Masker) posID(kc Position) string { return m.p.raw("enviado", string(kc[:]), 16) }
 
-// UseSent liga o registro em disco do que já saiu (só o proxy usa). impressao
-// identifica a configuração e a versão: se mudarem, os registros antigos não valem.
+// UseSent turns on the on-disk record of what already went out (only the proxy uses it).
+// fingerprint identifies the configuration and the version: if they change, the old records are no
+// longer valid.
 func (m *Masker) UseSent(path, fingerprint string) error {
 	e, err := LoadSent(path, m.p.raw("impressao", fingerprint, 16))
 	if err != nil {
@@ -127,14 +128,14 @@ func (m *Masker) UseSent(path, fingerprint string) error {
 	return nil
 }
 
-// Position identifica um texto num ponto exato da conversa: um hash de tudo o que vem antes
-// dele na requisição e dele mesmo (quem calcula é o proxy). O congelamento vale só para a
-// mesma Position: o reenvio exato daquele ponto da conversa sai igual; o mesmo texto noutra
-// conversa, ou numa mensagem nova, é mascarado com o que se sabe agora.
+// Position identifies a text at an exact point of the conversation: a hash of everything that comes
+// before it in the request and of itself (the proxy computes it). Freezing only applies to the same
+// Position: the exact resend of that point of the conversation goes out the same; the same text in
+// another conversation, or in a new message, is masked with what is known now.
 type Position [32]byte
 
-// congelado: o resultado com que o texto saiu nesta posição, se já saiu (da memória, ou do
-// enviados.log depois de um reinício).
+// frozen: the result the text went out with at this position, if it already went out (from memory,
+// or from enviados.log after a restart).
 func (m *Masker) frozen(kc Position, s string) (result, bool) {
 	m.mu.Lock()
 	r, ok := m.frz[kc]
@@ -162,7 +163,7 @@ func (m *Masker) frozen(kc Position, s string) (result, bool) {
 	return r, true
 }
 
-// storeFrozen: como guardar, para os congelados (com m.mu travado).
+// storeFrozen: how to store, for the frozen ones (with m.mu locked).
 func (m *Masker) storeFrozen(kc Position, r result) {
 	if _, ok := m.frz[kc]; !ok {
 		if m.frzBytes > memoMax/2 {
@@ -173,43 +174,43 @@ func (m *Masker) storeFrozen(kc Position, r result) {
 	m.frz[kc] = r
 }
 
-// Batch: os textos de uma requisição. Depois que a requisição sai, Freeze fixa o
-// resultado de cada um na sua posição.
+// Batch: the texts of a request. After the request goes out, Freeze fixes the result of each one at
+// its position.
 type Batch struct {
 	m       *Masker
-	outputs map[Position]result // o que saiu em cada posição
-	mem     *memory             // a memória da conversa (ver memory_conversation.go); nil = vazia
-	pre     map[Position]result // o resultado do memo de cada texto novo, já consultado em Memory
-	// rastreamento (ver memory_tracing.go)
-	deducedSet    map[string]bool            // valores marcados por dedução: não servem de semente
-	sources       map[string]map[string]bool // valor (minúsculas) -> fontes em que teve prova direta
-	currentSource string                     // a fonte do texto sendo montado (vazia: sem comando)
-	currentProv   map[string]bool            // decididos com prova no próprio texto sendo montado
-	writing       bool                       // montando texto do assistente (recebe todo o contágio)
-	prose         bool                       // montando texto de mensagem, do usuário ou da resposta (vocab_words.go)
-	publicSet     map[string]bool            // anterioridade: o modelo escreveu antes de qualquer dado
+	outputs map[Position]result // what went out at each position
+	mem     *memory             // the conversation memory (see memory_conversation.go); nil = empty
+	pre     map[Position]result // the memo result of each new text, already looked up in Memory
+	// tracing (see memory_tracing.go)
+	deducedSet    map[string]bool            // values marked by deduction: they do not serve as seeds
+	sources       map[string]map[string]bool // value (lowercase) -> sources where it had direct proof
+	currentSource string                     // the source of the text being assembled (empty: no command)
+	currentProv   map[string]bool            // decided with proof in the text being assembled itself
+	writing       bool                       // assembling assistant text (receives all the contagion)
+	prose         bool                       // assembling message text, from the user or the response (vocab_words.go)
+	publicSet     map[string]bool            // priority: the model wrote it before any data
 }
 
 func (m *Masker) NewBatch() *Batch {
 	return &Batch{m: m, outputs: map[Position]result{}, pre: map[Position]result{}}
 }
 
-// BatchItem: um texto da requisição, onde está e se veio da internet.
+// BatchItem: a text of the request, where it is and whether it came from the internet.
 type BatchItem struct {
 	S       string
 	FromWeb bool
 	Pos     Position
-	Hint    string // o que o comando que produziu o texto diz dele (Commands.Hint)
+	Hint    string // what the command that produced the text says about it (Commands.Hint)
 }
 
-// Mask: texto que já saiu nesta posição sai igual (reescrever não protegeria nada e
-// regravaria a conversa no cache da API). fromWeb = conteúdo da internet (resultado de
-// WebFetch/WebSearch): é mascarado, mas nada dele é lembrado.
+// Mask: a text that already went out at this position goes out the same (rewriting would protect
+// nothing and would rewrite the conversation in the API cache). fromWeb = internet content
+// (WebFetch/WebSearch result): it is masked, but nothing of it is remembered.
 func (l *Batch) Mask(s string, fromWeb bool, pos Position) (string, []Entry) {
 	return l.MaskHint(s, fromWeb, pos, "")
 }
 
-// MaskHint: como Mask, com a dica do comando que produziu o texto.
+// MaskHint: like Mask, with the hint of the command that produced the text.
 func (l *Batch) MaskHint(s string, fromWeb bool, pos Position, hint string) (string, []Entry) {
 	l.currentSource, hint = SplitSource(hint)
 	if l.currentSource == SystemSource {
@@ -232,8 +233,8 @@ func (l *Batch) MaskHint(s string, fromWeb bool, pos Position, hint string) (str
 	return r.text, r.entries
 }
 
-// Warm mascara antes da montagem os textos da requisição que ainda não saíram, para que
-// todo valor aprendido nela já valha quando os textos forem montados em ordem.
+// Warm masks, before assembly, the texts of the request that have not gone out yet, so that every
+// value learned in it already applies when the texts are assembled in order.
 func (l *Batch) Warm(items []BatchItem) {
 	items = noSources(items)
 	pend := make([]warmItem, 0, len(items))
@@ -249,8 +250,8 @@ func (l *Batch) Warm(items []BatchItem) {
 	l.m.warm(pend)
 }
 
-// Freeze: a requisição saiu. O resultado de cada texto fica fixo na sua posição (e vai
-// para o disco).
+// Freeze: the request went out. The result of each text stays fixed at its position (and goes to
+// disk).
 func (l *Batch) Freeze() {
 	m := l.m
 	newSet := make([]Position, 0, len(l.outputs))
@@ -270,7 +271,7 @@ func (l *Batch) Freeze() {
 	}
 }
 
-// Persist grava em disco o que foi aprendido e ainda não foi gravado (pessoas novas).
+// Persist writes to disk what was learned and not yet written (new people).
 func (m *Masker) Persist() {
 	if m.people != nil {
 		m.people.SaveIfDirty()
@@ -280,11 +281,11 @@ func (m *Masker) Persist() {
 	}
 }
 
-// Warm mascara em paralelo os textos que ainda não estão no memo. Serve para o momento em
-// que chega muito texto novo de uma vez (primeira mensagem depois de um reinício, sessão
-// retomada): em vez de um texto por vez, usa todos os núcleos. O resultado final é o mesmo,
-// porque quem monta a requisição chama Mask em ordem logo depois (e Mask reconfere
-// o texto ainda não enviado contra valores aprendidos nesse meio-tempo).
+// Warm masks in parallel the texts that are not in the memo yet. It is for the moment when a lot of
+// new text arrives at once (first message after a restart, resumed session): instead of one text at
+// a time, it uses every core. The final result is the same, because whoever assembles the request
+// calls Mask in order right after (and Mask rechecks the text not yet sent against values learned
+// in the meantime).
 func (m *Masker) Warm(texts []string) {
 	items := make([]warmItem, len(texts))
 	for i, t := range texts {
@@ -319,13 +320,13 @@ func (m *Masker) warm(items []warmItem) {
 	}
 	m.mu.Unlock()
 	if len(pend) < 2 || total < warmMin {
-		// pouco texto: um por vez (mas antes da montagem, para todo aprendizado valer nela)
+		// little text: one at a time (but before assembly, so all learning applies in it)
 		for _, it := range pend {
 			m.maskD(it.s, it.learn, it.hint)
 		}
 		return
 	}
-	// os maiores primeiro, para as tarefas ficarem equilibradas
+	// the largest first, so the tasks stay balanced
 	sort.Slice(pend, func(i, j int) bool { return len(pend[i].s) > len(pend[j].s) })
 	n := runtime.GOMAXPROCS(0)
 	if n > len(pend) {
@@ -349,13 +350,14 @@ func (m *Masker) warm(items []warmItem) {
 	wg.Wait()
 }
 
-// warmMin: abaixo disso de texto novo, o paralelismo não compensa
+// warmMin: below this much new text, parallelism does not pay off
 const warmMin = 48 << 10
 
-// guardar põe o resultado no memo (com m.mu travado) e o devolve. O memo tem duas
-// gerações: quando a atual enche, vira a "velha" e começa outra vazia; o que continua em uso
-// é trazido de volta na consulta, e o resto some quando a velha é descartada. Assim a RAM
-// tem teto e não há um momento em que tudo é esquecido de uma vez.
+// store puts the result in the memo (with m.mu locked) and returns it. The memo has two
+// generations: when the current one fills up, it becomes the "old" one and another empty one
+// starts; what is still in use is brought back on lookup, and the rest disappears when the old one
+// is dropped. This way RAM has a ceiling and there is no moment when everything is forgotten at
+// once.
 func (m *Masker) store(k [32]byte, r result) result {
 	if _, ok := m.memo[k]; !ok {
 		if m.bytes > memoMax/2 {

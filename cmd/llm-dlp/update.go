@@ -25,12 +25,12 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/config"
 )
 
-// Commands atualizar e recarregar: põem no ar outro binário (ou o mesmo, com a configuração
-// nova) sem tirar o llm-dlp do ar. Como a troca funciona: swap.go.
+// The update and reload commands: put another binary online (or the same one, with the new
+// configuration) without taking llm-dlp offline. How the swap works: swap.go.
 
 const urlReleases = "https://github.com/yurivenancio30/llm-dlp/releases"
 
-// firstInEnglish: a primeira versão com os comandos e os campos do config.json em inglês.
+// firstInEnglish: the first version with the commands and the config.json fields in English.
 const firstInEnglish = "0.9.0"
 
 var reExactVersion = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
@@ -64,7 +64,7 @@ func update(args []string) error {
 	if err != nil {
 		return fmt.Errorf("config: %w", err)
 	}
-	// na pasta do destino: o binário novo entra no lugar com uma troca de nome (atômica)
+	// in the destination folder: the new binary comes in with a rename (atomic)
 	tmp, err := os.MkdirTemp(filepath.Dir(destination), ".llm-dlp-atualizar-")
 	if err != nil {
 		return err
@@ -101,10 +101,10 @@ func update(args []string) error {
 		adjustNames(home, destination, vNew)
 		return nil
 	}
-	// uma versão anterior aos nomes em inglês ignoraria os campos do config.json com nome novo
-	// (e deixaria de mascarar o que eles pedem): o arquivo volta aos nomes antigos antes de ela
-	// subir. Indo para frente, os nomes novos entram só depois da troca (até lá, a versão no ar
-	// pode precisar reler o arquivo).
+	// a version older than the English names would ignore the config.json fields with a new name
+	// (and stop masking what they ask for): the file goes back to the old names before it starts.
+	// Going forward, the new names come in only after the swap (until then, the running version may
+	// need to reread the file).
 	previous := minorVersion(vNew, firstInEnglish)
 	if previous {
 		if c, err := config.MigrateFile(true); err != nil {
@@ -149,7 +149,7 @@ func update(args []string) error {
 	}
 	if err := swapService(cfg, info, cNew); err != nil {
 		goBack()
-		// uma versão sem troca já pode ter saído: sobe de novo, com o binário de volta
+		// a version without swap may already have exited: start it again, with the binary back
 		if _, ok := health(cfg); !ok {
 			ensure()
 		}
@@ -165,10 +165,10 @@ func update(args []string) error {
 	return nil
 }
 
-// adjustNames passa os hooks do Claude Code e o config.json para os nomes que a versão v (a
-// do binário bin) conhece. Roda depois de pôr v no ar, e também quando ela já estava no ar: de
-// 0.8.0 para cá com "llm-dlp atualizar", quem rodou foi o código da 0.8.0, que não sabia
-// fazer isso (os nomes antigos seguem valendo; só não tinham sido trocados).
+// adjustNames moves the Claude Code hooks and config.json to the names version v (that of binary
+// bin) knows. It runs after putting v online, and also when it was already online: from 0.8.0 to
+// here with "llm-dlp atualizar", the code that ran was 0.8.0's, which did not know how to do this
+// (the old names still apply; they just had not been swapped).
 func adjustNames(home, bin, v string) {
 	if changed, err := hooksForVersion(home, bin, v); err != nil {
 		fmt.Printf("! não consegui ajustar os hooks do Claude Code (%v); rode: llm-dlp install\n", err)
@@ -185,8 +185,8 @@ func adjustNames(home, bin, v string) {
 	}
 }
 
-// recarregar põe no ar de novo o binário instalado, com a configuração como está agora, sem
-// tirar o llm-dlp do ar.
+// reload puts the installed binary online again, with the configuration as it is now, without
+// taking llm-dlp offline.
 func reload() error {
 	cfg, err := config.Load()
 	if err != nil {
@@ -220,12 +220,12 @@ func reload() error {
 	return nil
 }
 
-// swapService põe no ar o binário instalado no lugar do proxy antigo (a saúde dele em
-// antigo) e confere que é o novo (commit) quem responde. Ver swap.go.
+// swapService puts the installed binary online in place of the old proxy (its health in old) and
+// checks that the new one (commit) is the one answering. See swap.go.
 func swapService(cfg config.Config, old healthInfo, commit string) error {
 	sup := supervisorUp()
 	if old.Swap && sup > 0 {
-		// o supervisor segura a porta: ele mesmo troca o proxy e conta como foi
+		// the supervisor holds the port: it swaps the proxy itself and reports how it went
 		state := config.Path("troca.estado")
 		os.Remove(state)
 		if err := syscall.Kill(sup, syscall.SIGHUP); err != nil {
@@ -243,8 +243,9 @@ func swapService(cfg config.Config, old healthInfo, commit string) error {
 		}
 		return nil
 	}
-	// versão anterior a esta (o supervisor não segura a porta): um supervisor novo espera a
-	// porta; o antigo é parado, e a porta fica vazia só entre um fechar e o outro abrir
+	// a version older than this one (the supervisor does not hold the port): a new supervisor waits
+	// for the port; the old one is stopped, and the port is empty only between one closing and the
+	// other opening
 	newOne := exec.Command(serviceBinary(), "supervisionar", "--assumir")
 	newOne.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	devnull, _ := os.Open(os.DevNull)
@@ -269,7 +270,8 @@ func swapService(cfg config.Config, old healthInfo, commit string) error {
 	if !waitFile(config.Path("supervisor.esperando"), wentOut) {
 		return giveUp(fmt.Sprintf("a versão nova não ficou pronta em %s", readyDeadline))
 	}
-	// o supervisor antigo (senão ele sobe o proxy de novo); sem supervisor, o próprio proxy
+	// the old supervisor (otherwise it starts the proxy again); without a supervisor, the proxy
+	// itself
 	if target := cmp.Or(sup, old.PID); target > 0 {
 		syscall.Kill(target, syscall.SIGTERM)
 	}
@@ -279,7 +281,7 @@ func swapService(cfg config.Config, old healthInfo, commit string) error {
 	return nil
 }
 
-// waitContent: o conteúdo do arquivo p, quando ele aparecer (até prazo).
+// waitContent: the content of file p, when it appears (until the deadline).
 func waitContent(p string, deadline time.Duration) (string, bool) {
 	for limitN := time.Now().Add(deadline); time.Now().Before(limitN); time.Sleep(20 * time.Millisecond) {
 		if b, err := os.ReadFile(p); err == nil && len(b) > 0 {
@@ -289,8 +291,8 @@ func waitContent(p string, deadline time.Duration) (string, bool) {
 	return "", false
 }
 
-// waitNew: até readyDeadline, espera seguidas respostas de saúde, com prova, de um proxy com
-// esse commit que não é o antigo. Desiste se o supervisor novo sair.
+// waitNew: until readyDeadline, waits for consecutive health answers, with proof, from a proxy with
+// this commit that is not the old one. Gives up if the new supervisor exits.
 func waitNew(cfg config.Config, commit string, oldPid, consecutive int, wentOut <-chan struct{}) bool {
 	n := 0
 	for limitN := time.Now().Add(readyDeadline); time.Now().Before(limitN); {
@@ -325,8 +327,8 @@ func waitFile(p string, wentOut <-chan struct{}) bool {
 	return false
 }
 
-// publishedVersion: a pedida, ou a mais nova (a página "latest" redireciona para
-// .../tag/vX.Y.Z, sem API e sem limite de chamadas).
+// publishedVersion: the requested one, or the newest (the "latest" page redirects to
+// .../tag/vX.Y.Z, without an API and without a call limit).
 func publishedVersion(base, asked string) (string, error) {
 	if asked != "" {
 		if !reExactVersion.MatchString(asked) {
@@ -348,8 +350,8 @@ func publishedVersion(base, asked string) (string, error) {
 	return v, nil
 }
 
-// downloadRelease baixa o pacote da versão para esta máquina e confere o SHA-256 com o
-// checksums.txt publicado junto. Devolve o caminho do pacote.
+// downloadRelease downloads the version's archive for this machine and checks the SHA-256 against
+// the checksums.txt published with it. Returns the archive path.
 func downloadRelease(base, v, dir string) (string, error) {
 	if runtime.GOOS != "linux" {
 		return "", errors.New("só há binário pronto para Linux (inclusive WSL); em outro sistema, compile do código (README)")
@@ -428,7 +430,7 @@ func sha256Of(p string) (string, error) {
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
-// extractBinary tira o llm-dlp do pacote (.tar.gz) e grava em para, executável.
+// extractBinary takes llm-dlp out of the archive (.tar.gz) and writes it to to, executable.
 func extractBinary(pkgName, to string) error {
 	f, err := os.Open(pkgName)
 	if err != nil {
@@ -465,7 +467,7 @@ func extractBinary(pkgName, to string) error {
 
 var reVersionOutput = regexp.MustCompile(`^llm-dlp (\S+) \(([^)]*)\)`)
 
-// versionOf roda "BIN versao" e devolve a versão e o commit.
+// versionOf runs "BIN versao" and returns the version and the commit.
 func versionOf(bin string) (string, string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -480,8 +482,9 @@ func versionOf(bin string) (string, string, error) {
 	return m[1], m[2], nil
 }
 
-// swapBinary põe novo no lugar de destino e guarda o anterior ao lado (destino.bak-DATA),
-// para voltar se a versão nova não subir. Devolve o caminho da cópia.
+// swapBinary puts newOne in place of destination and keeps the previous one alongside
+// (destination.bak-DATE), to go back if the new version does not start. Returns the path of the
+// copy.
 func swapBinary(newOne, destination string) (string, error) {
 	bak := destination + ".bak-" + time.Now().Format("20060102-150405")
 	if err := os.Link(destination, bak); err != nil {
@@ -496,8 +499,8 @@ func swapBinary(newOne, destination string) (string, error) {
 	return bak, nil
 }
 
-// cleanCopies apaga as cópias antigas do binário (destino.bak-*), menos a que acabou de ser
-// feita: uma volta basta, e cada cópia tem uns 15 MB.
+// cleanCopies deletes the old copies of the binary (destination.bak-*), except the one just made:
+// one way back is enough, and each copy is about 15 MB.
 func cleanCopies(destination, keep string) {
 	if keep == "" {
 		return

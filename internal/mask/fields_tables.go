@@ -6,19 +6,19 @@ import (
 	"unicode"
 )
 
-// Detecção pelo nome do campo, parte 3: tabelas (CSV, markdown, terminal, planilha).
+// Detection by field name, part 3: tables (CSV, markdown, terminal, spreadsheet).
 
-// findTables procura tabelas com cabeçalho e mascara as células das colunas sensíveis.
-// Só vale para as linhas logo abaixo do cabeçalho, com a mesma forma. Formas aceitas:
-//   - com separador: CSV, TSV, ";", "|", markdown, tabela de terminal (mysql, psql);
-//   - linhas no formato do Python: ('NOME', 'CPF') / ['NOME', 'CPF'] (openpyxl, csv.reader);
-//   - colunas alinhadas por espaços: a impressão de uma planilha ou DataFrame (pandas),
-//     "column -t", saída de terminal sem bordas.
+// findTables looks for tables with a header and masks the cells of the sensitive columns. It only
+// applies to the lines right below the header, with the same shape. Accepted forms:
+//   - with a separator: CSV, TSV, ";", "|", markdown, terminal table (mysql, psql);
+//   - lines in Python format: ('NOME', 'CPF') / ['NOME', 'CPF'] (openpyxl, csv.reader);
+//   - columns aligned by spaces: the printout of a spreadsheet or DataFrame (pandas),
+//     "column -t", terminal output without borders.
 //
-// É assim que planilha Excel é coberta: o .xlsx nunca vai para a API como arquivo; o que
-// vai é o texto que uma ferramenta tirou dele (CSV, markdown, DataFrame impresso, tuplas).
+// This is how an Excel spreadsheet is covered: the .xlsx never goes to the API as a file; what goes
+// is the text a tool extracted from it (CSV, markdown, printed DataFrame, tuples).
 func (m *Masker) findTables(s string, add func(ini, end int, typ string)) {
-	line := func(ini int) (string, int) { // a linha que começa em ini, e o começo da próxima
+	line := func(ini int) (string, int) { // the line that starts at start, and the start of the next one
 		f := strings.IndexByte(s[ini:], '\n')
 		if f < 0 {
 			return s[ini:], len(s)
@@ -27,9 +27,9 @@ func (m *Masker) findTables(s string, add func(ini, end int, typ string)) {
 	}
 	for ini := 0; ini < len(s); {
 		l, next := line(ini)
-		// A ferramenta de leitura do Claude Code põe o número da linha antes de cada linha
-		// ("12<tab>conteúdo"). Sem tirar isso, a primeira coluna de toda tabela ficaria com o
-		// número grudado no valor e não seria reconhecida.
+		// Claude Code's read tool puts the line number before each line ("12<tab>content"). Without
+		// removing it, the first column of every table would have the number glued to the value and
+		// would not be recognized.
 		num := lineNumber(l)
 		lineStart := ini
 		l, ini = l[num:], ini+num
@@ -37,7 +37,7 @@ func (m *Masker) findTables(s string, add func(ini, end int, typ string)) {
 			ini = next
 			for ini < len(s) {
 				l, next = line(ini)
-				if num > 0 { // se o cabeçalho tinha número de linha, as linhas também têm
+				if num > 0 { // if the header had a line number, the lines have it too
 					k := lineNumber(l)
 					l, ini = l[k:], ini+k
 				}
@@ -47,7 +47,7 @@ func (m *Masker) findTables(s string, add func(ini, end int, typ string)) {
 						cells = nil
 					}
 					if len(cells) != len(classes) {
-						break // fim da tabela; esta linha volta a ser candidata a cabeçalho
+						break // end of the table; this line becomes a header candidate again
 					}
 					for i, c := range cells {
 						if classes[i] != "" {
@@ -70,10 +70,10 @@ func (m *Masker) findTables(s string, add func(ini, end int, typ string)) {
 	}
 }
 
-// continuesTable: a linha que começa em ini é a continuação de uma tabela que já vinha das
-// linhas de cima? Um cabeçalho só pode ser a PRIMEIRA linha da tabela: numa tabela de
-// documentação ("| Column | Type | Description |"), a linha de dados "| USER_ID | NUMBER |
-// ... |" não é cabeçalho, por mais que "USER_ID" seja nome de campo.
+// continuesTable: is the line that starts at start the continuation of a table that was already
+// coming from the lines above? A header can only be the FIRST line of the table: in a documentation
+// table ("| Column | Type | Description |"), the data line "| USER_ID | NUMBER | ... |" is not a
+// header, however much "USER_ID" is a field name.
 func continuesTable(s string, ini int, sep byte, n int) bool {
 	if ini == 0 {
 		return false
@@ -85,8 +85,8 @@ func continuesTable(s string, ini int, sep byte, n int) bool {
 		return false
 	}
 	if isMarkdownSeparator(prev) {
-		// separador logo abaixo de um cabeçalho ("|---|"): continuação. Borda de cima de uma
-		// tabela de terminal ("+----+", sem nada acima): não é.
+		// separator right below a header ("|---|"): continuation. Top border of a terminal table
+		// ("+----+", with nothing above): it is not.
 		if a == 0 {
 			return false
 		}
@@ -95,24 +95,24 @@ func continuesTable(s string, ini int, sep byte, n int) bool {
 		above = above[lineNumber(above):]
 		return strings.TrimSpace(above) != "" && !isMarkdownSeparator(above)
 	}
-	if sep == ' ' { // tabela alinhada por espaços: a linha de cima também tem colunas separadas por 2+ espaços
+	if sep == ' ' { // table aligned by spaces: the line above also has columns separated by 2+ spaces
 		return strings.Contains(strings.TrimSpace(prev), "  ")
 	}
 	return len(splitText(prev, sep)) == n
 }
 
-// notTableLine: a linha tem vírgulas mas é uma lista de colunas de SQL ou uma
-// enumeração em texto, não uma linha de CSV. Sinais: começa recuada, termina em vírgula,
-// tem crases ou parênteses, ou começa com uma palavra de SQL.
+// notTableLine: the line has commas but is a list of SQL columns or an enumeration in text, not a
+// CSV line. Signs: it starts indented, ends with a comma, has backticks or parentheses, or starts
+// with an SQL word.
 //
 //	select start_time, user_name, role_name     (SQL)
-//	    user_name,                              (SQL, uma coluna por linha)
-//	`user_id`, `user_name`, `role_name`         (texto)
+//	    user_name,                              (SQL, one column per line)
+//	`user_id`, `user_name`, `role_name`         (text)
 var reSQLStart = regexp.MustCompile(`(?i)^(?:select|from|where|group|order|having|insert|update|delete|values|set|join|left|right|inner|on|and|or|with|union|create|alter|partition|by|case|when)\b`)
 
 func notTableLine(l string) bool {
 	if strings.IndexByte(l, ',') < 0 || strings.IndexByte(l, ';') >= 0 || strings.IndexByte(l, '\t') >= 0 || strings.IndexByte(l, '|') >= 0 {
-		return false // só se aplica a linhas separadas por vírgula
+		return false // only applies to comma-separated lines
 	}
 	t := strings.TrimRight(l, " \r")
 	if t == "" {
@@ -124,8 +124,8 @@ func notTableLine(l string) bool {
 	return reSQLStart.MatchString(t)
 }
 
-// lineNumber devolve o tamanho do prefixo de número de linha de l ("  12<tab>" ou
-// "  12→"), ou 0 se não houver.
+// lineNumber returns the length of the line number prefix of l (" 12<tab>" or " 12→"), or 0 if
+// there is none.
 func lineNumber(l string) int {
 	i := 0
 	for i < len(l) && l[i] == ' ' {
@@ -147,7 +147,7 @@ func lineNumber(l string) int {
 	return 0
 }
 
-// dividir: as células de uma linha de tabela. sep 'P' é o formato do Python: (a, b) ou [a, b].
+// splitText: the cells of a table line. sep 'P' is the Python format: (a, b) or [a, b].
 func splitText(l string, sep byte) [][2]int {
 	if sep != 'P' {
 		return cellsOf(l, sep)
@@ -182,12 +182,12 @@ func splitText(l string, sep byte) [][2]int {
 }
 
 type alignedColumn struct {
-	ini, end int // posição do nome da coluna na linha do cabeçalho, em caracteres
+	ini, end int // position of the column name in the header line, in characters
 	class    string
 }
 
-// alignedHeader: a linha é um cabeçalho de tabela alinhada por espaços (nomes de coluna
-// separados por espaços), com alguma coluna sensível?
+// alignedHeader: is the line the header of a table aligned by spaces (column names separated by
+// spaces), with some sensitive column?
 func (m *Masker) alignedHeader(l string) []alignedColumn {
 	if len(l) < 5 || len(l) > 2000 || strings.ContainsAny(l, "=(){}@:;|,\t\"'.!?") {
 		return nil
@@ -210,7 +210,7 @@ func (m *Masker) alignedHeader(l string) []alignedColumn {
 		}
 		return cols
 	}
-	// quantas colunas sensíveis a divisão reconhece (0 = não serve como cabeçalho)
+	// how many sensitive columns the split recognizes (0 = it does not work as a header)
 	sensitives := func(cols []alignedColumn) int {
 		if len(cols) < 2 {
 			return 0
@@ -218,7 +218,7 @@ func (m *Masker) alignedHeader(l string) []alignedColumn {
 		sens := 0
 		for _, c := range cols {
 			name := string(rs[c.ini:c.end])
-			// palavra solta de frase ("o", "de", "foi"): não é nome de coluna
+			// a loose sentence word ("o", "de", "foi"): not a column name
 			if len(name) > 48 || (len(name) <= 3 && name == strings.ToLower(name) && c.class == "") {
 				return 0
 			}
@@ -228,9 +228,9 @@ func (m *Masker) alignedHeader(l string) []alignedColumn {
 		}
 		return sens
 	}
-	// Os nomes podem estar separados por 2+ espaços (e ter espaço dentro) ou por um espaço só
-	// (o pandas, sem índice, deixa um espaço entre colunas). Fica a divisão que reconhece
-	// mais colunas sensíveis.
+	// The names may be separated by 2+ spaces (and have spaces inside) or by a single space
+	// (pandas, without an index, leaves one space between columns). The split that recognizes more
+	// sensitive columns wins.
 	cols, c1 := splitAt(2), splitAt(1)
 	if sensitives(c1) > sensitives(cols) {
 		cols = c1
@@ -246,18 +246,18 @@ func (m *Masker) alignedHeader(l string) []alignedColumn {
 	return cols
 }
 
-// alignedTable trata a tabela alinhada por espaços cujo cabeçalho começa em s[ini].
-// Devolve onde a tabela acaba (ini se a linha não era um cabeçalho de tabela).
+// alignedTable handles the table aligned by spaces whose header starts at s[start]. Returns where
+// the table ends (start if the line was not a table header).
 //
-// Os limites de cada coluna são procurados ENTRE os nomes do cabeçalho: tem que haver, entre
-// um nome e o seguinte, uma posição que seja espaço em todas as linhas (o "corredor").
-// Funciona com valores alinhados à direita (pandas), à esquerda ("column -t"), com coluna de
-// índice e com um espaço só entre colunas.
+// The limits of each column are looked for BETWEEN the header names: between one name and the next
+// there has to be a position that is a space on every line (the "lane"). It works with
+// right-aligned values (pandas), left-aligned ones ("column -t"), with an index column and with a
+// single space between columns.
 func (m *Masker) alignedTable(s string, ini int, numbered bool, add func(ini, end int, typ string)) int {
 	type lineV struct {
-		ini int // onde a linha começa em s
+		ini int // where the line starts in s
 		rs  []rune
-		pos []int // caractere -> byte dentro da linha
+		pos []int // character -> byte inside the line
 	}
 	var ls []lineV
 	wid := 0
@@ -267,7 +267,7 @@ func (m *Masker) alignedTable(s string, ini int, numbered bool, add func(ini, en
 		if f >= 0 {
 			txt = s[p : p+f]
 		}
-		q := p // onde o conteúdo da linha começa (depois do número de linha, se houver)
+		q := p // where the line content starts (after the line number, if any)
 		if numbered && len(ls) > 0 {
 			k := lineNumber(txt)
 			txt, q = txt[k:], p+k
@@ -296,11 +296,10 @@ func (m *Masker) alignedTable(s string, ini int, numbered bool, add func(ini, en
 	if cols == nil || len(ls) < 2 {
 		return ini
 	}
-	// Quais linhas são da tabela: uma linha entra enquanto sobrar, entre cada nome do cabeçalho
-	// e o seguinte, alguma posição que é espaço em todas as linhas aceitas. A primeira que
-	// fecha um desses corredores (texto que veio logo depois, sem linha em branco) encerra a
-	// tabela.
-	free := make([]bool, wid+2) // posição é espaço em todas as linhas aceitas
+	// Which lines belong to the table: a line enters while there is still, between each header name
+	// and the next, some position that is a space on all accepted lines. The first one that closes
+	// one of these lanes (text that came right after, without a blank line) ends the table.
+	free := make([]bool, wid+2) // the position is a space on all accepted lines
 	for c := range free {
 		free[c] = c >= len(ls[0].rs) || ls[0].rs[c] == ' '
 	}
@@ -313,7 +312,7 @@ func (m *Masker) alignedTable(s string, ini int, numbered bool, add func(ini, en
 			}
 		}
 		fits := true
-		if hasIndex { // a linha tem que manter o corredor entre o índice e a primeira coluna
+		if hasIndex { // the line has to keep the lane between the index and the first column
 			fits = false
 			for c := 1; c < cols[0].ini; c++ {
 				if tmp[c] {
@@ -336,10 +335,10 @@ func (m *Masker) alignedTable(s string, ini int, numbered bool, add func(ini, en
 		}
 		free, n = tmp, i+1
 		if i == 1 {
-			// a primeira linha de dados diz se há coluna de índice (pandas): algo escrito e,
-			// depois, um corredor, tudo antes do primeiro nome do cabeçalho
+			// the first data line says whether there is an index column (pandas): something written
+			// and, after it, a lane, all before the first header name
 			for c := 1; c < cols[0].ini && c < len(ls[1].rs); c++ {
-				// dois espaços seguidos: um espaço só pode ser o de dentro de um nome
+				// two spaces in a row: a single space can be the one inside a name
 				if free[c] && free[c+1] && c+1 < cols[0].ini && strings.TrimSpace(string(ls[1].rs[:c])) != "" {
 					hasIndex = true
 					break
@@ -351,12 +350,13 @@ func (m *Masker) alignedTable(s string, ini int, numbered bool, add func(ini, en
 		return ini
 	}
 	if n == 2 {
-		// Uma linha de dados só: não há como saber onde uma coluna acaba e a outra começa
-		// (todo espaço da linha parece um corredor). Na dúvida, mascara: todo número longo
-		// se a tabela tem coluna de documento, e toda sequência de palavras se tem coluna de
-		// nome. Pode pegar um valor de outra coluna; não deixa passar o da coluna sensível.
+		// A single data line: there is no way to know where one column ends and the other starts
+		// (every space in the line looks like a lane). When in doubt, mask: every long number if
+		// the table has a document column, and every sequence of words if it has a name column. It
+		// may catch a value from another column; it does not let the one of the sensitive column
+		// through.
 		hasName := false
-		var others []string // classes sensíveis que não são de nome
+		var others []string // sensitive classes that are not names
 		for _, c := range cols {
 			switch c.class {
 			case "nome", "nomecompleto":
@@ -370,7 +370,7 @@ func (m *Masker) alignedTable(s string, ini int, numbered bool, add func(ini, en
 		if len(others) > 0 {
 			classNum = others[0]
 		}
-		// um valor que não é nome é marcado com a primeira classe sensível que o aceitar
+		// a value that is not a name is marked with the first sensitive class that accepts it
 		markOther := func(a, b int) {
 			for _, c := range others {
 				if typ, ok := fieldValue(c, s[a:b]); ok {
@@ -393,7 +393,7 @@ func (m *Masker) alignedTable(s string, ini int, numbered bool, add func(ini, en
 				j++
 			}
 			if lettersOnly && hasName {
-				for j+1 < len(l.rs) && l.rs[j] == ' ' && letter(l.rs[j+1]) { // junta as palavras seguintes
+				for j+1 < len(l.rs) && l.rs[j] == ' ' && letter(l.rs[j+1]) { // joins the following words
 					k := j + 1
 					for k < len(l.rs) && letter(l.rs[k]) {
 						k++
@@ -403,9 +403,9 @@ func (m *Masker) alignedTable(s string, ini int, numbered bool, add func(ini, en
 					}
 					j = k
 				}
-				// só o que tem cara de nome de gente (nome e sobrenome com maiúscula)
+				// only what looks like a person's name (first and last name capitalized)
 				markIt(s, l.ini+l.pos[i], l.ini+l.pos[j], "nomecompleto", add)
-			} else if !lettersOnly && classNum != "" && (i > 0 || cols[0].ini == 0) { // i > 0: não o índice da linha
+			} else if !lettersOnly && classNum != "" && (i > 0 || cols[0].ini == 0) { // i > 0: not the line index
 				markOther(l.ini+l.pos[i], l.ini+l.pos[j])
 			}
 			i = j
@@ -413,7 +413,7 @@ func (m *Masker) alignedTable(s string, ini int, numbered bool, add func(ini, en
 		return min(len(s), l.ini+l.pos[len(l.rs)]+1)
 	}
 	{
-		lane := func(c int) (int, int) { // o corredor que contém a posição c: [a, b)
+		lane := func(c int) (int, int) { // the lane that contains position c: [a, b)
 			a, b := c, c+1
 			for a > 0 && free[a-1] {
 				a--
@@ -423,11 +423,11 @@ func (m *Masker) alignedTable(s string, ini int, numbered bool, add func(ini, en
 			}
 			return a, b
 		}
-		left := make([]int, len(cols)) // limites de cada coluna, em caracteres: [esq, dir)
+		left := make([]int, len(cols)) // limits of each column, in characters: [left, right)
 		dir := make([]int, len(cols))
 		ok := true
-		// antes da primeira coluna pode haver um índice (pandas): a coluna começa depois do
-		// primeiro corredor que vem após algum caractere
+		// before the first column there may be an index (pandas): the column starts after the first
+		// lane that comes after some character
 		left[0] = 0
 		for c := 0; c < cols[0].ini; c++ {
 			if free[c] {
@@ -446,25 +446,25 @@ func (m *Masker) alignedTable(s string, ini int, numbered bool, add func(ini, en
 		}
 		dir[len(cols)-1] = wid
 		for j := 0; j+1 < len(cols) && ok; j++ {
-			e, f := cols[j].end, cols[j+1].ini-1 // logo depois de um nome, logo antes do seguinte
+			e, f := cols[j].end, cols[j+1].ini-1 // right after a name, right before the next
 			switch {
 			case free[e] && free[f]:
 				a1, b1 := lane(e)
 				a2, b2 := lane(f)
-				if a1 == a2 { // um corredor só entre os dois nomes
+				if a1 == a2 { // a single lane between the two names
 					dir[j], left[j+1] = a1, b1
-				} else if cols[j].class != "" { // há valores no meio: na dúvida, ficam com a coluna sensível
+				} else if cols[j].class != "" { // there are values in between: when in doubt, they go with the sensitive column
 					dir[j], left[j+1] = a2, b2
 				} else {
 					dir[j], left[j+1] = a1, b1
 				}
-			case free[e]: // valores da coluna seguinte passam à esquerda do nome dela (alinhados à direita)
+			case free[e]: // values of the next column pass to the left of its name (right-aligned)
 				a, b := lane(e)
 				dir[j], left[j+1] = a, b
-			case free[f]: // valores desta coluna passam à direita do nome dela (alinhados à esquerda)
+			case free[f]: // values of this column pass to the right of its name (left-aligned)
 				a, b := lane(f)
 				dir[j], left[j+1] = a, b
-			default: // procura um corredor no meio
+			default: // looks for a lane in the middle
 				ok = false
 				for c := e; c <= f; c++ {
 					if free[c] {
@@ -503,13 +503,13 @@ func (m *Masker) alignedTable(s string, ini int, numbered bool, add func(ini, en
 	}
 }
 
-// cabecalho: a linha é o cabeçalho de uma tabela com alguma coluna sensível? Devolve a
-// classe de cada coluna e o separador. Rejeita cedo o que não tem cara de cabeçalho.
+// header: is the line the header of a table with some sensitive column? Returns the class of each
+// column and the separator. Rejects early what does not look like a header.
 func (m *Masker) header(line string) ([]string, byte) {
 	if len(line) < 5 || len(line) > 4000 {
 		return nil, 0
 	}
-	if cells := splitText(line, 'P'); len(cells) >= 2 { // ('NOME', 'CPF') ou ['NOME', 'CPF']
+	if cells := splitText(line, 'P'); len(cells) >= 2 { // ('NOME', 'CPF') or ['NOME', 'CPF']
 		cs := make([]string, len(cells))
 		sens := 0
 		for i, c := range cells {
@@ -534,7 +534,7 @@ func (m *Masker) header(line string) ([]string, byte) {
 	if notTableLine(line) {
 		return nil, 0
 	}
-	// o separador é o mais frequente entre tab, "|", ";" e ","
+	// the separator is the most frequent among tab, "|", ";" and ","
 	var n [4]int
 	seps := [4]byte{'\t', '|', ';', ','}
 	for i := 0; i < len(line); i++ {
@@ -548,7 +548,7 @@ func (m *Masker) header(line string) ([]string, byte) {
 		case ',':
 			n[3]++
 		case '=', '(', ')', '{', '}', '@':
-			return nil, 0 // código ou dado, não nomes de coluna
+			return nil, 0 // code or data, not column names
 		}
 	}
 	best := -1
@@ -579,7 +579,7 @@ func (m *Masker) header(line string) ([]string, byte) {
 	if sens == 0 {
 		return nil, 0
 	}
-	for i := range cs { // "nome" sozinho, numa tabela com outra coluna de pessoa, é nome de pessoa
+	for i := range cs { // "nome" alone, in a table with another person column, is a person's name
 		if cs[i] == "nomesolto" {
 			cs[i] = "nomecompleto"
 		}
@@ -587,7 +587,8 @@ func (m *Masker) header(line string) ([]string, byte) {
 	return cs, seps[best]
 }
 
-// celulas divide a linha pelo separador, respeitando aspas duplas; devolve [ini,fim) de cada célula.
+// cellsOf splits the line by the separator, respecting double quotes; returns [start,end) of each
+// cell.
 func cellsOf(line string, sep byte) [][2]int {
 	if strings.IndexByte(line, sep) < 0 {
 		return nil
@@ -604,7 +605,7 @@ func cellsOf(line string, sep byte) [][2]int {
 		}
 	}
 	out = append(out, [2]int{ini, len(line)})
-	if sep == '|' && len(out) >= 3 { // "| a | b |": as pontas vazias não são colunas
+	if sep == '|' && len(out) >= 3 { // "| a | b |": the empty ends are not columns
 		if strings.TrimSpace(line[out[0][0]:out[0][1]]) == "" {
 			out = out[1:]
 		}
@@ -625,25 +626,24 @@ func trim(line string, a, b int) (int, int) {
 	return a, b
 }
 
-// isMarkdownSeparator: linha só de traços, como a que separa o cabeçalho numa tabela
-// markdown ("|---|:-:|") ou de terminal ("+----+----+", "-----+-----", "=====").
+// isMarkdownSeparator: a line of dashes only, like the one that separates the header in a markdown
+// table ("|---|:-:|") or a terminal one ("+----+----+", "-----+-----", "=====").
 func isMarkdownSeparator(line string) bool {
 	t := strings.TrimSpace(line)
 	return len(t) >= 3 && strings.Trim(t, "|-:+= ") == ""
 }
 
-// identifiesPerson: tipos de achado que, numa linha de tabela, mostram que a linha é de uma
-// pessoa.
+// identifiesPerson: finding types that, in a table line, show the line belongs to a person.
 var identifiesPerson = map[string]bool{"cpf": true, "email": true, "telefone": true, "rg": true, "cnh": true, "pis": true, "nascimento": true}
 
-// namesInLine: numa linha de tabela sem cabeçalho (colada no chat, um pedaço de CSV) que já
-// tem um CPF, e-mail ou telefone detectado, a célula com cara de nome completo é o nome da
-// pessoa. "Maria Lopes | 529.982.247-25 | maria@x.com" -> "Maria Lopes" também é mascarado.
+// namesInLine: in a table line without a header (pasted in the chat, a piece of CSV) that already
+// has a detected CPF, e-mail or telephone, the cell that looks like a full name is the person's
+// name. "Maria Lopes | 529.982.247-25 | maria@x.com" -> "Maria Lopes" is also masked.
 func namesInLine(s string, findings []Finding) []Finding {
-	lines := map[int]bool{} // começo das linhas que têm um identificador de pessoa
+	lines := map[int]bool{} // start of the lines that have a person identifier
 	for _, a := range findings {
 		if identifiesPerson[a.Type] {
-			// linha de mais de 2000 caracteres não é linha de tabela: a busca para aí
+			// a line of more than 2000 characters is not a table line: the search stops there
 			a0 := max(0, a.Start-2001)
 			k := strings.LastIndexByte(s[a0:a.Start], '\n')
 			if k < 0 && a0 > 0 {

@@ -2,14 +2,13 @@ package mask
 
 import "strings"
 
-// Endereços (ver docs/pt-BR/structures.md): host interno, armazenamento e filas em URLs, remoto do
-// git, pasta pessoal (/home/u, C:\Users\u) e usuário de rede (DOMÍNIO\usuário). No começo, as
-// regras de domínio que os outros leitores de desenvolvimento também usam (chave-valor,
-// pacotes, caminhos, nuvem).
+// Addresses (see docs/structures.md): internal host, storage and queues in URLs, git remote, home
+// folder (/home/u, C:\Users\u) and network user (DOMAIN\user). At the start, the domain rules the
+// other development readers also use (key-value, packages, paths, cloud).
 
 func internalSuffix(h string) bool {
-	// nome DNS de serviço do Kubernetes (servico.namespace.svc[.cluster.local]): fica com o
-	// leitor de Kubernetes, que mascara o serviço e o namespace e deixa o sufixo público
+	// Kubernetes service DNS name (service.namespace.svc[.cluster.local]): stays with the
+	// Kubernetes reader, which masks the service and the namespace and leaves the public suffix
 	if l := strings.ToLower(h); strings.HasSuffix(l, ".svc.cluster.local") || strings.HasSuffix(l, ".svc") {
 		return false
 	}
@@ -21,8 +20,8 @@ func internalSuffix(h string) bool {
 	return false
 }
 
-// publicDomain: nome com TLD público ou reservado (não é mascarado: domínio do cliente vai em
-// dominios_internos e é pego pelo detector de host).
+// publicDomain: a name with a public or reserved TLD (not masked: the client domain goes in
+// internal_domains and is caught by the host detector).
 func publicDomain(h string) bool {
 	h = strings.TrimRight(strings.ToLower(h), ".")
 	d := strings.LastIndexByte(h, '.')
@@ -36,7 +35,7 @@ func publicDomain(h string) bool {
 	return len(t) == 2 && letterD(t[0]) && letterD(t[1])
 }
 
-// internalHost: rótulo único (sem ponto) ou nome com sufixo interno.
+// internalHost: a single label (without a dot) or a name with an internal suffix.
 func internalHost(h string) bool {
 	h = strings.TrimRight(strings.ToLower(h), ".")
 	if len(h) < 2 || publicDev(h) || isSimpleIPv4(h) {
@@ -58,7 +57,7 @@ func publicDev(v string) bool {
 	return vocabDev[l] || publicConnection(l) || codeReceivers[l]
 }
 
-// ---- URLs: host interno, armazenamento, filas e remotos do git -------------------------
+// ---- URLs: internal host, storage, queues and git remotes ----------------------------------
 
 func urlEnd(c byte) bool {
 	switch c {
@@ -71,9 +70,9 @@ func urlEnd(c byte) bool {
 func findAddresses(s string, add func(ObjFinding)) {
 	if strings.Contains(s, "://") {
 		for i := strings.Index(s, "://"); i >= 0; {
-			// a URL termina, no máximo, onde começa o esquema da próxima: URLs coladas sem
-			// separador ("https://a/xhttps://b/y") não fazem cada uma varrer o resto da linha
-			// (era quadrático). E nunca passa de maxURL bytes.
+			// the URL ends, at most, where the scheme of the next one starts: URLs glued without a
+			// separator ("https://a/xhttps://b/y") do not make each one scan the rest of the line
+			// (it was quadratic). And it never goes past maxURL bytes.
 			lim, next := min(len(s), i+3+maxURL), -1
 			if j := strings.Index(s[i+3:], "://"); j >= 0 {
 				next = i + 3 + j
@@ -89,10 +88,10 @@ func findAddresses(s string, add func(ObjFinding)) {
 	findInternalHosts(s, add)
 }
 
-// maxURL: até onde se lê uma URL depois do "://".
+// maxURL: how far a URL is read after the "://".
 const maxURL = 2 * lineWindow
 
-// schemeStart: onde começa o esquema que termina no "://" em s[i].
+// schemeStart: where the scheme that ends at the "://" at s[i] starts.
 func schemeStart(s string, i int) int {
 	a := i
 	for a > 0 && i-a < 16 && (isAlnum(s[a-1]) || s[a-1] == '+' || s[a-1] == '-' || s[a-1] == '.') {
@@ -101,11 +100,11 @@ func schemeStart(s string, i int) int {
 	return a
 }
 
-// urlIn lê a URL cujo "://" está em s[i]. s termina onde a URL pode terminar (ver
-// findAddresses); o que vem antes de i é lido inteiro.
+// urlIn reads the URL whose "://" is at s[i]. s ends where the URL may end (see findAddresses);
+// what comes before i is read whole.
 func urlIn(s string, i int, add func(ObjFinding)) {
 	a := schemeStart(s, i)
-	// "${X:-http://...}": o "-" de ":-" não faz parte do esquema
+	// "${X:-http://...}": the "-" of ":-" is not part of the scheme
 	for a < i && s[a] == '-' {
 		a++
 	}
@@ -177,7 +176,7 @@ func urlIn(s string, i int, add func(ObjFinding)) {
 		addFolders(s, pa, pb, "armazenamento", add)
 	case "amqp", "amqps", "kafka", "nats", "tls+nats", "mqtt", "mqtts", "pulsar", "pulsar+ssl", "stomp":
 		user("fila")
-		for x := ha; x < e; { // lista de hosts
+		for x := ha; x < e; { // host list
 			y := strings.IndexByte(s[x:e], ',')
 			if y < 0 {
 				y = e
@@ -221,7 +220,7 @@ func urlIn(s string, i int, add func(ObjFinding)) {
 	}
 }
 
-// simpleName: [A-Za-z0-9_.-]+ com uma letra ou dígito no começo.
+// simpleName: [A-Za-z0-9_.-]+ with a letter or digit at the start.
 func simpleName(v string) bool {
 	if v == "" || !isAlnum(v[0]) {
 		return false
@@ -234,8 +233,8 @@ func simpleName(v string) bool {
 	return true
 }
 
-// addFolders: pedaços de um caminho com cara de identificador -> pasta (fraco). O último pedaço
-// com extensão é nome de arquivo e fica; partição "chave=valor", curingas e variáveis também.
+// addFolders: identifier-shaped pieces of a path -> folder (weak). The last piece with an extension
+// is a file name and stays; "key=value" partitions, wildcards and variables too.
 func addFolders(s string, a, b int, rule string, add func(ObjFinding)) {
 	for n := 0; a < b && n < 12; n++ {
 		for a < b && s[a] == '/' {
@@ -246,7 +245,7 @@ func addFolders(s string, a, b int, rule string, add func(ObjFinding)) {
 			c++
 		}
 		v := s[a:c]
-		if c == b { // último pedaço: arquivo?
+		if c == b { // last piece: a file?
 			if d := strings.LastIndexByte(v, '.'); d > 0 && c-a-d <= 8 {
 				return
 			}
@@ -258,8 +257,9 @@ func addFolders(s string, a, b int, rule string, add func(ObjFinding)) {
 	}
 }
 
-// gitContext: a URL é um remoto do git (termina em .git, vem depois de git clone/remote/
-// push/pull/fetch/submodule na mesma linha, ou é o "url =" de uma seção [remote "..."]).
+// gitContext: the URL is a git remote (ends in .git, comes after git
+// clone/remote/push/pull/fetch/submodule on the same line, or is the "url =" of a [remote "..."]
+// section).
 func gitContext(s string, a, pa, pb int) bool {
 	if strings.HasSuffix(s[pa:pb], ".git") || strings.HasSuffix(s[pa:pb], ".git/") {
 		return true
@@ -275,17 +275,17 @@ func gitContext(s string, a, pa, pb int) bool {
 	}
 	t := strings.TrimSpace(pre)
 	if strings.HasPrefix(t, "url") && strings.HasSuffix(strings.TrimSpace(t[3:]), "=") && li > 0 && s[li-1] == '\n' && (s[li] == '\t' || s[li] == ' ') {
-		// a seção [remote "..."] fica poucas linhas acima do "url ="
+		// the [remote "..."] section is a few lines above the "url ="
 		cfg := s[max(0, a-2000):a]
 		return strings.Contains(cfg, "[remote \"") || strings.Contains(cfg, "[submodule \"")
 	}
 	return false
 }
 
-// pedaços de caminho que são da plataforma de hospedagem, não da organização
+// path pieces that belong to the hosting platform, not to the organization
 var hostingPieces = setOf("scm", "_git", "v3", "git", "-", "tree", "blob")
 
-// addRepo: org(/subgrupo)/repo(.git) no caminho s[a:b] -> organização e repositório.
+// addRepo: org(/subgroup)/repo(.git) in the path s[a:b] -> organization and repository.
 func addRepo(s string, a, b int, add func(ObjFinding)) {
 	var ps [][2]int
 	for x := a; x < b; {
@@ -323,7 +323,7 @@ func addRepo(s string, a, b int, add func(ObjFinding)) {
 	}
 }
 
-// git@host:org/repo(.git) (forma scp do ssh)
+// git@host:org/repo(.git) (ssh's scp form)
 func findGitSCP(s string, add func(ObjFinding)) {
 	for i := strings.Index(s, "git@"); i >= 0; {
 		if i == 0 || !(isAlnum(s[i-1]) || s[i-1] == '.' || s[i-1] == '-' || s[i-1] == '_' || s[i-1] == '/') {
@@ -355,10 +355,10 @@ func findGitSCP(s string, add func(ObjFinding)) {
 	}
 }
 
-// findInternalHosts: nomes com sufixo interno fora de URL ("db01.corp:5432",
-// "redis.vendas.svc.cluster.local"). Para não pegar atributo de código ("threading.local")
-// nem pacote Java ("org.foo.internal"), pede dígito ou hífen, ou dois rótulos antes do sufixo
-// sem cara de pacote, e não pode vir seguido de "(".
+// findInternalHosts: names with an internal suffix outside a URL ("db01.corp:5432",
+// "redis.vendas.svc.cluster.local"). To not catch a code attribute ("threading.local") or a Java
+// package ("org.foo.internal"), it asks for a digit or a hyphen, or two labels before the suffix
+// without a package look, and it cannot be followed by "(".
 func findInternalHosts(s string, add func(ObjFinding)) {
 	for _, suf := range internalSuffixes {
 		if suf == ".local" && !strings.Contains(s, ".local") {
@@ -387,7 +387,7 @@ func internalHostIn(s string, i, end int, add func(ObjFinding)) {
 		a++
 	}
 	if a >= i || a > 0 && (s[a-1] == '@' || s[a-1] == '/' && !(a >= 3 && s[a-3:a] == "://")) {
-		return // e-mail, caminho (a URL fica com urlIn)
+		return // e-mail, path (the URL stays with urlIn)
 	}
 	if a >= 3 && s[a-3:a] == "://" {
 		return
@@ -396,7 +396,7 @@ func internalHostIn(s string, i, end int, add func(ObjFinding)) {
 		return
 	}
 	h := s[a:end]
-	if !internalSuffix(h) { // nome DNS de serviço do Kubernetes: fica com o leitor de Kubernetes
+	if !internalSuffix(h) { // Kubernetes service DNS name: stays with the Kubernetes reader
 		return
 	}
 	if strings.IndexByte(h, '_') >= 0 && !dashOrDigit(h) {
@@ -416,14 +416,14 @@ func internalHostIn(s string, i, end int, add func(ObjFinding)) {
 	add(ObjFinding{a, end, "servidor", "host-interno", true})
 }
 
-// ---- caminhos de usuário --------------------------------------------------------------
+// ---- user paths ----------------------------------------------------------------------------
 
 func publicFolder(v string) bool {
 	l := strings.ToLower(v)
 	if publicFolders[l] || reVersionOrHash.MatchString(l) || publicDomain(l) || strings.HasPrefix(l, "go-build") {
 		return true
 	}
-	// ferramenta + versão: python3.10, go1.22.0, jdk-17, node-v20
+	// tool + version: python3.10, go1.22.0, jdk-17, node-v20
 	k := 0
 	for k < len(l) && l[k] >= 'a' && l[k] <= 'z' {
 		k++
@@ -461,7 +461,7 @@ func findPaths(s string, add func(ObjFinding)) {
 func pathSep(c byte) bool { return c == '/' || c == '\\' }
 
 func pathIn(s string, u int, add func(ObjFinding)) {
-	for u < len(s) && s[u] == '\\' { // "C:\\Users\\" (escapado em JSON)
+	for u < len(s) && s[u] == '\\' { // "C:\\Users\\" (escaped in JSON)
 		u++
 	}
 	e := u
@@ -475,8 +475,8 @@ func pathIn(s string, u int, add func(ObjFinding)) {
 	if !letterD(name[0]) && !isDig(name[0]) {
 		return
 	}
-	// usuário público (/home/ubuntu, /home/ec2-user) fica, mas as pastas do projeto abaixo dele
-	// continuam sendo lidas
+	// a public user (/home/ubuntu, /home/ec2-user) stays, but the project folders below it are
+	// still read
 	if !publicDev(name) && len(name) >= 2 {
 		add(ObjFinding{u, e, "usuario", "caminho", true})
 	}
@@ -494,7 +494,7 @@ func pathIn(s string, u int, add func(ObjFinding)) {
 		}
 		v := s[a:b]
 		if publicDependency(prev, v, s[b:]) {
-			return // código de terceiro: .venv/lib/python3.11/site-packages/pandas/...
+			return // third-party code: .venv/lib/python3.11/site-packages/pandas/...
 		}
 		prev = v
 		dir := b < len(s) && pathSep(s[b])
@@ -511,7 +511,7 @@ func pathIn(s string, u int, add func(ObjFinding)) {
 	}
 }
 
-// ---- usuário de rede ------------------------------------------------------------------
+// ---- network user ---------------------------------------------------------------------------
 
 func findNetworkUsers(s string, add func(ObjFinding)) {
 	if strings.IndexByte(s, '\\') >= 0 {
@@ -531,11 +531,11 @@ func findNetworkUsers(s string, add func(ObjFinding)) {
 	}
 }
 
-// DOMINIO\usuario: domínio NetBIOS (maiúsculas, 2 a 15 caracteres). O domínio fica com os
-// outros detectores; aqui só o usuário.
+// DOMAIN\user: NetBIOS domain (uppercase, 2 to 15 characters). The domain stays with the other
+// detectors; here only the user.
 func findDomainUser(s string, add func(ObjFinding)) {
-	// texto de JSON escapado (várias quebras de linha "\\n"): "COMMAND\\nroot" é fim de linha,
-	// não domínio e usuário
+	// escaped JSON text (several "\\n" line breaks): "COMMAND\\nroot" is an end of line, not domain
+	// and user
 	escaped := strings.Count(s, `\n`) >= 2
 	for i := strings.IndexByte(s, '\\'); i >= 0; {
 		if i > 0 && s[i-1] != '\\' {
@@ -544,7 +544,7 @@ func findDomainUser(s string, add func(ObjFinding)) {
 				u++
 			}
 			if escaped && u+1 < len(s) && (s[u] == 'n' || s[u] == 't' || s[u] == 'r') && s[u-1] == '\\' && u == i+1 {
-				u = len(s) // "\\n": quebra de linha escapada
+				u = len(s) // "\\n": escaped line break
 			}
 			a := i
 			for a > 0 && i-a <= 15 && (s[a-1] >= 'A' && s[a-1] <= 'Z' || isDig(s[a-1]) || s[a-1] == '-') {
@@ -563,7 +563,8 @@ func findDomainUser(s string, add func(ObjFinding)) {
 				}
 				v := s[u:b]
 				escape := strings.IndexByte("ntrbfvaxuU0", v[0]) >= 0 && a > 0 && s[a-1] != ' ' && s[a-1] != '\t' && s[a-1] != '\n'
-				// "\nPALAVRA", "\tCAMPO": letra de escape seguida de maiúscula é escape, não usuário
+				// "\nWORD", "\tFIELD": an escape letter followed by a capital is an escape, not a
+				// user
 				escape = escape || strings.IndexByte("ntr", v[0]) >= 0 && len(v) > 1 && v[1] >= 'A' && v[1] <= 'Z'
 				if len(v) >= 2 && !escape && (b == len(s) || s[b] != '\\' && s[b] != '/') && !publicDev(v) {
 					add(ObjFinding{u, b, "usuario", "usuario-rede", true})
@@ -578,7 +579,7 @@ func findDomainUser(s string, add func(ObjFinding)) {
 	}
 }
 
-// ssh|scp|sftp|rsync [-opções] usuario@host[:caminho]
+// ssh|scp|sftp|rsync [-options] user@host[:path]
 func sshIn(s string, p int, add func(ObjFinding)) {
 	end := strings.IndexByte(s[p:], '\n')
 	if end < 0 {

@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// Key criada por vários processos ao mesmo tempo: todos têm que ver a MESMA chave.
+// Key created by several processes at the same time: all of them have to see the SAME key.
 func TestConcurrentKey(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "chave")
 	var wg sync.WaitGroup

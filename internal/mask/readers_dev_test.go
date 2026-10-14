@@ -8,10 +8,10 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/config"
 )
 
-// Testes dos leitores de desenvolvimento: chave-valor, endereços, git, pacotes, caminhos, usuário de
-// rede, nuvem, IP público e termos embutidos. Dados fictícios.
+// Tests of the development readers: key-value, addresses, git, packages, paths, network user,
+// cloud, public IP and embedded terms. Made-up data.
 
-// lidos: o que o leitor achou em s, como "ent:valor" (+ "!" quando forte), em ordem.
+// readOnes: what the reader found in s, as "ent:value" (+ "!" when strong), in order.
 func readOnes(find func(string, func(ObjFinding)), s string) []string {
 	var out []string
 	find(s, func(o ObjFinding) {
@@ -22,7 +22,7 @@ func readOnes(find func(string, func(ObjFinding)), s string) []string {
 		out = append(out, v)
 	})
 	sort.Strings(out)
-	// sem repetição (dois caminhos podem achar o mesmo trecho)
+	// no repetition (two paths can find the same snippet)
 	var u []string
 	for i, v := range out {
 		if i == 0 || v != out[i-1] {
@@ -34,7 +34,7 @@ func readOnes(find func(string, func(ObjFinding)), s string) []string {
 
 type readerCase struct {
 	s     string
-	wants []string // "ent:valor" ou "ent:valor!" (forte)
+	wants []string // "ent:value" or "ent:value!" (strong)
 }
 
 func checkReader(t *testing.T, name string, find func(string, func(ObjFinding)), pub func(string) bool, cases []readerCase) {
@@ -43,7 +43,7 @@ func checkReader(t *testing.T, name string, find func(string, func(ObjFinding)),
 		got := readOnes(func(s string, add func(ObjFinding)) {
 			find(s, func(o ObjFinding) {
 				if pub != nil && pub(s[o.Start:o.End]) {
-					return // findObjects descarta o vocabulário público
+					return // findObjects discards the public vocabulary
 				}
 				add(o)
 			})
@@ -72,10 +72,10 @@ func TestReaderKeyValue(t *testing.T) {
 		// XML: elemento e atributo
 		{"<host>db-exemplo-01</host><database>vendas_x</database>", []string{"database:vendas_x!", "servidor:db-exemplo-01!"}},
 		{`<conexao host="db-exemplo-01" porta="1">`, []string{"servidor:db-exemplo-01!"}},
-		// linha de comando
+		// command line
 		{"pg_dump --host db-exemplo-01 --dbname=vendas_x --username svc_relatorio", []string{"database:vendas_x!", "servidor:db-exemplo-01!", "usuario:svc_relatorio!"}},
 		{"kubectl get pods --namespace vendas-prod", []string{"namespace:vendas-prod!"}},
-		// valor que fica: número, booleano, localhost, caminho, expressão, domínio público
+		// value that stays: number, boolean, localhost, path, expression, public domain
 		{"host: localhost\nport: 5432\nuser: root\nenabled: true\n", nil},
 		{"host: ${DB_HOST}\nuser: {{ .Values.user }}\ndb: $DATABASE\n", nil},
 		{"host=%s user=%s", nil},
@@ -86,7 +86,7 @@ func TestReaderKeyValue(t *testing.T) {
 		{"pip install --user requests\n", nil},
 		{"Server: nginx\nUser: alice\n", nil},
 	})
-	// código Go/Python/JS comum: nada
+	// common Go/Python/JS code: nothing
 	checkReader(t, "chave-valor (código)", findKeyValue, publicDev, []readerCase{
 		{"host := cfg.Host\nuser := u.User\n", nil},
 		{"    user = models.ForeignKey(User)\n    host = self.host\n    db = get_db()\n", nil},
@@ -105,8 +105,8 @@ func TestReaderKeyValue(t *testing.T) {
 
 func TestReaderAddresses(t *testing.T) {
 	checkReader(t, "endereço", findAddresses, publicDev, []readerCase{
-		// host interno em URL
-		{"veja http://wiki-interna/pagina e https://grafana.vendas.svc.cluster.local:3000/d/x", []string{"servidor:wiki-interna!"}}, // o DNS do Kubernetes fica com o leitor de Kubernetes
+		// internal host in a URL
+		{"veja http://wiki-interna/pagina e https://grafana.vendas.svc.cluster.local:3000/d/x", []string{"servidor:wiki-interna!"}}, // the Kubernetes DNS is left to the Kubernetes reader
 		{"grpc://svc-pedidos.internal:50051", []string{"servidor:svc-pedidos.internal!"}},
 		{"http://svc_relatorio@intranet-x9/painel", []string{"servidor:intranet-x9!", "usuario:svc_relatorio!"}},
 		// armazenamento
@@ -117,18 +117,18 @@ func TestReaderAddresses(t *testing.T) {
 		// filas
 		{"amqp://svc_relatorio:x@rabbit-01.interno:5672/vhost_pedidos", []string{"fila:vhost_pedidos!", "servidor:rabbit-01.interno!", "usuario:svc_relatorio!"}},
 		{"kafka://broker-01:9092/fila-pedidos-x9", []string{"fila:fila-pedidos-x9!", "servidor:broker-01!"}},
-		// git em contexto
+		// git in context
 		{"git clone https://github.com/org-exemplo/repo-demo.git", []string{"organizacao:org-exemplo!", "repositorio:repo-demo!"}},
 		{"git remote add origin https://gitlab.interno/org-exemplo/sub/repo-demo", []string{"organizacao:org-exemplo!", "organizacao:sub!", "repositorio:repo-demo!", "servidor:gitlab.interno!"}},
 		{"ssh://git@git-interno/org-exemplo/repo-demo.git", []string{"organizacao:org-exemplo!", "repositorio:repo-demo!", "servidor:git-interno!"}},
 		{"[remote \"origin\"]\n\turl = https://bitbucket.org/org-exemplo/repo-demo\n", []string{"organizacao:org-exemplo!", "repositorio:repo-demo!"}},
-		// endereço sem esquema
-		{"conecte em db01.corp:5432 ou redis.vendas.svc.cluster.local", []string{"servidor:db01.corp!"}}, // o DNS do Kubernetes fica com o leitor de Kubernetes
-		// fica: domínio público, documentação, localhost, código
+		// address without a scheme
+		{"conecte em db01.corp:5432 ou redis.vendas.svc.cluster.local", []string{"servidor:db01.corp!"}}, // the Kubernetes DNS is left to the Kubernetes reader
+		// stays: public domain, documentation, localhost, code
 		{"veja https://github.com/golang/go/issues/123 e https://pkg.go.dev/net/http", nil},
 		{"http://localhost:8080/ e http://127.0.0.1:9000 e http://host:port/", nil},
 		{"local = threading.local()\nimport com.acme.internal\nx := os.local", nil},
-		// nome com cara de exemplo também é mascarado (pode ser real; na dúvida, mascara)
+		// a name that looks like an example is also masked (it may be real; when in doubt, mask)
 		{"s3://my-bucket-x1/path/", []string{"bucket:my-bucket-x1!"}},
 		{"file:///home/x e postgres://db/x", nil},
 		{"~/.local/share e /usr/local/bin", nil},
@@ -205,7 +205,7 @@ func TestReaderPublicIP(t *testing.T) {
 		{"10.0.0.1 192.168.1.1 127.0.0.1 8.8.8.8 1.1.1.1 192.0.2.10 ::1 fe80::1 2001:db8::1", nil},
 		{"versão 1.2.3.4.5, hora 12:30:45, mac aa:bb:cc:dd:ee:ff, slice x[1::2], std::vector", nil},
 	})
-	// desligado por padrão
+	// off by default
 	if ls := configReaders(config.Default()); len(ls) != 0 {
 		t.Errorf("leitores de configuração ligados por padrão: %d", len(ls))
 	}
@@ -229,7 +229,7 @@ func TestReaderEmbeddedTerms(t *testing.T) {
 		{"SELECT * FROM acmex_pedidos", []string{"tabela:acmex_pedidos!"}},
 		{"host: dbAcmexVendas01", []string{"servidor:dbAcmexVendas01!"}},
 		{"o job svc-acmex-carga falhou", []string{"servico:svc-acmex-carga!"}},
-		{"a acmex e acmexvendas e macmex_x", nil}, // termo sozinho (outro detector) e pedaço que não é inteiro
+		{"a acmex e acmexvendas e macmex_x", nil}, // term alone (another detector) and a piece that is not whole
 	})
 	cfg := config.Default()
 	cfg.Terms = []config.Term{{Label: "empresa", Values: []string{"Acmex"}}}
@@ -238,13 +238,13 @@ func TestReaderEmbeddedTerms(t *testing.T) {
 	if strings.Contains(strings.ToLower(out), "acmex") {
 		t.Errorf("termo embutido ficou: %q", out)
 	}
-	// aprendido em posição forte: volta a ser mascarado em prosa
+	// learned in a strong position: masked again in prose
 	if out, _ := m.Mask("reinicie o svc-acmex-carga"); strings.Contains(out, "svc-acmex-carga") {
 		t.Errorf("nome com termo não propagou: %q", out)
 	}
 }
 
-// Ida e volta: o pseudônimo de host, caminho, usuário, bucket e repositório volta ao real.
+// Round trip: the pseudonym of host, path, user, bucket and repository goes back to the real one.
 func TestDevReadersRoundTrip(t *testing.T) {
 	m := newTest(t)
 	for _, s := range []string{
@@ -266,7 +266,7 @@ func TestDevReadersRoundTrip(t *testing.T) {
 	}
 }
 
-// Name aprendido em posição forte é mascarado em prosa e em outro formato.
+// A name learned in a strong position is masked in prose and in another format.
 func TestDevReadersPropagate(t *testing.T) {
 	m := newTest(t)
 	m.Mask("namespace: vendas-prod-x9\nbucket: bkt-relatorios-demo\n")
@@ -284,14 +284,14 @@ func TestDevReadersPropagate(t *testing.T) {
 			}
 		}
 	}
-	// palavra simples aprendida não propaga (sem cara de identificador)
+	// a learned plain word does not propagate (it does not look like an identifier)
 	m.Mask("database: vendas\n")
 	if out, _ := m.Mask("as vendas subiram"); !strings.Contains(out, "vendas") {
 		t.Errorf("palavra comum propagou: %q", out)
 	}
 }
 
-// Os leitores que dependem da configuração também nunca quebram com entrada estranha.
+// The readers that depend on the configuration never break on odd input either.
 func FuzzReadersDev(f *testing.F) {
 	for _, s := range []string{"host: ", "--host ", "</host>", "s3://", "git@x:", "arn:aws:", "/subscriptions/x/",
 		"projects/a/b/c", "C:\\Users\\", "A\\b", "ssh a@", "::1:", "module ", "\"name\": \"@a/\"", "acmex_"} {
@@ -309,7 +309,7 @@ func FuzzReadersDev(f *testing.F) {
 	})
 }
 
-// Valor seguido de operador é expressão de código, não nome de recurso.
+// A value followed by an operator is a code expression, not a resource name.
 func TestKeyValueExpressionIsNotName(t *testing.T) {
 	m := newTest(t)
 	for _, s := range []string{"// addr = arg0 + auxInt + aux", "host = base_x1 + sufixo", "server = srv_a1 - 1", "user = u_x1 * 2"} {
@@ -322,8 +322,8 @@ func TestKeyValueExpressionIsNotName(t *testing.T) {
 	}
 }
 
-// Bucket e fila de chave explícita e metadata.name de Deployment/Service/StatefulSet
-// são evidência forte: o nome aprendido é mascarado também em outro texto.
+// Bucket and queue from an explicit key and metadata.name of Deployment/Service/StatefulSet are
+// strong evidence: the learned name is masked in other text too.
 func TestExplicitKeyTeaches(t *testing.T) {
 	for _, c := range []struct{ teaches, name string }{
 		{"S3_BUCKET=bkt-relatorios-x9\n", "bkt-relatorios-x9"},

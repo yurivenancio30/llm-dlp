@@ -6,10 +6,10 @@ import (
 	"testing"
 )
 
-// Call de ferramenta (call.go, call_decider.go): proveniência,
-// identidade, eco, tipo do pedido. Names inventados, vários de palavra comum.
+// Tool call (call.go, call_decider.go): provenance, identity, echo, request type. Made-up names,
+// several of them common words.
 
-// conversationStep: uma mensagem do usuário (opcional), a chamada e a saída dela.
+// conversationStep: a user message (optional), the call and its output.
 type conversationStep struct {
 	user   string
 	cmd    string
@@ -17,14 +17,14 @@ type conversationStep struct {
 	trans  []TranslatedWord
 }
 
-// maskedOutput: o resultado de um passo (texto mascarado, decisões, entrada mascarada).
+// maskedOutput: the result of a step (masked text, decisions, masked input).
 type maskedOutput struct {
 	text, entry string
 	dec         []Decision
 	decUsage    []Decision
 }
 
-// runConversation: os passos em ordem, como o proxy (commandHints + walker) faz.
+// runConversation: the steps in order, as the proxy (commandHints + walker) does.
 func runConversation(t *testing.T, m *Masker, ps []conversationStep) []maskedOutput {
 	t.Helper()
 	cs := NewCommands()
@@ -54,8 +54,8 @@ func wholeWord(s, w string) bool {
 	return regexp.MustCompile(`(^|[^\pL\pN_])` + regexp.QuoteMeta(w) + `($|[^\pL\pN_])`).MatchString(s)
 }
 
-// simpleMemory: o que a memória da conversa faz com as decisões, de forma simples:
-// a palavra inteira vira o pseudônimo do tipo decidido.
+// simpleMemory: what the conversation memory does with the decisions, in a simple way: the whole
+// word becomes the pseudonym of the decided type.
 func simpleMemory(m *Masker, s string, ds []Decision) string {
 	for _, d := range ds {
 		if d.Generic {
@@ -68,7 +68,7 @@ func simpleMemory(m *Masker, s string, ds []Decision) string {
 	return s
 }
 
-// sixFormats: o mesmo nome solto em 6 formatos.
+// sixFormats: the same loose name in 6 formats.
 func sixFormats(n string) []string {
 	return []string{
 		"o " + n + " parou de responder hoje cedo",
@@ -85,7 +85,7 @@ type areaT2 struct {
 	user   string
 	cmd    string
 	output string
-	names  []string // os nomes (palavra comum) que a saída traz
+	names  []string // the names (common words) the output brings
 	typ    string   // o tipo esperado ("" = qualquer)
 }
 
@@ -121,9 +121,8 @@ var areasT2 = []areaT2{
 		[]string{"notificacoes", "conciliacoes", "reprocessamento"}, ""},
 }
 
-// Para cada área, a saída do inventário é mascarada e cada nome fica decidido (sem
-// Generic); com a memória da conversa (simulada aqui), o mesmo nome solto em 6 formatos fica
-// 0 em claro.
+// For each area, the inventory output is masked and each name is decided (without Generic); with
+// the conversation memory (simulated here), the same loose name in 6 formats is 0 in the clear.
 func TestT2InventoryCommonWord(t *testing.T) {
 	for _, ar := range areasT2 {
 		t.Run(ar.name, func(t *testing.T) {
@@ -159,9 +158,9 @@ func TestT2InventoryCommonWord(t *testing.T) {
 	}
 }
 
-// O experimento do catálogo. O CSV (inventado) é lido com head e depois por um script
-// Python que imprime "a | b | c" sem cabeçalho; o script traz as tags e as regex como literais.
-// Colunas e tabelas saem mascaradas; tags e regex continuam legíveis.
+// The catalog experiment. The (made-up) CSV is read with head and then by a Python script that
+// prints "a | b | c" without a header; the script brings the tags and the regexes as literals.
+// Columns and tables go out masked; tags and regexes stay readable.
 func TestT1Catalog(t *testing.T) {
 	type line struct{ tag, order, regex, table, column, typ string }
 	ls := []line{
@@ -206,8 +205,8 @@ func TestT1Catalog(t *testing.T) {
 		dec = append(dec, r.dec...)
 	}
 	py := rs[1].text
-	// a parte desta trilha, sem a memória da conversa: as colunas (identidade + proveniência)
-	// e as tabelas com cara de identificador (aprendidas no head)
+	// this track's part, without the conversation memory: the columns (identity + provenance) and
+	// the identifier-shaped tables (learned in the head)
 	for _, l := range ls {
 		if wholeWord(py, l.column) {
 			t.Errorf("coluna %s em claro na saída do script", l.column)
@@ -216,11 +215,11 @@ func TestT1Catalog(t *testing.T) {
 			t.Errorf("tabela %s em claro na saída do script", l.table)
 		}
 	}
-	// com a memória da conversa (simulada): também a tabela de palavra comum
+	// with the conversation memory (simulated): also the common-word table
 	if o := simpleMemory(m, py, dec); wholeWord(o, "carteira") {
 		t.Errorf("tabela de palavra comum em claro com a memória da conversa")
 	}
-	// tags e regex: literais do programa, continuam legíveis
+	// tags and regexes: program literals, stay readable
 	for _, l := range ls {
 		if !wholeWord(py, l.tag) {
 			t.Errorf("tag %s foi mascarada", l.tag)
@@ -231,8 +230,8 @@ func TestT1Catalog(t *testing.T) {
 	}
 }
 
-// Negativos: saídas comuns de ls, ps, git log e pip list (com a extensão da dica, como o proxy
-// manda) continuam sem nada mascarado.
+// Negatives: common outputs of ls, ps, git log and pip list (with the hint extension, as the proxy
+// sends it) stay with nothing masked.
 func TestCallNegatives(t *testing.T) {
 	cases := []conversationStep{
 		{user: "o build quebrou, veja o que tem na pasta", cmd: "ls -la",
@@ -270,7 +269,7 @@ func TestCallNegatives(t *testing.T) {
 	}
 }
 
-// B6: o pedido do usuário vale só para as chamadas da resposta seguinte.
+// B6: the user request only applies to the calls of the next response.
 func TestUserRequestOnlyInNextResponse(t *testing.T) {
 	m := newTest(t)
 	list := "docs\ninternal\nscripts\nferramentas\n"
@@ -296,7 +295,7 @@ func TestUserRequestOnlyInNextResponse(t *testing.T) {
 	}
 }
 
-// B5: o substantivo do verbo de enumeração, em qualquer convenção.
+// B5: the noun of the enumeration verb, in any convention.
 func TestCommandType(t *testing.T) {
 	cases := map[string]string{
 		"kubectl get ns":                                   "namespace",
@@ -326,8 +325,8 @@ func TestCommandType(t *testing.T) {
 	}
 }
 
-// B4: a palavra de uma saída anterior que volta como argumento é nome (na entrada do tool_use).
-// B1 exceção: a palavra que o proxy traduziu de um pseudônimo é nome também na saída.
+// B4: a word of a previous output that comes back as an argument is a name (in the tool_use input).
+// B1 exception: a word the proxy translated from a pseudonym is a name in the output too.
 func TestEchoAndTranslated(t *testing.T) {
 	m := newTest(t)
 	rs := runConversation(t, m, []conversationStep{
@@ -351,7 +350,7 @@ func TestEchoAndTranslated(t *testing.T) {
 		t.Errorf("eco não decidido: %+v", rs[1].decUsage)
 	}
 
-	// o modelo escreveu o pseudônimo; o proxy traduziu; a saída traz a palavra
+	// the model wrote the pseudonym; the proxy translated it; the output brings the word
 	m2 := newTest(t)
 	ps := m2.Pseudonym(objTypePrefix+"namespace", "pagamentos")
 	tab := NewTable([]Entry{{ps, "pagamentos", objTypePrefix + "namespace"}})
@@ -369,7 +368,7 @@ func TestEchoAndTranslated(t *testing.T) {
 	}
 }
 
-// B4: segmento de um nome já mascarado que aparece solto no mesmo texto.
+// B4: a segment of an already masked name that appears loose in the same text.
 func TestNameSegmentMasked(t *testing.T) {
 	m := newTest(t)
 	r := runConversation(t, m, []conversationStep{{cmd: "kubectl get pods -A",
@@ -384,8 +383,8 @@ func TestNameSegmentMasked(t *testing.T) {
 	}
 }
 
-// Os negativos da matriz como saída de comando (com a extensão da dica, sem tipo pedido):
-// continuam sem nada mascarado.
+// The matrix negatives as command output (with the hint extension, without a requested type): stay
+// with nothing masked.
 func TestMatrixNegativesAsOutput(t *testing.T) {
 	if testing.Short() {
 		t.Skip("matriz grande")

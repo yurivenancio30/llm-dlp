@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// Medições de tempo (go test -bench).
+// Timing measurements (go test -bench).
 
 func denseText(seed int) string {
 	var b strings.Builder
@@ -46,7 +46,7 @@ func BenchmarkColdCommon(b *testing.B) {
 	b.SetBytes(int64(n / b.N))
 }
 
-// igual ao FrioComum, mas com valores já aprendidos (inclusive de antes de um reinício)
+// same as ColdCommon, but with values already learned (including from before a restart)
 func BenchmarkColdCommonWithKnown(b *testing.B) {
 	dir := b.TempDir()
 	vs, _ := LoadSeen(dir + "/v.json")
@@ -67,7 +67,7 @@ func BenchmarkColdCommonWithKnown(b *testing.B) {
 	b.SetBytes(int64(n / b.N))
 }
 
-// texto cheio de caminhos e URLs: o pior caso para o teste de pedaços de senha
+// text full of paths and URLs: the worst case for the password-piece test
 func pathsText(seed int) string {
 	var b strings.Builder
 	for i := seed * 50; i < seed*50+50; i++ {
@@ -105,8 +105,8 @@ func BenchmarkMask5KB(b *testing.B) {
 	}
 }
 
-// Line única longa (JSON minificado, resposta de API, HTML): o tempo tem que crescer de forma
-// linear com o tamanho. Cada item é fictício.
+// A single long line (minified JSON, API response, HTML): time has to grow linearly with size.
+// Every item is fictitious.
 func longLine(typ string, size int) string {
 	var b strings.Builder
 	for i := 0; b.Len() < size; i++ {
@@ -121,9 +121,9 @@ func longLine(typ string, size int) string {
 			fmt.Fprintf(&b, `{"de":"fulano%d`+"@"+`empresa-ficticia.com.br","n":%d},`, i%50, i)
 		case "k8sdns":
 			fmt.Fprintf(&b, `{"svc":"svc-x%d.ns-x.svc.cluster.local:8080"},`, i%50)
-		case "urlcolada": // URLs sem separador entre elas
+		case "urlcolada": // URLs without a separator between them
 			b.WriteString("https://exemplo.com/a")
-		case "esquemas": // só o separador de esquema, repetido
+		case "esquemas": // only the scheme separator, repeated
 			b.WriteString("a://")
 		case "conexao":
 			fmt.Fprintf(&b, `{"c":"Server=srv-x%d;Database=db_x;User Id=u_x;"},`, i%50)

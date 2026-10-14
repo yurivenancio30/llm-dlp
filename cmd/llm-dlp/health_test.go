@@ -19,8 +19,8 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/proxy"
 )
 
-// onPort sobe h numa porta local e devolve a configuração que aponta para ela, com a pasta do
-// llm-dlp num diretório temporário.
+// onPort starts h on a local port and returns the configuration pointing to it, with the llm-dlp
+// folder in a temporary directory.
 func onPort(t *testing.T, h http.Handler) config.Config {
 	t.Helper()
 	t.Setenv("LLM_DLP_HOME", t.TempDir())
@@ -32,8 +32,9 @@ func onPort(t *testing.T, h http.Handler) config.Config {
 	return cfg
 }
 
-// Outro programa que pegue a porta e responda "sou o llm-dlp" não passa: falta a prova, que só
-// quem lê a chave calcula. Sem isso ele receberia a conversa sem máscara e a credencial da API.
+// Another program that takes the port and answers "I am llm-dlp" does not pass: it lacks the proof,
+// which only whoever reads the key computes. Without it, that program would receive the
+// conversation without masking and the API credential.
 func TestHealthRequiresProof(t *testing.T) {
 	impostor := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]any{"ok": true, "servico": "llm-dlp", "versao": "9.9.9",
@@ -44,7 +45,7 @@ func TestHealthRequiresProof(t *testing.T) {
 		t.Fatalf("o impostor passou: ok=%v semProva=%v", ok, info.WithoutProof)
 	}
 
-	// o llm-dlp de verdade, com a chave da mesma pasta, passa
+	// the real llm-dlp, with the key of the same folder, passes
 	var h http.Handler
 	cfg = onPort(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { h.ServeHTTP(w, r) }))
 	key, err := mask.Key(config.Path("chave"))
@@ -60,20 +61,20 @@ func TestHealthRequiresProof(t *testing.T) {
 		t.Fatalf("o llm-dlp com a chave certa não passou: ok=%v semProva=%v", ok, info.WithoutProof)
 	}
 
-	// o mesmo llm-dlp com outra chave (o de outro usuário) não passa
+	// the same llm-dlp with another key (another user's) does not pass
 	h = proxy.New(cfg, m, nil, log.New(io.Discard, "", 0)).WithKey([]byte("a chave de outro usuario........"))
 	if info, ok := health(cfg); ok || !info.WithoutProof {
 		t.Fatalf("passou com a chave de outro: ok=%v", ok)
 	}
 
-	// versão anterior, que não sabe provar
+	// earlier version, which does not know how to prove
 	h = proxy.New(cfg, m, nil, log.New(io.Discard, "", 0))
 	if info, ok := health(cfg); ok || !info.WithoutProof {
 		t.Fatalf("passou sem prova: ok=%v", ok)
 	}
 }
 
-// Dizer "estou em emergência" só vale se o arquivo que o administrador grava disser o mesmo.
+// Saying "I am in emergency" only counts if the file the administrator writes says the same.
 func TestHealthEmergencyOnlyWithFile(t *testing.T) {
 	before := dirEmergencia
 	dirEmergencia = t.TempDir()
@@ -93,8 +94,8 @@ func TestHealthEmergencyOnlyWithFile(t *testing.T) {
 	}
 }
 
-// A configuração padrão não gera aviso; cada campo que tira proteção, ou manda as mensagens para
-// outro lugar, gera o seu.
+// The default configuration produces no warning; each field that removes protection, or sends the
+// messages elsewhere, produces its own.
 func TestReducedProtection(t *testing.T) {
 	t.Setenv("LLM_DLP_HOME", "")
 	if a := reducedProtection(config.Default()); len(a) != 0 {

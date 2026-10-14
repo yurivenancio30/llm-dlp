@@ -16,14 +16,14 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/mask"
 )
 
-// Ida: mascara o corpo da requisição (formato da API da Anthropic).
+// Outbound: masks the request body (Anthropic API format).
 
-// maskBody mascara o JSON da requisição. Corpo que não é JSON não sai (falha fechada).
-// Devolve também o lote dos textos, para congelar depois que a requisição sair.
+// maskBody masks the request JSON. A body that is not JSON does not go out (fail closed). Also
+// returns the batch of texts, to freeze after the request goes out.
 //
-// formato: "anthropic" (/v1/messages); "gemini", "codeassist", "openai" ou "responses" (vista na
-// forma da Anthropic por uma ponte: ver gemini.go, openai.go e responses.go); ou outro (modo
-// genérico: todo texto é mascarado).
+// format: "anthropic" (/v1/messages); "gemini", "codeassist", "openai" or "responses" (seen in the
+// Anthropic shape by a bridge: see gemini.go, openai.go and responses.go); or another one (generic
+// mode: all text is masked).
 func (p *Proxy) maskBody(format, typ string, body []byte) ([]byte, []mask.Entry, *mask.Batch, error) {
 	dec := json.NewDecoder(bytes.NewReader(body))
 	dec.UseNumber()
@@ -33,7 +33,7 @@ func (p *Proxy) maskBody(format, typ string, body []byte) ([]byte, []mask.Entry,
 	}
 	anthropic := format == "anthropic"
 	v, goBack := original, func() {}
-	// outro formato com leitor próprio: a requisição é vista na forma da Anthropic (ponte)
+	// another format with its own reader: the request is seen in the Anthropic shape (bridge)
 	bridge := map[string]func(any) (map[string]any, func(), bool){"gemini": geminiBridge, "openai": openAIBridge,
 		"codeassist": codeAssistBridge, "responses": responsesBridge}[format]
 	withBridge := false
@@ -43,9 +43,9 @@ func (p *Proxy) maskBody(format, typ string, body []byte) ([]byte, []mask.Entry,
 		}
 	}
 	batch := p.m.NewBatch()
-	// 1ª passada: só junta os textos (os mesmos que a montagem vai mascarar) e os mascara
-	// antes, em paralelo quando são muitos. Assim, todo valor aprendido nesta requisição já
-	// vale quando ela é montada, e a requisição seguinte não muda nada do que esta enviou.
+	// 1st pass: only gathers the texts (the same ones the assembly will mask) and masks them first,
+	// in parallel when there are many. This way, every value learned in this request already
+	// applies when it is assembled, and the next request changes nothing of what this one sent.
 	col := &collection{}
 	wc := walker{cfg: p.cfg, m: p.m, col: col, batch: batch, pos: &position{}, bridge: withBridge}
 	if anthropic {
@@ -56,31 +56,32 @@ func (p *Proxy) maskBody(format, typ string, body []byte) ([]byte, []mask.Entry,
 	}
 	batch.Warm(col.items)
 	if anthropic {
-		// anterioridade (priority.go), com o que cada saída de ferramenta decidiu (já no memo)
+		// priority (priority.go), with what each tool output decided (already in the memo)
 		batch.UsePublic(modelPublics(v, p.m, batch.DecidedByText(col.items)))
 	}
-	// memória da conversa: os nomes decididos em todos os textos valem para os textos ainda
-	// não enviados (ver mask/memory_conversation.go)
+	// conversation memory: the names decided in all texts apply to the texts not yet sent (see
+	// mask/memory_conversation.go)
 	batch.Memory(col.items, col.extras)
 
-	// 2ª passada: monta, em ordem
+	// 2nd pass: assembles, in order
 	var ents []mask.Entry
 	var errMedia error
-	// as posições já foram calculadas na 1ª passada (os blocos ainda estavam intactos)
+	// the positions were already computed in the 1st pass (the blocks were still intact)
 	w := walker{cfg: p.cfg, m: p.m, batch: batch, md: p.media, ents: &ents, err: &errMedia, pos: &position{seq: wc.pos.seq}, bridge: withBridge}
 	if anthropic {
 		v = w.anthropicRequest(v)
 	} else {
-		// fora de /v1/messages não há conversa: congela só o reenvio do corpo inteiro igual
+		// outside /v1/messages there is no conversation: only freezes the resend of the same whole
+		// body
 		w.pos.block = after(mask.Position{}, v)
 		v = w.generic(v)
 	}
 	if errMedia != nil {
-		// imagem/PDF que não deu para verificar nunca sai, mesmo com falhar_fechado=false
+		// an image/PDF that could not be checked never goes out, even with fail_closed=false
 		return nil, nil, nil, requiredError{errMedia}
 	}
 	if withBridge {
-		goBack() // o que foi mascarado na forma da Anthropic volta para a requisição original
+		goBack() // what was masked in the Anthropic shape goes back to the original request
 	} else {
 		original = v
 	}
@@ -93,32 +94,32 @@ func (p *Proxy) maskBody(format, typ string, body []byte) ([]byte, []mask.Entry,
 	return bytes.TrimRight(buf.Bytes(), "\n"), ents, batch, nil
 }
 
-// coleta: os textos que a montagem vai mascarar, com a posição e a origem de cada um, e as
-// decisões dos trechos traduzidos dos textos do assistente que voltam como a API os mandou.
+// collection: the texts the assembly will mask, with the position and origin of each one, and the
+// decisions of the translated pieces of the assistant texts that come back as the API sent them.
 type collection struct {
 	items  []mask.BatchItem
 	extras []mask.Decision
 }
 
-// posicao: onde o walker está na conversa. Cada bloco (ferramenta, bloco do system, bloco
-// de mensagem) encadeia o hash do anterior, na ordem em que a API monta o cache: tools,
-// system, messages. Os textos de um bloco têm a posição de tudo o que vem antes dele. Assim
-// o congelamento (ver mask.Batch) vale só para o reenvio exato daquele ponto da conversa.
+// position: where the walker is in the conversation. Each block (tool, system block, message block)
+// chains the hash of the previous one, in the order in which the API builds the cache: tools,
+// system, messages. The texts of a block have the position of everything that comes before it. This
+// way freezing (see mask.Batch) only applies to the exact resend of that point of the conversation.
 //
-// A posição de um texto é o hash do seu bloco (que cobre tudo o que vem antes e o bloco
-// inteiro) mais a ordem do texto dentro do bloco, num percurso em ordem fixa. Assim o texto
-// de um bloco que já saiu é reconhecido sem calcular o hash dele de novo.
+// The position of a text is the hash of its block (which covers everything that comes before and
+// the whole block) plus the order of the text inside the block, in a fixed-order walk. This way the
+// text of a block that already went out is recognized without computing its hash again.
 type position struct {
 	current mask.Position
-	// seq: a posição depois de cada bloco, na ordem; a 1ª passada calcula, a 2ª reaproveita
+	// seq: the position after each block, in order; the 1st pass computes it, the 2nd reuses it
 	seq []mask.Position
 	i   int
-	// bloco e n: o bloco atual e quantos textos dele já foram vistos
+	// block and n: the current block and how many of its texts were already seen
 	block mask.Position
 	n     uint64
 }
 
-// ofText: a posição do próximo texto do bloco atual.
+// ofText: the position of the next text of the current block.
 func (p *position) ofText() mask.Position {
 	var b [40]byte
 	copy(b[:], p.block[:])
@@ -127,7 +128,7 @@ func (p *position) ofText() mask.Position {
 	return sha256.Sum256(b[:])
 }
 
-// depois: a posição seguinte a um bloco (calculada antes de o bloco ser mascarado).
+// after: the position following a block (computed before the block is masked).
 func after(prev mask.Position, v any) mask.Position {
 	h := sha256.New()
 	h.Write(prev[:])
@@ -137,8 +138,8 @@ func after(prev mask.Position, v any) mask.Position {
 	return out
 }
 
-// hashJSON escreve v em h numa forma estável: chaves em ordem e sem cache_control (o
-// marcador de cache muda de lugar a cada mensagem e não faz parte do conteúdo).
+// hashJSON writes v into h in a stable form: keys in order and without cache_control (the cache
+// marker moves with every message and is not part of the content).
 func hashJSON(h hash.Hash, v any) {
 	var n [8]byte
 	writeIt := func(tag byte, s string) {
@@ -181,8 +182,8 @@ func hashJSON(h hash.Hash, v any) {
 	}
 }
 
-// unidade: processa v como um bloco da conversa, com a posição encadeada. Só os blocos de
-// primeiro nível encadeiam: o conteúdo de um tool_result é parte do bloco dele.
+// unit: processes v as a block of the conversation, with the chained position. Only top-level
+// blocks chain: the content of a tool_result is part of its block.
 func (w walker) unit(v any, f func(w walker)) {
 	if w.inside {
 		f(w)
@@ -204,8 +205,8 @@ func (w walker) unit(v any, f func(w walker)) {
 	w.pos.current = next
 }
 
-// chaves: as chaves de um objeto JSON em ordem (a de um mapa em Go é aleatória, e a ordem
-// dos textos de um bloco faz parte da posição de cada um).
+// keys: the keys of a JSON object in order (the order of a Go map is random, and the order of the
+// texts of a block is part of the position of each one).
 func keys(x map[string]any) []string {
 	ks := make([]string, 0, len(x))
 	for k := range x {
@@ -215,51 +216,49 @@ func keys(x map[string]any) []string {
 	return ks
 }
 
-// walker percorre o JSON de uma requisição e mascara as strings que podem levar
-// dado do usuário, guardando as entradas pseudônimo -> real usadas.
+// walker walks the JSON of a request and masks the strings that may carry user data, keeping the
+// pseudonym -> real entries used.
 type walker struct {
 	cfg config.Config
-	// ponte: a requisição veio de outro formato (Gemini, OpenAI) e é vista na forma da Anthropic.
-	// Só liga o que é desses formatos (bridgeUntouchableKeys, bridgeWebTools).
+	// bridge: the request came from another format (Gemini, OpenAI) and is seen in the Anthropic
+	// shape. Only turns on what belongs to those formats (bridgeUntouchableKeys, bridgeWebTools).
 	bridge bool
-	m      *mask.Masker // só para as palavras traduzidas de um tool_use (commandHints)
+	m      *mask.Masker // only for the translated words of a tool_use (commandHints)
 	batch  *mask.Batch
 	md     *Media
 	ents   *[]mask.Entry
-	err    *error // primeiro erro ao tratar mídia (a requisição inteira é recusada)
-	// col != nil: só junta os textos, sem mudar nada (1ª passada)
+	err    *error // first error while handling media (the whole request is refused)
+	// col != nil: only gathers the texts, without changing anything (1st pass)
 	col *collection
-	// webIDSet: tool_use_id das chamadas de WebFetch/WebSearch desta conversa
+	// webIDSet: tool_use_id of the WebFetch/WebSearch calls of this conversation
 	webIDSet map[string]bool
-	// fromWeb: o texto atual veio da internet (mascara, mas não aprende)
+	// fromWeb: the current text came from the internet (mask, but do not learn)
 	fromWeb bool
-	// dicas: tool_use_id -> o que o comando da chamada diz do resultado (mask.Commands.Hint)
+	// hints: tool_use_id -> what the command of the call says about the result (mask.Commands.Hint)
 	hints map[string]string
-	// usageHints: tool_use id -> o que se sabe da entrada da chamada (eco, palavras traduzidas)
+	// usageHints: tool_use id -> what is known about the call input (echo, translated words)
 	usageHints map[string]string
-	// dica: a do resultado atual
+	// hint: the one of the current result
 	hint string
 	pos  *position
-	// dentro: já dentro de um bloco (não encadeia de novo)
+	// inside: already inside a block (does not chain again)
 	inside bool
-	// assist: mensagem do assistente (texto e entrada de ferramenta escritos pelo modelo)
+	// assist: assistant message (text and tool input written by the model)
 	assist bool
-	// mensagem: dentro do conteúdo de uma mensagem (fora de um resultado de ferramenta)
+	// message: inside the content of a message (outside a tool result)
 	message bool
-	// prosa: texto da mensagem, do usuário ou do assistente (não entrada nem saída de ferramenta),
-	// e texto do cliente
+	// prose: message text, from the user or the assistant (not tool input nor output), and client
+	// text
 	prose bool
-	// cliente: system ou definição de ferramenta, o texto que o Claude Code escreve (instruções,
-	// descrições, schema). É mascarado como os outros, mas a palavra comum que a conversa
-	// aprendeu como nome fica como palavra (como na prosa): "billing" é tabela no dado e palavra
-	// na instrução.
+	// client: system or tool definition, the text Claude Code writes (instructions, descriptions,
+	// schema). It is masked like the others, but the common word the conversation learned as a name
+	// stays a word (as in prose): "billing" is a table in the data and a word in the instruction.
 	client bool
-	// fixo: bloco de texto do system, onde o texto fixo do cliente (clientFixedText) passa
-	// intacto
+	// fixed: system text block, where the client's fixed text (clientFixedText) passes intact
 	fixed bool
 }
 
-// midia trata um bloco de imagem/PDF; devolve os blocos que o substituem.
+// media handles an image/PDF block; returns the blocks that replace it.
 func (w walker) media(b map[string]any) []any {
 	if w.col != nil {
 		return []any{b}
@@ -295,11 +294,11 @@ func (w walker) s(v string) string {
 		return w.written(v)
 	}
 	if w.fixed && clientFixedText(v) {
-		w.pos.ofText() // não é dado nem fonte de decisão
+		w.pos.ofText() // not data nor a source of decisions
 		return v
 	}
 	if f, _ := mask.SplitSource(w.hint); w.col != nil && f == mask.SystemSource {
-		w.pos.ofText() // catálogo de sistema: não é fonte de decisão (mask/memory_tracing.go)
+		w.pos.ofText() // system catalog: not a source of decisions (mask/memory_tracing.go)
 		return v
 	}
 	if w.col != nil {
@@ -315,8 +314,8 @@ func (w walker) s(v string) string {
 	return out
 }
 
-// escrito: texto do assistente. Se o proxy o desmascarou (quem escreveu), volta como a API o
-// mandou; as palavras traduzidas entram na memória da conversa.
+// written: assistant text. If the proxy unmasked it (who wrote it), it comes back as the API sent
+// it; the translated words enter the conversation memory.
 func (w walker) written(v string) string {
 	if w.col != nil {
 		if d, ok := w.batch.Written(v); ok {
@@ -325,7 +324,7 @@ func (w walker) written(v string) string {
 			return v
 		}
 		if !w.fromWeb {
-			w.pos.ofText() // o texto do assistente não é fonte de decisão (mask/memory_tracing.go)
+			w.pos.ofText() // the assistant text is not a source of decisions (mask/memory_tracing.go)
 			return v
 		}
 		w.col.items = append(w.col.items, mask.BatchItem{S: v, FromWeb: w.fromWeb, Pos: w.pos.ofText(), Hint: w.hint})
@@ -340,15 +339,15 @@ func (w walker) written(v string) string {
 	return out
 }
 
-// Text fixo do cliente: os dois blocos do system com que o Claude Code se identifica à API. A
-// API só aceita a requisição como do Claude Code com eles intactos; com uma palavra trocada, ela
-// responde 429 a toda mensagem da conversa. Não levam dado do usuário, e só passam com prova:
+// Client fixed text: the two system blocks Claude Code identifies itself to the API with. The API
+// only accepts the request as Claude Code's with them intact; with one word changed, it answers 429
+// to every message of the conversation. They carry no user data, and only pass with proof:
 //
-//   - o cabeçalho ("x-anthropic-billing-header: cc_version=2.1.296.c17; cc_entrypoint=cli;") pela
-//     forma exata: o nome dele e pares nome=valor curtos, sem espaço nem texto livre;
-//   - a frase de identidade por ser, inteira, uma das frases públicas do Claude Code.
+//   - the header ("x-anthropic-billing-header: cc_version=2.1.296.c17; cc_entrypoint=cli;") by
+//     its exact shape: its name and short name=value pairs, without spaces or free text;
+//   - the identity sentence by being, whole, one of the public sentences of Claude Code.
 //
-// O mesmo texto com qualquer coisa a mais é um texto como os outros.
+// The same text with anything more is a text like the others.
 var (
 	reClientHeader  = regexp.MustCompile(`^x-anthropic-billing-header:( ?[a-z][a-z0-9_]{1,23}=[A-Za-z0-9._-]{1,64};)+ ?$`)
 	clientSentences = map[string]bool{
@@ -362,10 +361,10 @@ func clientFixedText(v string) bool {
 	return clientSentences[v] || len(v) <= 400 && reClientHeader.MatchString(v)
 }
 
-// web: as ferramentas da lista ferramentas_sem_desmascarar (WebFetch, WebSearch) trazem
-// conteúdo da internet. Um exemplo de documentação (a senha de exemplo numa URL) não é
-// segredo do usuário: é mascarado onde aparece, mas não é lembrado. Os conectores do
-// claude.ai (mcp__claude_ai_*) ficam de fora: trazem dado do próprio usuário.
+// web: the tools of the tools_without_unmask list (WebFetch, WebSearch) bring content from the
+// internet. A documentation example (the example password in a URL) is not the user's secret: it is
+// masked where it appears, but is not remembered. The claude.ai connectors (mcp__claude_ai_*) stay
+// out: they bring the user's own data.
 func (w walker) web(name string) bool {
 	if w.bridge && bridgeWebTools[name] {
 		return true
@@ -378,8 +377,8 @@ func (w walker) web(name string) bool {
 	return false
 }
 
-// webIDs junta os ids das chamadas de ferramentas da web feitas na conversa e das leituras de
-// arquivo de dependência pública: o resultado delas é mascarado, mas não ensina.
+// webIDs gathers the ids of the web tool calls made in the conversation and of the reads of public
+// dependency files: their result is masked, but does not teach.
 func (w walker) webIDs(msgs []any) map[string]bool {
 	ids := map[string]bool{}
 	for _, mm := range msgs {
@@ -394,8 +393,8 @@ func (w walker) webIDs(msgs []any) map[string]bool {
 			if name, _ := bl["name"].(string); w.web(name) && id != "" {
 				ids[id] = true
 			}
-			// arquivo lido de uma dependência pública (site-packages/pandas/..., node_modules/
-			// express/...): código do fornecedor, mascarado mas sem ensinar a memória (como a web)
+			// file read from a public dependency (site-packages/pandas/..., node_modules/
+			// express/...): vendor code, masked but without teaching the memory (like the web)
 			if in, _ := bl["input"].(map[string]any); in != nil && id != "" && w.m != nil {
 				for _, k := range []string{"file_path", "path", "notebook_path"} {
 					if p, _ := in[k].(string); p != "" && w.m.ThirdPartyPath(p) {
@@ -408,12 +407,12 @@ func (w walker) webIDs(msgs []any) map[string]bool {
 	return ids
 }
 
-// commandHints: para cada resultado de ferramenta, o que o comando da chamada (o tool_use
-// do mesmo id) diz dele: as colunas de um SELECT, o tipo pedido numa listagem, a coluna de um
-// arquivo cujo cabeçalho já passou, as palavras do programa (ver mask/call_command.go e
-// mask/call.go). E, para cada tool_use, o que se sabe da entrada (eco de uma saída anterior,
-// palavras que o proxy traduziu de um pseudônimo). Calculado em ordem, antes de mascarar (a
-// entrada do tool_use ainda é a original), e igual nas duas passadas.
+// commandHints: for each tool result, what the command of the call (the tool_use with the same id)
+// says about it: the columns of a SELECT, the type asked for in a listing, the column of a file
+// whose header already went by, the program words (see mask/call_command.go and mask/call.go). And,
+// for each tool_use, what is known about the input (echo of a previous output, words the proxy
+// translated from a pseudonym). Computed in order, before masking (the tool_use input is still the
+// original), and the same in both passes.
 func commandHints(msgs []any, m *mask.Masker) (hints, usageHints map[string]string) {
 	cs := mask.NewCommands()
 	cmds := map[string]string{}
@@ -428,8 +427,8 @@ func commandHints(msgs []any, m *mask.Masker) (hints, usageHints map[string]stri
 		blocks, _ := msg["content"].([]any)
 		return hostRole, blocks
 	}
-	// os argumentos de todas as chamadas (o eco procura só por eles nas saídas)
-	writtenSet := map[string]string{} // arquivo que a conversa escreveu -> as fontes que ele cita
+	// the arguments of all calls (the echo looks only for them in the outputs)
+	writtenSet := map[string]string{} // file the conversation wrote -> the sources it cites
 	for _, mm := range msgs {
 		_, blocks := blocksOf(mm)
 		for _, b := range blocks {
@@ -479,7 +478,7 @@ func commandHints(msgs []any, m *mask.Masker) (hints, usageHints map[string]stri
 				}
 				d = mask.WithExtension(d, cs.Result(chs[rid], output))
 				if cmd := cmds[rid]; cmd != "" {
-					d = mask.WithSource(sourceWith(writtenSet, cmd), d) // a fonte do resultado
+					d = mask.WithSource(sourceWith(writtenSet, cmd), d) // the source of the result
 					if mask.SystemTarget(cmd) {
 						d = mask.WithSource(mask.SystemSource, "")
 					}
@@ -496,8 +495,8 @@ func commandHints(msgs []any, m *mask.Masker) (hints, usageHints map[string]stri
 	return hints, usageHints
 }
 
-// noReminders: o texto do usuário sem os blocos <system-reminder> que o Claude Code acrescenta
-// (não são o pedido do usuário).
+// noReminders: the user text without the <system-reminder> blocks Claude Code adds (they are not
+// the user's request).
 func noReminders(t string) string {
 	const ab, fe = "<system-reminder>", "</system-reminder>"
 	if !strings.Contains(t, ab) {
@@ -519,8 +518,8 @@ func noReminders(t string) string {
 	}
 }
 
-// translatedIn: as palavras que o proxy traduziu de um pseudônimo nas strings da entrada de um
-// tool_use (ver mask.Masker.RecordResponse).
+// translatedIn: the words the proxy translated from a pseudonym in the strings of a tool_use input
+// (see mask.Masker.RecordResponse).
 func translatedIn(m *mask.Masker, v any) []mask.TranslatedWord {
 	if m == nil {
 		return nil
@@ -545,8 +544,8 @@ func translatedIn(m *mask.Masker, v any) []mask.TranslatedWord {
 	return out
 }
 
-// commandOf: o texto da entrada de uma ferramenta que diz o que ela faz (o comando do shell,
-// a consulta, o caminho). A descrição livre fica de fora.
+// commandOf: the text of a tool input that says what it does (the shell command, the query, the
+// path). The free description stays out.
 func commandOf(v any) string {
 	in, _ := v.(map[string]any)
 	if c, ok := in["command"].(string); ok {
@@ -562,7 +561,7 @@ func commandOf(v any) string {
 	return b.String()
 }
 
-// textOf: o texto de um conteúdo de tool_result (string ou blocos de texto).
+// textOf: the text of a tool_result content (string or text blocks).
 func textOf(v any) string {
 	switch c := v.(type) {
 	case string:
@@ -582,21 +581,20 @@ func textOf(v any) string {
 	return ""
 }
 
-// Chaves que nunca carregam dado do usuário (ou que não podem mudar).
+// Keys that never carry user data (or that cannot change).
 var untouchableKeys = map[string]bool{"type": true, "id": true, "tool_use_id": true, "signature": true,
 	"media_type": true, "cache_control": true, "model": true, "role": true, "stop_reason": true,
 	"stop_sequence": true, "citations": false}
 
-// bridgeUntouchableKeys: as de untouchableKeys e, só nas requisições vistas por uma ponte
-// (Gemini, OpenAI), as que esses formatos têm a mais: a assinatura do raciocínio, o tipo do
-// arquivo e o formato de um schema. Nunca valem para a API da Anthropic: lá um campo "format"
-// numa entrada de ferramenta continua sendo mascarado.
+// bridgeUntouchableKeys: those of untouchableKeys and, only in requests seen by a bridge (Gemini,
+// OpenAI), the extra ones those formats have: the reasoning signature, the file type and the format
+// of a schema. They never apply to the Anthropic API: there a "format" field in a tool input is
+// still masked.
 var bridgeUntouchableKeys = map[string]bool{"thoughtSignature": true, "thought_signature": true,
 	"mimeType": true, "mime_type": true, "format": true}
 
-// bridgeWebTools: os nomes que o Gemini CLI, o opencode e o Copilot dão às ferramentas de
-// busca e leitura na internet (as do Claude Code estão em ferramentas_sem_desmascarar). Só valem
-// nas requisições vistas por uma ponte.
+// bridgeWebTools: the names Gemini CLI, opencode and Copilot give to the internet search and read
+// tools (Claude Code's are in tools_without_unmask). They only apply in requests seen by a bridge.
 var bridgeWebTools = map[string]bool{"web_fetch": true, "google_web_search": true, "webfetch": true, "websearch": true}
 
 func (w walker) untouchable(k string) bool {
@@ -610,7 +608,7 @@ func (w walker) anthropicRequest(v any) any {
 	if !ok {
 		return w.generic(v)
 	}
-	// ordem fixa (a de um mapa em Go é aleatória): a mesma em que a API monta o cache
+	// fixed order (the order of a Go map is random): the same in which the API builds the cache
 	ks := make([]string, 0, len(req))
 	for k := range req {
 		if k != "tools" && k != "system" && k != "messages" {
@@ -635,7 +633,7 @@ func (w walker) anthropicRequest(v any) any {
 				w.hints, w.usageHints = commandHints(msgs, w.m)
 				for _, mm := range msgs {
 					if msg, ok := mm.(map[string]any); ok {
-						// quem fala também faz parte da posição
+						// who speaks is also part of the position
 						w.pos.current = after(w.pos.current, msg["role"])
 						wm := w
 						wm.assist = msg["role"] == "assistant"
@@ -645,7 +643,7 @@ func (w walker) anthropicRequest(v any) any {
 				}
 			}
 		case "tools":
-			// descrições podem citar dado (ex.: ferramenta de MCP); o nome não pode mudar
+			// descriptions may cite data (e.g. MCP tool); the name cannot change
 			if ts, ok := val.([]any); ok {
 				for _, t := range ts {
 					if tm, ok := t.(map[string]any); ok {
@@ -663,16 +661,16 @@ func (w walker) anthropicRequest(v any) any {
 		case "model", "max_tokens", "stream", "temperature", "top_p", "top_k", "stop_sequences", "tool_choice",
 			"thinking", "metadata", "service_tier", "context_management", "container", "output_config",
 			"betas", "speed", "mcp_servers":
-			// parâmetros e identificadores: não carregam dado do usuário e não podem mudar
+			// parameters and identifiers: carry no user data and cannot change
 		default:
-			// campo que não conheço: mascara por precaução (falha para o lado seguro)
+			// field I do not know: mask as a precaution (fail toward the safe side)
 			w.unit(val, func(w walker) { req[k] = w.generic(val) })
 		}
 	}
 	return req
 }
 
-// conteudo: string ou lista de blocos.
+// content: string or list of blocks.
 func (w walker) content(v any) any {
 	switch c := v.(type) {
 	case string:
@@ -683,7 +681,7 @@ func (w walker) content(v any) any {
 		})
 		return out
 	case []any:
-		// uma imagem/PDF pode virar mais de um bloco (imagem coberta + nota, páginas)
+		// an image/PDF can become more than one block (covered image + note, pages)
 		out := make([]any, 0, len(c))
 		for _, b := range c {
 			bl, ok := b.(map[string]any)
@@ -707,14 +705,14 @@ func (w walker) content(v any) any {
 func (w walker) block(b map[string]any) map[string]any {
 	switch b["type"] {
 	case "thinking", "redacted_thinking":
-		// assinado pela API: qualquer mudança invalida a conversa. O modelo só viu
-		// pseudônimos, então o raciocínio dele também só contém pseudônimos.
+		// signed by the API: any change invalidates the conversation. The model only saw
+		// pseudonyms, so its reasoning also only contains pseudonyms.
 		return b
 	case "image":
-		return b // só chega aqui se não for base64 (url/arquivo hospedado)
+		return b // only gets here if it is not base64 (url/hosted file)
 	case "server_tool_use", "web_search_tool_result", "web_fetch_tool_result", "code_execution_tool_result",
 		"container_upload", "mcp_tool_use", "mcp_tool_result":
-		return b // gerados do lado da API
+		return b // generated on the API side
 	case "text":
 		if s, ok := b["text"].(string); ok {
 			w.prose = w.message || w.client
@@ -722,7 +720,7 @@ func (w walker) block(b map[string]any) map[string]any {
 		}
 		return b
 	case "tool_use":
-		// a entrada de WebFetch/WebSearch é escrita pelo modelo a partir do que leu na web
+		// the WebFetch/WebSearch input is written by the model from what it read on the web
 		if name, _ := b["name"].(string); w.web(name) {
 			w.fromWeb = true
 		}
@@ -736,7 +734,7 @@ func (w walker) block(b map[string]any) map[string]any {
 			w.fromWeb = true
 		}
 		w.hint = w.hints[id]
-		w.message = false // saída de ferramenta: dado, não prosa
+		w.message = false // tool output: data, not prose
 		b["content"] = w.content(b["content"])
 		return b
 	case "document":
@@ -757,11 +755,11 @@ func (w walker) block(b map[string]any) map[string]any {
 		}
 		return b
 	}
-	// tipo desconhecido: mascara toda string fora das chaves intocáveis
+	// unknown type: mask every string outside the untouchable keys
 	return w.generic(b).(map[string]any)
 }
 
-// tudo mascara todas as strings (entrada de ferramenta: comando, caminho, conteúdo...).
+// all masks all strings (tool input: command, path, content...).
 func (w walker) all(v any) any {
 	switch x := v.(type) {
 	case string:
@@ -778,7 +776,7 @@ func (w walker) all(v any) any {
 	return v
 }
 
-// generico mascara strings de qualquer JSON, exceto chaves intocáveis e blocos de raciocínio.
+// generic masks the strings of any JSON, except untouchable keys and reasoning blocks.
 func (w walker) generic(v any) any {
 	switch x := v.(type) {
 	case string:
@@ -800,8 +798,8 @@ func (w walker) generic(v any) any {
 	return v
 }
 
-// noteWritten: um arquivo que a conversa escreveu (Write, Edit) cita as fontes que lê; rodá-lo
-// depois tem essas fontes também ("python3 gerar_tags.py" lê o catalogo.csv que o script cita).
+// noteWritten: a file the conversation wrote (Write, Edit) cites the sources it reads; running it
+// later has those sources too ("python3 gerar_tags.py" reads the catalogo.csv the script cites).
 func noteWritten(writtenSet map[string]string, v any) {
 	in, _ := v.(map[string]any)
 	p, _ := in["file_path"].(string)
@@ -823,7 +821,8 @@ func noteWritten(writtenSet map[string]string, v any) {
 	}
 }
 
-// sourceWith: a fonte do comando, com as fontes herdadas dos arquivos que a conversa escreveu.
+// sourceWith: the source of the command, with the sources inherited from the files the conversation
+// wrote.
 func sourceWith(writtenSet map[string]string, cmd string) string {
 	f := mask.CommandSource(cmd)
 	var extra []string

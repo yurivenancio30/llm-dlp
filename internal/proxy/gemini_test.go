@@ -18,15 +18,15 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/mask"
 )
 
-// A API do Gemini pela rota /gemini: nada real chega à API, a resposta volta real (inteira e em
-// streaming) e o histórico sai idêntico de uma requisição para a outra.
+// The Gemini API through the /gemini route: nothing real reaches the API, the response comes back
+// real (whole and in streaming) and the history goes out identical from one request to the next.
 
 type geminiRequest struct {
 	path, key string
 	body      []byte
 }
 
-// buildGemini: proxy com o provedor "gemini" apontando para uma API falsa, que responde com resp.
+// buildGemini: proxy with the "gemini" provider pointing to a fake API, which answers with resp.
 func buildGemini(t *testing.T, f func(*config.Config), resp func(p geminiRequest, w http.ResponseWriter)) (*httptest.Server, *[]geminiRequest) {
 	t.Helper()
 	cfg := config.Default()
@@ -111,8 +111,9 @@ type respG struct {
 	} `json:"candidates"`
 }
 
-// A requisição chega à API do Gemini sem nada real, no caminho certo, com a mesma estrutura; o
-// que não é dado (assinatura do raciocínio, configuração, nome da ferramenta, schema) não muda.
+// The request reaches the Gemini API without anything real, on the right path, with the same
+// structure; what is not data (reasoning signature, configuration, tool name, schema) does not
+// change.
 func TestGeminiMaskedOutbound(t *testing.T) {
 	px, requests := buildGemini(t, nil, func(p geminiRequest, w http.ResponseWriter) {
 		w.Header().Set("content-type", "application/json")
@@ -168,8 +169,8 @@ func TestGeminiMaskedOutbound(t *testing.T) {
 	}
 }
 
-// A resposta volta real: o texto e os argumentos da chamada de ferramenta, que o modelo escreveu
-// com os pseudônimos que recebeu.
+// The response comes back real: the text and the arguments of the tool call, which the model wrote
+// with the pseudonyms it received.
 func TestGeminiReturnWithoutStreaming(t *testing.T) {
 	px, _ := buildGemini(t, nil, func(p geminiRequest, w http.ResponseWriter) {
 		var req map[string]any
@@ -209,14 +210,14 @@ func TestGeminiReturnWithoutStreaming(t *testing.T) {
 	}
 }
 
-// Em streaming (alt=sse) o texto chega picotado, com pseudônimos cortados entre dois pedaços, e
-// o cliente monta o texto real.
+// In streaming (alt=sse) the text arrives chopped up, with pseudonyms cut between two pieces, and
+// the client builds the real text.
 func TestGeminiReturnStreaming(t *testing.T) {
 	for _, n := range []int{1, 3, 7, 50} {
 		px, _ := buildGemini(t, nil, func(p geminiRequest, w http.ResponseWriter) {
 			var req map[string]any
 			json.Unmarshal(p.body, &req)
-			// picotado por letra (a API não corta uma letra acentuada ao meio)
+			// chopped per letter (the API does not cut an accented letter in half)
 			echo := []rune(req["contents"].([]any)[0].(map[string]any)["parts"].([]any)[0].(map[string]any)["text"].(string))
 			w.Header().Set("content-type", "text/event-stream")
 			for i := 0; i < len(echo); i += n {
@@ -266,8 +267,8 @@ func TestGeminiReturnStreaming(t *testing.T) {
 	}
 }
 
-// O histórico sai byte a byte idêntico na requisição seguinte, mesmo depois de a conversa
-// aprender um valor novo (o cache da API depende disso).
+// The history goes out byte for byte identical in the next request, even after the conversation
+// learns a new value (the API cache depends on it).
 func TestGeminiFrozenHistory(t *testing.T) {
 	px, requests := buildGemini(t, nil, func(p geminiRequest, w http.ResponseWriter) {
 		w.Header().Set("content-type", "application/json")
@@ -301,8 +302,8 @@ func TestGeminiFrozenHistory(t *testing.T) {
 	}
 }
 
-// Imagem que não dá para verificar e arquivo de tipo que o llm-dlp não verifica não saem: no
-// lugar vai uma parte de texto com o aviso.
+// An image that cannot be checked and a file of a type llm-dlp does not check do not go out: a text
+// part with the notice goes in their place.
 func TestGeminiFileWithoutCheck(t *testing.T) {
 	px, requests := buildGemini(t, func(c *config.Config) {
 		c.OCR.Tesseract = filepath.Join(t.TempDir(), "tesseract-que-nao-existe")
@@ -340,8 +341,8 @@ func TestGeminiFileWithoutCheck(t *testing.T) {
 	}
 }
 
-// O erro do Gemini vai para o log com o status e a mensagem; a chave da API, que pode vir no
-// endereço (?key=...), não vai para o log quando a API não responde.
+// The Gemini error goes to the log with the status and the message; the API key, which may come in
+// the address (?key=...), does not go to the log when the API does not answer.
 func TestGeminiErrorInLogWithoutKey(t *testing.T) {
 	if s := errorSummary([]byte(`{"error":{"code":429,"message":"Quota exceeded for metric","status":"RESOURCE_EXHAUSTED"}}`)); s != " | API: RESOURCE_EXHAUSTED: Quota exceeded for metric" {
 		t.Errorf("erro do Gemini: %q", s)
@@ -363,8 +364,8 @@ func TestGeminiErrorInLogWithoutKey(t *testing.T) {
 	}
 }
 
-// "llm-dlp last" também mostra a conversa do Gemini: a última requisição mascarada fica
-// guardada (só para quem tem a chave), e a contagem de tokens não toma o lugar dela.
+// "llm-dlp last" also shows the Gemini conversation: the last masked request is kept (only for
+// whoever has the key), and token counting does not take its place.
 func TestGeminiLast(t *testing.T) {
 	cfg := config.Default()
 	cfg.InternalDomains = []string{"empresa-ficticia"}

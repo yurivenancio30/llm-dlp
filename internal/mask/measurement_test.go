@@ -12,16 +12,17 @@ import (
 	"testing"
 )
 
-// Medições de falso positivo. Só rodam com as variáveis de ambiente e só
-// imprimem contagens (nenhum valor):
+// False positive measurements. They only run with the environment variables and only print counts
+// (no value):
 //
-//	LLM_DLP_CORPUS=dir1:dir2   corpus público (código e documentação de terceiros): todo nome de
-//	                           objeto achado ali é falso positivo; conta por regra e por MB
-//	LLM_DLP_SESSOES=dir        transcripts (.jsonl) de sessões reais: por regra, quantos nomes
-//	                           foram aprendidos e quantos deles existem no corpus público (sem
-//	                           cara de nome interno). Limite: 2% por regra. Precisa do corpus.
+//	LLM_DLP_CORPUS=dir1:dir2   public corpus (third-party code and documentation): every object
+//	                           name found there is a false positive; counts per rule and per MB
+//	LLM_DLP_SESSIONS=dir       transcripts (.jsonl) of real sessions: per rule, how many names
+//	                           were learned and how many of them exist in the public corpus
+//	                           (without an internal-name shape). Limit: 2% per rule. Needs the corpus.
 //
-// O Masker usa chave e configuração de teste (nada da instalação real é lido nem gravado).
+// The Masker uses a test key and configuration (nothing of the real installation is read or
+// written).
 
 type ruleCount struct {
 	mu       sync.Mutex
@@ -45,7 +46,7 @@ func (c *ruleCount) enable() {
 
 func disableHook() { hookFound = nil }
 
-// corpusFiles: os arquivos de texto do corpus, em ordem, até max bytes.
+// corpusFiles: the text files of the corpus, in order, up to max bytes.
 func corpusFiles(dirs []string, max int64) []string {
 	exts := setOf(".go", ".py", ".md", ".rst", ".txt", ".yaml", ".yml", ".json", ".toml", ".sql", ".sh", ".cfg", ".ini")
 	var out []string
@@ -95,7 +96,7 @@ func TestMeasurePublicCorpus(t *testing.T) {
 			continue
 		}
 		bytes += int64(len(b))
-		if i%200 == 0 { // um Masker novo de tempos em tempos: o que se aprende num projeto não vaza para o outro
+		if i%200 == 0 { // a new Masker from time to time: what is learned in one project does not leak into another
 			t.Logf("... %d/%d arquivos", i, len(files))
 		}
 		m := newTest(t)
@@ -110,7 +111,7 @@ func TestMeasurePublicCorpus(t *testing.T) {
 		tot += n
 	}
 	sort.Strings(ls)
-	if os.Getenv("LLM_DLP_AMOSTRA") != "" { // só no corpus público (nunca nas sessões): exemplos por regra
+	if os.Getenv("LLM_DLP_AMOSTRA") != "" { // only in the public corpus (never in the sessions): examples per rule
 		for k, vs := range c.values {
 			var xs []string
 			for v := range vs {
@@ -124,7 +125,7 @@ func TestMeasurePublicCorpus(t *testing.T) {
 	t.Logf("corpus público: %d arquivos, %.1f MB, %d achados (%.2f/MB)\n%s", len(files), mb, tot, float64(tot)/mb, strings.Join(ls, "\n"))
 }
 
-// publicIdentifiers: os identificadores (com cara de nome) que aparecem no corpus público.
+// publicIdentifiers: the identifiers (name-shaped) that appear in the public corpus.
 func publicIdentifiers(dirs []string) map[string]bool {
 	out := map[string]bool{}
 	for _, a := range corpusFiles(dirs, 200<<20) {
@@ -235,21 +236,21 @@ func TestMeasureRealSessions(t *testing.T) {
 		q(.5), q(.9), q(1), strings.Join(rs, " "), tu, pu, pct(tu, pu), ta, pa, pct(ta, pa))
 }
 
-// sessionStats: as duas métricas da memória da conversa numa sessão (só contagens).
+// sessionStats: the two conversation memory metrics in a session (counts only).
 type sessionStats struct {
 	texts           int
-	commonsInMemory int            // palavras comuns (sem cara de identificador) que entram na memória
-	byRule          map[string]int // as mesmas, pela regra que decidiu
-	userWords       int            // palavras de texto corrido nas mensagens do usuário
-	userSwaps       int            // quantas a memória trocaria
-	assistWords     int            // o mesmo nos textos do assistente (pior caso: sem registro)
+	commonsInMemory int            // common words (without identifier shape) that enter the memory
+	byRule          map[string]int // the same ones, by the rule that decided them
+	userWords       int            // running-text words in the user messages
+	userSwaps       int            // how many the memory would swap
+	assistWords     int            // the same in the assistant texts (worst case: no record)
 	assistSwaps     int
-	swapsByType     map[string]int // trocas no texto do usuário, pelo tipo do nome (forma, sem valor)
+	swapsByType     map[string]int // swaps in the user text, by the type of the name (shape, no value)
 }
 
-// maskSession: os textos de um transcript na ordem, com a dica de cada resultado de
-// ferramenta como o proxy monta (comando, pedido do usuário, extensão), e no fim a memória da
-// conversa da sessão inteira (o último pedido de uma conversa carrega o histórico todo).
+// maskSession: the texts of a transcript in order, with the hint of each tool result as the proxy
+// builds it (command, user request, extension), and at the end the conversation memory of the whole
+// session (the last request of a conversation carries the whole history).
 func maskSession(m *Masker, file string) sessionStats {
 	var st sessionStats
 	b, err := os.ReadFile(file)
@@ -258,7 +259,7 @@ func maskSession(m *Masker, file string) sessionStats {
 	}
 	type item struct {
 		s, hint  string
-		hostRole string // "user", "assistant" ou "tool"
+		hostRole string // "user", "assistant" or "tool"
 	}
 	var msgs []map[string]any
 	for _, l := range strings.Split(string(b), "\n") {
@@ -380,7 +381,7 @@ func maskSession(m *Masker, file string) sessionStats {
 
 func asSlice(v any) []any { x, _ := v.([]any); return x }
 
-// sessionCommand: como o proxy (commandOf): o comando do shell, ou as strings da entrada.
+// sessionCommand: like the proxy (commandOf): the shell command, or the strings of the input.
 func sessionCommand(v any) string {
 	in, _ := v.(map[string]any)
 	if c, ok := in["command"].(string); ok {
@@ -418,8 +419,8 @@ func resultTexts(c any) []string {
 	return nil
 }
 
-// formas: só a FORMA dos aprendidos que existem no corpus público (nenhum valor), para achar a
-// regra que precisa de freio.
+// shapes: only the SHAPE of the learned names that exist in the public corpus (no value), to find
+// the rule that needs a brake.
 func shapes(vs, pub map[string]bool) string {
 	n := map[string]int{}
 	for v := range vs {

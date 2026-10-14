@@ -1,6 +1,6 @@
-// Package proxy fica entre o cliente (Claude Code) e a API da LLM: mascara tudo que
-// sai e desmascara tudo que volta. Do cliente para o usuário, tudo é real; só o
-// trecho até a API é mascarado.
+// Package proxy sits between the client (Claude Code) and the LLM API: it masks everything that
+// goes out and unmasks everything that comes back. From the client to the user, everything is real;
+// only the stretch up to the API is masked.
 package proxy
 
 import (
@@ -24,8 +24,8 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/version"
 )
 
-// O servidor HTTP: recebe a requisição do Claude Code, manda mascarada para a API e devolve
-// a resposta desmascarada.
+// The HTTP server: receives the request from Claude Code, sends it masked to the API and returns
+// the unmasked response.
 
 const Version = version.Version
 
@@ -35,19 +35,19 @@ type Proxy struct {
 	media   *Media
 	seenSet *mask.Seen
 	client  *http.Client
-	key     []byte // para as provas da porta local (WithKey)
-	swap    bool   // a porta é de um supervisor que troca o proxy sem fechá-la (WithSwap)
+	key     []byte // for the local port proofs (WithKey)
+	swap    bool   // the port belongs to a supervisor that swaps the proxy without closing it (WithSwap)
 	log     *log.Logger
 	start   time.Time
 	reqs    atomic.Int64
-	// a última requisição de mensagens, já mascarada (só em memória): é o que o comando
-	// "llm-dlp last" mostra, para conferir o que a API recebeu
+	// the last messages request, already masked (in memory only): it is what the "llm-dlp last"
+	// command shows, to check what the API received
 	lastConv atomic.Pointer[[]byte]
 }
 
-// destino: para onde a requisição vai e em que formato ela vem. "/gemini/..." vai para o
-// provedor "gemini" da configuração, sem o "/gemini"; o que não começa com o nome de um provedor
-// vai para o upstream (a API da Anthropic).
+// destination: where the request goes and in which format it comes. "/gemini/..." goes to the
+// "gemini" provider of the configuration, without the "/gemini"; what does not start with a
+// provider name goes to upstream (the Anthropic API).
 func (p *Proxy) destination(r *http.Request) (format, upstream, uri string) {
 	uri = r.URL.RequestURI()
 	name, _, _ := strings.Cut(strings.TrimPrefix(r.URL.Path, "/"), "/")
@@ -55,9 +55,9 @@ func (p *Proxy) destination(r *http.Request) (format, upstream, uri string) {
 		format = pv.Format
 		switch {
 		case strings.HasSuffix(r.URL.Path, "/chat/completions"):
-			format = "openai" // o endereço compatível com a OpenAI de qualquer provedor (o do Gemini também)
+			format = "openai" // the OpenAI-compatible endpoint of any provider (Gemini's too)
 		case strings.HasSuffix(r.URL.Path, "/responses"):
-			format = "responses" // o Responses da OpenAI (o Codex, com chave ou com a assinatura do ChatGPT)
+			format = "responses" // OpenAI's Responses (Codex, with a key or with the ChatGPT subscription)
 		case format == "codeassist":
 			if i := strings.LastIndexByte(r.URL.Path, ':'); i >= 0 && accountMethods[r.URL.Path[i+1:]] {
 				format = accountFormat
@@ -71,13 +71,13 @@ func (p *Proxy) destination(r *http.Request) (format, upstream, uri string) {
 	return format, p.cfg.Upstream, uri
 }
 
-// bridgeNoUnmask: na volta do Gemini e da OpenAI, a ferramenta segue com os pseudônimos
-// (vai para a internet): as da configuração e as de mesmo papel nesses clientes.
+// bridgeNoUnmask: on the Gemini and OpenAI return path, the tool keeps the pseudonyms (it goes to
+// the internet): the ones in the configuration and the ones with the same role in these clients.
 func (p *Proxy) bridgeNoUnmask(name string) bool {
 	return p.cfg.NoUnmask(name) || bridgeWebTools[name]
 }
 
-// requiredError: falha que bloqueia a requisição independentemente de falhar_fechado.
+// requiredError: a failure that blocks the request regardless of fail_closed.
 type requiredError struct{ error }
 
 func New(cfg config.Config, m *mask.Masker, seenSet *mask.Seen, logger *log.Logger) *Proxy {
@@ -94,15 +94,15 @@ var hopByHop = map[string]bool{"connection": true, "keep-alive": true, "proxy-co
 	"trailer": true, "transfer-encoding": true, "upgrade": true, "host": true, "content-length": true,
 	"accept-encoding": true, "content-encoding": true}
 
-// WithKey liga as provas da porta local (ver local.go). Sem chave, a última conversa não é
-// servida e o proxy não prova quem é.
+// WithKey turns on the local port proofs (see local.go). Without a key, the last conversation is
+// not served and the proxy does not prove who it is.
 func (p *Proxy) WithKey(key []byte) *Proxy {
 	p.key = key
 	return p
 }
 
-// WithSwap: a saúde diz que este proxy está num supervisor que segura a porta e o troca sem
-// fechá-la (cmd/llm-dlp/swap.go); é o que o atualizar pergunta antes de pedir a troca.
+// WithSwap: health says this proxy is under a supervisor that holds the port and swaps it without
+// closing it (cmd/llm-dlp/swap.go); it is what update asks before requesting the swap.
 func (p *Proxy) WithSwap(swap bool) *Proxy {
 	p.swap = swap
 	return p
@@ -129,7 +129,8 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/__llm-dlp/ultima" {
 		w.Header().Set("content-type", "application/json")
 		if !ProofMatches(p.key, "ultima", r.Header.Get(ProofHeader)) {
-			// a conversa (mesmo mascarada) é só de quem lê a chave: use o comando "llm-dlp last"
+			// the conversation (even masked) belongs only to whoever reads the key: use the
+			// "llm-dlp last" command
 			w.WriteHeader(http.StatusForbidden)
 			w.Write([]byte(`{"erro":"use o comando: llm-dlp last"}` + "\n"))
 			return
@@ -192,7 +193,8 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := p.client.Do(req)
 	if err != nil {
-		// só a causa: a mensagem inteira traz o endereço, que pode levar a chave da API (?key=...)
+		// only the cause: the whole message carries the address, which may include the API key
+		// (?key=...)
 		var ue *url.Error
 		if errors.As(err, &ue) {
 			err = ue.Err
@@ -202,7 +204,7 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if batch != nil {
-		// a API recebeu: daqui em diante, estes textos saem sempre iguais (cache)
+		// the API received it: from here on, these texts always go out the same (cache)
 		batch.Freeze()
 	}
 	defer resp.Body.Close()
@@ -255,8 +257,8 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		collided(tab), notUndone(tab), apiError, errSuffix(err))
 }
 
-// byType: quantos valores distintos de cada tipo foram mascarados (" | tipos: cpf 2, ip 1,
-// tabela 5"), do mais frequente ao menos. Só contagens: nenhum valor vai para o log.
+// byType: how many distinct values of each type were masked (" | tipos: cpf 2, ip 1, tabela 5"),
+// from most to least frequent. Counts only: no value goes to the log.
 func byType(es []mask.Entry) string {
 	seenSet, n := map[string]bool{}, map[string]int{}
 	for _, e := range es {
@@ -285,9 +287,9 @@ func byType(es []mask.Entry) string {
 	return b.String()
 }
 
-// notUndone: os pseudônimos nossos que sobraram na resposta entregue ao cliente (o cliente,
-// e o que ele gravar em arquivo, ficaram com o pseudônimo no lugar do valor real). Pseudônimo
-// não é dado real: vai inteiro para o log, para dar para procurar onde ficou.
+// notUndone: our pseudonyms that were left in the response delivered to the client (the client, and
+// whatever it writes to a file, kept the pseudonym in place of the real value). A pseudonym is not
+// real data: it goes whole to the log, so it can be searched for.
 func notUndone(tab *mask.Table) string {
 	nd := tab.NotUndone()
 	if len(nd) == 0 {
@@ -296,8 +298,8 @@ func notUndone(tab *mask.Table) string {
 	return fmt.Sprintf(" | NÃO DESFEITOS %d: %s", len(nd), strings.Join(nd, ", "))
 }
 
-// colididos: os pseudônimos que colidiram (" | colididos: CPF-x, 240.1.2.x"): a forma de cada um
-// diz o tipo do dado que ficou sem desmascarar.
+// collided: the pseudonyms that collided (" | colididos: CPF-x, 240.1.2.x"): the form of each one
+// tells the type of the data that was left without unmasking.
 func collided(tab *mask.Table) string {
 	c := tab.Collided()
 	if len(c) == 0 {
@@ -306,9 +308,10 @@ func collided(tab *mask.Table) string {
 	return " | colididos: " + strings.Join(c, ", ")
 }
 
-// errorSummary: o tipo e o começo da mensagem de um erro da API, como ela mandou, para o log
-// (um 429 de limite da conta e um 429 de requisição recusada só se distinguem pela mensagem).
-// A API só recebeu pseudônimos, e a mensagem não passa pela volta: não há dado real nela.
+// errorSummary: the type and the start of the message of an API error, as the API sent it, for the
+// log (a 429 for the account limit and a 429 for a refused request can only be told apart by the
+// message). The API only received pseudonyms, and the message does not go through the return path:
+// there is no real data in it.
 func errorSummary(b []byte) string {
 	var e struct {
 		Error struct {
@@ -318,7 +321,7 @@ func errorSummary(b []byte) string {
 		} `json:"error"`
 	}
 	if json.Unmarshal(b, &e) != nil {
-		// o Gemini manda uma lista com um erro só
+		// Gemini sends a list with a single error
 		var list []json.RawMessage
 		if json.Unmarshal(b, &list) != nil || len(list) == 0 || json.Unmarshal(list[0], &e) != nil {
 			return ""

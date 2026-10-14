@@ -2,7 +2,7 @@ package mask
 
 import "testing"
 
-// O mesmo conjunto de nomes do Snowflake em todas as formas.
+// The same set of Snowflake names in every shape.
 
 var snowNames = []string{"acme-erpfin", "papel_fin_leitura", "wh_fin_carga", "pol_mascara_cpf", "stg_notas_fin", "tsk_carga_fin"}
 
@@ -60,7 +60,7 @@ func TestSnowflakeForms(t *testing.T) {
 	}
 }
 
-// depois de aprendidos, os nomes são mascarados soltos no texto
+// once learned, the names are masked loose in the text
 func TestSnowflakeLoose(t *testing.T) {
 	m := newTest(t)
 	m.Mask("SNOWFLAKE_ACCOUNT=acme-erpfin\nSNOWFLAKE_ROLE=papel_fin_leitura\nSNOWFLAKE_WAREHOUSE=wh_fin_carga\n")

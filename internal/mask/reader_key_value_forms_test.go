@@ -2,7 +2,7 @@ package mask
 
 import "testing"
 
-// A regra "o nome ao lado diz o tipo" em todas as sintaxes de chave → valor.
+// The rule "the name beside it gives the type" in every key → value syntax.
 
 var keyValueCases = []struct {
 	name, text string

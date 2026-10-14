@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-// Fuzz: a normalização mantém o mapa coerente e a ida e volta pelos leitores
-// devolve o texto byte a byte, com qualquer transporte em volta.
+// Fuzz: normalization keeps the map coherent and the round trip through the readers returns the
+// text byte for byte, with any transport around it.
 // go test ./internal/mask -run '^$' -fuzz FuzzNormalize -fuzztime 60s
 // go test ./internal/mask -run '^$' -fuzz FuzzRoundTrip -fuzztime 60s
 
@@ -60,7 +60,7 @@ func FuzzRoundTrip(f *testing.F) {
 	})
 }
 
-// a varredura manual do leitor de SQL faz o mesmo que as regex que substituiu
+// the manual scan of the SQL reader does the same as the regexes it replaced
 func FuzzSQLScan(f *testing.F) {
 	for _, s := range []string{"SELECT a.b, [x y].\"z\" FROM `db.t` GROUP  BY c ORDER\nBY d", "café.ação_1 $x #y 1abc", "[]\"\"``[a", "group by groupby ORDERBY"} {
 		f.Add(s)

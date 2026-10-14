@@ -11,29 +11,29 @@ import (
 	"unicode"
 )
 
-// People: registro (só hashes) de nomes, e-mails e códigos de pessoas conhecidas.
+// People: registry (hashes only) of names, e-mails and codes of known people.
 
-// People guarda, SÓ COMO HASH (HMAC com a chave), os nomes, e-mails e códigos de
-// pessoas conhecidas e a qual pessoa cada um pertence. Serve para (1) achar um nome
-// solto no texto e (2) dar o mesmo identificador ao nome e ao e-mail da mesma pessoa.
-// Nenhum valor real fica no arquivo.
+// People keeps, ONLY AS HASHES (HMAC with the key), the names, e-mails and codes of known people
+// and which person each one belongs to. It serves to (1) find a loose name in the text and (2) give
+// the same identifier to the name and the e-mail of the same person. No real value stays in the
+// file.
 type People struct {
 	path       string
 	mu         sync.RWMutex
 	dirty      bool
 	saved      time.Time
-	codeCache  sync.Map // palavra -> é código de alguém? (só em RAM)
+	codeCache  sync.Map // word -> is it someone's code? (RAM only)
 	nCodeCache atomic.Int64
-	disk       fileFingerprint // o arquivo como este processo o deixou (ver Seen.disco)
+	disk       fileFingerprint // the file as this process left it (see Seen.disk)
 	D          struct {
 		Names  map[string]string `json:"nomes"`   // id(nome) -> pid
 		Emails map[string]string `json:"emails"`  // id(email) -> pid
-		Codes  map[string]string `json:"codigos"` // id(código) -> pid
-		// id(primeiro nome): filtro barato para achar nomes em qualquer grafia
-		// ("joão silva", "JOAO SILVA") sem testar toda sequência de palavras do texto
+		Codes  map[string]string `json:"codigos"` // id(code) -> pid
+		// id(first name): a cheap filter to find names in any spelling ("joão silva", "JOAO SILVA")
+		// without testing every word sequence of the text
 		FirstNames map[string]bool `json:"primeiros"`
-		// tamanhos dos códigos de usuário: filtro barato (só palavras desses tamanhos são
-		// conferidas). IsEmpty em registros antigos: aí todas são conferidas.
+		// lengths of the user codes: a cheap filter (only words of these lengths are checked).
+		// Empty in old registries: then every word is checked.
 		CodeLengths map[int]bool `json:"tam_codigos,omitempty"`
 	}
 }
@@ -56,9 +56,9 @@ func LoadPeople(path string) (*People, error) {
 	return ps, nil
 }
 
-// Save grava o registro. Se outro processo gravou depois deste (o importar-pessoas com o
-// proxy no ar; a versão nova durante a troca), junta antes o que só o outro tem: o registro só
-// cresce, e uma gravação não apaga a outra.
+// Save writes the registry. If another process wrote it after this one (import-people with the
+// proxy running; the new version during a swap), it first merges what only the other has: the
+// registry only grows, and one write does not erase the other.
 func (ps *People) Save() error {
 	ps.mu.Lock()
 	ps.mergeFromDisk()
@@ -74,7 +74,7 @@ func (ps *People) Save() error {
 	return nil
 }
 
-// mergeFromDisk: com ps.mu travado. Um id que os dois têm fica com a pessoa deste processo.
+// mergeFromDisk: with ps.mu locked. An id both have stays with this process's person.
 func (ps *People) mergeFromDisk() {
 	if fingerprintOf(ps.path) == ps.disk {
 		return
@@ -87,8 +87,8 @@ func (ps *People) mergeFromDisk() {
 	if json.Unmarshal(b, &other.D) != nil {
 		return
 	}
-	// sem tamanhos = registro antigo, que confere toda palavra: se um dos lados é assim, o
-	// resultado fica sem o filtro (conferir a mais nunca deixa um código passar)
+	// no lengths = an old registry, which checks every word: if one of the sides is like that, the
+	// result stays without the filter (checking more never lets a code through)
 	noFilter := len(ps.D.Codes) > 0 && len(ps.D.CodeLengths) == 0 ||
 		len(other.D.Codes) > 0 && len(other.D.CodeLengths) == 0
 	join := func(mine *map[string]string, its map[string]string) {
@@ -120,11 +120,12 @@ func (ps *People) mergeFromDisk() {
 			ps.D.CodeLengths[n] = true
 		}
 	}
-	ps.codeCache.Clear() // códigos novos: "não é código" guardado antes pode ter deixado de valer
+	ps.codeCache.Clear() // new codes: a "not a code" stored before may no longer hold
 	ps.nCodeCache.Store(0)
 }
 
-// SaveNow grava já o que estiver pendente, sem esperar o intervalo (na saída do proxy).
+// SaveNow writes what is pending right away, without waiting for the interval (when the proxy
+// exits).
 func (ps *People) SaveNow() error {
 	ps.mu.Lock()
 	dirty := ps.dirty
@@ -136,7 +137,7 @@ func (ps *People) SaveNow() error {
 	return ps.Save()
 }
 
-// SaveIfDirty grava o registro se entrou alguém novo (no máximo uma vez a cada 5 s).
+// SaveIfDirty writes the registry if someone new came in (at most once every 5 s).
 func (ps *People) SaveIfDirty() error {
 	ps.mu.Lock()
 	if !ps.dirty || time.Since(ps.saved) < saveInterval {
@@ -148,11 +149,11 @@ func (ps *People) SaveIfDirty() error {
 	return ps.Save()
 }
 
-// IsCode: v é o código de alguém do registro? Guarda a resposta por palavra (as mesmas
-// palavras se repetem muito, e a conta do hash é a parte cara).
+// IsCode: is v the code of someone in the registry? It keeps the answer per word (the same words
+// repeat a lot, and computing the hash is the expensive part).
 func (ps *People) IsCode(p *Pseudo, v string) bool {
-	// mesma regra da importação, para registros feitos antes dela: código curto ou sem dígito
-	// não é procurado no texto
+	// same rule as the import, for registries made before it: a short code or one without a digit
+	// is not looked for in the text
 	if len(v) < 4 || !hasDigit(v) {
 		return false
 	}
@@ -186,12 +187,12 @@ func (ps *People) Total() int {
 	return len(ps.D.Names)
 }
 
-// Import registra uma pessoa. Values vazios são ignorados. Names com uma palavra só
-// não entram na detecção (costumam ser times ou sistemas, não pessoas).
+// Import registers a person. Empty values are ignored. Single-word names do not enter detection
+// (they are usually teams or systems, not people).
 func (ps *People) Import(p *Pseudo, name, email, codeValue string) string {
 	name, email, codeValue = NormName(name), strings.ToLower(strings.TrimSpace(email)), NormName(codeValue)
-	// código curto ou sem dígito ("TBD", "N/A", "SIM") não identifica ninguém e, procurado no
-	// texto, mascararia palavras comuns
+	// a short code or one without a digit ("TBD", "N/A", "SIM") identifies nobody and, looked for
+	// in the text, would mask common words
 	if len(codeValue) < 4 || !hasDigit(codeValue) {
 		codeValue = ""
 	}
@@ -261,7 +262,7 @@ func (ps *People) Import(p *Pseudo, name, email, codeValue string) string {
 	return pid
 }
 
-// PID devolve o identificador da pessoa dona do valor, ou "" se desconhecida.
+// PID returns the identifier of the person who owns the value, or "" if unknown.
 func (ps *People) PID(p *Pseudo, typ, normValue string) string {
 	ps.mu.RLock()
 	defer ps.mu.RUnlock()
@@ -284,8 +285,8 @@ type word struct {
 	connector bool
 }
 
-// FindNames procura sequências de 2 a 6 palavras com cara de nome ("João da Silva",
-// "JOAO SILVA") e confere o hash de cada uma no registro.
+// FindNames looks for sequences of 2 to 6 name-shaped words ("João da Silva", "JOAO SILVA") and
+// checks the hash of each one in the registry.
 func (ps *People) FindNames(s string, p *Pseudo) []Finding {
 	if ps.Total() == 0 {
 		return nil
@@ -307,7 +308,7 @@ func (ps *People) FindNames(s string, p *Pseudo) []Finding {
 	byFirst := len(ps.D.FirstNames) > 0
 	ps.mu.RUnlock()
 	start := func(i int) bool {
-		if !byFirst { // registro antigo, sem o filtro: só sequências com iniciais maiúsculas
+		if !byFirst { // old registry, without the filter: only sequences with capital initials
 			return ws[i].upperCase
 		}
 		if ws[i].end-ws[i].ini < 2 {
@@ -350,7 +351,7 @@ func (ps *People) FindNames(s string, p *Pseudo) []Finding {
 	return out
 }
 
-// sameLine: entre as palavras i..j só há espaços simples (não quebra linha nem pontuação).
+// sameLine: between words i..j there are only single spaces (no line break or punctuation).
 func sameLine(s string, ws []word, i, j int) bool {
 	for k := i; k < j; k++ {
 		gap := s[ws[k].end:ws[k+1].ini]

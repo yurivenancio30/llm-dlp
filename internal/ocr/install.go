@@ -6,8 +6,8 @@ import (
 	"strings"
 )
 
-// InstallHint devolve o comando para instalar tesseract (com português) e poppler
-// no sistema atual.
+// InstallHint returns the command to install tesseract (with Portuguese) and poppler on the current
+// system.
 func InstallHint() string {
 	if runtime.GOOS == "darwin" {
 		return "brew install tesseract tesseract-lang poppler"
@@ -34,8 +34,8 @@ func InstallHint() string {
 	return "instale tesseract (com o idioma português) e poppler pelo gerenciador de pacotes do sistema"
 }
 
-// InstallCommand devolve o comando (para rodar como administrador) que instala o OCR no
-// sistema atual, já atualizando a lista de pacotes. "" se o sistema não for reconhecido.
+// InstallCommand returns the command (to run as administrator) that installs OCR on the current
+// system, refreshing the package list. "" if the system is not recognized.
 func InstallCommand() string {
 	d := InstallHint()
 	switch {

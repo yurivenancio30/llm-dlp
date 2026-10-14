@@ -11,7 +11,7 @@ import (
 	"unicode/utf8"
 )
 
-// Detectores por formato: e-mail, IP, hostname, CPF, CNPJ, telefone, cartão, tokens (gitleaks)...
+// Detectors by format: e-mail, IP, hostname, CPF, CNPJ, telephone, card, tokens (gitleaks)...
 
 var (
 	reEmail   = regexp.MustCompile(`[A-Za-z0-9._%+\-]+@[A-Za-z0-9\-]+(?:\.[A-Za-z0-9\-]+)+`)
@@ -36,13 +36,13 @@ var (
 )
 
 var (
-	fakeNet = netip.MustParsePrefix("240.0.0.0/4") // faixa reservada (RFC 1112): só pseudônimos
+	fakeNet = netip.MustParsePrefix("240.0.0.0/4") // reserved range (RFC 1112): pseudonyms only
 )
 
-// inURLAuthority: a posição i está na autoridade de uma URL ("esquema://usuario:senha@host"),
-// antes de qualquer "/", "?" ou "#". Ali, "senha@host" não é e-mail: é a senha e o servidor,
-// que os leitores de conexão e de senha mascaram cada um com o seu tipo. Um e-mail no caminho ou
-// nos parâmetros da URL (?email=...) continua sendo e-mail.
+// inURLAuthority: position i is in the authority of a URL ("scheme://user:password@host"), before
+// any "/", "?" or "#". There, "password@host" is not an e-mail: it is the password and the server,
+// which the connection and password readers mask each with its type. An e-mail in the path or in
+// the parameters of the URL (?email=...) is still an e-mail.
 func inURLAuthority(s string, i int) bool {
 	ini := i
 	for ini > 0 && !blank(s[ini-1]) && !strings.ContainsRune("\"'`<>()[]{},;", rune(s[ini-1])) {
@@ -65,7 +65,7 @@ func (m *Masker) internal(h string) bool {
 
 func isDig(b byte) bool { return b >= '0' && b <= '9' }
 
-// numberEdge: como digitEdge, mas também rejeita "1.2.3.4.5" (versões, OIDs).
+// numberEdge: like digitEdge, but also rejects "1.2.3.4.5" (versions, OIDs).
 func numberEdge(s string, i, j int) bool {
 	if !digitEdge(s, i, j) {
 		return false
@@ -81,7 +81,7 @@ func numberEdge(s string, i, j int) bool {
 
 func formatted(v string) bool { return strings.ContainsAny(v, ".-/") }
 
-// contexto: a palavra aparece nos ~30 caracteres antes do trecho.
+// contextOf: the word appears in the ~30 characters before the piece.
 func contextOf(s string, i int, word string) bool {
 	ini := i - 30
 	if ini < 0 {
@@ -102,7 +102,7 @@ func anyContext(s string, i int, words ...string) bool {
 	return false
 }
 
-// wordContext: como contexto, mas exige a palavra inteira (evita "rg" dentro de "cargo").
+// wordContext: like contextOf, but requires the whole word (avoids "rg" inside "cargo").
 func wordContext(s string, i int, word string) bool {
 	ini := i - 30
 	if ini < 0 {
@@ -120,23 +120,22 @@ func wordContext(s string, i int, word string) bool {
 	return false
 }
 
-// detectBase: todos os detectores, um por um.
+// detectBase: all detectors, one by one.
 
-// janelas do gitleaks (ver Detect)
+// gitleaks windows (see Detect)
 const (
 	leaksWindow   = 64 << 10
 	leaksLeftover = 8 << 10
 )
 
-// detectBase roda os detectores sobre s, sem a memória de valores conhecidos.
+// detectBase runs the detectors over s, without the memory of known values.
 func (m *Masker) detectBase(s string) []Finding {
 	var out []Finding
 	add := func(ini, end int, typ string) {
 		out = append(out, Finding{ini, end, typ, s[ini:end]})
 	}
-	// Pré-filtros baratos: cada detector só roda se o texto tiver o "ingrediente" dele.
-	// Sem isso, ~15 regex varrem todo texto (≈6 ms a cada 5 KB); com isso, quase nada roda
-	// em texto comum.
+	// Cheap prefilters: each detector only runs if the text has its "ingredient". Without this, ~15
+	// regexes scan every text (≈6 ms per 5 KB); with it, almost nothing runs on common text.
 	lower := strings.ToLower(s)
 	has := func(ps ...string) bool {
 		for _, p := range ps {
@@ -149,7 +148,7 @@ func (m *Masker) detectBase(s string) []Finding {
 	longNum, ipLike := numericProfile(s)
 	on := func(d string) bool { return !m.cfg.Disabled(d) }
 
-	// a própria chave do llm-dlp nunca pode sair
+	// llm-dlp's own key can never go out
 	for i := 0; ; {
 		j := strings.Index(s[i:], m.keyB64)
 		if j < 0 {
@@ -160,10 +159,10 @@ func (m *Masker) detectBase(s string) []Finding {
 	}
 
 	if on("segredo") {
-		// O gitleaks fica desproporcionalmente lento em textos grandes (acima de ~128 KB o
-		// tempo cresce mais que o tamanho). Por isso o texto vai em janelas, em paralelo, com
-		// sobra entre elas para não cortar ao meio um segredo de várias linhas (chave privada
-		// PEM). Com um bloco PEM maior que a sobra, vai inteiro.
+		// gitleaks gets disproportionately slow on large texts (above ~128 KB the time grows faster
+		// than the size). So the text goes in windows, in parallel, with an overlap between them so
+		// a multi-line secret (PEM private key) is not cut in half. With a PEM block larger than
+		// the overlap, it goes whole.
 		type window struct{ base, end int }
 		var js []window
 		if len(s) <= leaksWindow || longBlock(s, leaksLeftover) {
@@ -172,7 +171,7 @@ func (m *Masker) detectBase(s string) []Finding {
 			for base := 0; ; {
 				end := min(len(s), base+leaksWindow)
 				for end < len(s) && end > base && s[end]&0xC0 == 0x80 {
-					end-- // não corta um caractere UTF-8 ao meio
+					end-- // does not cut a UTF-8 character in half
 				}
 				js = append(js, window{base, end})
 				if end == len(s) {
@@ -226,9 +225,9 @@ func (m *Masker) detectBase(s string) []Finding {
 					foundIt = true
 				}
 				if !foundIt {
-					// segredo achado DEPOIS de decodificar (ex.: base64 de um Secret do Kubernetes):
-					// ele não aparece literal no texto; cobre o trecho codificado naquela posição,
-					// inteiro (mesmo a parte que ficou fora desta janela)
+					// a secret found AFTER decoding (e.g. base64 of a Kubernetes Secret): it does
+					// not appear literally in the text; covers the encoded piece at that position,
+					// whole (even the part that was outside this window)
 					if ini, f2, ok := encodedSnippet(part, f.line, f.col); ok {
 						a, b := f.base+ini, f.base+f2
 						for a > 0 && isB64(s[a-1]) {
@@ -347,7 +346,7 @@ func (m *Masker) detectBase(s string) []Finding {
 			if !digitEdge(s, ix[0], ix[1]) {
 				continue
 			}
-			strong := strings.HasPrefix(v, "+55") || reDDD.MatchString(v) // "(11) 9...": parêntese aberto E fechado
+			strong := strings.HasPrefix(v, "+55") || reDDD.MatchString(v) // "(11) 9...": parenthesis opened AND closed
 			if strong || (strings.ContainsAny(v, "- ") && anyContext(s, ix[0], "tel", "fone", "celular", "whatsapp", "contato", "cel")) {
 				add(ix[0], ix[1], "telefone")
 			}
@@ -355,8 +354,8 @@ func (m *Masker) detectBase(s string) []Finding {
 	}
 	if on("cep") && has("cep") {
 		for _, ix := range reCEP.FindAllStringIndex(s, -1) {
-			// a palavra "cep" inteira (não dentro de "exception", "conceito"), e o número não
-			// pode ser uma data escrita junta (20261003)
+			// the whole word "cep" (not inside "exception", "conceito"), and the number cannot be a
+			// date written together (20261003)
 			if digitEdge(s, ix[0], ix[1]) && wordContext(s, ix[0], "cep") && !gluedDate(s[ix[0]:ix[1]]) {
 				add(ix[0], ix[1], "cep")
 			}
@@ -428,10 +427,9 @@ func isB64(c byte) bool {
 	return c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z' || c >= '0' && c <= '9' || c == '+' || c == '/' || c == '=' || c == '-' || c == '_'
 }
 
-// encodedSnippet acha, na linha `linha` (0-based) perto da coluna `col` informada pelo
-// gitleaks, o trecho base64/hex inteiro que contém essa posição. A coluna do gitleaks tem
-// deslocamento de 1–2 caracteres conforme a linha; procurar o trecho inteiro em volta dela
-// torna isso irrelevante.
+// encodedSnippet finds, on line `line` (0-based) near the column `col` reported by gitleaks, the
+// whole base64/hex piece containing that position. The gitleaks column is off by 1–2 characters
+// depending on the line; looking for the whole piece around it makes that irrelevant.
 func encodedSnippet(s string, line, col int) (int, int, bool) {
 	ini := 0
 	for l := 0; l < line; l++ {
@@ -463,8 +461,8 @@ func encodedSnippet(s string, line, col int) (int, int, bool) {
 	return 0, 0, false
 }
 
-// numericProfile: há um número longo (>= 8 dígitos, aceitando . - / ( ) espaço e +)? E algo
-// com cara de IPv4 (dígitos com 3 pontos)? Uma passada só, sem regex.
+// numericProfile: is there a long number (>= 8 digits, accepting . - / ( ) space and +)? And
+// something IPv4-shaped (digits with 3 dots)? A single pass, without regex.
 func numericProfile(s string) (longNum, ipLike bool) {
 	dig, dots, ipDigits := 0, 0, 0
 	for i := 0; i < len(s); i++ {
@@ -496,15 +494,15 @@ func numericProfile(s string) (longNum, ipLike bool) {
 	return
 }
 
-// digitEdge: o trecho não está colado a outros dígitos (é um número inteiro, não um pedaço).
+// digitEdge: the piece is not glued to other digits (it is a whole number, not a piece).
 func digitEdge(s string, i, j int) bool {
 	return (i == 0 || !isDig(s[i-1])) && (j >= len(s) || !isDig(s[j]))
 }
 
-// Endereço físico de placa de rede (identifica um aparelho, e por ele uma pessoa)
+// Physical address of a network card (identifies a device, and through it a person)
 var reMAC = regexp.MustCompile(`\b(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}\b`)
 
-// gluedDate: 8 dígitos que formam uma data plausível (AAAAMMDD ou DDMMAAAA).
+// gluedDate: 8 digits that form a plausible date (YYYYMMDD or DDMMYYYY).
 func gluedDate(v string) bool {
 	if len(v) != 8 {
 		return false
@@ -525,9 +523,9 @@ func gluedDate(v string) bool {
 	return ok(n(0, 4), n(4, 6), n(6, 8)) || ok(n(4, 8), n(2, 4), n(0, 2))
 }
 
-// isolatedNumberOnly: s[i:j] é um número inteiro sozinho, não um pedaço de outra coisa: não está
-// colado em letra (hash, identificador), nem é a parte decimal ou um trecho de um número
-// maior com ponto, vírgula ou traço ("3.14159265358", "v1.31845276035").
+// isolatedNumberOnly: s[i:j] is a whole number on its own, not a piece of something else: it is not
+// glued to a letter (hash, identifier), nor is it the decimal part or a piece of a larger number
+// with a dot, comma or dash ("3.14159265358", "v1.31845276035").
 func isolatedNumberOnly(s string, i, j int) bool {
 	if i > 0 {
 		a := s[i-1]
@@ -550,7 +548,7 @@ func isolatedNumberOnly(s string, i, j int) bool {
 	return true
 }
 
-// gluedDateTime: 14 dígitos no formato AAAAMMDDhhmmss (carimbo de data e hora).
+// gluedDateTime: 14 digits in the YYYYMMDDhhmmss format (date and time stamp).
 func gluedDateTime(v string) bool {
 	d := digitsOnly(v)
 	if len(d) != 14 || !gluedDate(d[:8]) {

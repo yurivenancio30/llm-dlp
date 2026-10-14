@@ -2,9 +2,9 @@ package mask
 
 import "strings"
 
-// Tipos de dado das linguagens e formatos (SQL, pandas/numpy, Arrow, Polars, Spark, Avro,
-// Protobuf, R). É vocabulário de FORMATO, fechado: onde um nome vem com um tipo de dado ao
-// lado, o nome é coluna (leitor de esquema), e um tipo de dado nunca é nome de objeto.
+// Data types of languages and formats (SQL, pandas/numpy, Arrow, Polars, Spark, Avro, Protobuf, R).
+// It is a closed FORMAT vocabulary: where a name comes with a data type beside it, the name is a
+// column (schema reader), and a data type is never an object name.
 
 var dataTypes = setOf(
 	// SQL
@@ -30,7 +30,7 @@ var dataTypes = setOf(
 	"chr", "dbl", "lgl", "fct", "dttm", "num", "logi", "factor", "character", "numeric", "complex",
 )
 
-// isDataType: v é um tipo de dado, com ou sem parâmetros e marcadores (varchar(50),
+// isDataType: v is a data type, with or without parameters and markers (varchar(50),
 // datetime64[ns], <chr>, Int64, decimal(10,2), "string?", list<int>).
 func isDataType(v string) bool {
 	v = strings.TrimSpace(v)

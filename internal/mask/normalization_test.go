@@ -7,8 +7,8 @@ import (
 	"testing"
 )
 
-// Transportes: o mesmo conteúdo embrulhado como chega na conversa. Usados também
-// pela matriz CONTEÚDO × TRANSPORTE × DESENHO.
+// Transports: the same content wrapped as it arrives in the conversation. Also used by the CONTENT
+// × TRANSPORT × LAYOUT matrix.
 
 type transport struct {
 	name string
@@ -52,7 +52,7 @@ var transports = []transport{
 	}},
 }
 
-// checkMasked: nenhum dos nomes sobra na saída, e a volta reproduz o texto exato.
+// checkMasked: none of the names is left in the output, and the return reproduces the exact text.
 func checkMasked(t *testing.T, m *Masker, label, text string, names []string) (ok, tot int) {
 	t.Helper()
 	out, ents := m.Mask(text)
@@ -108,7 +108,7 @@ func TestNormalizeMap(t *testing.T) {
 			t.Errorf("%q: sobrou transporte: %q", c, n.t)
 		}
 	}
-	// texto comum não é tocado
+	// common text is not touched
 	for _, c := range []string{"SELECT a FROM b\nWHERE c = 1\n", "nome: x\n12: y\nz: 3\n", "- name: a\n- name: b\n"} {
 		if _, ok := normalize(c); ok {
 			t.Errorf("%q: normalizado sem transporte", c)
@@ -116,7 +116,7 @@ func TestNormalizeMap(t *testing.T) {
 	}
 }
 
-// O manifesto chega com prefixo de linha
+// The manifest arrives with a line prefix
 func TestTransportManifest(t *testing.T) {
 	y := "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: svc-cobranca-lote\n  namespace: ns-financeiro\nspec:\n  replicas: 2\n"
 	for _, tr := range transports {

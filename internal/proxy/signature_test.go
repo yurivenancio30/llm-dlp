@@ -15,16 +15,16 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/mask"
 )
 
-// As assinaturas: o Gemini CLI com a conta Google (Code Assist) e o Codex com a conta do ChatGPT
-// (formato Responses). Nada real chega à API, o envelope e os ids não mudam, e a resposta volta
-// real, em pedaços e inteira.
+// The subscriptions: Gemini CLI with the Google account (Code Assist) and Codex with the ChatGPT
+// account (Responses format). Nothing real reaches the API, the envelope and the ids do not change,
+// and the response comes back real, in pieces and whole.
 
 type assistRequest struct {
 	path, auth string
 	body       []byte
 }
 
-// buildSignatures: proxy com os provedores "codeassist" e "chatgpt" apontando para uma API falsa.
+// buildSignatures: proxy with the "codeassist" and "chatgpt" providers pointing to a fake API.
 func buildSignatures(t *testing.T, resp func(p assistRequest, w http.ResponseWriter)) (*httptest.Server, *[]assistRequest, *Proxy) {
 	t.Helper()
 	cfg := config.Default()
@@ -63,7 +63,8 @@ func sseEvents(w http.ResponseWriter, events ...map[string]any) {
 	}
 }
 
-// ---- Gemini CLI com a conta Google ------------------------------------------------------------
+// ---- Gemini CLI with the Google account
+// ----------------------------------------------------------
 
 func codeAssistReq() []byte {
 	b, _ := json.Marshal(map[string]any{"model": "gemini-2.5-pro", "project": "projeto-123", "user_prompt_id": "upi-1",
@@ -80,7 +81,7 @@ func TestCodeAssistRoundTrip(t *testing.T) {
 	px, requests, p := buildSignatures(t, func(pd assistRequest, w http.ResponseWriter) {
 		pse := rePseEmail.FindString(string(pd.body))
 		if strings.Contains(pd.path, "streamGenerateContent") {
-			// o pseudônimo chega cortado entre dois pedaços, como o Code Assist manda
+			// the pseudonym arrives cut between two pieces, as Code Assist sends it
 			sseEvents(w, map[string]any{"response": map[string]any{"candidates": []any{map[string]any{"content": map[string]any{"role": "model",
 				"parts": []any{map[string]any{"text": "avise " + pse[:6]}}}}}}, "traceId": "tr-1"},
 				map[string]any{"response": map[string]any{"candidates": []any{map[string]any{"finishReason": "STOP", "content": map[string]any{"role": "model",
@@ -144,8 +145,8 @@ func TestCodeAssistRoundTrip(t *testing.T) {
 	}
 }
 
-// Os métodos da conta (login, cota, experimentos) passam como vieram: não levam conversa, e o
-// projeto e os ids não podem mudar.
+// The account methods (login, quota, experiments) pass as they came: they carry no conversation,
+// and the project and the ids cannot change.
 func TestCodeAssistAccountMethodsPassAsIs(t *testing.T) {
 	px, requests, _ := buildSignatures(t, func(pd assistRequest, w http.ResponseWriter) {
 		w.Header().Set("content-type", "application/json")
@@ -238,16 +239,16 @@ func TestResponsesMaskedOutbound(t *testing.T) {
 	if out, _ := req.Input[4]["output"].(string); !strings.HasPrefix(out, "PING ") {
 		t.Errorf("resultado: %v", req.Input[4]["output"])
 	}
-	// a mesma requisição de novo sai idêntica (o cache da API depende disso)
+	// the same request again goes out identical (the API cache depends on it)
 	ask(t, "POST", px.URL+"/chatgpt/responses", responsesReq(false), nil)
 	if n := len(*requests); !bytes.Equal((*requests)[0].body, (*requests)[n-1].body) {
 		t.Errorf("a mesma requisição saiu diferente na segunda vez")
 	}
 }
 
-// Em streaming, o texto, os argumentos e o patch chegam em pedaços, com o pseudônimo cortado; o
-// cliente nunca recebe um pedaço de pseudônimo, e tanto os pedaços juntos quanto os eventos com o
-// item inteiro trazem o valor real. Uma ferramenta de internet segue com o pseudônimo.
+// In streaming, the text, the arguments and the patch arrive in pieces, with the pseudonym cut; the
+// client never receives a piece of a pseudonym, and both the joined pieces and the events with the
+// whole item carry the real value. An internet tool keeps the pseudonym.
 func TestResponsesReturnStreaming(t *testing.T) {
 	px, _, _ := buildSignatures(t, func(pd assistRequest, w http.ResponseWriter) {
 		pse := rePseEmail.FindString(string(pd.body))
@@ -350,14 +351,14 @@ func TestResponsesReturnStreaming(t *testing.T) {
 	for _, d := range dones {
 		reals += strings.Count(d, oaEmail)
 	}
-	// text.done, item da mensagem, arguments.done, item da chamada, input.done, item do patch e os 3
-	// itens do response.completed
+	// text.done, message item, arguments.done, call item, input.done, patch item and the 3 items of
+	// response.completed
 	if reals != 9 {
 		t.Errorf("os eventos com o item inteiro deviam trazer o valor real 9 vezes, vieram %d", reals)
 	}
 }
 
-// Sem streaming, o texto e as entradas das ferramentas voltam reais.
+// Without streaming, the text and the tool inputs come back real.
 func TestResponsesReturnWithoutStreaming(t *testing.T) {
 	px, _, _ := buildSignatures(t, func(pd assistRequest, w http.ResponseWriter) {
 		pse := rePseEmail.FindString(string(pd.body))
@@ -377,9 +378,9 @@ func TestResponsesReturnWithoutStreaming(t *testing.T) {
 	}
 }
 
-// O formato vem do provedor, e o caminho decide quando o provedor atende mais de um: /responses é
-// sempre Responses (a chave da OpenAI e a assinatura do ChatGPT), /chat/completions é sempre Chat
-// Completions, e os métodos da conta do Code Assist passam como vieram.
+// The format comes from the provider, and the path decides when the provider serves more than one:
+// /responses is always Responses (the OpenAI key and the ChatGPT subscription), /chat/completions
+// is always Chat Completions, and the Code Assist account methods pass as they came.
 func TestDestinationByPath(t *testing.T) {
 	cfg := config.Default()
 	p := &Proxy{cfg: cfg}

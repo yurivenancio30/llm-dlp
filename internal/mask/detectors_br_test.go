@@ -6,8 +6,8 @@ import (
 	"testing"
 )
 
-// Os exemplos dos manuais: módulo 10 e 11 da FEBRABAN (DAC de 01230067896: 3 e 0), o código de
-// barras do Anexo I do manual da CAIXA (DV geral 4) e o identificador da norma S10 da UPU
+// The manuals' examples: FEBRABAN modulo 10 and 11 (DAC of 01230067896: 3 and 0), the barcode from
+// Annex I of the CAIXA manual (general check digit 4) and the identifier of the UPU S10 standard
 // (473124829).
 func TestValidatorsBR(t *testing.T) {
 	if checkDigitMod10("01230067896") != 3 || billPaymentCheckDigit("01230067896", true) != 0 {
@@ -32,14 +32,15 @@ func TestValidatorsBR(t *testing.T) {
 	}
 }
 
-// boletoLine monta a linha digitável (5 campos) de um código de barras de cobrança.
+// boletoLine builds the typed line (5 fields) of a collection barcode.
 func boletoLine(c string) string {
 	c1, c2, c3 := c[0:4]+c[19:24], c[24:34], c[34:44]
 	return fmt.Sprintf("%s.%s%d %s.%s%d %s.%s%d %s %s", c1[:5], c1[5:], checkDigitMod10(c1), c2[:5], c2[5:], checkDigitMod10(c2),
 		c3[:5], c3[5:], checkDigitMod10(c3), c[4:5], c[5:19])
 }
 
-// billPaymentLine: com 43 dígitos (sem o DV geral) monta o código e a linha de 48 em 4 blocos.
+// billPaymentLine: with 43 digits (without the general check digit) builds the code and the
+// 48-digit line in 4 blocks.
 func billPaymentLine(without string) string {
 	mod11 := without[2] >= '8'
 	c := without[:3] + fmt.Sprint(billPaymentCheckDigit(without, mod11)) + without[3:]
@@ -72,7 +73,7 @@ func TestDetectsBR(t *testing.T) {
 			t.Errorf("volta de %q:\n   %q", c.s, back)
 		}
 	}
-	// RG de qualquer estado, pelo rótulo
+	// RG of any state, by the label
 	for _, c := range []struct{ s, gone string }{
 		{"RG: MG-12.345.678 expedido em BH", "345.678"},
 		{"RG nº 1234567 SSP/DF", "1234567"},

@@ -6,26 +6,26 @@ import (
 	"unicode"
 )
 
-// Detector de senhas comuns (as que o gitleaks não pega).
+// Detector of common passwords (the ones gitleaks does not catch).
 
-// Senhas "de gente": as regras do gitleaks pegam tokens com formato próprio e valores de
-// alta entropia, mas deixam passar a senha comum de banco de dados ("Ficticia@2024"), a palavra
-// "senha" em português, a senha dentro de URL e a do "mysql -pXXX". Estes padrões cobrem
-// isso. O último grupo de cada um é a senha.
+// "Human" passwords: gitleaks rules catch tokens with their own format and high-entropy values, but
+// let through the common database password ("Ficticia@2024"), the word "senha" in Portuguese, the
+// password inside a URL and that of "mysql -pXXX". These patterns cover that. The last group of
+// each one is the password.
 //
-// Critério: na dúvida, mascara. Um nome de segredo do Kubernetes ("secretRef: db-credentials")
-// ou um caminho também saem mascarados; isso não quebra nada (a volta desfaz) e é melhor do
-// que deixar uma senha passar. Só fica de fora o que claramente é código ou marcador.
+// Criterion: when in doubt, mask. A Kubernetes secret name ("secretRef: db-credentials") or a path
+// also go out masked; that breaks nothing (the return path undoes it) and is better than letting a
+// password through. Only what is clearly code or a marker stays out.
 var (
 	// chave = valor   (senha: X, DB_PASSWORD=X, "password": "X", pwd => X)
 	rePasswordAttr = regexp.MustCompile("(?i)(?:senha|passw(?:or)?d|pwd|secret|segredo)([\\w.\\-]*)[\"']?\\s*(?:=>|:=|=|:)\\s*[\"'`]?([^\\s\"'`,;]{4,})")
-	// frase   (a senha do sistema é X, the password is X)
+	// sentence (a senha do sistema é X, the password is X)
 	rePasswordSentence = regexp.MustCompile("(?i)\\b(?:senha|password)\\b(?:[ \\t]+[\\p{L}_\\-]+){0,4}?[ \\t]+(?:é|eh|is|era|será)[ \\t]+[\"'`]?([^\\s\"'`,;]{6,})")
-	// palavra e valor entre crases ou aspas, sem ":" nem "=" (senha `X`, password "X")
+	// word and value between backticks or quotes, without ":" or "=" (senha `X`, password "X")
 	reQuotedPassword = regexp.MustCompile("(?i)\\b(?:senha|password|passwd|pwd)\\b(?:[ \\t]+[\\p{L}_\\-]+){0,3}?[ \\t]+[`\"']([^\\s`\"']{4,})[`\"']")
-	// usuário:senha@ numa URL
+	// user:password@ in a URL
 	rePasswordURL = regexp.MustCompile("[a-zA-Z][a-zA-Z0-9+.\\-]*://[^\\s:/@]+:([^\\s@/]{3,})@")
-	// linha de comando
+	// command line
 	rePasswordCLI = regexp.MustCompile("(?:\\b(?:mysql|mysqldump|mysqladmin|mariadb)\\b[^\\n|;&]*?\\s-p|\\bsshpass\\s+-p\\s*|--password[= ]+|\\bcurl\\b[^\\n|;&]*?\\s(?:-u|--user)\\s+[^\\s:]+:)[\"']?([^\\s\"'`]{4,})")
 )
 
@@ -34,23 +34,23 @@ var reFileSuffix = regexp.MustCompile(`\.\w{1,5}$`)
 var notPassword = map[string]bool{"null": true, "none": true, "nil": true, "true": true, "false": true, "undefined": true,
 	"string": true, "str": true, "varchar": true, "text": true, "required": true, "optional": true}
 
-// looksLikePassword separa um valor literal de um pedaço de código (variável, chamada, tipo).
-// fraca=true aceita qualquer literal (posições em que só cabe uma senha, como numa URL).
+// looksLikePassword tells a literal value from a piece of code (variable, call, type). weak=true
+// accepts any literal (positions where only a password fits, as in a URL).
 
 func looksLikePassword(v string, weak bool) bool {
 	if notPassword[strings.ToLower(v)] || strings.ContainsAny(v[:1], "$<{%*|=") || strings.ContainsAny(v, "()[]") {
 		return false
 	}
 	if strings.HasPrefix(v, "SEGREDO-") || strings.Trim(v, "*x.#-") == "" {
-		return false // já mascarado, ou "*****"
+		return false // already masked, or "*****"
 	}
 	if weak {
 		return true
 	}
 	if d := digitsOnly(v); len(d) < 6 && len(strings.Trim(v, "0123456789-")) == 0 {
-		return false // número curto: linha de arquivo, porta, código
+		return false // short number: file line, port, code
 	}
-	// pelo menos um dígito ou símbolo: "self.password", "args.senha" e "obrigatória" não contam
+	// at least one digit or symbol: "self.password", "args.senha" and "obrigatória" do not count
 	for _, r := range v {
 		if unicode.IsDigit(r) || (r < 128 && !unicode.IsLetter(r) && r != '_' && r != '.') {
 			return true
@@ -64,9 +64,10 @@ func (m *Masker) findPasswords(s, lower string, add func(ini, end int, typ strin
 		for _, ix := range re.FindAllStringSubmatchIndex(s, -1) {
 			ini, end := ix[len(ix)-2], ix[len(ix)-1]
 			if re == rePasswordAttr && reFileSuffix.MatchString(s[ix[2]:ix[3]]) {
-				continue // nome de arquivo: "PasswordEncoder.java:123", "secrets.yaml: ..."
+				continue // file name: "PasswordEncoder.java:123", "secrets.yaml: ..."
 			}
-			// pontuação da frase, não da senha. Na URL, não: a senha vai até o "@" (Senha!@host)
+			// sentence punctuation, not the password's. In a URL, no: the password goes up to the
+			// "@" (Senha!@host)
 			for re != rePasswordURL && end > ini && strings.ContainsRune(".,;:!?)]}", rune(s[end-1])) {
 				end--
 			}

@@ -14,10 +14,11 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/config"
 )
 
-// llm-dlp audit [PERÍODO]: o resumo do llm-dlp.log (e do .1) num período. Só lê o log, que só tem
-// contagens e pseudônimos: nada do dado real. Responde o que antes exigia vigiar a sessão:
-// o que foi mascarado, por tipo; se algum pseudônimo voltou ao cliente sem virar o valor real
-// (e pode ter ido parar num arquivo); se algo saiu sem máscara; o que foi recusado.
+// llm-dlp audit [PERIOD]: the summary of llm-dlp.log (and of the .1) over a period. It only reads
+// the log, which only has counts and pseudonyms: nothing of the real data. It answers what used to
+// require watching the session: what was masked, by type; whether some pseudonym came back to the
+// client without becoming the real value (and may have ended up in a file); whether something went
+// out without masking; what was refused.
 
 var (
 	reLogReq       = regexp.MustCompile(` -> (\d{3}) \| (\d+) substituições \| (\d+) colisões`)
@@ -31,7 +32,7 @@ type logSummary struct {
 	since                    time.Time
 	req, substs, collisions  int
 	collided                 []string
-	status                   map[string]int // status HTTP diferente de 2xx
+	status                   map[string]int // HTTP status other than 2xx
 	apiErrors                map[string]int
 	types                    map[string]int
 	ndResponses              int
@@ -45,8 +46,8 @@ func newSummary(since time.Time) *logSummary {
 		refusalReasons: map[string]int{}}
 }
 
-// ler junta ao resumo as linhas do período (as linhas começam com "2006/01/02 15:04:05 ", na
-// hora local).
+// read adds the lines of the period to the summary (the lines start with "2006/01/02 15:04:05 ", in
+// local time).
 func (r *logSummary) readIt(in io.Reader) {
 	sc := bufio.NewScanner(in)
 	sc.Buffer(make([]byte, 64<<10), 1<<20)
@@ -109,7 +110,7 @@ func (r *logSummary) readIt(in io.Reader) {
 	}
 }
 
-// joinList acrescenta os itens de "a, b, c" que ainda não estão em xs (até 40).
+// joinList adds the items of "a, b, c" that are not in xs yet (up to 40).
 func joinList(xs []string, list string) []string {
 	for _, p := range strings.Split(list, ",") {
 		if p = strings.TrimSpace(p); p != "" && len(xs) < 40 && !containsStr(xs, p) {
@@ -128,7 +129,7 @@ func containsStr(xs []string, x string) bool {
 	return false
 }
 
-// contagens: "a 3, b 1", do maior ao menor.
+// counts: "a 3, b 1", from largest to smallest.
 func counts(m map[string]int) string {
 	ks := make([]string, 0, len(m))
 	for k := range m {
@@ -181,7 +182,7 @@ func (r *logSummary) text(period string) string {
 	return b.String()
 }
 
-// periodo: "24h", "90m", "7d" (dias) ou só o número de horas.
+// period: "24h", "90m", "7d" (days) or just the number of hours.
 func period(s string) (time.Duration, error) {
 	if n, err := strconv.Atoi(s); err == nil && n > 0 {
 		return time.Duration(n) * time.Hour, nil
@@ -210,7 +211,7 @@ func audit(args []string) error {
 	r := newSummary(time.Now().Add(-d))
 	file := config.Path("llm-dlp.log")
 	readOnes := 0
-	for _, a := range []string{file + ".1", file} { // o antigo primeiro: a ordem do tempo
+	for _, a := range []string{file + ".1", file} { // the old one first: time order
 		f, err := os.Open(a)
 		if err != nil {
 			continue

@@ -6,16 +6,16 @@ import (
 	"testing"
 )
 
-// Memória da conversa (memory_conversation.go): nomes inventados, montados por partes.
+// Conversation memory (memory_conversation.go): made-up names, built from parts.
 
 var (
-	nsCommon  = "pag" + "amentos" // namespace de palavra comum
-	tabCommon = "fat" + "uras"    // tabela de palavra comum
+	nsCommon  = "pag" + "amentos" // common-word namespace
+	tabCommon = "fat" + "uras"    // common-word table
 )
 
 func testPos(s string) Position { return sha256.Sum256([]byte("pos\x00" + s)) }
 
-// lote como o proxy usa: aquece, monta a memória e mascara em ordem
+// batch as the proxy uses it: warms, builds the memory and masks in order
 func batchWith(m *Masker, texts ...string) (*Batch, []string, []Entry) {
 	l := m.NewBatch()
 	items := make([]BatchItem, len(texts))
@@ -59,7 +59,8 @@ func TestMemoryWholeWordAndCase(t *testing.T) {
 	}
 }
 
-// Sem o inventário no pedido (conversa nova), a palavra comum fica (no nível do lote).
+// Without the inventory in the request (new conversation), the common word stays (at the batch
+// level).
 func TestMemoryOnlyInRequest(t *testing.T) {
 	m := newTest(t)
 	batchWith(m, "kubectl logs -n "+nsCommon+" deploy/web --tail 10", "o "+nsCommon+" caiu")
@@ -69,8 +70,8 @@ func TestMemoryOnlyInRequest(t *testing.T) {
 	}
 }
 
-// Word genérica (referência pública) é mascarada onde foi decidida, mas não entra na
-// memória (D4).
+// A generic word (public reference) is masked where it was decided, but does not enter the memory
+// (D4).
 func TestMemoryGenericOut(t *testing.T) {
 	prev := publicRef
 	defer func() { publicRef = prev }()
@@ -82,7 +83,7 @@ func TestMemoryGenericOut(t *testing.T) {
 	}
 }
 
-// Text já enviado (congelado) sai igual, mesmo que a memória agora conheça o nome.
+// Text already sent (frozen) goes out the same, even if the memory now knows the name.
 func TestMemoryDoesNotRewritePast(t *testing.T) {
 	m := newTest(t)
 	stale := "o " + nsCommon + " caiu ontem"
@@ -96,7 +97,7 @@ func TestMemoryDoesNotRewritePast(t *testing.T) {
 	if strings.Contains(o2[2], nsCommon) {
 		t.Fatalf("texto novo sem a memória: %s", o2[2])
 	}
-	// o congelamento grava o texto com a memória aplicada: o reenvio sai igual
+	// freezing writes the text with the memory applied: the resend goes out the same
 	l2.Freeze()
 	_, o3, _ := batchWith(m, stale, inv, "e o "+nsCommon+" hoje")
 	for i := range o3 {
@@ -106,9 +107,9 @@ func TestMemoryDoesNotRewritePast(t *testing.T) {
 	}
 }
 
-// Quem escreveu: o texto do assistente volta como a API o mandou; só o trecho traduzido é
-// pseudônimo, a mesma palavra escrita pelo modelo fica (no nível do lote); a palavra
-// traduzida entra na memória.
+// Who wrote it: the assistant text comes back as the API sent it; only the translated piece is a
+// pseudonym, the same word written by the model stays (at the batch level); the translated word
+// enters the memory.
 func TestMemoryWhoWrote(t *testing.T) {
 	m := newTest(t)
 	inv := "kubectl logs -n " + nsCommon + " deploy/web --tail 10"
@@ -143,7 +144,7 @@ func TestMemoryWhoWrote(t *testing.T) {
 	}
 }
 
-// O registro de quem escreveu sobrevive a um reinício (enviados.log, só HMAC e pseudônimos).
+// The who-wrote-it record survives a restart (enviados.log, only HMAC and pseudonyms).
 func TestWhoWroteOnDisk(t *testing.T) {
 	dir := t.TempDir()
 	m := newTest(t)
@@ -174,8 +175,8 @@ func TestWhoWroteOnDisk(t *testing.T) {
 	}
 }
 
-// A memória varre cada texto uma vez (uma consulta no índice por palavra): o custo cresce com
-// o tamanho do texto, não com o número de nomes.
+// The memory scans each text once (one index lookup per word): the cost grows with the text size,
+// not with the number of names.
 func BenchmarkMemoryScan1MB(b *testing.B) {
 	m := newTest(b)
 	var decs []Decision
@@ -192,8 +193,8 @@ func BenchmarkMemoryScan1MB(b *testing.B) {
 	}
 }
 
-// O marcador de comentário só vale fora de aspas; "--x" colado numa letra é opção de comando e
-// "#3" é numeração.
+// The comment marker only counts outside quotes; "--x" glued to a letter is a command option and
+// "#3" is numbering.
 func TestInComment(t *testing.T) {
 	cases := map[string]bool{
 		"# carrega as faturas":                    true,
@@ -215,9 +216,9 @@ func TestInComment(t *testing.T) {
 	}
 }
 
-// Procedência: num dado (saída de ferramenta, arquivo lido), o nome de recurso que a requisição
-// provou continua nome dentro de um comentário; na mensagem do usuário, o comentário colado
-// continua fora do alcance da memória, como antes.
+// Provenance: in data (tool output, file read), the resource name the request proved stays a name
+// inside a comment; in the user message, the pasted comment stays out of the memory's reach, as
+// before.
 func TestProvenanceInDataComment(t *testing.T) {
 	m := newTest(t)
 	sql := "SELECT valor FROM " + tabCommon + " WHERE id = 1 AND x = 2"
@@ -232,11 +233,10 @@ func TestProvenanceInDataComment(t *testing.T) {
 	}
 }
 
-// Arquivo de documentação (README, prompt de agente) é prosa fora dos blocos de código: a
-// palavra comum que a memória traz fica como palavra; no bloco de código e num arquivo de
-// código, a procedência vale.
+// A documentation file (README, agent prompt) is prose outside the code blocks: the common word the
+// memory brings stays a word; in the code block and in a code file, provenance applies.
 func TestDocumentAndProseOutsideCode(t *testing.T) {
-	tab := "pro" + "postas" // tabela de palavra comum (está na lista)
+	tab := "pro" + "postas" // common-word table (it is in the list)
 	if !commonWord(tab) {
 		t.Fatalf("premissa: %q devia ser palavra comum", tab)
 	}

@@ -1,4 +1,4 @@
-// Package config carrega a configuração do llm-dlp e define onde ficam os arquivos dele.
+// Package config loads the llm-dlp configuration and defines where its files live.
 package config
 
 import (
@@ -9,94 +9,94 @@ import (
 	"strings"
 )
 
-// ExtraPattern é uma regex própria do usuário, com um rótulo para o pseudônimo.
+// ExtraPattern is a user's own regex, with a label for the pseudonym.
 type ExtraPattern struct {
 	Label string `json:"label"`
 	Regex string `json:"regex"`
 }
 
-// Term é uma lista de valores exatos (sem diferenciar maiúsculas) que devem ser mascarados.
+// Term is a list of exact values (case-insensitive) that must be masked.
 type Term struct {
 	Label  string   `json:"label"`
 	Values []string `json:"values"`
 }
 
-// Provider: outra API de LLM atendida na mesma porta, pelo caminho "/<nome>/..." (o cliente
-// aponta o endereço da API para http://127.0.0.1:<porta>/<nome>).
+// Provider: another LLM API served on the same port, under the path "/<name>/..." (the client
+// points the API address to http://127.0.0.1:<port>/<name>).
 type Provider struct {
-	// Para onde a requisição vai, sem o "/<nome>".
+	// Where the request goes, without the "/<name>".
 	Upstream string `json:"upstream"`
-	// Como ler a requisição e a resposta: "gemini", "codeassist" (o Gemini CLI com a conta
-	// Google), "openai" (Chat Completions), "responses" (o Codex) ou "anthropic". Outro valor:
-	// modo genérico (todo texto da requisição é mascarado, e a resposta em streaming não é
-	// desmascarada). Um caminho terminado em /chat/completions é sempre lido como "openai", e um
-	// terminado em /responses, como "responses".
+	// How to read the request and the response: "gemini", "codeassist" (Gemini CLI with the Google
+	// account), "openai" (Chat Completions), "responses" (Codex) or "anthropic". Any other value:
+	// generic mode (all request text is masked, and the streaming response is not unmasked). A path
+	// ending in /chat/completions is always read as "openai", and one ending in /responses, as
+	// "responses".
 	Format string `json:"format"`
 }
 
 type Config struct {
 	Port     int    `json:"port"`
 	Upstream string `json:"upstream"`
-	// Outras APIs, pelo nome que vai no caminho. O que não começa com um nome daqui vai para
-	// Upstream (a API da Anthropic).
+	// Other APIs, by the name that goes in the path. What does not start with a name from here goes
+	// to Upstream (the Anthropic API).
 	Providers map[string]Provider `json:"providers"`
 
-	// Hostnames e e-mails que contêm um destes trechos são tratados como internos.
+	// Hostnames and e-mails that contain one of these pieces are treated as internal.
 	InternalDomains []string `json:"internal_domains"`
-	// E-mails e domínios que passam sem máscara.
+	// E-mails and domains that pass without masking.
 	EmailsLiberados     []string `json:"allowed_emails"`
 	AllowedEmailDomains []string `json:"allowed_email_domains"`
-	// Primeiro rótulo de hostname que pode ficar visível (ex.: "mysql" em mysql.empresa.intra).
+	// First hostname label that may stay visible (e.g. "mysql" in mysql.company.intra).
 	HostRoles []string `json:"host_roles"`
 
 	ExtraPatterns []ExtraPattern `json:"extra_patterns"`
 	Terms         []Term         `json:"terms"`
 
-	// Detectores que o usuário quer desligar (ex.: "endereco").
+	// Detectors the user wants to turn off (e.g. "endereco").
 	DisabledDetectors []string `json:"disabled_detectors"`
-	// Detectores opcionais que o usuário quer ligar. Hoje: "quase" (quase identificadores:
-	// sexo, idade, estado civil, profissão, nacionalidade, renda, latitude/longitude).
+	// Optional detectors the user wants to turn on. Today: "quase" (quasi-identifiers: sex, age,
+	// marital status, profession, nationality, income, latitude/longitude).
 	OptionalDetectors []string `json:"optional_detectors,omitempty"`
 
-	// Words a mais para reconhecer nomes de campo (cabeçalho de CSV, chave de JSON...).
-	// Tipos: cpf, cnpj, rg, cnh, pis, doc, nascimento, telefone, cep, endereco, usuario,
-	// conta, cartao, sensivel, nome, quase; "pessoa" (de quem é o campo: "segurado") e
-	// "neutra" (palavra que não muda o que o campo guarda: "bco", "sis").
+	// Extra words to recognize field names (CSV header, JSON key...). Types: cpf, cnpj, rg, cnh,
+	// pis, doc, nascimento, telefone, cep, endereco, usuario, conta, cartao, sensivel, nome, quase;
+	// "pessoa" (whose field it is: "segurado") and "neutra" (a word that does not change what the
+	// field holds: "bco", "sis").
 	ExtraFields []ExtraField `json:"extra_fields,omitempty"`
 
-	// CPF e CNPJ só com dígitos (sem pontuação) são mascarados mesmo sem a palavra "cpf"/"cnpj"
-	// por perto, desde que o dígito verificador confira. Cerca de 1 em cada 100 números
-	// aleatórios desse tamanho também confere: esses são mascarados a mais (na dúvida, mascara).
+	// CPF and CNPJ with digits only (no punctuation) are masked even without the word "cpf"/"cnpj"
+	// nearby, as long as the check digit matches. About 1 in 100 random numbers of that length also
+	// matches: those are masked in excess (when in doubt, mask).
 	DocumentsWithoutContext bool `json:"documents_without_context"`
 
-	// Bloqueia (502) requisições que o llm-dlp não sabe mascarar, em vez de deixá-las passar.
+	// Blocks (502) requests that llm-dlp cannot mask, instead of letting them through.
 	FailClosed bool `json:"fail_closed"`
 
 	OCR OCR `json:"ocr"`
 
-	// Ferramentas cuja entrada NUNCA é desmascarada: vão para a internet, então devem
-	// levar só pseudônimos (evita que uma página maliciosa induza o modelo a mandar o
-	// dado real numa URL).
+	// Tools whose input is NEVER unmasked: they go to the internet, so they must carry only
+	// pseudonyms (this keeps a malicious page from inducing the model to send the real data in a
+	// URL).
 	ToolsWithoutUnmask []string `json:"tools_never_unmasked"`
 
-	// Names de recursos internos (servidor, banco, schema, tabela, coluna...), reconhecidos
-	// pela estrutura do conteúdo. Ver docs/pt-BR/configuration.md.
+	// Names of internal resources (server, database, schema, table, column...), recognized by the
+	// structure of the content. See docs/configuration.md.
 	Objects Objects `json:"objects"`
 }
 
-// Objects liga e desliga, por tipo de entidade, o mascaramento e a propagação. Type que não
-// estiver nos mapas fica no padrão: mascarar todos; propagar todos menos coluna e índice.
+// Objects turns masking and propagation on and off, per entity type. A type that is not in the maps
+// stays at the default: mask all; propagate all except column and index.
 type Objects struct {
 	Enabled   bool            `json:"enabled"`
 	Mask      map[string]bool `json:"mask,omitempty"`
 	Propagate map[string]bool `json:"propagate,omitempty"`
-	// IPv4 público e IPv6 viram nome de servidor (desligado: só o IP privado é mascarado).
+	// Public IPv4 and IPv6 become a server name (off: only the private IP is masked).
 	PublicIP bool `json:"public_ip"`
 }
 
-// ConnectorPrefix: ferramentas dos conectores do claude.ai (Gmail, Drive...). Rodam fora
-// da máquina, nos servidores da Anthropic: a entrada delas também segue com pseudônimos.
-// Vale sempre, mesmo que o config.json tenha a própria lista.
+// ConnectorPrefix: tools of the claude.ai connectors (Gmail, Drive...). They run outside the
+// machine, on Anthropic's servers: their input also goes with pseudonyms. Always applies, even if
+// config.json has its own list.
 const ConnectorPrefix = "mcp__claude_ai_"
 
 func (c Config) NoUnmask(tool string) bool {
@@ -111,10 +111,10 @@ func (c Config) NoUnmask(tool string) bool {
 	return false
 }
 
-// OCR controla imagens e PDFs enviados à LLM.
+// OCR controls images and PDFs sent to the LLM.
 type OCR struct {
-	// "mask" (OCR e cobre o que é sensível), "block" (não deixa sair) ou "allow" (até a 0.8.0:
-	// "mascarar", "bloquear", "permitir"; ainda aceitos, ver Read).
+	// "mask" (OCR, and covers what is sensitive), "block" (does not let it out) or "allow" (up to
+	// 0.8.0: "mascarar", "bloquear", "permitir"; still accepted, see Read).
 	Mode      string            `json:"mode"`
 	Tesseract string            `json:"tesseract"`
 	PDFToText string            `json:"pdftotext"`
@@ -122,17 +122,18 @@ type OCR struct {
 	Language  string            `json:"language"`
 	Env       map[string]string `json:"env"` // ex.: LD_LIBRARY_PATH, TESSDATA_PREFIX
 	MaxPages  int               `json:"max_pages"`
-	// PDF com texto e sem nada sensível sai original; com true, sai sempre como texto extraído.
+	// A PDF with text and nothing sensitive goes out as the original; with true, it always goes out
+	// as extracted text.
 	StrictPDF bool `json:"strict_pdf"`
 }
 
-// DefaultProviders: as APIs que já vêm configuradas.
+// DefaultProviders: the APIs that come configured.
 func DefaultProviders() map[string]Provider {
 	return map[string]Provider{
 		"gemini": {Upstream: "https://generativelanguage.googleapis.com", Format: "gemini"},
 		"openai": {Upstream: "https://api.openai.com", Format: "openai"},
 		"xai":    {Upstream: "https://api.x.ai", Format: "openai"},
-		// as assinaturas: o Gemini CLI com a conta Google e o Codex com a conta do ChatGPT
+		// the subscriptions: Gemini CLI with the Google account and Codex with the ChatGPT account
 		"codeassist": {Upstream: "https://cloudcode-pa.googleapis.com", Format: "codeassist"},
 		"chatgpt":    {Upstream: "https://chatgpt.com/backend-api/codex", Format: "responses"},
 	}
@@ -157,7 +158,7 @@ func Default() Config {
 	}
 }
 
-// Dir é a pasta do llm-dlp: $LLM_DLP_HOME ou ~/.config/llm-dlp.
+// Dir is the llm-dlp folder: $LLM_DLP_HOME or ~/.config/llm-dlp.
 func Dir() string {
 	if d := os.Getenv("LLM_DLP_HOME"); d != "" {
 		return d
@@ -168,7 +169,7 @@ func Dir() string {
 
 func Path(name string) string { return filepath.Join(Dir(), name) }
 
-// Load lê config.json; se não existir, grava o padrão para o usuário editar.
+// Load reads config.json; if it does not exist, writes the default for the user to edit.
 func Load() (Config, error) {
 	c := Default()
 	if err := os.MkdirAll(Dir(), 0o700); err != nil {

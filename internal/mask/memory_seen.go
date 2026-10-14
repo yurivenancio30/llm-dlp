@@ -11,25 +11,25 @@ import (
 	"time"
 )
 
-// Seen: os mesmos valores, guardados em disco só como hash, para valer depois de reiniciar.
+// Seen: the same values, kept on disk only as hashes, so they apply after a restart.
 
-// Seen guarda em disco, só como hash (HMAC com a chave), os valores contextuais já
-// mascarados e o tipo de cada um.
+// Seen keeps on disk, only as hashes (HMAC with the key), the contextual values already masked and
+// the type of each one.
 type Seen struct {
 	path  string
 	mu    sync.RWMutex
 	ids   map[string]string // id -> tipo
-	size  map[int]bool      // tamanhos das senhas guardadas (filtro: só testa pedaços desses tamanhos)
-	n     map[string]int    // quantos de cada tipo
-	nObj  int               // quantos nomes de objeto
+	size  map[int]bool      // lengths of the stored passwords (filter: only tests pieces of these lengths)
+	n     map[string]int    // how many of each type
+	nObj  int               // how many object names
 	dirty bool
-	// noSize: há senhas guardadas sem o tamanho (arquivo antigo)
+	// noSize: there are passwords stored without the length (old file)
 	noSize    bool
 	saved     time.Time
 	scheduled bool
-	// disco: o arquivo como este processo o deixou (leu ou gravou). Se mudou, outro processo
-	// gravou (a versão nova durante a troca, ver atualizar; um comando): o que ele aprendeu é
-	// juntado antes de gravar, e uma gravação não apaga a outra.
+	// disk: the file as this process left it (read or written). If it changed, another process
+	// wrote it (the new version during a swap, see update; a command): what it learned is merged
+	// before writing, and one write does not erase the other.
 	disk fileFingerprint
 }
 
@@ -46,9 +46,9 @@ func fingerprintOf(path string) fileFingerprint {
 	return fileFingerprint{st.ModTime(), st.Size()}
 }
 
-// writeSwapping grava b num arquivo temporário deste processo e troca pelo arquivo (dois
-// processos gravando ao mesmo tempo não misturam um temporário com o outro). Devolve a
-// impressão do que gravou (a troca de nome não muda data nem tamanho).
+// writeSwapping writes b to a temporary file of this process and swaps it for the file (two
+// processes writing at the same time do not mix one temporary file with the other). Returns the
+// fingerprint of what it wrote (the rename changes neither date nor size).
 func writeSwapping(path string, b []byte) (fileFingerprint, error) {
 	tmp := path + ".tmp-" + strconv.Itoa(os.Getpid())
 	if err := os.WriteFile(tmp, b, 0o600); err != nil {
@@ -63,7 +63,7 @@ func writeSwapping(path string, b []byte) (fileFingerprint, error) {
 	return imp, nil
 }
 
-// sizePrefix: os tamanhos vão no mesmo arquivo, como chaves "tam:13"
+// sizePrefix: the lengths go in the same file, as keys "tam:13"
 const sizePrefix = "tam:"
 
 var saveInterval = 5 * time.Second
@@ -94,17 +94,17 @@ func LoadSeen(path string) (*Seen, error) {
 	}
 	v.disk = fingerprintOf(path)
 	if json.Unmarshal(b, &v.ids) != nil {
-		v.ids = map[string]string{} // formato antigo (lista): recomeça; os valores são reaprendidos
+		v.ids = map[string]string{} // old format (list): start over; the values are learned again
 	}
 	for id, t := range v.ids {
 		v.tally(id, t)
 	}
-	// arquivo de antes de os tamanhos serem guardados: sem o filtro (testa todos os pedaços)
+	// a file from before lengths were stored: without the filter (tests every piece)
 	v.noSize = v.n["segredo"] > 0 && len(v.size) == 0
 	return v, nil
 }
 
-// contar põe nos contadores e no filtro de tamanhos uma entrada que já está em v.ids.
+// tally puts into the counters and the length filter an entry that is already in v.ids.
 func (v *Seen) tally(id, t string) {
 	if n, err := strconv.Atoi(strings.TrimPrefix(id, sizePrefix)); err == nil && strings.HasPrefix(id, sizePrefix) {
 		v.size[n] = true
@@ -116,9 +116,9 @@ func (v *Seen) tally(id, t string) {
 	}
 }
 
-// mergeFromDisk (com v.mu travado): se outro processo gravou o arquivo depois deste, traz o
-// que só ele aprendeu. Uma entrada que este processo podou (teto) pode voltar assim; a próxima
-// poda a tira de novo.
+// mergeFromDisk (with v.mu locked): if another process wrote the file after this one, brings what
+// only it learned. An entry this process pruned (ceiling) may come back this way; the next prune
+// removes it again.
 func (v *Seen) mergeFromDisk() {
 	if fingerprintOf(v.path) == v.disk {
 		return
@@ -148,16 +148,16 @@ func (v *Seen) Type(id string) (string, bool) {
 	return t, ok
 }
 
-// Has diz se há algum valor desse tipo guardado.
+// Has says whether some value of this type is stored.
 func (v *Seen) Has(typ string) bool {
 	v.mu.RLock()
 	defer v.mu.RUnlock()
 	return v.n[typ] > 0
 }
 
-// Objects (ver objects.go): o valor guarda o tipo e duas datas, em dias desde 1970:
-// "obj.tabela|<aprendido>|<visto pela última vez>". O teto é separado, para os nomes de
-// objeto não expulsarem senhas e documentos.
+// Objects (see objects.go): the value keeps the type and two dates, in days since 1970:
+// "obj.tabela|<learned>|<last seen>". The ceiling is separate, so object names do not push out
+// passwords and documents.
 const maxObjects = 500_000
 
 func baseType(t string) string {
@@ -173,7 +173,7 @@ func (v *Seen) HasObj() bool {
 	return v.nObj > 0
 }
 
-// Obj devolve o tipo de entidade e o dia em que o nome foi visto pela última vez.
+// Obj returns the entity type and the day the name was last seen.
 func (v *Seen) Obj(id string) (ent string, seen int, ok bool) {
 	v.mu.RLock()
 	t, ok := v.ids[id]
@@ -195,7 +195,7 @@ func readObj(t string) (ent string, learned, seen int, ok bool) {
 	return p[0][4:], a, b, e1 == nil && e2 == nil
 }
 
-// MarkObj guarda o nome (ou atualiza o dia em que foi visto, no máximo uma vez por dia).
+// MarkObj stores the name (or updates the day it was seen, at most once a day).
 func (v *Seen) MarkObj(id, ent string, day int) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
@@ -215,7 +215,7 @@ func (v *Seen) MarkObj(id, ent string, day int) {
 	v.nObj++
 }
 
-// pruneObj tira o décimo dos nomes de objeto vistos há mais tempo (com v.mu travado).
+// pruneObj removes the tenth of the object names seen longest ago (with v.mu locked).
 func (v *Seen) pruneObj() {
 	days := make([]int, 0, v.nObj)
 	for _, t := range v.ids {
@@ -234,8 +234,8 @@ func (v *Seen) pruneObj() {
 	}
 }
 
-// maxSeen: teto dos hashes guardados (~40 bytes cada). Passou disso, um décimo sai, ao
-// acaso; esses valores voltam a depender da palavra ao lado até serem vistos de novo.
+// maxSeen: ceiling of the stored hashes (~40 bytes each). Past it, a tenth goes, at random; those
+// values go back to depending on the word next to them until they are seen again.
 const maxSeen = 500_000
 
 func (v *Seen) Mark(id, typ string) {
@@ -243,7 +243,7 @@ func (v *Seen) Mark(id, typ string) {
 	if _, ok := v.ids[id]; !ok {
 		if len(v.ids)-v.nObj >= maxSeen {
 			newOne, n := make(map[string]string, maxSeen), map[string]int{}
-			for k, t := range v.ids { // a ordem de um mapa em Go é aleatória
+			for k, t := range v.ids { // the order of a Go map is random
 				if strings.HasPrefix(k, sizePrefix) || strings.HasPrefix(t, "obj.") {
 					newOne[k] = t
 					continue
@@ -267,9 +267,9 @@ func (v *Seen) Mark(id, typ string) {
 	v.mu.Unlock()
 }
 
-// SaveIfDirty grava o arquivo se houve novidade desde a última gravação.
-// Com muitos hashes a gravação custa (≈0,3 s com 250 mil), então acontece no máximo uma
-// vez a cada saveInterval; o que ficou pendente é gravado por um temporizador.
+// SaveIfDirty writes the file if there was something new since the last write. With many hashes the
+// write is costly (≈0.3 s with 250 thousand), so it happens at most once every saveInterval; what
+// was left pending is written by a timer.
 func (v *Seen) SaveIfDirty() error {
 	v.mu.Lock()
 	if !v.dirty {
@@ -304,7 +304,8 @@ func (v *Seen) SaveIfDirty() error {
 	return nil
 }
 
-// SaveNow grava já o que estiver pendente, sem esperar o intervalo (na saída do proxy).
+// SaveNow writes what is pending right away, without waiting for the interval (when the proxy
+// exits).
 func (v *Seen) SaveNow() error {
 	v.mu.Lock()
 	v.saved = time.Time{}

@@ -6,8 +6,8 @@ import (
 	"testing"
 )
 
-// Dados sensíveis da LGPD (art. 5º, II) no meio do texto. Cada caso: o que tem de sumir; e as
-// frases em que a mesma palavra não fala de ninguém, que têm de ficar como estão.
+// LGPD sensitive data (art. 5, II) in the middle of the text. Each case: what has to disappear; and
+// the sentences where the same word talks about nobody, which have to stay as they are.
 func TestSensitiveInText(t *testing.T) {
 	m := newTest(t)
 	fmr := base64.StdEncoding.EncodeToString(append([]byte("FMR\x00 20\x00"), make([]byte, 30)...))
@@ -57,7 +57,7 @@ func TestSensitiveLabels(t *testing.T) {
 			t.Errorf("%s: %q", r, c)
 		}
 	}
-	// filiação sozinha continua sendo o nome dos pais; identidade, o RG
+	// "filiação" alone is still the name of the parents; "identidade", the RG
 	if labelClass("filiacao") != "nome" || labelClass("identidade") != "rg" {
 		t.Errorf("filiacao %q, identidade %q", labelClass("filiacao"), labelClass("identidade"))
 	}

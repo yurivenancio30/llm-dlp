@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// Anterioridade (priority.go), com nomes inventados.
+// Priority (priority.go), with made-up names.
 
 func rtAssist(text string) any {
 	return map[string]any{"role": "assistant", "content": []any{map[string]any{"type": "text", "text": text}}}
@@ -27,8 +27,8 @@ func rtAPI(t *testing.T, system string, msgs []any) string {
 	return string(bodies[0])
 }
 
-// O modelo escreve a query com as colunas das views de sistema (conhecimento dele); depois a
-// saída as mostra no cabeçalho e o usuário as cita. Ficam legíveis; os valores do cliente não.
+// The model writes the query with the columns of the system views (its knowledge); then the output
+// shows them in the header and the user cites them. They stay readable; the client's values do not.
 func TestPrioritySystemSQLBeforeOutput(t *testing.T) {
 	q := "SELECT TAG_NAME, TAG_VALUE, APPLY_METHOD, OBJECT_NAME FROM SNOWFLAKE.ACCOUNT_USAGE.TAG_REFERENCES WHERE TAG_NAME = 'OWNER'"
 	msgs := []any{map[string]any{"role": "user", "content": "quem é o owner das views?"}}
@@ -41,8 +41,8 @@ func TestPrioritySystemSQLBeforeOutput(t *testing.T) {
 			t.Errorf("%s (o modelo escreveu antes) foi mascarado", p)
 		}
 	}
-	// (os valores de TAG_VALUE, como squad_receita, não são nome de objeto: lacuna conhecida,
-	// anterior à anterioridade)
+	// (the TAG_VALUE values, like squad_receita, are not object names: a known gap, older than
+	// priority)
 	for _, s := range []string{"VW_FATURAMENTO_DIA", "TB_CLIENTE_PJ"} {
 		if rtTok(api, s) > 0 {
 			t.Errorf("%s (do cliente) foi em claro", s)
@@ -50,7 +50,7 @@ func TestPrioritySystemSQLBeforeOutput(t *testing.T) {
 	}
 }
 
-// O nome que o modelo escreve depois de vê-lo num dado (ou que o proxy traduziu) não é dele.
+// The name the model writes after seeing it in data (or that the proxy translated) is not its own.
 func TestPriorityCopyIsNotFromModel(t *testing.T) {
 	msgs := rtTurns("o que tem no cluster?", [2]string{"kubectl get ns", "NAME             STATUS   AGE\nkube-system      Active   400d\npagto-core-prd   Active   210d\n"})
 	msgs = append(msgs, rtAssist("O namespace pagto-core-prd tem os pods de pagamento; vou olhar os logs."))
@@ -61,8 +61,8 @@ func TestPriorityCopyIsNotFromModel(t *testing.T) {
 	}
 }
 
-// O system (diretório de trabalho, CLAUDE.md) é dado: o nome que o modelo repete dele não é do
-// modelo. Se o proxy mascara o nome no system, mascara também quando o modelo o escreve.
+// The system (working directory, CLAUDE.md) is data: the name the model repeats from it is not the
+// model's. If the proxy masks the name in the system, it also masks it when the model writes it.
 func TestPrioritySystemIsData(t *testing.T) {
 	system := "Working directory: /home/u/trabalho/acme-cobranca-core\nO projeto acme-cobranca-core usa o banco dw_cobranca_prd."
 	msgs := []any{map[string]any{"role": "user", "content": "lista os arquivos"}}
@@ -82,8 +82,8 @@ func TestPrioritySystemIsData(t *testing.T) {
 	}
 }
 
-// O modelo instala pacotes pelo nome (conhecimento dele); a lista de dependências que aparece
-// depois continua legível.
+// The model installs packages by name (its knowledge); the list of dependencies that appears later
+// stays readable.
 func TestPriorityPackages(t *testing.T) {
 	msgs := rtTurns("prepara o ambiente", [2]string{"pip install apache-airflow flask-appbuilder marshmallow-sqlalchemy", "Successfully installed apache-airflow-2.9.1 flask-appbuilder-4.4.1 marshmallow-sqlalchemy-0.28.2\n"})
 	msgs = append(msgs, rtTurns("", [2]string{"pip freeze", "apache-airflow==2.9.1\nflask-appbuilder==4.4.1\nmarshmallow-sqlalchemy==0.28.2\n"})[1:]...)
@@ -95,8 +95,8 @@ func TestPriorityPackages(t *testing.T) {
 	}
 }
 
-// Risco medido (não falha): o modelo chuta um nome genérico antes de ver os dados, e o cliente
-// tem um objeto com esse nome. O nome genérico fica legível; o específico, não.
+// Measured risk (does not fail): the model guesses a generic name before seeing the data, and the
+// client has an object with that name. The generic name stays readable; the specific one does not.
 func TestPriorityGenericGuess(t *testing.T) {
 	msgs := rtTurns("me mostra os clientes", [2]string{`psql -c "SELECT * FROM customers LIMIT 2"`, "ERROR: relation \"customers\" does not exist"})
 	msgs = append(msgs, rtTurns("", [2]string{`psql -c "\dt"`, " Schema |      Name       | Type  \n--------+-----------------+-------\n public | customers       | table\n public | tb_cliente_pj_x | table\n public | tb_contrato_y   | table\n"})[1:]...)
@@ -117,8 +117,8 @@ func rtSendBody(t *testing.T, px *httptest.Server, b []byte) {
 	resp.Body.Close()
 }
 
-// Result de ferramenta do lado da API (dentro da mensagem do modelo) é dado: o nome que vem
-// nele não vira conhecimento do modelo.
+// An API-side tool result (inside the model message) is data: the name that comes in it does not
+// become model knowledge.
 func TestPriorityResultInsideModelIsData(t *testing.T) {
 	msgs := []any{map[string]any{"role": "user", "content": "roda o script no arquivo"},
 		map[string]any{"role": "assistant", "content": []any{
@@ -139,9 +139,9 @@ func TestPriorityResultInsideModelIsData(t *testing.T) {
 	}
 }
 
-// Uma saída que só MENCIONA a palavra (um changelog público que cita tag_name) não tira a autoria
-// do modelo: quando ele a escreve numa query, é dele, mesmo que depois um dado a decida. O nome
-// que o usuário digitou continua sendo do cliente (TestTracingAssistantSQL).
+// An output that only MENTIONS the word (a public changelog that cites tag_name) does not take
+// authorship from the model: when it writes it in a query, it is its own, even if data later
+// decides it. The name the user typed still belongs to the client (TestTracingAssistantSQL).
 func TestPriorityMentionKeepsAuthorship(t *testing.T) {
 	changelog := "## 0.12.1\n\n- #9244: o construtor de tag mudou; TagKey(\"x\", [\"tag_name\"]) não é mais aceito, use TagKey(\"tag_name\").\n"
 	q := "SELECT tag_name, tag_value, object_name FROM snowflake.account_usage.tag_references"
@@ -157,8 +157,8 @@ func TestPriorityMentionKeepsAuthorship(t *testing.T) {
 	}
 }
 
-// Word comum decidida como nome num dado (a tabela CONTA existe) continua nome no dado, mas
-// na prosa do modelo é a palavra; nome com cara de identificador continua mascarado na prosa.
+// A common word decided as a name in data (the table CONTA exists) stays a name in the data, but in
+// the model's prose it is the word; an identifier-shaped name stays masked in prose.
 func TestCommonWordInModelProse(t *testing.T) {
 	ddl := "CREATE TABLE FIN.CONTA (ID INTEGER NOT NULL PRIMARY KEY, NM_TITULAR VARCHAR(10));\nCREATE TABLE FIN.TB_PEDIDO_X9 (ID INTEGER);\n"
 	msgs := rtTurns("cria as tabelas do lab", [2]string{"cat ddl.sql", ddl})
@@ -176,8 +176,8 @@ func TestCommonWordInModelProse(t *testing.T) {
 	}
 }
 
-// O mesmo no texto do usuário: a palavra comum que chegou por contágio fica como palavra; no DDL
-// que ele cola na mesma mensagem, onde um leitor a decide, continua mascarada.
+// The same in the user text: the common word that came by contagion stays a word; in the DDL the
+// user pastes in the same message, where a reader decides it, it stays masked.
 func TestCommonWordInUserProse(t *testing.T) {
 	ddl := "CREATE TABLE FIN.CONTA (ID INTEGER NOT NULL PRIMARY KEY, NM_TITULAR VARCHAR(10));\n"
 	msgs := rtTurns("cria as tabelas do lab", [2]string{"cat ddl.sql", ddl})

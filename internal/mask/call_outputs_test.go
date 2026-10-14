@@ -5,9 +5,9 @@ import (
 	"testing"
 )
 
-// Saídas soltas de script e de shell. Os nomes são fictícios.
+// Loose script and shell outputs. The names are fictitious.
 
-// mostrar: o texto mascarado com cada pseudônimo trocado por «tipo» (para ler a falha).
+// show: the masked text with each pseudonym replaced by «type» (to read the failure).
 func show(m *Masker, s string) string {
 	out, ents := m.Mask(s)
 	return showOut(out, ents)
@@ -20,11 +20,11 @@ func showOut(out string, ents []Entry) string {
 	return out
 }
 
-// passo: uma chamada de ferramenta da conversa (o comando e o que ele devolveu).
+// step: a tool call of the conversation (the command and what it returned).
 type step struct{ cmd, output string }
 
-// checkCommand: mascara a saída do último passo com a dica do seu comando (os passos antes
-// dele passam pelos Commands, como no proxy) e conta os nomes mascarados.
+// checkCommand: masks the output of the last step with the hint of its command (the steps before it
+// go through Commands, as in the proxy) and counts the masked names.
 func checkCommand(t *testing.T, m *Masker, label string, ps []step, names []string) (ok, tot int, out, seen string) {
 	t.Helper()
 	cs := NewCommands()
@@ -47,7 +47,7 @@ func checkCommand(t *testing.T, m *Masker, label string, ps []step, names []stri
 
 var loadHdr = step{"head -3 dados/carga_contab.csv", "cd_conta,nm_tabela,nm_schema\n1001,t_lanc_diario,fin_contab\n1002,t_saldo_mes,fin_fiscal\n"}
 
-// O comando tipa as colunas do resultado
+// The command types the columns of the result
 var commandCases = []struct {
 	name  string
 	ps    []step
@@ -93,7 +93,7 @@ func TestCommandTypesOutput(t *testing.T) {
 		if tot == 0 || ok != tot {
 			t.Errorf("%s: %d/%d\n%s", c.name, ok, tot, seen)
 		}
-		// sem o comando, a mesma saída não basta: é a dica que tipa
+		// without the command, the same output is not enough: the hint is what types it
 		m2 := newTest(t)
 		lastPos := c.ps[len(c.ps)-1].output
 		o2, _ := m2.Mask(lastPos)
@@ -108,7 +108,8 @@ func TestCommandTypesOutput(t *testing.T) {
 	}
 }
 
-// a dica vem do comando, não do texto: a mesma saída com outro comando não muda
+// the hint comes from the command, not from the text: the same output with another command does not
+// change
 func TestCommandWithoutHintDoesNotType(t *testing.T) {
 	output := "t_lanc_diario\nt_saldo_mes\nt_nota_entrada\n"
 	for _, cmd := range []string{"cat notas.txt", "echo ok", ""} {
@@ -120,8 +121,8 @@ func TestCommandWithoutHintDoesNotType(t *testing.T) {
 	}
 }
 
-// listagens comuns e consultas sem coluna de nome: a dica não acrescenta nada (o que os outros
-// leitores já mascaram nessas saídas não vem ao caso aqui)
+// common listings and queries without a name column: the hint adds nothing (what the other readers
+// already mask in these outputs is beside the point here)
 func TestCommandNegatives(t *testing.T) {
 	cases := []step{
 		{"ls -la", "total 16\ndrwxr-xr-x 2 ana ana 4096 Oct  5 10:11 relatorio_mensal\n-rw-r--r-- 1 ana ana  220 Oct  5 10:11 notas_reuniao.txt\n"},
@@ -169,7 +170,7 @@ func TestCommandHint(t *testing.T) {
 	}
 }
 
-// Name qualificado depois de palavra de tipo, em qualquer frase
+// Qualified name after a type word, in any sentence
 var qualifiedTypeCases = []struct{ name, text string }{
 	{"rótulo pt", "tabela fin_contab.t_lanc_diario: 1200 linhas\n"},
 	{"dbt", "10:01:02  1 of 3 OK created sql table model fin_contab.t_lanc_diario ....... [SUCCESS 1 in 2.10s]\n"},
@@ -191,7 +192,7 @@ func TestQualifiedType(t *testing.T) {
 			}
 		}
 	}
-	// o tipo de cada parte
+	// the type of each part
 	m := newTest(t)
 	s := "Loading table dwprd_fin.fin_contab.t_lanc_diario\n"
 	for real, wants := range map[string]string{"dwprd_fin": "obj.database", "fin_contab": "obj.schema", "t_lanc_diario": "obj.tabela"} {
@@ -219,7 +220,7 @@ func TestQualifiedTypeNegatives(t *testing.T) {
 	}
 }
 
-// Lista homogênea; os nomes ensinados antes por um SQL
+// Homogeneous list; the names taught before by an SQL statement
 const sqlTeaches = "select * from fin_contab.t_lanc_diario d join fin_contab.t_saldo_mes s on s.cd = d.cd join fin_contab.t_plano_contas p on p.cd = d.cd\n"
 
 var listCases = []struct{ name, text string }{
@@ -245,7 +246,7 @@ func TestHomogeneousList(t *testing.T) {
 			}
 		}
 	}
-	// o item novo é aprendido: depois aparece sozinho e é mascarado
+	// the new item is learned: later it appears alone and is masked
 	m := newTest(t)
 	m.Mask(sqlTeaches)
 	m.Mask("t_lanc_diario\nt_saldo_mes\nt_razao_aux\n")
@@ -259,9 +260,9 @@ func TestHomogeneousList(t *testing.T) {
 
 func TestHomogeneousListNegatives(t *testing.T) {
 	for _, s := range []string{
-		"t_lanc_diario\nfoo_bar\nbaz_qux\nqux_1\n",                    // menos da metade conhecida
-		"carregar(t_lanc_diario, t_saldo_mes, x_train)\n",             // argumentos de função
-		"t_lanc_diario\nt_saldo_mes\nresumo\npronto\n",                // sem cara de identificador
+		"t_lanc_diario\nfoo_bar\nbaz_qux\nqux_1\n",                    // less than half known
+		"carregar(t_lanc_diario, t_saldo_mes, x_train)\n",             // function arguments
+		"t_lanc_diario\nt_saldo_mes\nresumo\npronto\n",                // without identifier shape
 		"t_lanc_diario, t_saldo_mes, relatorio_final.pdf\n",           // arquivo
 		"      12 build_cache\n       7 notas_reuniao\n       3 ok\n", // nada conhecido
 		"fin_contab.read_csv(arquivo)\n",                              // chamada
@@ -280,7 +281,7 @@ func TestHomogeneousListNegatives(t *testing.T) {
 	}
 }
 
-// Um nome aprendido é mascarado dentro de qualquer forma solta
+// A learned name is masked inside any loose form
 func TestPropagationLooseForms(t *testing.T) {
 	shapes := []struct{ name, text string }{
 		{"f-string", `print(f"carregando fin_contab.t_lanc_diario em {destino}")` + "\n" + `log.info(f"t_saldo_mes: {n} linhas")` + "\n"},

@@ -7,9 +7,9 @@ import (
 	"testing"
 )
 
-// Ida e volta: o valor é mascarado com contexto, o modelo o repete num texto neutro, o
-// proxy desmascara para o usuário e, na mensagem seguinte, o histórico volta com o valor
-// real SEM o contexto. Ele tem que ser mascarado de novo (e com o mesmo pseudônimo).
+// Round trip: the value is masked with context, the model repeats it in a neutral text, the proxy
+// unmasks it for the user and, in the next message, the history comes back with the real value
+// WITHOUT the context. It has to be masked again (and with the same pseudonym).
 func TestRoundTripWithoutContext(t *testing.T) {
 	cpf := strings.NewReplacer(".", "", "-", "").Replace(genCPF("529982247"))
 	cases := []struct{ name, original, real string }{
@@ -34,7 +34,7 @@ func TestRoundTripWithoutContext(t *testing.T) {
 			continue
 		}
 		response := "Anotado: o valor " + ents[0].Pseudo + " foi registrado."
-		history := NewTable(ents).Unmask(response, false) // é o que o Claude Code guarda
+		history := NewTable(ents).Unmask(response, false) // it is what Claude Code keeps
 		if !strings.Contains(history, c.real) {
 			t.Fatalf("%s: desmascarar falhou: %q", c.name, history)
 		}
@@ -47,8 +47,8 @@ func TestRoundTripWithoutContext(t *testing.T) {
 	}
 }
 
-// Depois de um reinício do proxy a memória some; só os hashes em disco restam. O valor
-// repetido sem contexto ainda tem que ser reconhecido.
+// After a proxy restart the memory is gone; only the hashes on disk remain. The value repeated
+// without context still has to be recognized.
 func TestRoundTripAfterRestart(t *testing.T) {
 	dir := t.TempDir()
 	newOne := func() *Masker {
@@ -69,7 +69,7 @@ func TestRoundTripAfterRestart(t *testing.T) {
 	if b, _ := os.ReadFile(dir + "/vistos.json"); strings.Contains(string(b), "12.345") || strings.Contains(string(b), "Xk9mP2") {
 		t.Fatalf("valor legível gravado em disco: %s", b)
 	}
-	m2 := newOne() // "reiniciou": memória vazia
+	m2 := newOne() // "restarted": empty memory
 	for _, real := range []string{"12.345.678-9", "Xk9mP2qL7vT4zR8w", "01310-100", "11 98765-4321"} {
 		if out, _ := m2.Mask("o valor " + real + " apareceu de novo"); strings.Contains(out, real) {
 			t.Errorf("após reinício, vazou: %q", out)
@@ -77,8 +77,8 @@ func TestRoundTripAfterRestart(t *testing.T) {
 	}
 }
 
-// O valor apareceu solto ANTES de ser aprendido: o resultado memorizado daquele texto
-// tem que ser refeito quando o valor vira conhecido.
+// The value appeared loose BEFORE being learned: the memoized result of that text has to be redone
+// when the value becomes known.
 func TestMemoRedoneWhenLearning(t *testing.T) {
 	m := newTest(t)
 	looseOne := "pedido referente a 12.345.678-9 em análise"
@@ -91,8 +91,8 @@ func TestMemoRedoneWhenLearning(t *testing.T) {
 	}
 }
 
-// Aprender um número curto não pode fazer números parecidos virarem dado sensível, e a
-// mesma numeração com outra pontuação é reconhecida e volta sem conflito.
+// Learning a short number cannot make similar numbers become sensitive data, and the same numbering
+// with other punctuation is recognized and comes back without conflict.
 func TestKnownWithoutFalsePositive(t *testing.T) {
 	m := newTest(t)
 	m.Mask("agência 4321-0")
@@ -111,8 +111,8 @@ func TestKnownWithoutFalsePositive(t *testing.T) {
 	}
 }
 
-// Depois de um reinício só o hash existe. Quando o valor é reconhecido pelo hash, ele volta
-// para a memória; daí em diante é pego também grudado em outra coisa.
+// After a restart only the hash exists. When the value is recognized by the hash, it goes back to
+// the memory; from then on it is caught also glued to something else.
 func TestRecognizedByHashReturnsToMemory(t *testing.T) {
 	dir := t.TempDir()
 	vs, _ := LoadSeen(dir + "/v.json")
@@ -121,8 +121,8 @@ func TestRecognizedByHashReturnsToMemory(t *testing.T) {
 	vs.SaveIfDirty()
 
 	vs2, _ := LoadSeen(dir + "/v.json")
-	m2, _ := NewMasker(m.cfg, testKey, nil, vs2) // "reiniciou": memória vazia
-	// primeira aparição depois do reinício já grudada, sem palavra-chave: pega pelos pedaços
+	m2, _ := NewMasker(m.cfg, testKey, nil, vs2) // "restarted": empty memory
+	// first appearance after the restart already glued, without a keyword: caught by the pieces
 	for _, stuck := range []string{"GET /x?a=1&k=Ficticia@2024&b=2", "mysql://app:Ficticia@2024@db1:3306/x", "v=Ficticia@2024"} {
 		vs3, _ := LoadSeen(dir + "/v.json")
 		m3, _ := NewMasker(m.cfg, testKey, nil, vs3)
@@ -133,13 +133,13 @@ func TestRecognizedByHashReturnsToMemory(t *testing.T) {
 	if out, _ := m2.Mask("erro ao logar com Ficticia@2024 no banco"); strings.Contains(out, "Ficticia@2024") {
 		t.Fatalf("solto, depois do reinício, deveria ser pego pelo hash: %s", out)
 	}
-	// reconhecido pelo hash, volta para a memória: daí em diante é pego em qualquer posição
+	// recognized by the hash, goes back to the memory: from then on it is caught in any position
 	if out, _ := m2.Mask("xFicticia@2024;y e (Ficticia@2024)"); strings.Count(out, "Ficticia@2024") != 1 {
 		t.Fatalf("esperava só a ocorrência colada em letra sem máscara: %s", out)
 	}
 }
 
-// A busca pelo índice tem que achar exatamente o que a busca ingênua (valor por valor) acha.
+// The index search has to find exactly what the naive search (value by value) finds.
 func TestScanEqualsNaiveSearch(t *testing.T) {
 	c := newKnown()
 	vals := []string{"Xk9$mQ2vLp7w", "12.345.678-9", "1234-5", "abcd", "abcdef", "Xk9$", "ção-ñ9"}
@@ -172,7 +172,7 @@ func TestScanEqualsNaiveSearch(t *testing.T) {
 	}
 }
 
-// A memória em RAM tem teto; o que sai dela continua reconhecido pelo hash em disco.
+// The RAM memory has a ceiling; what leaves it stays recognized by the hash on disk.
 func TestKnownHasCap(t *testing.T) {
 	vs, _ := LoadSeen(t.TempDir() + "/v.json")
 	m, _ := NewMasker(newTest(t).cfg, testKey, nil, vs)
@@ -193,7 +193,7 @@ func TestKnownHasCap(t *testing.T) {
 	if out, _ := m.Mask("erro com Zq8wPrimeiroValor01 no log"); strings.Contains(out, "Zq8wPrimeiroValor01") {
 		t.Fatalf("valor que saiu da RAM vazou: %s", out)
 	}
-	// texto memorizado antes da saída: não dá mais para conferir, então é refeito
+	// text memoized before leaving: it can no longer be checked, so it is redone
 	if !m.known.containsSince("qualquer", 0) {
 		t.Fatal("geração anterior ao teto deveria forçar refazer")
 	}
@@ -209,16 +209,16 @@ func TestSeenHasCap(t *testing.T) {
 	}
 }
 
-// Item 4 (revisão externa): um valor que passou em claro num texto e só depois foi aprendido
-// (em outra grafia) não pode continuar em claro quando o histórico é reenviado. O memo do
-// texto antigo tem que ser refeito.
+// Item 4 (external review): a value that went out in the clear in a text and was only learned later
+// (in another spelling) cannot stay in the clear when the history is resent. The memo of the old
+// text has to be redone.
 func TestMemoRedoneWhenLearningOtherSpelling(t *testing.T) {
 	m := newTest(t)
 	old := "linha 7: 123456789;ATIVO"
 	if out, _ := m.Mask(old); !strings.Contains(out, "123456789") {
 		t.Skip("premissa mudou: o número já é mascarado sozinho")
 	}
-	m.Mask("RG: 12.345.678-9`") // aprende o mesmo número, com pontuação
+	m.Mask("RG: 12.345.678-9`") // learns the same number, with punctuation
 	if out, _ := m.Mask(old); strings.Contains(out, "123456789") {
 		t.Fatalf("o texto antigo continuou em claro depois de o valor ser aprendido: %q", out)
 	}

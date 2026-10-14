@@ -12,7 +12,7 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/mask"
 )
 
-// almostFourThousand: um texto de pouco menos de 4000 bytes, cheio de e-mails curtos.
+// almostFourThousand: a text of a little under 4000 bytes, full of short e-mails.
 func almostFourThousand() string {
 	var b strings.Builder
 	for i := 0; b.Len() < 3900; i++ {
@@ -21,7 +21,7 @@ func almostFourThousand() string {
 	return b.String()
 }
 
-// outputOf roda f e devolve o que ela escreveu na saída padrão.
+// outputOf runs f and returns what it wrote to standard output.
 func outputOf(t *testing.T, f func() error) string {
 	t.Helper()
 	stale := os.Stdout
@@ -40,9 +40,9 @@ func outputOf(t *testing.T, f func() error) string {
 	return string(b)
 }
 
-// "llm-dlp simulate" repete também o arquivo de um subagente (subagents/agent-*.jsonl), em que toda
-// mensagem é lateral (isSidechain). No arquivo da sessão, as laterais continuam puladas. Um arquivo
-// sem nada para repetir avisa, em vez de mostrar zeros que parecem "tudo certo".
+// "llm-dlp simulate" also replays a subagent's file (subagents/agent-*.jsonl), in which every
+// message is a side chain (isSidechain). In the session file, side chains are still skipped. A file
+// with nothing to replay warns, instead of showing zeros that look like "all good".
 func TestSimulateReadsSubagent(t *testing.T) {
 	t.Setenv("LLM_DLP_HOME", t.TempDir())
 	cfg := config.Default()
@@ -76,8 +76,8 @@ func TestSimulateReadsSubagent(t *testing.T) {
 		{"subagente", conversation(true), "2 requisições simuladas"},
 		{"sessão com subagente no meio", append(conversation(false), conversation(true)...), "2 requisições simuladas"},
 		{"sem mensagem", []string{`{"type":"summary","summary":"x"}`}, "ATENÇÃO: nenhuma requisição"},
-		// abaixo de 4000 bytes, mas acima disso depois de mascarado (o pseudônimo de um e-mail
-		// curto é maior que ele): o eco da API falsa é cortado e não conta como diferença
+		// below 4000 bytes, but above that after masking (the pseudonym of a short e-mail is longer
+		// than it): the fake API's echo is cut and does not count as a difference
 		{"texto que cresce ao mascarar", []string{line("user", false, almostFourThousand())}, "resposta voltou diferente do original: 0"},
 	} {
 		file := filepath.Join(dir, strings.ReplaceAll(c.name, " ", "_")+".jsonl")

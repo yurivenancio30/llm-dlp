@@ -7,8 +7,8 @@ import (
 	"testing"
 )
 
-// Reader de teste: as regras de verdade chegam nos lotes seguintes. "TABLE x" e "HOST x" são
-// posição forte; "tab x" e "ref x" são fracas (cada uma é uma regra); "COLUMN x" é coluna.
+// Test reader: the real rules come in the following batches. "TABLE x" and "HOST x" are a strong
+// position; "tab x" and "ref x" are weak (each one is a rule); "COLUMN x" is a column.
 var reStrongTest = regexp.MustCompile(`\b(TABLE|HOST|COLUMN) ([\w.\-]+)`)
 var reWeakTest = regexp.MustCompile(`\b(tab|ref) ([\w.\-]+)`)
 
@@ -48,7 +48,7 @@ func TestObjectPseudonym(t *testing.T) {
 	if b := m.Pseudonym("obj.coluna", "tb_pedido_x9"); b[2:] == a[2:] {
 		t.Errorf("tipos diferentes deveriam ter IDs diferentes")
 	}
-	// estável entre instâncias (reinício) com a mesma chave; outro com outra chave
+	// stable across instances (restart) with the same key; another one with another key
 	m2, _ := NewMasker(m.cfg, testKey, nil, nil)
 	if m2.Pseudonym("obj.tabela", "tb_pedido_x9") != a {
 		t.Errorf("pseudônimo mudou com outra instância da mesma chave")
@@ -86,7 +86,7 @@ func TestStrongObjectPropagates(t *testing.T) {
 			t.Errorf("não propagou: %q", out)
 		}
 	}
-	// pedaço de outro nome não é o nome
+	// a piece of another name is not the name
 	if out, _ := m.Mask("a tb_pedido_x9_hist e a xtb_pedido_x9"); !strings.Contains(out, "tb_pedido_x9_hist") || !strings.Contains(out, "xtb_pedido_x9") {
 		t.Errorf("mascarou pedaço de outro nome: %q", out)
 	}
@@ -194,8 +194,8 @@ func TestObjectAfterRestartAndValidity(t *testing.T) {
 	}
 }
 
-// Ida e volta: o pseudônimo que o modelo escreve, em qualquer das duas caixas do prefixo,
-// volta ao nome real.
+// Round trip: the pseudonym the model writes, in either case of the prefix, goes back to the real
+// name.
 func TestRoundTripObject(t *testing.T) {
 	m := withReader(t)
 	out, ents := m.Mask("SELECT * FROM x; TABLE tb_ida_01")
@@ -214,7 +214,8 @@ func TestRoundTripObject(t *testing.T) {
 	}
 }
 
-// Name aprendido depois não muda o texto que já saiu (congelamento), mas vale para texto novo.
+// A name learned later does not change the text that already went out (freezing), but applies to
+// new text.
 func TestLearnedObjectKeepsWhatWasSent(t *testing.T) {
 	m := withReader(t)
 	old := "a carga da tb_cong_01 falhou"
@@ -230,8 +231,8 @@ func TestLearnedObjectKeepsWhatWasSent(t *testing.T) {
 	}
 }
 
-// Name com a forma de um pseudônimo (prefixo de tipo + 8 letras) não é pulado: só é
-// pulado o pseudônimo que nós mesmos geramos.
+// A name with the shape of a pseudonym (type prefix + 8 letters) is not skipped: only the pseudonym
+// we generated ourselves is skipped.
 func TestNameShapedLikePseudonymIsMasked(t *testing.T) {
 	m := newTest(t)
 	for _, n := range []string{"t_transactions", "t_customer", "repo_services", "org_platform", "pkg_payments", "dir_archives", "acc_billings"} {
@@ -243,7 +244,7 @@ func TestNameShapedLikePseudonymIsMasked(t *testing.T) {
 			t.Errorf("prosa: %q ficou em claro: %q", n, out)
 		}
 	}
-	// o pseudônimo que nós geramos não é mascarado de novo
+	// the pseudonym we generated is not masked again
 	out, _ := m.Mask("SELECT id_x FROM tb_ja_x1 WHERE a = 1 AND b = 2")
 	p := rePseudoT.FindString(out)
 	if p == "" {
@@ -254,7 +255,7 @@ func TestNameShapedLikePseudonymIsMasked(t *testing.T) {
 	}
 }
 
-// Item 4a: caixa só é ignorada nos tipos de SQL; nos outros, cada grafia é um nome.
+// Item 4a: case is only ignored in the SQL types; in the others, each spelling is a name.
 func TestCaseOnlyInSQLTypes(t *testing.T) {
 	m := newTest(t)
 	if m.Pseudonym("obj.tabela", "TB_X1") == "" || m.Pseudonym("obj.tabela", "TB_X1")[2:] != m.Pseudonym("obj.tabela", "tb_x1")[2:] {
@@ -275,8 +276,8 @@ func TestCaseOnlyInSQLTypes(t *testing.T) {
 	}
 }
 
-// Ajuste final 1: servidor (nome DNS) é insensível à caixa: aprendido em minúsculas, é
-// mascarado em maiúsculas e em caixa mista, e volta com a grafia do texto.
+// Final adjustment 1: server (DNS name) is case-insensitive: learned in lowercase, it is masked in
+// uppercase and in mixed case, and comes back with the spelling of the text.
 func TestServerWithoutCase(t *testing.T) {
 	m := newTest(t)
 	m.Mask("DB_HOST=sqlprd01\n")

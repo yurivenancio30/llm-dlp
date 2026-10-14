@@ -8,20 +8,20 @@ import (
 	"strings"
 )
 
-// IPv4 interno pelo próprio dado, além da forma com pontos (detectors_format.go): a faixa
-// compartilhada dos provedores, o endereço escrito com hífens dentro do nome de uma máquina e
-// o nome reverso do DNS. Todos viram o mesmo IP falso (240.0.0.0/4), na mesma grafia.
+// Internal IPv4 by the data itself, beyond the dotted form (detectors_format.go): the providers'
+// shared range, the address written with hyphens inside a machine name and the DNS reverse name.
+// All become the same fake IP (240.0.0.0/4), in the same spelling.
 
-// sharedNetwork: 100.64.0.0/10, "Shared Address Space" (RFC 6598): rede interna de
-// provedor (CGNAT), também usada por VPNs e clusters; não é roteável na internet.
+// sharedNetwork: 100.64.0.0/10, "Shared Address Space" (RFC 6598): a provider's internal network
+// (CGNAT), also used by VPNs and clusters; not routable on the internet.
 var sharedNetwork = netip.MustParsePrefix("100.64.0.0/10")
 
-// internalIP: IPv4 de rede interna: privado (RFC 1918) ou compartilhado (RFC 6598).
+// internalIP: internal network IPv4: private (RFC 1918) or shared (RFC 6598).
 func internalIP(a netip.Addr) bool {
 	return a.Is4() && (a.IsPrivate() || sharedNetwork.Contains(a)) && !fakeNet.Contains(a)
 }
 
-// digitHyphenDigit: pré-filtro barato de findHyphenIP (um dígito, hífen, dígito).
+// digitHyphenDigit: cheap prefilter of findHyphenIP (a digit, a hyphen, a digit).
 func digitHyphenDigit(s string) bool {
 	for i := strings.IndexByte(s, '-'); i >= 0; {
 		if i > 0 && i+1 < len(s) && isDig(s[i-1]) && isDig(s[i+1]) {
@@ -36,22 +36,22 @@ func digitHyphenDigit(s string) bool {
 	return false
 }
 
-// findHyphenIP chama f para cada IPv4 escrito com hífens (quatro números de 1 a 3 dígitos) num
-// nome de máquina. As formas documentadas:
-//   - AWS, nome privado da instância: ip-10-42-7-15.ec2.internal,
-//     ip-10-42-7-15.sa-east-1.compute.internal (e o nome sozinho, no prompt: ubuntu@ip-10-42-7-15)
-//   - AWS, nome público: ec2-52-14-88-21.compute-1.amazonaws.com
+// findHyphenIP calls f for each IPv4 written with hyphens (four numbers of 1 to 3 digits) in a
+// machine name. The documented forms:
+//   - AWS, private instance name: ip-10-42-7-15.ec2.internal,
+//     ip-10-42-7-15.sa-east-1.compute.internal (and the name alone, in the prompt: ubuntu@ip-10-42-7-15)
+//   - AWS, public name: ec2-52-14-88-21.compute-1.amazonaws.com
 //     (https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/hostname-types.html)
 //   - Kubernetes, pod: 172-17-0-3.default.pod.cluster.local
 //     (https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/)
 //
-// Vale logo depois de "ip-" ou "ec2-", ou como o primeiro rótulo de um nome com mais rótulos
-// depois ("172-17-0-3.default..."). Fora disso ("versão 10-1-2-3") não é IP. pre: onde começa
-// o rótulo, com o "ip-"/"ec2-"; ini e fim: só os números.
+// It counts right after "ip-" or "ec2-", or as the first label of a name with more labels after it
+// ("172-17-0-3.default..."). Outside that ("versão 10-1-2-3") it is not an IP. pre: where the label
+// starts, with the "ip-"/"ec2-"; start and end: only the numbers.
 func findHyphenIP(s string, f func(pre, ini, end int, a netip.Addr)) {
 	glued := func(c byte) bool { return isAlnum(c) || c == '-' || c == '_' || c == '.' }
-	// fim dos quatro números a partir de i, ou -1 (sem regex: em "ec2-52-14-88-21" uma regex
-	// casaria "2-52-14-88" e pularia o endereço)
+	// end of the four numbers from i, or -1 (without regex: in "ec2-52-14-88-21" a regex would
+	// match "2-52-14-88" and skip the address)
 	four := func(i int) int {
 		for g := 0; g < 4; g++ {
 			n := 0
@@ -97,11 +97,11 @@ func findHyphenIP(s string, f func(pre, ini, end int, a netip.Addr)) {
 	}
 }
 
-// reReverseV4: nome reverso de IPv4 (RFC 1035, 3.5): os octetos ao contrário mais
-// in-addr.arpa. Com 4 octetos é um endereço; com 3, a zona de uma rede /24.
+// reReverseV4: IPv4 reverse name (RFC 1035, 3.5): the octets reversed plus in-addr.arpa. With 4
+// octets it is an address; with 3, the zone of a /24 network.
 var reReverseV4 = regexp.MustCompile(`(?i)\b(?:\d{1,3}\.){2,3}\d{1,3}\.in-addr\.arpa\b`)
 
-// findReverseV4 chama f para cada nome reverso de IPv4 interno; o trecho inclui o sufixo.
+// findReverseV4 calls f for each reverse name of an internal IPv4; the piece includes the suffix.
 func findReverseV4(s string, f func(ini, end int)) {
 	for _, ix := range reReverseV4.FindAllStringIndex(s, -1) {
 		if ix[0] > 0 && (isAlnum(s[ix[0]-1]) || s[ix[0]-1] == '.' || s[ix[0]-1] == '-') {
@@ -119,7 +119,7 @@ func findReverseV4(s string, f func(ini, end int)) {
 	}
 }
 
-// reverseOctets: os octetos de "15.7.42.10.in-addr.arpa" na ordem normal (10, 42, 7, 15).
+// reverseOctets: the octets of "15.7.42.10.in-addr.arpa" in normal order (10, 42, 7, 15).
 func reverseOctets(v string) ([]byte, bool) {
 	i := strings.Index(strings.ToLower(v), ".in-addr.arpa")
 	if i < 0 {
@@ -137,9 +137,10 @@ func reverseOctets(v string) ([]byte, bool) {
 	return o, len(o) == 3 || len(o) == 4
 }
 
-// pseudoIP: o IPv4 falso na grafia do real. A rede /24 vira outra, na faixa reservada
-// 240.0.0.0/4 (RFC 1112), sempre a mesma para a mesma rede; o último octeto fica. Grafias: com
-// pontos, com hífens (nome de máquina) e ao contrário (nome reverso, também da zona /24).
+// pseudoIP: the fake IPv4 in the spelling of the real one. The /24 network becomes another one, in
+// the reserved range 240.0.0.0/4 (RFC 1112), always the same for the same network; the last octet
+// stays. Spellings: with dots, with hyphens (machine name) and reversed (reverse name, also of the
+// /24 zone).
 func (m *Masker) pseudoIP(real string) string {
 	fakeVal := func(o []byte) []byte {
 		h := m.p.Bits("rede24", fmt.Sprintf("%d.%d.%d", o[0], o[1], o[2]), 3)

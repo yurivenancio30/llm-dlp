@@ -13,49 +13,50 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/mask"
 )
 
-// Format da API do Gemini (generateContent, streamGenerateContent, countTokens): o que o Gemini
-// CLI, o opencode e as SDKs do Google mandam.
+// Gemini API format (generateContent, streamGenerateContent, countTokens): what Gemini CLI,
+// opencode and Google's SDKs send.
 //
-// A ida não tem um mascarador próprio. A requisição é vista na forma da Anthropic (geminiBridge) e
-// passa pelo mesmo caminho de /v1/messages: a memória da conversa, o rastreamento, as dicas dos
-// comandos, o congelamento do que já saiu e o tratamento de imagens valem igual. O que muda de
-// nome:
+// The outbound side has no masker of its own. The request is seen in the Anthropic shape
+// (geminiBridge) and goes through the same path as /v1/messages: the conversation memory, tracing,
+// command hints, freezing of what already went out and image handling apply the same. What changes
+// name:
 //
 //	systemInstruction.parts[].text          -> system
-//	tools[].functionDeclarations[]          -> tools (descrição e schema)
-//	contents[] com role "model"             -> mensagem do assistente
-//	parts[].text                            -> bloco de texto
-//	parts[].text com "thought": true        -> raciocínio (não muda, como o thinking)
+//	tools[].functionDeclarations[]          -> tools (description and schema)
+//	contents[] with role "model"            -> assistant message
+//	parts[].text                            -> text block
+//	parts[].text with "thought": true       -> reasoning (unchanged, like thinking)
 //	parts[].functionCall {name, args}       -> tool_use
-//	parts[].functionResponse {name, response} -> tool_result (cada texto de response)
-//	parts[].inlineData {mimeType, data}     -> imagem ou PDF (OCR)
+//	parts[].functionResponse {name, response} -> tool_result (each text of response)
+//	parts[].inlineData {mimeType, data}     -> image or PDF (OCR)
 //
-// Os textos são mascarados no lugar: os mapas da requisição original são os mesmos que o
-// mascarador percorre, e o que ele devolve em bloco novo é copiado de volta (voltar).
+// Texts are masked in place: the maps of the original request are the same ones the masker walks,
+// and what it returns in a new block is copied back (goBack).
 
-// partMark: no bloco criado pela ponte, o índice da parte de onde ele veio.
+// partMark: in the block created by the bridge, the index of the part it came from.
 const partMark = "\x00parte"
 
-// parâmetros do Gemini que não levam dado do usuário (ou que não podem mudar)
+// Gemini parameters that carry no user data (or that cannot change)
 var geminiParams = map[string]bool{"contents": true, "tools": true, "systemInstruction": true, "system_instruction": true,
 	"generationConfig": true, "generation_config": true, "safetySettings": true, "safety_settings": true,
 	"toolConfig": true, "tool_config": true, "cachedContent": true, "cached_content": true, "model": true,
 	"labels": true, "serviceTier": true, "service_tier": true, "store": true, "session_id": true}
 
-// O Gemini CLI com a conta Google (Login with Google) não fala com a API do Gemini: fala com a
-// API do Code Assist (cloudcode-pa.googleapis.com/v1internal:<método>), apontada pela variável
-// CODE_ASSIST_ENDPOINT. A conversa vai no formato do Gemini dentro de "request" ({model, project,
-// user_prompt_id, request: {contents, systemInstruction, tools...}}), e a resposta volta dentro de
-// "response" ({response: {candidates...}, traceId}). Os métodos da conta (login, cota,
-// experimentos) não levam conversa e passam como vieram.
+// Gemini CLI with the Google account (Login with Google) does not talk to the Gemini API: it talks
+// to the Code Assist API (cloudcode-pa.googleapis.com/v1internal:<method>), pointed by the
+// CODE_ASSIST_ENDPOINT variable. The conversation goes in the Gemini format inside "request"
+// ({model, project, user_prompt_id, request: {contents, systemInstruction, tools...}}), and the
+// response comes back inside "response" ({response: {candidates...}, traceId}). The account methods
+// (login, quota, experiments) carry no conversation and pass as they came.
 var accountMethods = map[string]bool{"loadCodeAssist": true, "onboardUser": true, "getCodeAssistGlobalUserSetting": true,
 	"setCodeAssistGlobalUserSetting": true, "listExperiments": true, "retrieveUserQuota": true, "fetchAdminControls": true}
 
-// accountFormat: um método da conta do Code Assist (ver accountMethods): passa sem mudar nada.
+// accountFormat: a Code Assist account method (see accountMethods): passes without changing
+// anything.
 const accountFormat = "codeassist-conta"
 
-// codeAssistBridge: a requisição do Gemini que vai dentro de "request", vista como a do Gemini. O
-// envelope (modelo, projeto, ids) não muda.
+// codeAssistBridge: the Gemini request that goes inside "request", seen as the Gemini one. The
+// envelope (model, project, ids) does not change.
 func codeAssistBridge(v any) (map[string]any, func(), bool) {
 	req, _ := v.(map[string]any)
 	in, ok := req["request"].(map[string]any)
@@ -74,8 +75,8 @@ func field(m map[string]any, names ...string) (any, string) {
 	return nil, names[0]
 }
 
-// geminiIDs casa cada functionResponse com a sua functionCall. O Gemini mais novo manda um id;
-// sem ele, vale a ordem: a n-ésima resposta de um nome é da n-ésima chamada desse nome.
+// geminiIDs matches each functionResponse with its functionCall. Newer Gemini sends an id; without
+// it, order applies: the n-th response of a name belongs to the n-th call of that name.
 type geminiIDs struct{ calls, replies map[string]int }
 
 func (g *geminiIDs) de(m map[string]any, cnt map[string]int) string {
@@ -87,7 +88,7 @@ func (g *geminiIDs) de(m map[string]any, cnt map[string]int) string {
 	return fmt.Sprintf("g:%s:%d", name, cnt[name])
 }
 
-// folhas chama f para cada string de v (objetos em ordem de chave), com como gravá-la de volta.
+// leaves calls f for each string of v (objects in key order), with how to write it back.
 func leaves(v any, saveIt func(any), f func(s string, saveIt func(any))) {
 	switch x := v.(type) {
 	case string:
@@ -105,9 +106,9 @@ func leaves(v any, saveIt func(any), f func(s string, saveIt func(any))) {
 	}
 }
 
-// geminiBridge devolve a requisição do Gemini na forma da Anthropic e a função que, depois de
-// mascarada, copia o resultado de volta para a requisição original. ok = false: não é uma
-// requisição com "contents" (cai no modo genérico, que mascara todo texto).
+// geminiBridge returns the Gemini request in the Anthropic shape and the function that, after
+// masking, copies the result back to the original request. ok = false: not a request with
+// "contents" (falls into generic mode, which masks all text).
 func geminiBridge(v any) (map[string]any, func(), bool) {
 	req, _ := v.(map[string]any)
 	if req == nil {
@@ -131,7 +132,7 @@ func geminiBridge(v any) (map[string]any, func(), bool) {
 			list, _ := fds.([]any)
 			for _, fd := range list {
 				if m, ok := fd.(map[string]any); ok {
-					tools = append(tools, m) // o mesmo mapa: descrição e schema são mascarados no lugar
+					tools = append(tools, m) // the same map: description and schema are masked in place
 				}
 			}
 		}
@@ -180,7 +181,8 @@ func geminiBridge(v any) (map[string]any, func(), bool) {
 			text, hasText := pm["text"].(string)
 			switch {
 			case pm["thought"] == true:
-				// resumo do raciocínio: o modelo só viu pseudônimos e a volta não o desmascara
+				// reasoning summary: the model only saw pseudonyms and the return path does not
+				// unmask it
 				b["type"], b["thinking"] = "thinking", pm["text"]
 			case fc != nil:
 				fm, _ := fc.(map[string]any)
@@ -204,7 +206,8 @@ func geminiBridge(v any) (map[string]any, func(), bool) {
 				case strings.HasPrefix(typ, "image/"):
 					b["type"] = "image"
 				default:
-					// áudio, vídeo e outros: não há como verificar; não sai (falha fechada)
+					// audio, video and others: there is no way to check; does not go out (fail
+					// closed)
 					delete(b, partMark)
 					b["type"], b["text"] = "text", "[llm-dlp] Um arquivo anexado foi retirado daqui e não foi enviado: o llm-dlp só consegue verificar imagem e PDF. Avise o usuário."
 				}
@@ -214,9 +217,9 @@ func geminiBridge(v any) (map[string]any, func(), bool) {
 			case hasText:
 				b["type"], b["text"] = "text", text
 			case pm["fileData"] != nil || pm["file_data"] != nil || pm["executableCode"] != nil || pm["codeExecutionResult"] != nil:
-				b["type"] = "server_tool_use" // já está do lado da API, ou foi ela que gerou: não muda
+				b["type"] = "server_tool_use" // already on the API side, or the API generated it: unchanged
 			default:
-				b["type"], b["parte"] = "parte desconhecida", pm // mascara todo texto dela, por precaução
+				b["type"], b["parte"] = "parte desconhecida", pm // masks all of its text, as a precaution
 			}
 			blocks = append(blocks, b)
 		}
@@ -227,7 +230,7 @@ func geminiBridge(v any) (map[string]any, func(), bool) {
 	anth["messages"] = msgs
 
 	for _, k := range keys(req) {
-		if !geminiParams[k] { // campo que não conheço: mascara por precaução, como na Anthropic
+		if !geminiParams[k] { // field I do not know: mask as a precaution, as with Anthropic
 			k := k
 			anth["gemini:"+k] = req[k]
 			returns = append(returns, func() { req[k] = anth["gemini:"+k] })
@@ -240,9 +243,9 @@ func geminiBridge(v any) (map[string]any, func(), bool) {
 	}, true
 }
 
-// partsOf: os blocos de uma mensagem já mascarada, de volta como partes do Gemini. O bloco que
-// veio de uma parte atualiza a própria parte (e mantém o que mais ela tinha, como a
-// thoughtSignature); o bloco novo (a nota do llm-dlp, a página de um PDF) vira uma parte nova.
+// partsOf: the blocks of an already masked message, back as Gemini parts. The block that came from
+// a part updates that part (and keeps whatever else it had, like the thoughtSignature); a new block
+// (the llm-dlp note, a PDF page) becomes a new part.
 func partsOf(content any, parts []map[string]any) []any {
 	blocks, _ := content.([]any)
 	out := make([]any, 0, len(blocks))
@@ -267,7 +270,7 @@ func partsOf(content any, parts []map[string]any) []any {
 				fc.(map[string]any)["args"] = b["input"]
 			}
 		case "image", "document":
-			if src["type"] != "base64" { // PDF que virou texto mascarado
+			if src["type"] != "base64" { // PDF that became masked text
 				t, _ := src["data"].(string)
 				if title, _ := b["title"].(string); title != "" {
 					t = title + "\n\n" + t
@@ -296,21 +299,21 @@ func partsOf(content any, parts []map[string]any) []any {
 
 // ---- volta --------------------------------------------------------------------------------
 
-// geminiReturn desmascara a resposta do Gemini, inteira ou em pedaços (cada pedaço do streaming é
-// uma resposta parcial). O texto passa por um Stream por candidato, que segura o pseudônimo
-// cortado entre dois pedaços; os argumentos de uma chamada de ferramenta chegam inteiros.
+// geminiReturn unmasks the Gemini response, whole or in pieces (each streaming piece is a partial
+// response). The text goes through one Stream per candidate, which holds a pseudonym cut between
+// two pieces; the arguments of a tool call arrive whole.
 type geminiReturn struct {
 	p       *Proxy
 	tab     *mask.Table
 	streams map[int]*mask.Stream
-	orig    map[int]*strings.Builder // o texto como a API mandou (quem escreveu)
+	orig    map[int]*strings.Builder // the text as the API sent it (who wrote it)
 }
 
 func (p *Proxy) newGeminiReturn(tab *mask.Table) *geminiReturn {
 	return &geminiReturn{p: p, tab: tab, streams: map[int]*mask.Stream{}, orig: map[int]*strings.Builder{}}
 }
 
-// soltar: o texto que o fluxo do candidato ainda segurava, e registra o que a API escreveu.
+// release: the text the candidate's stream was still holding, and records what the API wrote.
 func (g *geminiReturn) release(i int) string {
 	rest := ""
 	if f := g.streams[i]; f != nil {
@@ -324,7 +327,7 @@ func (g *geminiReturn) release(i int) string {
 	return rest
 }
 
-// pedaco desmascara uma resposta (ou um pedaço dela), no lugar. fim = não vem mais nada.
+// piece unmasks a response (or a piece of it), in place. end = nothing else is coming.
 func (g *geminiReturn) piece(resp map[string]any, end bool) {
 	if _, ok := resp["candidates"]; !ok {
 		if in, _ := resp["response"].(map[string]any); in != nil { // Code Assist: {response: {...}, traceId}
@@ -345,7 +348,7 @@ func (g *geminiReturn) piece(resp map[string]any, end bool) {
 		cnt, _ := cm["content"].(map[string]any)
 		ps, _ := cnt["parts"].([]any)
 		newOnes := make([]any, 0, len(ps)+1)
-		text := func(s string) { // acrescenta texto já desmascarado ao último bloco de texto
+		text := func(s string) { // appends already unmasked text to the last text block
 			if s == "" {
 				return
 			}
@@ -372,14 +375,14 @@ func (g *geminiReturn) piece(resp map[string]any, end bool) {
 				}
 				g.orig[i].WriteString(t)
 				out := g.streams[i].Push(t)
-				if len(pm) == 1 { // só o texto: junta ao anterior, ou some se o fluxo segurou tudo
+				if len(pm) == 1 { // only the text: joins the previous one, or disappears if the stream held everything
 					text(out)
 				} else {
 					pm["text"] = out
 					newOnes = append(newOnes, pm)
 				}
 			default:
-				// outra coisa depois de texto: o bloco de texto acabou
+				// something else after text: the text block is over
 				text(g.release(i))
 				if fm, _ := fc.(map[string]any); fm != nil {
 					if name, _ := fm["name"].(string); !g.p.bridgeNoUnmask(name) {
@@ -400,7 +403,7 @@ func (g *geminiReturn) piece(resp map[string]any, end bool) {
 	}
 }
 
-// resto: o que ficou segurado quando o streaming acaba sem aviso, como um pedaço a mais.
+// rest: what was held when streaming ends without notice, as one more piece.
 func (g *geminiReturn) rest() map[string]any {
 	var cands []any
 	idx := make([]int, 0, len(g.streams))
@@ -434,8 +437,8 @@ func encode(v any) []byte {
 	return bytes.TrimRight(buf.Bytes(), "\n")
 }
 
-// unmaskGeminiJSON: resposta sem streaming (um objeto) ou o streaming sem SSE (uma lista de
-// pedaços).
+// unmaskGeminiJSON: a response without streaming (an object) or streaming without SSE (a list of
+// pieces).
 func (p *Proxy) unmaskGeminiJSON(b []byte, tab *mask.Table) []byte {
 	v, ok := decode(b)
 	if !ok {
@@ -457,7 +460,7 @@ func (p *Proxy) unmaskGeminiJSON(b []byte, tab *mask.Table) []byte {
 	return encode(v)
 }
 
-// unmaskSSEGemini: streaming (alt=sse). Cada linha "data:" é um pedaço da resposta.
+// unmaskSSEGemini: streaming (alt=sse). Each "data:" line is a piece of the response.
 func (p *Proxy) unmaskSSEGemini(w http.ResponseWriter, body io.Reader, tab *mask.Table) error {
 	fl, _ := w.(http.Flusher)
 	rd := bufio.NewReaderSize(body, 64<<10)

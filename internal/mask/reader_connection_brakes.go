@@ -2,19 +2,19 @@ package mask
 
 import "strings"
 
-// Freios das regras acima de 2% nas sessões reais (TestMeasureRealSessions, só
-// contagens e formas). Pela forma e pelos vocabulários públicos que já existem.
+// Brakes of the rules above 2% in the real sessions (TestMeasureRealSessions, counts and shapes
+// only). By the shape and by the public vocabularies that already exist.
 
-// Conexão (medido nas sessões: conexão/tnsnames e conexão/uri acima de 2%). Os
-// valores públicos que as regras de conexão aprendiam tinham todos a mesma forma: palavra de
-// tipo ou de atributo seguida de número ou colada a outra ("host1", "user2", "db01", "dbName",
-// "serverHost"). É o nome de modelo de exemplo e de documentação, não nome de recurso. A
-// decisão é pela forma: no máximo dois pedaços, todos do vocabulário que já existe (entPiece,
-// entBeforeName, keyAttribute, vocabDev), com ou sem número no fim. Uma palavra só ("host")
-// já era pública. Vale só na URI de banco e no tnsnames: nas outras regras de conexão e de
-// endereço, "broker1" num bootstrap.servers continua nome (TestReaderKeyValue).
+// Connection (measured in the sessions: connection/tnsnames and connection/uri above 2%). The
+// public values the connection rules learned all had the same shape: a type or attribute word
+// followed by a number or glued to another one ("host1", "user2", "db01", "dbName", "serverHost").
+// It is an example and documentation model name, not a resource name. The decision is by shape: at
+// most two pieces, all from the vocabulary that already exists (entPiece, entBeforeName,
+// keyAttribute, vocabDev), with or without a number at the end. A single word ("host") was already
+// public. It only applies to the database URI and to tnsnames: in the other connection and address
+// rules, "broker1" in a bootstrap.servers is still a name (TestReaderKeyValue).
 
-// modelName: v é palavra(s) de tipo com número ou colada(s), sem nada de próprio.
+// modelName: v is type word(s) with a number or glued, with nothing of its own.
 func modelName(v string) bool {
 	base := strings.TrimRight(v, "0123456789")
 	if base == "" || len(v) > 24 {
@@ -31,7 +31,7 @@ func modelName(v string) bool {
 		}
 	}
 	if len(ps) == 0 || len(ps) > 2 || len(ps) == 1 && base == v {
-		return false // uma palavra sem número: as listas públicas de sempre decidem
+		return false // one word without a number: the usual public lists decide
 	}
 	for _, p := range ps {
 		_, t1 := entPiece[p]

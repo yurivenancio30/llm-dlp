@@ -6,7 +6,8 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/config"
 )
 
-// A lista só aceita uma palavra de letras; nome composto ou com dígito nunca é palavra comum.
+// The list only accepts a word of letters; a compound name or one with a digit is never a common
+// word.
 func TestCommonWord(t *testing.T) {
 	for _, v := range []string{"conta", "CONTA", "Tabela", "linhagem", "\"status\"", "[relatório]"} {
 		if !commonWord(v) {
@@ -20,8 +21,8 @@ func TestCommonWord(t *testing.T) {
 	}
 }
 
-// Term cadastrado sempre vence: o nome que o modelo escreveu antes não é dele se contém um
-// termo, e palavra comum que é termo não fica em claro.
+// A registered term always wins: the name the model wrote before is not its own if it contains a
+// term, and a common word that is a term does not stay in plain text.
 func TestTermBeatsModelAndCommonWord(t *testing.T) {
 	cfg := config.Default()
 	cfg.Terms = []config.Term{{Label: "empresa", Values: []string{"Azul"}}}

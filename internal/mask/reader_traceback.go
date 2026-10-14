@@ -5,23 +5,23 @@ import (
 	"strings"
 )
 
-// Reader de traceback (ver docs/pt-BR/structures.md, seção Público só com prova). Num erro, cada linha
-// do traceback diz de onde veio, como os caminhos de include de um compilador separam o cabeçalho
-// do sistema do cabeçalho do projeto: a linha que aponta para uma dependência ou para a
-// biblioteca padrão (site-packages, node_modules, go/pkg/mod, .m2, /usr/lib/python3.x, o runtime
-// do Go) é código do fornecedor e fica; a que aponta para outro lugar é código do cliente: a
-// função, os identificadores da linha de código e, no fim, o valor citado no erro (KeyError:
-// 'COD_APOLICE') são nomes dele. As pastas do caminho ficam com os leitores de caminho.
+// Traceback reader (see docs/structures.md, section Public only with proof). In an error, each
+// traceback line says where it came from, the way a compiler's include paths separate system
+// headers from project headers: the line pointing to a dependency or to the standard library
+// (site-packages, node_modules, go/pkg/mod, .m2, /usr/lib/python3.x, the Go runtime) is vendor code
+// and stays; one pointing elsewhere is customer code: the function, the identifiers of the code
+// line and, at the end, the value cited in the error (KeyError: 'COD_APOLICE') are its names. The
+// path folders are left to the path readers.
 //
-// Formatos: Python (File "x", line N, in f + a linha de código), Java/Kotlin/Scala
-// (at pacote.Class.metodo(Arquivo.java:N)), JavaScript (at f (caminho:L:C)) e Go
-// (pacote.Funcao(...) + a linha com o caminho).
+// Formats: Python (File "x", line N, in f + the code line), Java/Kotlin/Scala (at
+// package.Class.method(File.java:N)), JavaScript (at f (path:L:C)) and Go (package.Function(...) +
+// the line with the path).
 //
-// Estar numa pasta de dependências não basta (ver thirdPartyPath): o pacote instalado tem de
-// ser software público (public_software.txt, Imagem Oficial) e não ser definido no projeto
-// (sombreamento); o módulo no cache do Go, do Maven, do Gradle ou do Cargo tem de ser de dono
-// ou grupo público. Um pacote interno do cliente instalado no ambiente virtual, ou um módulo
-// privado baixado para o cache, continua sendo do cliente.
+// Being in a dependency folder is not enough (see thirdPartyPath): the installed package has to be
+// public software (public_software.txt, Official Image) and not be defined in the project
+// (shadowing); the module in the Go, Maven, Gradle or Cargo cache has to be from a public owner or
+// group. A customer's internal package installed in the virtual environment, or a private module
+// downloaded to the cache, still belongs to the customer.
 
 var (
 	reFramePy    = regexp.MustCompile(`^\s*File "([^"\n]+)", line \d+, in ([\w<>.]+)`)
@@ -35,9 +35,9 @@ var (
 	reQuoted     = regexp.MustCompile(`'([^'\n]{2,80})'|"([^"\n]{2,80})"`)
 )
 
-// thirdPartyPath: o arquivo p (de um frame ou de uma leitura) é de dependência pública ou da
-// biblioteca padrão. Estar numa pasta de dependências não basta: o pacote tem de ser público
-// (um pacote interno do cliente é instalado e baixado para as mesmas pastas).
+// thirdPartyPath: the file p (from a frame or a read) is from a public dependency or from the
+// standard library. Being in a dependency folder is not enough: the package has to be public (a
+// customer's internal package is installed and downloaded to the same folders).
 func (m *Masker) thirdPartyPath(p string) bool {
 	p = strings.ReplaceAll(p, "\\", "/")
 	if pkg, ok := installedPackage(p); ok {
@@ -53,28 +53,29 @@ func (m *Masker) thirdPartyPath(p string) bool {
 			return c.public(p[i+len(c.folder):])
 		}
 	}
-	// a JVM e o GOROOT nos lugares de instalação conhecidos
+	// the JVM and GOROOT in the known installation places
 	for _, d := range []string{"/usr/lib/jvm/", "/usr/local/go/src/", "/usr/lib/go/", "/usr/lib/go-"} {
 		if strings.Contains(p, d) {
 			return true
 		}
 	}
-	// internos do runtime, que vêm sem pasta: <frozen importlib._bootstrap>, node:internal/...
-	// Só no começo, e sem o internal/ solto: a pasta internal/ de um projeto Go é do cliente.
+	// runtime internals, which come without a folder: <frozen importlib._bootstrap>,
+	// node:internal/... Only at the start, and without a loose internal/: the internal/ folder of a
+	// Go project belongs to the customer.
 	for _, d := range []string{"<frozen ", "node:"} {
 		if strings.HasPrefix(p, d) {
 			return true
 		}
 	}
-	// biblioteca padrão do Python: .../lib/python3.11/<módulo> (fora de site-packages). Com a
-	// versão menor: uma pasta lib/python3/ ou lib/python_etl/ de projeto não é a biblioteca.
+	// Python standard library: .../lib/python3.11/<module> (outside site-packages). With the minor
+	// version: a project's lib/python3/ or lib/python_etl/ folder is not the library.
 	return reLibPython.MatchString(p)
 }
 
-// ThirdPartyPath: o arquivo p é de dependência pública ou da biblioteca padrão, pelo critério
-// estrito (para o proxy: a leitura dele não ensina a memória da conversa). Pacote instalado com
-// nome de palavra de dicionário não conta: é o que um pacote interno do cliente costuma ter, e
-// deixar de ensinar o que ele traz seria perder nome do cliente.
+// ThirdPartyPath: the file p is from a public dependency or from the standard library, by the
+// strict criterion (for the proxy: reading it does not teach the conversation memory). An installed
+// package named with a dictionary word does not count: that is what a customer's internal package
+// usually has, and not teaching what it brings would mean missing a customer name.
 func (m *Masker) ThirdPartyPath(p string) bool {
 	if pkg, ok := installedPackage(strings.ReplaceAll(p, "\\", "/")); ok && dictionaryWord(pkg) {
 		return false
@@ -82,8 +83,8 @@ func (m *Masker) ThirdPartyPath(p string) bool {
 	return m.thirdPartyPath(p)
 }
 
-// installedPackage: o pacote de p debaixo de site-packages, dist-packages ou node_modules (a
-// última ocorrência: node_modules aninha). Escopo do npm vem junto: "@org/nome".
+// installedPackage: the package of p under site-packages, dist-packages or node_modules (the last
+// occurrence: node_modules nests). An npm scope comes along: "@org/name".
 func installedPackage(p string) (pkg string, ok bool) {
 	for _, d := range []string{"/site-packages/", "/dist-packages/", "/node_modules/"} {
 		if i := strings.LastIndex(p, d); i >= 0 {
@@ -98,15 +99,16 @@ func installedPackage(p string) (pkg string, ok bool) {
 	return "", false
 }
 
-// packageRoles: nomes de papel que um pacote ou uma pasta de código costuma ter em qualquer
-// projeto. Dizem o que a pasta faz, não de quem é: como nome de pacote instalado, é quase sempre
-// pacote interno (há repositório popular chamado "core" e "common", mas não é ele que está lá).
+// packageRoles: role names that a package or code folder usually has in any project. They say what
+// the folder does, not whose it is: as an installed package name, it is almost always an internal
+// package (there are popular repositories called "core" and "common", but that is not what is
+// there).
 var packageRoles = setOf("core", "common", "commons", "util", "utils", "shared", "lib", "libs", "config", "configs",
 	"models", "helpers", "services", "domain", "infra", "backend", "frontend", "web", "site", "project", "package")
 
-// dependencyPackage: o pacote instalado é software público: nome de repositório popular ou
-// Imagem Oficial (pandas, requests, express); no npm com escopo, o escopo público (@types,
-// @aws-sdk). Name de papel (core, common, app, server) não prova nada.
+// dependencyPackage: the installed package is public software: a popular repository name or an
+// Official Image (pandas, requests, express); in scoped npm, the public scope (@types, @aws-sdk). A
+// role name (core, common, app, server) proves nothing.
 func dependencyPackage(pkg string) bool {
 	pkg = strings.ToLower(pkg)
 	if strings.HasPrefix(pkg, "@") {
@@ -119,11 +121,11 @@ func dependencyPackage(pkg string) bool {
 	return publicSoftware[normSoftware(pkg)] || officialImages[pkg]
 }
 
-// publicDependency: o pedaço v de um caminho, depois de ant, começa código de terceiro (o
-// pacote público em site-packages ou node_modules, um módulo público no cache do Go, do Maven
-// ou do Cargo): dali para a frente o caminho é do fornecedor e os leitores de caminho param.
-// resto: o que vem depois de v. Critério estrito (os leitores de caminho mascaravam essas
-// pastas antes): pacote com nome de palavra de dicionário não para.
+// publicDependency: the piece v of a path, after prev, starts third-party code (the public package
+// in site-packages or node_modules, a public module in the Go, Maven or Cargo cache): from there on
+// the path belongs to the vendor and the path readers stop. rest: what comes after v. Strict
+// criterion (the path readers used to mask these folders): a package named with a dictionary word
+// does not stop.
 func publicDependency(prev, v, rest string) bool {
 	switch strings.ToLower(prev) {
 	case "site-packages", "dist-packages", "node_modules":
@@ -140,8 +142,8 @@ func publicDependency(prev, v, rest string) bool {
 	return false
 }
 
-// piecesAfter: os primeiros n pedaços do caminho r (com / ou \), cada um cortado onde o
-// caminho acaba (espaço, aspas, dois-pontos).
+// piecesAfter: the first n pieces of the path r (with / or \), each cut where the path ends (space,
+// quotes, colon).
 func piecesAfter(r string, n int) []string {
 	if len(r) > 400 {
 		r = r[:400]
@@ -159,13 +161,13 @@ func piecesAfter(r string, n int) []string {
 	return ps
 }
 
-// hosts de módulo Go em que só há código aberto (nos de hospedagem, github.com e afins, o
-// módulo pode ser privado: ver publicGoModule)
+// Go module hosts with only open source (on hosting ones, github.com and the like, the module may
+// be private: see publicGoModule)
 var publicGoHosts = setOf("golang.org", "google.golang.org", "gopkg.in", "go.uber.org", "k8s.io", "sigs.k8s.io")
 
-// publicGoModule: r, o caminho depois de pkg/mod/, é de um módulo público: num host só de
-// código aberto, ou github.com/<dono>/<repositório> com as duas chaves (dono fornecedor e
-// repositório popular). O cache escreve maiúscula como "!x" e a versão depois de "@".
+// publicGoModule: r, the path after pkg/mod/, is from a public module: on an open-source-only host,
+// or github.com/<owner>/<repository> with both keys (vendor owner and popular repository). The
+// cache writes an uppercase letter as "!x" and the version after "@".
 func publicGoModule(r string) bool {
 	ps := piecesAfter(strings.TrimPrefix(strings.TrimLeft(strings.ReplaceAll(r, "\\", "/"), "/"), "cache/download/"), 3)
 	cleaned := func(x string) string {
@@ -185,21 +187,21 @@ func publicGoModule(r string) bool {
 	return false
 }
 
-// publicMavenGroup: r, o caminho depois de .m2/repository/, começa por um groupId público
-// (org/apache/commons/... -> org.apache.commons). Critério estrito (publicJavaGroup).
+// publicMavenGroup: r, the path after .m2/repository/, starts with a public groupId
+// (org/apache/commons/... -> org.apache.commons). Strict criterion (publicJavaGroup).
 func publicMavenGroup(r string) bool {
 	return publicJavaGroup(strings.ToLower(strings.Join(piecesAfter(r, 4), ".")), true)
 }
 
-// publicCargoRegistry: r, o caminho depois de .cargo/registry/, é do crates.io
-// (src/index.crates.io-<hash>/, ou o índice antigo no GitHub); registro privado tem outro nome.
+// publicCargoRegistry: r, the path after .cargo/registry/, is from crates.io
+// (src/index.crates.io-<hash>/, or the old index on GitHub); a private registry has another name.
 func publicCargoRegistry(r string) bool {
 	ps := piecesAfter(r, 2)
 	return len(ps) == 2 && (strings.HasPrefix(ps[1], "index.crates.io-") || ps[1] == "github.com-1ecc6299db9ec823")
 }
 
-// publicGradleCache: r, o caminho depois de .gradle/caches/, é um artefato de groupId público
-// (modules-2/files-2.1/<grupo>/<artefato>/...).
+// publicGradleCache: r, the path after .gradle/caches/, is an artifact of a public groupId
+// (modules-2/files-2.1/<group>/<artifact>/...).
 func publicGradleCache(r string) bool {
 	_, after, ok := strings.Cut(strings.ReplaceAll(r, "\\", "/"), "/files-2.1/")
 	if !ok {
@@ -209,10 +211,10 @@ func publicGradleCache(r string) bool {
 	return len(ps) == 1 && publicJavaGroup(strings.ToLower(ps[0]), true)
 }
 
-// publicJavaPackage: o pacote de uma linha de traceback Java é de fornecedor: um grupo público
-// do Maven (com os de TLD inteiro: io.netty, io.grpc e dev.* são as bibliotecas de quase toda
-// pilha Java, e deixar a linha delas em claro é o que já acontecia sem este leitor) ou a
-// plataforma (JDK, Kotlin, Scala).
+// publicJavaPackage: the package of a Java traceback line belongs to a vendor: a public Maven group
+// (including whole-TLD ones: io.netty, io.grpc and dev.* are the libraries of almost every Java
+// stack, and leaving their line in plain text is what already happened without this reader) or the
+// platform (JDK, Kotlin, Scala).
 func publicJavaPackage(pkg string) bool {
 	pkg = strings.TrimSuffix(pkg, ".")
 	if publicJavaGroup(pkg, false) {
@@ -226,11 +228,11 @@ func publicJavaPackage(pkg string) bool {
 	return false
 }
 
-// primeiros pedaços de pacote Java que são domínio, não nome
+// first pieces of a Java package that are a domain, not a name
 var javaDomains = setOf("com", "br", "org", "net", "io", "gov", "edu", "co", "me", "dev", "app", "uk", "de", "fr", "es", "pt", "ar", "mx", "cl")
 
-// clientName: um identificador de código do cliente que vale mascarar (cara de identificador,
-// fora do vocabulário público e dos nomes especiais __x__).
+// clientName: a customer code identifier worth masking (looks like an identifier, outside the
+// public vocabulary and the special __x__ names).
 func clientName(v string) bool {
 	return identifierShape(v) && !strings.HasPrefix(v, "__") && !publicDev(v) && !publicSQL(v)
 }
@@ -247,9 +249,9 @@ func (m *Masker) findTraceback(s string, add func(ObjFinding)) {
 			}
 		}
 	}
-	client := false   // o traceback tem frame do cliente (o erro final é dele)
-	pyCode := false   // a próxima linha recuada é o código de um frame do cliente
-	var goFunc [4]int // pacote e (receptor e) função do frame Go, à espera da linha do caminho
+	client := false   // the traceback has a customer frame (the final error is theirs)
+	pyCode := false   // the next indented line is the code of a customer frame
+	var goFunc [4]int // package and (receiver and) function of the Go frame, waiting for the path line
 	pos := 0
 	lines(s, func(l string) {
 		a := pos
@@ -264,8 +266,8 @@ func (m *Masker) findTraceback(s string, add func(ObjFinding)) {
 			mt := reFramePy.FindStringSubmatchIndex(l)
 			if !m.thirdPartyPath(l[mt[2]:mt[3]]) {
 				client, pyCode = true, true
-				// o arquivo do frame é o módulo do cliente (carga_sinistros.py); main.py e
-				// utils.py não têm cara de identificador e ficam
+				// the frame's file is the customer's module (carga_sinistros.py); main.py and
+				// utils.py do not look like an identifier and stay
 				p := l[mt[2]:mt[3]]
 				if i := strings.LastIndexAny(p, "/\\") + 1; strings.HasSuffix(p, ".py") {
 					if st := p[i : len(p)-3]; clientName(st) {
@@ -281,8 +283,8 @@ func (m *Masker) findTraceback(s string, add func(ObjFinding)) {
 			mt := reFrameJava.FindStringSubmatchIndex(l)
 			if pkg := l[mt[2]:mt[3]]; !publicJavaPackage(pkg) {
 				client = true
-				// cada pedaço do pacote que não é domínio nem vocabulário público é do cliente,
-				// inclusive em minúsculas (br.com.<empresa>.<sistema>)
+				// each piece of the package that is neither a domain nor public vocabulary belongs
+				// to the customer, even in lowercase (br.com.<empresa>.<sistema>)
 				k := a + mt[2]
 				for _, p := range strings.Split(strings.TrimSuffix(pkg, "."), ".") {
 					if len(p) >= 2 && !javaDomains[p] && !publicDev(p) {
@@ -310,9 +312,9 @@ func (m *Masker) findTraceback(s string, add func(ObjFinding)) {
 		case reGoPath.MatchString(l):
 			if mt := reGoPath.FindStringSubmatchIndex(l); goFunc[3] > 0 && !m.thirdPartyPath(l[mt[2]:mt[3]]) {
 				client = true
-				// o pacote do frame do cliente: fora o host, cada pedaço que não é vocabulário
-				// público é dele (github.com/<empresa>/<sistema>/internal/<módulo>), e a pasta
-				// de mesmo nome na linha do caminho também
+				// the package of the customer frame: apart from the host, each piece that is not
+				// public vocabulary is theirs (github.com/<empresa>/<sistema>/internal/<modulo>),
+				// and so is the folder with the same name on the path line
 				fromPackage := map[string]bool{}
 				k := goFunc[0]
 				for i, p := range strings.Split(s[goFunc[0]:goFunc[1]], "/") {
@@ -337,13 +339,13 @@ func (m *Masker) findTraceback(s string, add func(ObjFinding)) {
 			mt := reFrameGo.FindStringSubmatchIndex(l)
 			ini := mt[6]
 			if mt[4] >= 0 {
-				ini = mt[4] // o tipo do receptor: (*CargaSinistros).calcular
+				ini = mt[4] // the receiver type: (*CargaSinistros).calcular
 			}
 			goFunc = [4]int{a + mt[2], a + mt[3], a + ini, a + mt[7]}
 			return
 		}
 		pyCode = false
-		// o erro final de um traceback com frame do cliente: o valor citado é nome dele
+		// the final error of a traceback with a customer frame: the cited value is their name
 		if client {
 			if mt := reFinalError.FindStringSubmatchIndex(strings.TrimSpace(l)); mt != nil {
 				off := a + strings.Index(l, strings.TrimSpace(l))

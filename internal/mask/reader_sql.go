@@ -8,11 +8,11 @@ import (
 	"unicode/utf8"
 )
 
-// Reader de SQL e DDL (ver docs/pt-BR/structures.md, seção SQL e DDL). Uma instrução só vale se tiver
-// a forma mínima da gramática (SELECT ... FROM x, INSERT INTO x, CREATE TABLE x...). Dentro
-// dela, o nome depois de FROM, JOIN, INTO, UPDATE, TABLE, VIEW, PROCEDURE, DATABASE, SCHEMA,
-// INDEX... é objeto (tabela, procedure, banco, schema, índice), com as partes de um nome
-// qualificado servidor.banco.schema.objeto; os outros identificadores são colunas.
+// SQL and DDL reader (see docs/structures.md, section SQL and DDL). A statement only counts if it
+// has the minimal shape of the grammar (SELECT ... FROM x, INSERT INTO x, CREATE TABLE x...).
+// Inside it, the name after FROM, JOIN, INTO, UPDATE, TABLE, VIEW, PROCEDURE, DATABASE, SCHEMA,
+// INDEX... is an object (table, procedure, database, schema, index), with the parts of a qualified
+// name server.database.schema.object; the other identifiers are columns.
 
 //go:embed data/vocab_sql.txt
 var vocabSQLTxt string
@@ -32,8 +32,8 @@ var vocabSQL = func() map[string]bool {
 
 func publicSQL(v string) bool { return vocabSQL[strings.ToLower(v)] }
 
-// objetos de conta (papel, usuário, warehouse, integração) e de schema (políticas, stage,
-// stream, tarefa, pipe, sequência, formato de arquivo, tag, alerta) nas instruções DDL
+// account objects (role, user, warehouse, integration) and schema objects (policies, stage, stream,
+// task, pipe, sequence, file format, tag, alert) in DDL statements
 const (
 	reAccountTypes = `(?:DATABASE\s+)?ROLE|USER|WAREHOUSE|(?:STORAGE\s+|API\s+|NOTIFICATION\s+|SECURITY\s+)?INTEGRATION|RESOURCE\s+MONITOR`
 	reSchemaTypes  = `(?:MASKING|ROW\s+ACCESS|NETWORK|PASSWORD|SESSION|AGGREGATION|PROJECTION|AUTHENTICATION)\s+POLICY|TAG|FILE\s+FORMAT|SECRET|ALERT|DYNAMIC\s+TABLE|NOTEBOOK`
@@ -42,14 +42,14 @@ const (
 const (
 	reIdSQL   = "(?:\\[[^\\]\\n]{1,128}\\]|\"[^\"\\n]{1,128}\"|`[^`\\n]{1,128}`|[\\p{L}_][\\p{L}0-9_$#]*)"
 	reSQLQual = reIdSQL + "(?:\\." + reIdSQL + ")*"
-	// alvo de FROM/INTO/UPDATE: um nome, ou o lugar de um nome num modelo de código (o SQL
-	// montado pelo programa: f"... FROM {tbl}", "FROM ${tabela}", "FROM %s", dbt "{{ ref('x') }}").
-	// A instrução continua sendo SQL; as colunas dela são lidas como sempre
+	// target of FROM/INTO/UPDATE: a name, or the place of a name in a code template (SQL built by
+	// the program: f"... FROM {tbl}", "FROM ${tabela}", "FROM %s", dbt "{{ ref('x') }}"). The
+	// statement is still SQL; its columns are read as always
 	reSQLTarget = "(?:" + reSQLQual + "|\\{\\{?[^{}\\n]{1,80}\\}\\}?|\\$\\{[^}\\n]{1,60}\\}|%(?:\\(\\w+\\))?s)"
 )
 
 var (
-	// forma mínima de cada instrução: a gramática exige essas peças, nessa ordem
+	// minimal shape of each statement: the grammar requires these pieces, in this order
 	reSQLShape = regexp.MustCompile(`(?is)^(?:SELECT\b[^;]*?\bFROM\s+` + reSQLTarget + `|WITH\s+(?:RECURSIVE\s+)?` + reIdSQL + `\s*(?:\([^)]{0,500}\)\s*)?AS\s*\(` +
 		`|INSERT\s+(?:INTO\s+|OVERWRITE\s+(?:TABLE\s+)?)` + reSQLTarget + `|UPDATE\s+` + reSQLTarget + `(?:\s+(?:AS\s+)?\w+)?\s+SET\s+(?:\(|` + reSQLQual + `\s*=)|DELETE\s+FROM\s+` + reSQLTarget +
 		`|MERGE\s+INTO\s+` + reSQLQual + `|(?:CREATE|ALTER|DROP)\s+(?:OR\s+(?:REPLACE|ALTER)\s+)?(?:(?:GLOBAL|LOCAL|SECURE|EXTERNAL|MATERIALIZED|TRANSIENT|TEMP(?:ORARY)?|UNIQUE|CLUSTERED|NONCLUSTERED)\s+)*` +
@@ -59,23 +59,23 @@ var (
 		`|(?:GRANT|REVOKE)\s[^;]{0,300}?\bON\s+(?:TABLE\s+|SCHEMA\s+|DATABASE\s+|VIEW\s+)?` + reSQLQual +
 		`|(?:DESCRIBE|DESC)\s+(?:TABLE\s+)?` + reSQLQual + `\s*(?:;|$|\n)|SHOW\s+\w+(?:\s+\w+)?\s+(?:IN|FROM)\s+` + reSQLQual + `)`)
 	reSQLClauses = regexp.MustCompile(`(?i)\b(FROM|WHERE|JOIN|GROUP\s+BY|ORDER\s+BY|SET|VALUES|INTO|HAVING|UNION|AS|ON|TABLE)\b`)
-	// linha que já não é SQL (código em volta): para a instrução ali
+	// line that is no longer SQL (surrounding code): the statement stops there
 	reNotSQL = regexp.MustCompile(`^\s*(?:def |class |func |return\b|if\s*\(|for\s*\(|import |from \S+ import|package |\}|\)\s*$|#|//|print\(|echo |cd |\$ ` +
-		// Python: comandos que não existem em SQL e "if x:" / "while x:" no fim da linha
+		// Python: commands that do not exist in SQL and "if x:" / "while x:" at the end of the line
 		`|(?:raise|assert|yield|await|elif|except|async)\b|(?:else|try|finally)\s*:|(?:if|while)\s[^\n]*:\s*(?:\n|$))`)
-	// atribuição a atributo de objeto no começo da linha (self.cur.x = ..., mock.y.return_value =
-	// ...): código em volta, a não ser dentro de uma lista de SET (ver setList)
+	// assignment to an object attribute at the start of the line (self.cur.x = ...,
+	// mock.y.return_value = ...): surrounding code, unless inside a SET list (see setList)
 	reAttrAssign = regexp.MustCompile(`^\s*(?:(?:self|this|cls|mock\w*|\w+_mock)\.[\w.]+\s*=[^=]|\w+(?:\.\w+){2,}\s*=[^=])`)
 	reSQLEnd     = regexp.MustCompile("(?m);|\\n[ \\t]*\\n|```")
 	reSQLComment = regexp.MustCompile(`(?s)--[^\n]*|/\*.*?\*/`)
 	reSQLLit     = regexp.MustCompile(`(?s)'(?:[^']|'')*'|--[^\n]*|/\*.*?\*/`)
-	// lugar de modelo no SQL montado por código ({tbl}, ${tabela}, %(nome)s, {{ ref('x') }}): o
-	// que está dentro é do programa (variável, função), não nome do banco
+	// template placeholder in SQL built by code ({tbl}, ${tabela}, %(nome)s, {{ ref('x') }}): what
+	// is inside belongs to the program (variable, function), not a database name
 	reSQLModel = regexp.MustCompile(`\{\{[^{}\n]{1,80}\}\}|\$\{[^}\n]{1,60}\}|\{[^{}\n]{1,80}\}|%\(\w+\)s`)
 	reQualTok  = regexp.MustCompile(reSQLQual)
 	reSQLPart  = regexp.MustCompile(reIdSQL)
-	// posições de objeto: palavra-chave -> entidade do último pedaço
-	// tem: palavras (em maiúsculas) sem as quais a regex não casa; evita rodá-la à toa
+	// object positions: keyword -> entity of the last piece has: words (in uppercase) without which
+	// the regex does not match; avoids running it for nothing
 	reSQLObjPos = []struct {
 		re  *regexp.Regexp
 		ent string
@@ -94,13 +94,13 @@ var (
 		{regexp.MustCompile(`(?i)(?:\bFROM|\bINTO|\bLIST|\bLS|\bREMOVE|\bRM|=)\s*'?@(` + reSQLQual + `)`), "tabela", []string{"@"}},
 	}
 	reOnObjSQL = regexp.MustCompile(`(?i)\bON\s+(` + reSQLQual + `)\s*(?:\(|TO\b|FROM\b|;|$)`)
-	// DDL de qualquer tipo de objeto, pela gramática e não por uma lista de tipos: CREATE/ALTER/
-	// DROP [OR REPLACE] + 1 a 4 palavras do tipo em maiúsculas + nome (CREATE NETWORK RULE x,
-	// CREATE SEMANTIC VIEW x, CREATE CORTEX SEARCH SERVICE x). Os dialetos ganham tipos novos
-	// todo ano; em maiúsculas, a forma não se confunde com prosa ("create a new table"). Os
-	// tipos conhecidos (TABLE, INDEX, USER...) continuam dando o tipo do nome (reSQLObjPos).
+	// DDL of any object type, by the grammar and not by a list of types: CREATE/ALTER/ DROP [OR
+	// REPLACE] + 1 to 4 uppercase type words + name (CREATE NETWORK RULE x, CREATE SEMANTIC VIEW x,
+	// CREATE CORTEX SEARCH SERVICE x). Dialects gain new types every year; in uppercase, the shape
+	// is not confused with prose ("create a new table"). The known types (TABLE, INDEX, USER...)
+	// still give the type of the name (reSQLObjPos).
 	reDDLGenerico = regexp.MustCompile(`^(?:CREATE|ALTER|DROP)\s+(?:OR\s+(?:REPLACE|ALTER)\s+)?(?:[A-Z]+\s+){1,4}(?:IF\s+(?:NOT\s+)?EXISTS\s+)?(` + reSQLQual + `)`)
-	// declaração de CTE: WITH [RECURSIVE] x [(colunas)] AS (  e  ), y AS (
+	// CTE declaration: WITH [RECURSIVE] x [(columns)] AS ( and ), y AS (
 	reCTE     = regexp.MustCompile(`(?i)(?:\bWITH\s+(?:RECURSIVE\s+)?|\)\s*,\s*)(` + reIdSQL + `)\s*(?:\([^)]{0,500}\)\s*)?AS\s*\(`)
 	reSQLList = regexp.MustCompile(`^\s*(?:(?:AS\s+)?[A-Za-z_]\w*\s*)?,\s*(` + reSQLQual + `)`)
 )
@@ -114,7 +114,7 @@ func hasAnyOf(s string, ps []string) bool {
 	return false
 }
 
-// entQual: as entidades de cada parte de um nome qualificado a.b.c.d (ult = a do último).
+// entQual: the entities of each part of a qualified name a.b.c.d (last = that of the last one).
 func entQual(n int, lastPos string) []string {
 	above := []string{"schema", "database", "servidor"}
 	if lastPos == "coluna" {
@@ -136,8 +136,8 @@ func entQual(n int, lastPos string) []string {
 	return out
 }
 
-// sqlParts: as partes de um nome qualificado em lit[a:b]. No BigQuery o nome inteiro pode
-// estar entre crases com os pontos dentro (`projeto.dataset.tabela`): cada parte vale.
+// sqlParts: the parts of a qualified name in lit[a:b]. In BigQuery the whole name may be between
+// backticks with the dots inside (`projeto.dataset.tabela`): each part counts.
 func sqlParts(lit string, a, b int) [][2]int {
 	var out [][2]int
 	for _, p := range sqlPartsIn(lit[a:b]) {
@@ -157,7 +157,7 @@ func sqlParts(lit string, a, b int) [][2]int {
 	return out
 }
 
-// stripQuote: início e fim do nome sem os colchetes/aspas/crases em volta.
+// stripQuote: start and end of the name without the surrounding brackets/quotes/backticks.
 func stripQuote(s string, a, b int) (int, int) {
 	if b-a >= 2 {
 		switch s[a] {
@@ -168,17 +168,17 @@ func stripQuote(s string, a, b int) (int, int) {
 	return a, b
 }
 
-// statementEnd: onde termina a instrução que começa em i.
+// statementEnd: where the statement starting at i ends.
 func statementEnd(s string, i, j int) int {
 	lim := min(len(s), i+8000)
-	// SQL dentro de uma string de código, de qualquer linguagem: a instrução não passa do fim
-	// da string (da última, numa concatenação)
+	// SQL inside a code string, in any language: the statement does not go past the end of the
+	// string (of the last one, in a concatenation)
 	if a, ok := openingString(s, i); ok {
 		lim = stringEnd(s, j, lim, a)
 	}
-	// SQL citado num comentário de linha (# ..., // ..., * ... de Javadoc): termina com a linha;
-	// a linha seguinte já é o código em volta. Só olha 2000 bytes para trás (linha única longa,
-	// JSON minificado, ficaria quadrática): comentário de linha não é tão longo
+	// SQL quoted in a line comment (# ..., // ..., Javadoc * ...): ends with the line; the next
+	// line is already the surrounding code. Only looks 2000 bytes back (a long single line,
+	// minified JSON, would be quadratic): a line comment is not that long
 	w := max(0, i-2000)
 	if w == 0 || strings.IndexByte(s[w:i], '\n') >= 0 {
 		if with, _ := lineComment(s[w:], i-w); with {
@@ -194,8 +194,9 @@ func statementEnd(s string, i, j int) int {
 			break
 		}
 		e := k + loc[0]
-		// linha em branco no meio da instrução (estilo do dbt: CTEs e cláusulas separadas por
-		// linha em branco): continua se há parêntese aberto ou se a próxima linha continua o SQL
+		// blank line in the middle of the statement (dbt style: CTEs and clauses separated by a
+		// blank line): continues if there is an open parenthesis or if the next line continues the
+		// SQL
 		if s[e] == '\n' && continuesSQL(s, i, e, k+loc[1], lim) {
 			k += loc[1]
 			continue
@@ -217,16 +218,16 @@ func statementEnd(s string, i, j int) int {
 	return end
 }
 
-// artigos e determinantes do inglês (em minúsculas): nunca são nome numa instrução SQL
+// English articles and determiners (in lowercase): never a name in a SQL statement
 var proseArticles = setOf("the", "an", "this", "these", "those", "your", "our", "their", "its")
 
-// reSQLContinues: começo de linha que só existe no meio de uma instrução: cláusula, fecha
-// parêntese, vírgula de lista, comentário de SQL, Jinja (dbt) ou a próxima CTE ("x as (").
-// "and", "on", "with", "case" ficam de fora: começam frase em prosa.
+// reSQLContinues: line start that only exists in the middle of a statement: clause, closing
+// parenthesis, list comma, SQL comment, Jinja (dbt) or the next CTE ("x as ("). "and", "on",
+// "with", "case" are left out: they start a prose sentence.
 var reSQLContinues = regexp.MustCompile(`(?i)^[ \t]*(?:(?:select|from|where|qualify|having|union|except|intersect)\b|(?:inner|left|right|full|cross)\s+(?:outer\s+)?join\b|join\b|(?:group|order)\s+by\b|\)|,|--|\{\{|\{%|` + reIdSQL + `\s+as\s*\()`)
 
-// continuesSQL: depois da linha em branco que termina em p (a instrução começou em i e a linha
-// em branco em e), a instrução continua?
+// continuesSQL: after the blank line that ends at p (the statement started at i and the blank line
+// at e), does the statement continue?
 func continuesSQL(s string, i, e, p, lim int) bool {
 	openOnes := 0
 	quote := false
@@ -250,12 +251,12 @@ func continuesSQL(s string, i, e, p, lim int) bool {
 	return openOnes > 0 || reSQLContinues.MatchString(s[p:min(lim, p+120)])
 }
 
-// cláusulas que vêm logo depois do apelido de uma tabela (FROM anuncios an WHERE ...)
+// clauses that come right after a table alias (FROM anuncios an WHERE ...)
 var afterAlias = setOf("where", "join", "inner", "left", "right", "full", "cross", "on", "group", "order",
 	"having", "limit", "union", "set", "using", "natural", "qualify", "window", "fetch", "offset")
 
-// sqlAlias: o artigo v, que termina em b, é apelido de tabela e não prosa: é usado como
-// qualificador na instrução ("an.cod") ou vem seguido de uma cláusula ("apolices an WHERE").
+// sqlAlias: the article v, which ends at b, is a table alias and not prose: it is used as a
+// qualifier in the statement ("an.cod") or is followed by a clause ("apolices an WHERE").
 func sqlAlias(lit, v string, b int) bool {
 	for k := strings.Index(lit, v+"."); k >= 0; {
 		if k == 0 || !isIdent(lit[k-1]) {
@@ -274,8 +275,8 @@ func sqlAlias(lit, v string, b int) bool {
 	return afterAlias[strings.ToLower(lit[b+1:e])]
 }
 
-// chainedCall: depois do parêntese que abre em j e do que o fecha vem "." (o
-// select(User).where(...) de um construtor de consultas): chamada de método, não instrução.
+// chainedCall: after the parenthesis that opens at j and the one that closes it comes "." (the
+// select(User).where(...) of a query builder): a method call, not a statement.
 func chainedCall(s string, j int) bool {
 	n := 0
 	for k := j; k < len(s) && k < j+400; k++ {
@@ -290,24 +291,24 @@ func chainedCall(s string, j int) bool {
 			}
 		}
 	}
-	return true // sem fecho por perto: não é "SELECT(col) FROM x"
+	return true // no close nearby: it is not "SELECT(col) FROM x"
 }
 
-// setList: a linha que começa em p continua uma lista de atribuições do SQL: a linha anterior
-// termina em vírgula ou é o SET ("UPDATE t\nSET\n  t.a = 1,\n  t.b = 2").
+// setList: the line starting at p continues an SQL assignment list: the previous line ends in a
+// comma or is the SET ("UPDATE t\nSET\n t.a = 1,\n t.b = 2").
 func setList(s string, j, p int) bool {
 	prev := strings.TrimRight(s[j:max(j, p-1)], " \t\r\n")
 	return strings.HasSuffix(prev, ",") || len(prev) >= 3 && strings.EqualFold(prev[len(prev)-3:], "SET") &&
 		(len(prev) == 3 || !isIdent(prev[len(prev)-4]))
 }
 
-// sqlStarts: as palavras que começam uma instrução (em maiúsculas).
+// sqlStarts: the words that start a statement (in uppercase).
 var sqlStarts = map[string]bool{"SELECT": true, "WITH": true, "INSERT": true, "UPDATE": true, "DELETE": true, "MERGE": true,
 	"CREATE": true, "ALTER": true, "DROP": true, "TRUNCATE": true, "EXEC": true, "EXECUTE": true, "CALL": true, "USE": true,
 	"GRANT": true, "REVOKE": true, "DESCRIBE": true, "SHOW": true, "COPY": true}
 
-// startWords chama fn(i, j) para cada palavra de s que começa uma instrução SQL. Anda
-// palavra a palavra (bem mais rápido que uma regex sem diferença de caixa no texto inteiro).
+// startWords calls fn(i, j) for each word of s that starts an SQL statement. Walks word by word
+// (much faster than a case-insensitive regex over the whole text).
 func startWords(s string, fn func(i, j int)) {
 	var buf [8]byte
 	for i := 0; i < len(s); {
@@ -338,26 +339,26 @@ func findSQL(s string, add func(ObjFinding)) {
 		if i < until {
 			return
 		}
-		// select(...).where(...), update(...), delete(...): chamada de função (SQLAlchemy,
-		// query builders), não instrução. Só o SELECT existe colado ao parêntese em SQL
-		// ("SELECT(col) FROM x"), e aí não vem "." depois do parêntese que fecha
+		// select(...).where(...), update(...), delete(...): a function call (SQLAlchemy, query
+		// builders), not a statement. Only SELECT exists glued to the parenthesis in SQL
+		// ("SELECT(col) FROM x"), and then no "." comes after the closing parenthesis
 		if j < len(s) && s[j] == '(' && (!strings.EqualFold(s[i:j], "SELECT") || chainedCall(s, j)) {
 			return
 		}
 		upperCase := strings.ToUpper(s[i:j]) == s[i:j]
 		kw := strings.ToUpper(s[i:j])
-		// palavras comuns em prosa (use, copy, show, call, exec...): fora de maiúsculas, só com
-		// forma inequívoca
+		// common words in prose (use, copy, show, call, exec...): outside uppercase, only with an
+		// unambiguous shape
 		prose := !upperCase && (kw == "USE" || kw == "COPY" || kw == "SHOW" || kw == "DESCRIBE" || kw == "CALL" || kw == "EXEC" || kw == "EXECUTE" || kw == "GRANT" || kw == "REVOKE")
 		end := statementEnd(s, i, j)
 		body := s[i:end]
-		// a forma é lida sem os comentários ("UPDATE t /* x */ SET", "FROM t -- x\nWHERE")
+		// the shape is read without the comments ("UPDATE t /* x */ SET", "FROM t -- x\nWHERE")
 		shape := body
 		if strings.Contains(body, "--") || strings.Contains(body, "/*") {
 			shape = reSQLComment.ReplaceAllStringFunc(body, func(x string) string { return strings.Repeat(" ", len(x)) })
 		}
-		// a frase continua em prosa depois das palavras-chave ("o SELECT pega os dados FROM da
-		// tabela certa"): a instrução acaba onde começa a prosa
+		// the sentence continues in prose after the keywords ("o SELECT pega os dados FROM da
+		// tabela certa"): the statement ends where the prose begins
 		if k := sqlProseStart(shape); k >= 0 {
 			end, body, shape = i+k, body[:k], shape[:k]
 		}
@@ -371,8 +372,8 @@ func findSQL(s string, add func(ObjFinding)) {
 			return
 		}
 		claus := countClauses(shape, 4)
-		// uma cláusula só: em minúsculas, só vale com forma inequívoca; em maiúsculas vale
-		// sempre, e ensina quando a forma também é inequívoca
+		// a single clause: in lowercase, only counts with an unambiguous shape; in uppercase it
+		// always counts, and teaches when the shape is also unambiguous
 		unambiguous := false
 		if claus < 2 || prose {
 			if unambiguous = unambiguousShape(shape, kw); !unambiguous && (!upperCase || prose) {
@@ -385,19 +386,19 @@ func findSQL(s string, add func(ObjFinding)) {
 	})
 }
 
-// sqlProseStart: onde, no corpo de uma instrução, começa uma sequência de 3 ou mais palavras
-// soltas lado a lado (só espaço entre elas): palavras em minúsculas, sem "_" nem dígito, que
-// não são do vocabulário do SQL, não são qualificadas (a.b) nem chamada de função. Na gramática
-// do SQL, no máximo duas ficam assim lado a lado (nome e apelido: "pedidos p", "a AS b"); três
-// são prosa. Devolve -1 se não houver.
+// sqlProseStart: where, in the body of a statement, a sequence of 3 or more loose words side by
+// side starts (only space between them): lowercase words, without "_" or digit, that are not in the
+// SQL vocabulary, are not qualified (a.b) nor a function call. In SQL grammar, at most two stand
+// like that side by side (name and alias: "pedidos p", "a AS b"); three are prose. Returns -1 if
+// there is none.
 func sqlProseStart(body string) int {
 	lit := reSQLLit.ReplaceAllStringFunc(body, func(x string) string { return strings.Repeat(" ", len(x)) })
 	run, ini := 0, -1
 	for _, p := range sqlPartsIn(lit) {
 		a, b := p[0], p[1]
 		v := lit[a:b]
-		// artigo ou determinante do inglês seguido de palavra: não existe na gramática do SQL
-		// ("Select the policy ... from scratch", "Create a DatabaseOperations for the ...")
+		// English article or determiner followed by a word: does not exist in SQL grammar ("Select
+		// the policy ... from scratch", "Create a DatabaseOperations for the ...")
 		if proseArticles[v] && b+1 < len(lit) && lit[b] == ' ' && letterD(lit[b+1]) && !sqlAlias(lit, v, b) {
 			return a
 		}
@@ -408,7 +409,7 @@ func sqlProseStart(body string) int {
 			run = 0
 			continue
 		}
-		// só espaço (sem vírgula, operador ou quebra de linha) desde a palavra anterior
+		// only space (no comma, operator or line break) since the previous word
 		if run > 0 && !onlySpaceBetweenWords(lit[ini:a]) {
 			run = 0
 		}
@@ -423,8 +424,8 @@ func sqlProseStart(body string) int {
 	return -1
 }
 
-// onlySpaceBetweenWords: o trecho tem só letras, dígitos, "_" e espaço/tab (as palavras da
-// sequência e os espaços entre elas).
+// onlySpaceBetweenWords: the snippet has only letters, digits, "_" and space/tab (the words of the
+// sequence and the spaces between them).
 func onlySpaceBetweenWords(t string) bool {
 	for _, r := range t {
 		if !(r == ' ' || r == '\t' || r == '_' || unicode.IsLetter(r) || unicode.IsDigit(r)) {
@@ -434,15 +435,15 @@ func onlySpaceBetweenWords(t string) bool {
 	return true
 }
 
-// Instrução em minúsculas com uma cláusula só ("select * from tb_pedido", "delete from
-// tb_log where ..."): vale quando a forma não deixa dúvida, para não pegar prosa ("select from
-// the list", "update the readme"). A lista do SELECT é "*" ou nomes separados por vírgula (sem
-// palavras soltas lado a lado), e depois do nome da tabela vem o fim, ";" ou outra cláusula;
-// ou o nome da tabela tem cara de identificador.
+// Lowercase statement with a single clause ("select * from tb_pedido", "delete from tb_log where
+// ..."): counts when the shape leaves no doubt, so as not to catch prose ("select from the list",
+// "update the readme"). The SELECT list is "*" or comma-separated names (no loose words side by
+// side), and after the table name comes the end, ";" or another clause; or the table name looks
+// like an identifier.
 var (
 	reSelectMin = regexp.MustCompile(`(?is)^select\s+(?:distinct\s+|top\s+\d+\s+)?(\*|` + reSQLQual + `(?:\s*\([^)]{0,80}\))?(?:\s+as\s+\w+)?(?:\s*,\s*(?:\*|` + reSQLQual + `(?:\s*\([^)]{0,80}\))?(?:\s+as\s+\w+)?))*)\s+from\s+(` + reSQLQual + `)(.{0,12})`)
 	reMinTarget = regexp.MustCompile(`(?is)^(?:insert\s+into|delete\s+from|update)\s+(` + reSQLQual + `)(.{0,12})`)
-	// DDL, TRUNCATE, EXEC/CALL e USE fora de maiúsculas ("create table t_x (", "exec sp_x @a = 1")
+	// DDL, TRUNCATE, EXEC/CALL and USE outside uppercase ("create table t_x (", "exec sp_x @a = 1")
 	reDDLMin = regexp.MustCompile(`(?is)^(?:(?:create|alter|drop)\s+(?:or\s+(?:replace|alter)\s+)?(?:(?:global|local|temp|temporary|unique|external|materialized|transient|secure|clustered|nonclustered)\s+)*` +
 		`(?:table|view|procedure|proc|function|schema|database|index|sequence)|truncate\s+table|exec|execute|call|use|describe|desc)\s+(?:if\s+(?:not\s+)?exists\s+)?(` + reSQLQual + `)(.{0,12})`)
 	reAfterDDL = regexp.MustCompile(`^\s*(?:\(|;|@|\n|$)|^\s+as\s+(?:select|\()`)
@@ -462,8 +463,8 @@ func unambiguousShape(body, kw string) bool {
 			return reAfterMin.MatchString(after) || identifierShape(target)
 		}
 	case "CREATE", "ALTER", "DROP", "TRUNCATE", "EXEC", "EXECUTE", "CALL", "USE", "DESCRIBE":
-		// nome com cara de identificador, ou seguido do que só o SQL põe ali: "(", ";", "@"
-		// parâmetro, fim da linha. Prosa ("drop table permissions") não tem nenhum dos dois.
+		// a name that looks like an identifier, or followed by what only SQL puts there: "(", ";",
+		// "@" parameter, end of line. Prose ("drop table permissions") has neither.
 		m := reDDLMin.FindStringSubmatch(body)
 		if m == nil {
 			return false
@@ -485,7 +486,7 @@ func unambiguousShape(body, kw string) bool {
 	return identifierShape(target) || reAfterMin.MatchString(after)
 }
 
-// sqlStatement classifica os identificadores de uma instrução já reconhecida.
+// sqlStatement classifies the identifiers of an already recognized statement.
 func sqlStatement(s string, base int, body, kw string, strong bool, add func(ObjFinding)) {
 	blank := func(x string) string { return strings.Repeat(" ", len(x)) }
 	lit := reSQLLit.ReplaceAllStringFunc(body, blank)
@@ -494,8 +495,8 @@ func sqlStatement(s string, base int, body, kw string, strong bool, add func(Obj
 	}
 	ent := map[[2]int]string{} // parte -> entidade
 	objects := map[string]bool{}
-	// nomes de CTE (WITH x AS (, ), y AS (): nomes locais da consulta, nem tabela nem coluna
-	// (como o apelido de uma tabela, não existem no banco)
+	// CTE names (WITH x AS (, ), y AS (): local names of the query, neither table nor column (like
+	// a table alias, they do not exist in the database)
 	ctes := map[string]bool{}
 	if strings.Contains(strings.ToUpper(lit[:min(len(lit), 16)]), "WITH") {
 		for _, m := range reCTE.FindAllStringSubmatch(lit, -1) {
@@ -523,14 +524,13 @@ func sqlStatement(s string, base int, body, kw string, strong bool, add func(Obj
 		}
 		objects[strings.ToLower(strings.Trim(lit[vs[len(vs)-1][0]:vs[len(vs)-1][1]], "[]\"`"))] = true
 	}
-	// tipo de objeto fora das regras de posição: o nome do DDL é objeto (de schema, como a
-	// tabela); as regras de posição abaixo corrigem o tipo quando o conhecem
+	// object type outside the position rules: the DDL name is an object (of a schema, like a
+	// table); the position rules below correct the type when they know it
 	if kw == "CREATE" || kw == "ALTER" || kw == "DROP" {
 		if m := reDDLGenerico.FindStringSubmatchIndex(lit); m != nil {
 			if !reSQLShape.MatchString(lit) {
-				// tipo que as regras não conhecem (NETWORK RULE, AGENT...): o corpo são
-				// propriedades (TYPE = IPV4, VALUE_LIST = (...)), não colunas; só o nome
-				// do objeto é nome
+				// type the rules do not know (NETWORK RULE, AGENT...): the body is properties (TYPE
+				// = IPV4, VALUE_LIST = (...)), not columns; only the object name is a name
 				ps := sqlParts(lit, m[2], m[3])
 				ents := entQual(len(ps), "tabela") // banco.schema.objeto
 				for k, p := range ps {
@@ -582,10 +582,10 @@ func sqlStatement(s string, base int, body, kw string, strong bool, add func(Obj
 					continue
 				}
 				if v[0] != '[' && v[0] != '"' && v[0] != '`' && len(ps) == 1 && b < len(lit) && lit[b] == '(' {
-					continue // chamada de função
+					continue // function call
 				}
 				e = "coluna"
-				if k < len(ps)-1 { // qualificador de uma coluna: tabela (ou alias curto, que fica)
+				if k < len(ps)-1 { // qualifier of a column: table (or short alias, which stays)
 					if len(v) <= 3 && !objects[strings.ToLower(v)] {
 						continue
 					}
@@ -603,10 +603,10 @@ func sqlStatement(s string, base int, body, kw string, strong bool, add func(Obj
 	}
 }
 
-// Mensagem de erro que cita um objeto: palavra do tipo seguida do nome entre aspas ou
-// colchetes ("relation \"x\" does not exist", "Invalid object name 'x'", "Table 'db.x'
-// doesn't exist", "Object 'A.B.C' does not exist"), ou "Table/Dataset projeto:dataset(.x)".
-// Rule genérica: vale para qualquer banco, sem conhecer o texto de cada mensagem.
+// Error message that cites an object: type word followed by the name in quotes or brackets
+// ("relation \"x\" does not exist", "Invalid object name 'x'", "Table 'db.x' doesn't exist",
+// "Object 'A.B.C' does not exist"), or "Table/Dataset projeto:dataset(.x)". Generic rule: applies
+// to any database, without knowing the text of each message.
 var (
 	reBQError = regexp.MustCompile(`(?i)\b(table|dataset)\s+([A-Za-z][\w-]{2,62}):([A-Za-z_][\w$]*(?:\.[A-Za-z_][\w$]*)?)\b`)
 	entError  = map[string]string{"table": "tabela", "relation": "tabela", "object": "tabela", "view": "tabela", "column": "coluna",
@@ -617,7 +617,7 @@ var (
 func findObjectError(s string, add func(ObjFinding)) {
 	letter := func(c byte) bool { return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' }
 	var buf [10]byte
-	wordBefore := func(k int) (int, string) { // a palavra que termina em s[k] (inclusive)
+	wordBefore := func(k int) (int, string) { // the word that ends at s[k] (inclusive)
 		a := k
 		for a > 0 && letter(s[a-1]) && k-a < 10 {
 			a--
@@ -640,7 +640,7 @@ func findObjectError(s string, add func(ObjFinding)) {
 		for k >= 0 && (s[k] == ' ' || s[k] == '\t') {
 			k--
 		}
-		if k < 2 || k == i-1 || !letter(s[k]) { // precisa de espaço entre a palavra e a aspa
+		if k < 2 || k == i-1 || !letter(s[k]) { // needs a space between the word and the quote
 			continue
 		}
 		a, w := wordBefore(k)
@@ -679,15 +679,15 @@ func findObjectError(s string, add func(ObjFinding)) {
 	}
 }
 
-// palavras de tipo em português (sem acento: o texto é lido em ASCII) que também citam objeto
+// Portuguese type words (without accents: the text is read in ASCII) that also cite an object
 var entTypePT = map[string]string{"tabela": "tabela", "objeto": "tabela", "esquema": "schema", "banco": "database",
 	"coluna": "coluna", "indice": "indice", "colecao": "tabela", "visao": "tabela"}
 
-// findQualifiedType: nome qualificado SEM aspas logo depois de palavra de tipo, em qualquer
-// frase ("tabela fin.t_x: 1200 linhas", "Loading table a.b.c", "created sql table model
-// fin.t_x"). Entre a palavra e o nome cabe uma palavra em minúsculas ("table model", "view
-// model"). Sem aspas, só o nome qualificado vale: "table x" sozinho é prosa demais. Evidência
-// forte com a palavra de tipo colada ao nome; com a palavra no meio, fraca.
+// findQualifiedType: qualified name WITHOUT quotes right after a type word, in any sentence
+// ("tabela fin.t_x: 1200 linhas", "Loading table a.b.c", "created sql table model fin.t_x").
+// Between the word and the name one lowercase word fits ("table model", "view model"). Without
+// quotes, only a qualified name counts: "table x" alone is too much like prose. Strong evidence
+// with the type word right next to the name; with a word in between, weak.
 func findQualifiedType(s string, add func(ObjFinding)) {
 	letter := func(c byte) bool { return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' }
 	var buf [10]byte
@@ -721,7 +721,7 @@ func findQualifiedType(s string, add func(ObjFinding)) {
 			p++
 		}
 		middle := false
-		if q := p; q < len(s) && s[q] >= 'a' && s[q] <= 'z' { // uma palavra no meio ("table model")
+		if q := p; q < len(s) && s[q] >= 'a' && s[q] <= 'z' { // one word in between ("table model")
 			for q < len(s) && s[q] >= 'a' && s[q] <= 'z' {
 				q++
 			}
@@ -758,8 +758,8 @@ func findQualifiedType(s string, add func(ObjFinding)) {
 	}
 }
 
-// qualifiedIn: o nome qualificado (2 ou 3 partes, sem aspas) que começa em s[p], ou a == b.
-// Não vale arquivo (fin.csv), domínio público, chamada (a.b(), caminho (a.b/c) nem versão.
+// qualifiedIn: the qualified name (2 or 3 parts, no quotes) that starts at s[p], or a == b. A file
+// (fin.csv), public domain, call (a.b(), path (a.b/c) or version does not count.
 func qualifiedIn(s string, p int) (int, int) {
 	ident := func(c byte) bool { return isAlnum(c) || c == '_' || c == '$' }
 	if p >= len(s) || !(letterD(s[p]) || s[p] == '_') {
@@ -795,7 +795,7 @@ func qualifiedIn(s string, p int) (int, int) {
 	return p, q
 }
 
-// errorWords: a linha tem cara de mensagem de erro (só então o nome citado ensina)
+// errorWords: the line looks like an error message (only then does the cited name teach)
 var errorWords = []string{"error", "erro", "exist", "not found", "invalid", "unknown", "not authorized", "denied",
 	"failed", "falhou", "inválid", "não encontrad", "msg ", "ora-", "sqlstate", "exception"}
 
@@ -838,14 +838,14 @@ func findBQError(s string, add func(ObjFinding)) {
 	}
 }
 
-// reSimpleIdent: um identificador (com letras acentuadas: SQL e os catálogos aceitam).
+// reSimpleIdent: an identifier (with accented letters: SQL and catalogs accept them).
 var reSimpleIdent = regexp.MustCompile(`^[\p{L}_][\p{L}0-9_$#-]*$`)
 
-// Varredura sem regex das peças de SQL (o leitor roda em cada instrução; numa linha longa com
-// milhares de instruções curtas, as regex sem caixa custavam a maior parte do tempo). Fazem o
-// mesmo que reSQLPart, reQualTok e reSQLClauses.
+// Regex-free scan of the SQL pieces (the reader runs on each statement; on a long line with
+// thousands of short statements, the case-insensitive regexes took most of the time). They do the
+// same as reSQLPart, reQualTok and reSQLClauses.
 
-// sqlPartIn: o fim do identificador de SQL (reIdSQL) que começa em s[i], ou -1.
+// sqlPartIn: the end of the SQL identifier (reIdSQL) that starts at s[i], or -1.
 func sqlPartIn(s string, i int) int {
 	switch c := s[i]; c {
 	case '[', '"', '`':
@@ -853,7 +853,7 @@ func sqlPartIn(s string, i int) int {
 		if c == '[' {
 			f = ']'
 		}
-		for k, n := i+1, 0; k < len(s) && n <= 128; n++ { // até 128 caracteres (não bytes)
+		for k, n := i+1, 0; k < len(s) && n <= 128; n++ { // up to 128 characters (not bytes)
 			if s[k] == '\n' {
 				return -1
 			}
@@ -896,7 +896,7 @@ func sqlPartIn(s string, i int) int {
 	return k
 }
 
-// sqlPartsIn: as posições de cada identificador de s, como reSQLPart.FindAllStringIndex.
+// sqlPartsIn: the positions of each identifier of s, like reSQLPart.FindAllStringIndex.
 func sqlPartsIn(s string) [][2]int {
 	var out [][2]int
 	for i := 0; i < len(s); {
@@ -911,7 +911,7 @@ func sqlPartsIn(s string) [][2]int {
 	return out
 }
 
-// sqlQualsIn: os nomes qualificados (a.b.c) de s, como reQualTok.FindAllStringIndex.
+// sqlQualsIn: the qualified names (a.b.c) of s, like reQualTok.FindAllStringIndex.
 func sqlQualsIn(s string) [][2]int {
 	var out [][2]int
 	for i := 0; i < len(s); {
@@ -936,7 +936,7 @@ func sqlQualsIn(s string) [][2]int {
 
 var sqlClauses = setOf("FROM", "WHERE", "JOIN", "SET", "VALUES", "INTO", "HAVING", "UNION", "AS", "ON", "TABLE")
 
-// countClauses: quantas cláusulas (reSQLClauses) há em s, até max.
+// countClauses: how many clauses (reSQLClauses) there are in s, up to max.
 func countClauses(s string, max int) int {
 	n := 0
 	word := func(c byte) bool { return isAlnum(c) || c == '_' }
@@ -973,19 +973,19 @@ func countClauses(s string, max int) int {
 	return n
 }
 
-// asksContinuation: palavras com que uma linha de SQL termina quando a instrução continua na
-// linha seguinte (a gramática exige um complemento depois delas).
+// asksContinuation: words a SQL line ends with when the statement continues on the next line (the
+// grammar requires a complement after them).
 var asksContinuation = setOf("select", "from", "join", "on", "and", "or", "where", "by", "into", "update",
 	"table", "view", "as", "set", "values", "using", "in", "not", "is", "like", "then", "when", "else",
 	"case", "union", "all", "distinct", "having", "with", "over", "partition", "merge", "delete", "insert",
 	"create", "replace", "alter", "drop", "exists", "between", "returning", "inner", "left", "right",
 	"full", "outer", "cross", "natural", "lateral", "limit", "offset", "qualify", "window", "match", "matched")
 
-// looseLine: a linha que começa em p não continua a instrução que começou em j: a linha de
-// antes está completa (não termina com vírgula, parêntese aberto, operador nem palavra que
-// pede complemento), esta é uma palavra solta, sem nada de SQL, e a seguinte também não começa
-// com palavra de SQL (um nome de arquivo de uma listagem logo depois de um SQL cortado sem
-// ";": "linhagem.sql" não é tabela.coluna).
+// looseLine: the line starting at p does not continue the statement that started at j: the line
+// before is complete (does not end in a comma, open parenthesis, operator or word that asks for a
+// complement), this one is a loose word, with nothing of SQL, and the next one does not start with
+// an SQL word either (a file name from a listing right after an SQL cut without ";": "linhagem.sql"
+// is not table.column).
 func looseLine(s string, j, p, end int) bool {
 	e := strings.IndexByte(s[p:end], '\n')
 	if e < 0 {
@@ -1008,8 +1008,8 @@ func looseLine(s string, j, p, end int) bool {
 	if asksContinuation[strings.ToLower(strings.Trim(ws[len(ws)-1], "(),"))] {
 		return false
 	}
-	// a linha seguinte também não pode continuar o SQL (num SQL com uma palavra por linha, o
-	// apelido solto é seguido de JOIN, ON, WHERE...; numa listagem, de outro nome de arquivo)
+	// the next line cannot continue the SQL either (in SQL with one word per line, the loose alias
+	// is followed by JOIN, ON, WHERE...; in a listing, by another file name)
 	q := p + e + 1
 	for q < end && (s[q] == ' ' || s[q] == '\t' || s[q] == '\n' || s[q] == '\r') {
 		q++
@@ -1021,19 +1021,19 @@ func looseLine(s string, j, p, end int) bool {
 	return len(next) == 0 || !vocabSQL[strings.ToLower(strings.Trim(next[0], "(),;"))]
 }
 
-// SQL embutido em código. A string que contém a instrução é reconhecida pela forma dos
-// delimitadores, não pela linguagem: aspas simples, duplas e crases ("...", '...', `...`),
-// aspas triplas (Python, Java, Kotlin, Scala, C#), string crua (Rust r#"..."#, C++ R"x(...)x"),
-// heredoc (shell, Ruby, PHP: <<FIM, <<-FIM, <<~FIM, <<'FIM', <<<FIM) e concatenação ("a" + "b",
-// "a" . "b", "a" & "b", "a" || "b", "a" "b"). Vale para linguagem que não está nesta lista e usa
-// as mesmas formas.
+// SQL embedded in code. The string containing the statement is recognized by the shape of the
+// delimiters, not by the language: single, double quotes and backticks ("...", '...', `...`),
+// triple quotes (Python, Java, Kotlin, Scala, C#), raw string (Rust r#"..."#, C++ R"x(...)x"),
+// heredoc (shell, Ruby, PHP: <<FIM, <<-FIM, <<~FIM, <<'FIM', <<<FIM) and concatenation ("a" + "b",
+// "a" . "b", "a" & "b", "a" || "b", "a" "b"). Applies to a language not in this list that uses the
+// same shapes.
 
-// openingWindow: quanto da linha antes da instrução openingString olha.
+// openingWindow: how much of the line before the statement openingString looks at.
 const openingWindow = 2048
 
-// openingStr: como fecha a string em que a instrução começou.
+// openingStr: how the string in which the statement started closes.
 type openingStr struct {
-	closes  string // o delimitador que fecha (no heredoc, a palavra da linha final)
+	closes  string // the closing delimiter (in a heredoc, the word on the final line)
 	heredoc bool
 }
 
@@ -1043,10 +1043,10 @@ var (
 	reCppRaw  = regexp.MustCompile(`\bu?8?R"([^()\\\s"]{0,16})$`)
 )
 
-// openingString: a instrução que começa em i está dentro de uma string de código? Olha para
-// trás por cima de espaços, quebras de linha e "(" (cur.execute(\n    """\n    SELECT ...). A
-// aspa só é abertura se, na linha dela, as anteriores do mesmo tipo forem pares (x = "abc" na
-// linha de cima fecha uma string, não abre).
+// openingString: is the statement starting at i inside a code string? Looks back over spaces, line
+// breaks and "(" (cur.execute(\n """\n SELECT ...). A quote is only an opening if, on its line, the
+// previous ones of the same kind are paired (x = "abc" on the line above closes a string, it does
+// not open one).
 func openingString(s string, i int) (openingStr, bool) {
 	k := i
 	for n := 0; k > 0 && n < 400; n++ {
@@ -1056,14 +1056,14 @@ func openingString(s string, i int) (openingStr, bool) {
 		}
 		break
 	}
-	// a linha da abertura, até openingWindow bytes para trás: numa linha única longa (JSON
-	// minificado) olhar a linha inteira a cada instrução seria quadrático
+	// the opening line, up to openingWindow bytes back: on a long single line (minified JSON)
+	// looking at the whole line for each statement would be quadratic
 	j0 := max(0, k-openingWindow)
 	ini := j0 + strings.LastIndexByte(s[j0:k], '\n') + 1
 	cutOff := ini == j0 && j0 > 0 && s[j0-1] != '\n'
 	prev := s[ini:k]
-	prevEnd := prev[max(0, len(prev)-24):] // as aberturas cruas cabem no fim da linha
-	// heredoc: a linha da abertura termina antes, e a instrução começa numa linha seguinte
+	prevEnd := prev[max(0, len(prev)-24):] // the raw openings fit at the end of the line
+	// heredoc: the opening line ends before, and the statement starts on a following line
 	if strings.Contains(s[k:i], "\n") {
 		if ms := reHeredoc.FindAllStringSubmatch(prev, -1); ms != nil {
 			return openingStr{closes: ms[len(ms)-1][2], heredoc: true}, true
@@ -1077,7 +1077,7 @@ func openingString(s string, i int) (openingStr, bool) {
 	}
 	for _, q := range []string{`"""`, `'''`, `"`, `'`, "`"} {
 		if strings.HasSuffix(prev, q) {
-			// na linha cortada a paridade não é conhecida: a aspa colada na instrução abre
+			// on the cut line the parity is not known: the quote right next to the statement opens
 			if cutOff || countQuotes(prev[:len(prev)-len(q)], q)%2 == 0 {
 				return openingStr{closes: q}, true
 			}
@@ -1087,7 +1087,7 @@ func openingString(s string, i int) (openingStr, bool) {
 	return openingStr{}, false
 }
 
-// countQuotes: ocorrências de q em s, sem as escapadas (\").
+// countQuotes: occurrences of q in s, without the escaped ones (\").
 func countQuotes(s, q string) int {
 	n := 0
 	for p := 0; p+len(q) <= len(s); {
@@ -1104,10 +1104,10 @@ func countQuotes(s, q string) int {
 	return n
 }
 
-// stringEnd: onde fecha a string aberta (a), a partir de j; numa concatenação, a última.
+// stringEnd: where the open string (a) closes, starting from j; in a concatenation, the last one.
 func stringEnd(s string, j, lim int, a openingStr) int {
 	if a.heredoc {
-		// a linha que só tem a palavra (com recuo; ";" depois, no PHP)
+		// the line that has only the word (with indentation; ";" after it, in PHP)
 		for p := j; p < lim; {
 			e := strings.IndexByte(s[p:lim], '\n')
 			if e < 0 {
@@ -1135,8 +1135,8 @@ func stringEnd(s string, j, lim int, a openingStr) int {
 	return lim
 }
 
-// closeIndex: onde está o delimitador d em s; aspa simples, dupla e crase escapadas com \ não
-// fecham.
+// closeIndex: where the delimiter d is in s; single, double quotes and backticks escaped with \ do
+// not close.
 func closeIndex(s, d string) int {
 	if len(d) > 1 {
 		return strings.Index(s, d)
@@ -1152,9 +1152,9 @@ func closeIndex(s, d string) int {
 	return -1
 }
 
-// stringContinuation: depois de uma string fechada em p, vem outra que a continua (operador de
-// concatenação, ou só espaço, como no Python e no C)? Devolve o delimitador e onde começa o
-// conteúdo dela.
+// stringContinuation: after a string closed at p, does another one that continues it come
+// (concatenation operator, or just space, as in Python and C)? Returns the delimiter and where its
+// content starts.
 func stringContinuation(s string, p, lim int) (string, int) {
 	skip := func(p int) int {
 		for p < lim && (s[p] == ' ' || s[p] == '\t' || s[p] == '\n' || s[p] == '\r' || s[p] == '\\') {

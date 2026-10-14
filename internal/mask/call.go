@@ -8,52 +8,52 @@ import (
 	"unicode/utf8"
 )
 
-// O que o proxy sabe de uma chamada de ferramenta (ver docs/pt-BR/structures.md, seções
-// Proveniência, Identidade e Eco). Nenhuma regra é por ferramenta: tudo vem da gramática do
-// pedido (verbo de enumeração + substantivo), da proveniência das palavras (o programa que o
-// modelo escreveu x os dados que a saída trouxe) e da ordem da conversa (eco).
+// What the proxy knows about a tool call (see docs/structures.md, sections Provenance, Identity and
+// Echo). No rule is per tool: everything comes from the grammar of the request (enumeration verb +
+// noun), from the provenance of the words (the program the model wrote vs. the data the output
+// brought) and from the order of the conversation (echo).
 //
-// O proxy percorre a conversa em ordem (proxy/request.go, commandHints):
-//   - ArgumentText(cmd), antes de tudo, para cada tool_use: as palavras em posição de argumento;
-//   - User(texto): a última mensagem do usuário (B6: "lista os grupos..." dá o tipo);
-//   - Usage(cmd, traduzidas): o tool_use; devolve a Call (extensão da dica da entrada);
-//   - Result(ch, saida): o tool_result; devolve a extensão da dica da saída;
-//   - EndTurn(): fim de uma mensagem do assistente (o pedido do usuário vale só para as
-//     chamadas da primeira resposta depois dele).
+// The proxy walks the conversation in order (proxy/request.go, commandHints):
+//   - ArgumentText(cmd), before everything, for each tool_use: the words in argument position;
+//   - User(text): the last user message (B6: "list the groups..." gives the type);
+//   - Usage(cmd, translated): the tool_use; returns the Call (extension of the input hint);
+//   - Result(ch, output): the tool_result; returns the extension of the output hint;
+//   - EndTurn(): end of an assistant message (the user request only applies to the calls of
+//     the first response after it).
 //
-// A extensão vai depois de sepExt na dica (decision.go) e entra na chave do memo: é compacta e
-// determinística (hashes curtos das palavras, em ordem). Format:
+// The extension goes after sepExt in the hint (decision.go) and enters the memo key: it is compact
+// and deterministic (short hashes of the words, in order). Format:
 //
-//	s;t=<tipo>;p=<h>,<h>...;x=<tipo>:<h>,...      (saída de comando)
-//	u;e=<tipo>:<h>,...;x=<tipo>:<h>,...           (entrada do tool_use)
+//	s;t=<type>;p=<h>,<h>...;x=<type>:<h>,...      (command output)
+//	u;e=<type>:<h>,...;x=<type>:<h>,...           (tool_use input)
 //
-// t: o tipo pedido (verbo de enumeração do comando, ou da mensagem do usuário); p: as palavras
-// do programa; x: as palavras que o proxy traduziu de um pseudônimo nesse tool_use (B1: são
-// nome, nunca programa); e: as palavras do tool_use que ecoam uma saída anterior (B4). h é o
-// FNV-1a de 32 bits da palavra em minúsculas (ASCII), em hexadecimal.
+// t: the requested type (enumeration verb of the command, or of the user message); p: the program
+// words; x: the words the proxy translated from a pseudonym in that tool_use (B1: they are names,
+// never program); e: the tool_use words that echo a previous output (B4). h is the 32-bit FNV-1a of
+// the lowercased word (ASCII), in hexadecimal.
 
-// genericEnt: o tipo de um nome cujo substantivo não casa com nenhuma palavra de tipo de
-// ObjectPrefixes (list_findings, branches). Não é chave de ObjectPrefixes de propósito: pseudoObject usa
-// então o prefixo genérico "OBJ" (o mesmo de sempre); objMask vale (ligado por padrão,
-// desligável em objetos.mascarar.objeto) e objPropagates é falso (não está em defaultPropagates): o
-// nome é mascarado onde é decidido e pela memória da conversa, mas nunca aprendido.
+// genericEnt: the type of a name whose noun matches no type word of ObjectPrefixes (list_findings,
+// branches). It is not an ObjectPrefixes key on purpose: pseudoObject then uses the generic "OBJ"
+// prefix (the usual one); objMask applies (on by default, can be turned off in objects.mask.object)
+// and objPropagates is false (it is not in defaultPropagates): the name is masked where it is
+// decided and by the conversation memory, but never learned.
 const genericEnt = "objeto"
 
-// conversationCmd: o estado de Commands para as regras desta seção.
+// conversationCmd: the state of Commands for the rules of this section.
 type conversationCmd struct {
-	args     map[string]bool   // palavras em posição de argumento em algum tool_use
-	seenOnes map[string]string // argumento -> tipo pedido da saída em que apareceu ("" = sem tipo)
-	request  string            // o tipo pedido pela última mensagem do usuário ("" = nada)
+	args     map[string]bool   // words in argument position in some tool_use
+	seenOnes map[string]string // argument -> requested type of the output it appeared in ("" = no type)
+	request  string            // the type requested by the last user message ("" = none)
 	hasPed   bool
-	usedPed  bool // já houve chamada neste turno
+	usedPed  bool // there was already a call in this turn
 	nOutputs int
-	nScanned int // bytes de saída varridos (teto)
-	// scripts: o texto dos tool_use pelo nome de arquivo que citam. Um script escrito numa
-	// chamada e executado noutra ("python3 scripts/x.py") é programa da segunda também.
+	nScanned int // output bytes scanned (ceiling)
+	// scripts: the text of the tool_uses by the file name they cite. A script written in one call
+	// and run in another ("python3 scripts/x.py") is a program of the second one too.
 	scripts map[string]string
 }
 
-// Call: um tool_use, com o que se sabe dele.
+// Call: a tool_use, with what is known about it.
 type Call struct {
 	typ      string
 	prog     map[uint32]bool
@@ -62,11 +62,11 @@ type Call struct {
 	usageExt string
 }
 
-// TranslatedWord: uma palavra que o proxy pôs no texto ao traduzir um pseudônimo (Name) e o
-// tipo do pseudônimo.
+// TranslatedWord: a word the proxy put in the text when translating a pseudonym (Name) and the type
+// of the pseudonym.
 type TranslatedWord struct{ Name, Ent string }
 
-// UsageExt: a extensão da dica para as strings da entrada do tool_use ("" = nada).
+// UsageExt: the hint extension for the strings of the tool_use input ("" = none).
 func (ch *Call) UsageExt() string {
 	if ch == nil {
 		return ""
@@ -74,7 +74,7 @@ func (ch *Call) UsageExt() string {
 	return ch.usageExt
 }
 
-// WithExtension: a dica do leitor de tabela (codificar) com a extensão.
+// WithExtension: the table reader's hint (encode) with the extension.
 func WithExtension(table, ext string) string {
 	if ext == "" {
 		return table
@@ -84,11 +84,11 @@ func WithExtension(table, ext string) string {
 
 const (
 	maxArgs       = 4096
-	maxScanOutput = 64 << 20 // bytes de saída varridos para o eco, por requisição
+	maxScanOutput = 64 << 20 // output bytes scanned for the echo, per request
 )
 
-// ArgumentText: registra as palavras em posição de argumento de um tool_use (antes do percurso
-// em ordem, para a varredura das saídas procurar só por elas).
+// ArgumentText: records the words in argument position of a tool_use (before the in-order walk, so
+// the scan of the outputs looks only for them).
 func (c *Commands) ArgumentText(cmd string) {
 	if c.cv.args == nil {
 		c.cv.args = map[string]bool{}
@@ -100,8 +100,7 @@ func (c *Commands) ArgumentText(cmd string) {
 	})
 }
 
-// User: uma mensagem do usuário. O tipo que ela pede vale para as chamadas da resposta
-// seguinte.
+// User: a user message. The type it asks for applies to the calls of the next response.
 func (c *Commands) User(text string) {
 	if strings.TrimSpace(text) == "" {
 		return
@@ -110,15 +109,14 @@ func (c *Commands) User(text string) {
 	c.cv.usedPed = false
 }
 
-// EndTurn: acabou uma mensagem do assistente. Se ela teve chamadas, o pedido do usuário já foi
-// usado.
+// EndTurn: an assistant message ended. If it had calls, the user request was already used.
 func (c *Commands) EndTurn() {
 	if c.cv.usedPed {
 		c.cv.request, c.cv.hasPed, c.cv.usedPed = "", false, false
 	}
 }
 
-// Usage: um tool_use. trad: as palavras que o proxy traduziu de um pseudônimo na entrada dele.
+// Usage: a tool_use. trans: the words the proxy translated from a pseudonym in its input.
 func (c *Commands) Usage(cmd string, trans []TranslatedWord) *Call {
 	cmd = limitTo(cmd)
 	ch := &Call{trans: trans}
@@ -139,7 +137,7 @@ func (c *Commands) Usage(cmd string, trans []TranslatedWord) *Call {
 			ch.prog[h] = true
 		}
 	})
-	// eco: argumento que apareceu numa saída anterior
+	// echo: an argument that appeared in a previous output
 	seen := map[string]bool{}
 	arguments(cmd, func(p, ent string) {
 		outputType, ok := c.cv.seenOnes[p]
@@ -165,8 +163,8 @@ func (c *Commands) Usage(cmd string, trans []TranslatedWord) *Call {
 	return ch
 }
 
-// Result: a saída de uma chamada. Devolve a extensão da dica da saída. Também marca os
-// argumentos de tool_use que aparecem nela (para o eco das chamadas seguintes).
+// Result: the output of a call. Returns the extension of the output hint. It also marks the
+// tool_use arguments that appear in it (for the echo of the following calls).
 func (c *Commands) Result(ch *Call, output string) string {
 	typ := ""
 	if ch != nil {
@@ -231,7 +229,7 @@ func limitTo(cmd string) string {
 	return cmd
 }
 
-// hpal: FNV-1a de 32 bits da palavra, com as letras ASCII em minúsculas.
+// hpal: 32-bit FNV-1a of the word, with ASCII letters lowercased.
 func hpal(p string) uint32 {
 	h := uint32(2166136261)
 	for i := 0; i < len(p); i++ {
@@ -247,14 +245,14 @@ func hpal(p string) uint32 {
 
 // ---- palavras --------------------------------------------------------------------------
 
-// wordByte: letra ou dígito ASCII, "_", "-" e "." (o resto separa; letras fora do ASCII
-// são tratadas em scanWords).
+// wordByte: ASCII letter or digit, "_", "-" and "." (the rest separates; non-ASCII letters are
+// handled in scanWords).
 func wordByte(c byte) bool {
 	return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_' || c == '-' || c == '.'
 }
 
-// scanWords: as palavras de s, em uma passada: sequências de letras (de qualquer língua),
-// dígitos, "_", "-" e ".", sem "." e "-" nas pontas.
+// scanWords: the words of s, in one pass: sequences of letters (of any language), digits, "_", "-"
+// and ".", without "." and "-" at the ends.
 func scanWords(s string, f func(a, b int)) {
 	i := 0
 	for i < len(s) {
@@ -296,8 +294,8 @@ func scanWords(s string, f func(a, b int)) {
 	}
 }
 
-// identParts: as partes de um identificador: snake_case, kebab-case, a.b e camelCase
-// ("Get-ADGroup" -> Get, AD, Group; "listBuckets" -> list, Buckets).
+// identParts: the parts of an identifier: snake_case, kebab-case, a.b and camelCase ("Get-ADGroup"
+// -> Get, AD, Group; "listBuckets" -> list, Buckets).
 func identParts(v string, f func(p string)) {
 	ini := 0
 	emits := func(a, b int) {
@@ -324,10 +322,10 @@ func identParts(v string, f func(p string)) {
 	emits(ini, len(v))
 }
 
-// maxScript: teto do texto guardado por nome de arquivo (e do programa montado).
+// maxScript: ceiling of the text kept per file name (and of the assembled program).
 const maxScript = 256 << 10
 
-// citedFiles: os nomes de arquivo (com extensão) que cmd cita, sem o caminho.
+// citedFiles: the file names (with extension) that cmd cites, without the path.
 func citedFiles(cmd string, f func(name string)) {
 	for _, t := range strings.FieldsFunc(cmd, func(r rune) bool {
 		return r == ' ' || r == '\t' || r == '\n' || r == '\r' || r == '"' || r == '\'' || r == '`' || r == '=' || r == ';' || r == '(' || r == ')' || r == '<' || r == '>' || r == '|'
@@ -341,8 +339,8 @@ func citedFiles(cmd string, f func(name string)) {
 	}
 }
 
-// fullProgram: o comando mais o texto dos tool_use anteriores que citam os mesmos
-// arquivos (o script que ele executa); e guarda este comando para os seguintes.
+// fullProgram: the command plus the text of the previous tool_uses that cite the same files (the
+// script it runs); and keeps this command for the following ones.
 func (c *Commands) fullProgram(cmd string) string {
 	prog := cmd
 	seenSet := map[string]bool{}
@@ -352,7 +350,7 @@ func (c *Commands) fullProgram(cmd string) string {
 			prog += "\n" + t
 		}
 	})
-	if len(cmd) > 64 { // só um texto com conteúdo (não um comando curto que só cita o arquivo)
+	if len(cmd) > 64 { // only a text with content (not a short command that only cites the file)
 		if c.cv.scripts == nil {
 			c.cv.scripts = map[string]string{}
 		}
@@ -365,8 +363,7 @@ func (c *Commands) fullProgram(cmd string) string {
 	return prog
 }
 
-// programWords: B1, as palavras do programa (o comando ou o script): cada palavra inteira e
-// as partes dela.
+// programWords: B1, the program words (the command or the script): each whole word and its parts.
 func programWords(cmd string, f func(p string)) {
 	scanWords(cmd, func(a, b int) {
 		w := cmd[a:b]
@@ -375,14 +372,14 @@ func programWords(cmd string, f func(p string)) {
 	})
 }
 
-// ---- gramática do pedido (B5, B6) --------------------------------------------------------
+// ---- grammar of the request (B5, B6) -----------------------------------------------------
 
-// verbos de enumeração e consulta (gramática fechada; em qualquer convenção)
+// enumeration and query verbs (closed grammar; in any convention)
 var enumVerbs = setOf("list", "get", "describe", "show", "ls", "search", "find", "query", "select", "scan",
 	"enum", "enumerate", "dump", "export", "fetch", "inspect", "info")
 
-// os mesmos verbos em português (imperativo, infinitivo) e as palavras de ligação entre o verbo
-// e o substantivo numa frase ("lista todos os grupos", "show me all the tables")
+// the same verbs in Portuguese (imperative, infinitive) and the linking words between the verb and
+// the noun in a sentence ("lista todos os grupos", "show me all the tables")
 var (
 	proseVerbs = setOf("list", "get", "describe", "show", "search", "find", "query", "select", "scan",
 		"enumerate", "dump", "export", "fetch", "inspect",
@@ -398,8 +395,8 @@ var (
 		"available", "existing", "current")
 )
 
-// entOfNoun: o tipo de ObjectPrefixes que o substantivo indica (singular ou plural; as
-// palavras de tipo que já existem).
+// entOfNoun: the ObjectPrefixes type the noun indicates (singular or plural; the type words that
+// already exist).
 func entOfNoun(w string) (string, bool) {
 	l := strings.ToLower(w)
 	try := func(x string) (string, bool) {
@@ -434,9 +431,9 @@ func entOfNoun(w string) (string, bool) {
 	return "", false
 }
 
-// substantivo: o tipo de uma palavra que segue (ou precede) um verbo de enumeração. Casa com
-// ObjectPrefixes: esse tipo. Não casa, mas é plural de letras: o tipo genérico (list_findings).
-// Senão: nada (getLogger não é enumeração).
+// noun: the type of a word that follows (or precedes) an enumeration verb. Matches ObjectPrefixes:
+// that type. Does not match, but is a plural of letters: the generic type (list_findings).
+// Otherwise: nothing (getLogger is not an enumeration).
 func noun(w string) (string, bool) {
 	w = strings.Trim(w, `"'`)
 	if w == "" {
@@ -460,15 +457,15 @@ func lettersOnly(w string) bool {
 	return w != ""
 }
 
-// commandType: B5, o tipo que o verbo de enumeração do comando pede. Convenções:
-// get_x / listX / Get-X / describe-x (identificador), "<cli> get x" e "<cli> x list"
-// (subcomando; o verbo nunca é o próprio programa: "ls" sozinho é do shell), GET /x (REST) e
-// SHOW x / SELECT ... FROM <catálogo>.x (SQL).
+// commandType: B5, the type the command's enumeration verb asks for. Conventions: get_x / listX /
+// Get-X / describe-x (identifier), "<cli> get x" and "<cli> x list" (subcommand; the verb is never
+// the program itself: "ls" alone belongs to the shell), GET /x (REST) and SHOW x / SELECT ... FROM
+// <catalog>.x (SQL).
 func commandType(cmd string) (string, bool) {
 	if cmd == "" {
 		return "", false
 	}
-	// SQL: SHOW <tipos>; SELECT ... FROM <catálogo>.<tipos>
+	// SQL: SHOW <types>; SELECT ... FROM <catalog>.<types>
 	low := strings.ToLower(cmd)
 	if strings.Contains(low, "show") || strings.Contains(low, "select") {
 		if m := reShow.FindStringSubmatch(cmd); m != nil {
@@ -558,8 +555,8 @@ func commandType(cmd string) (string, bool) {
 	return best, foundIt
 }
 
-// identificadores: os identificadores de um token de shell (letras, dígitos, "_", "-"), cada um
-// com o que vem logo depois dele no token.
+// identifiers: the identifiers of a shell token (letters, digits, "_", "-"), each with what comes
+// right after it in the token.
 func identifiers(t string, f func(id, after string)) {
 	for i := 0; i < len(t); {
 		if !(isAlnum(t[i]) || t[i] == '_') {
@@ -574,7 +571,7 @@ func identifiers(t string, f func(id, after string)) {
 	}
 }
 
-// urlType: o tipo do último segmento de um caminho REST ("/api/queues", "https://h/v1/buckets?x").
+// urlType: the type of the last segment of a REST path ("/api/queues", "https://h/v1/buckets?x").
 func urlType(u string) (string, bool) {
 	u = strings.Trim(u, `"'()`)
 	if k := strings.Index(u, "://"); k >= 0 {
@@ -596,8 +593,8 @@ func urlType(u string) (string, bool) {
 	return noun(sgm)
 }
 
-// typeInProse: B6, o tipo pedido numa frase ("lista os grupos com acesso ao banco", "show me
-// the queues"): um verbo de enumeração, até três palavras de ligação e o substantivo.
+// typeInProse: B6, the type requested in a sentence ("lista os grupos com acesso ao banco", "show
+// me the queues"): an enumeration verb, up to three linking words and the noun.
 func typeInProse(s string) (string, bool) {
 	if len(s) > 8<<10 {
 		s = s[:8<<10]
@@ -640,13 +637,13 @@ func typeInProse(s string) (string, bool) {
 
 // ---- argumentos (B4) -------------------------------------------------------------------
 
-// palavras depois das quais vem um nome em SQL e em comandos (FROM x, TO ROLE x, USE x)
+// words after which a name comes in SQL and in commands (FROM x, TO ROLE x, USE x)
 var beforeName = setOf("from", "join", "into", "update", "table", "use", "role", "database", "schema", "warehouse")
 
-// argumentos: as palavras de cmd em posição de argumento, pela gramática: o valor depois de uma
-// opção (-n x, --namespace x, --namespace=x), de uma atribuição (x=v), de uma palavra de tipo
-// (ns x, queue x) ou de FROM/INTO/TO ROLE; os segmentos de um caminho REST; o literal de uma
-// palavra só ('x'). ent: o tipo que o contexto diz ("" = nenhum).
+// arguments: the words of cmd in argument position, by the grammar: the value after an option (-n
+// x, --namespace x, --namespace=x), an assignment (x=v), a type word (ns x, queue x) or
+// FROM/INTO/TO ROLE; the segments of a REST path; the literal of a single word ('x'). ent: the type
+// the context says ("" = none).
 func arguments(cmd string, f func(p, ent string)) {
 	emitIt := func(v, ent string) {
 		v = strings.Trim(v, `"'`+"`(),;[]{}")
@@ -706,9 +703,9 @@ func arguments(cmd string, f func(p, ent string)) {
 	}
 }
 
-// ---- palavras traduzidas (B1, exceção) ---------------------------------------------------
+// ---- translated words (B1, exception) ----------------------------------------------------
 
-// entOfPrefix: o tipo de um pseudônimo de objeto pelo prefixo ("ns_x" -> namespace).
+// entOfPrefix: the type of an object pseudonym by its prefix ("ns_x" -> namespace).
 var entOfPrefix = func() map[string]string {
 	m := map[string]string{"obj": genericEnt}
 	for e, p := range ObjectPrefixes {
@@ -717,8 +714,8 @@ var entOfPrefix = func() map[string]string {
 	return m
 }()
 
-// TranslatedWords: as palavras de s que o proxy traduziu de um pseudônimo de objeto (s é
-// uma string da entrada de um tool_use, como o Claude Code a reenvia). Sem registro: nada.
+// TranslatedWords: the words of s the proxy translated from an object pseudonym (s is a string of a
+// tool_use input, as Claude Code resends it). Without a registry: nothing.
 func (m *Masker) TranslatedWords(s string) []TranslatedWord {
 	tr, ok := m.Translated(s)
 	if !ok {

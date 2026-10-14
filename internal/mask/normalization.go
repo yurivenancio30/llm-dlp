@@ -6,25 +6,25 @@ import (
 	"strings"
 )
 
-// Normalização de transporte: o conteúdo quase sempre chega embrulhado por um comando ou por
-// uma ferramenta (número de linha da ferramenta de leitura, cat -n, grep -n, diff, citação de
-// markdown, carimbo de log, cerca de código, cores ANSI, bordas de caixa, texto escapado de
-// JSON, CRLF). Nenhum leitor trata isso, e cada um teria de tratar tudo: por isso é uma camada
-// antes deles. Ela devolve o texto limpo e, para cada posição dele, a posição no original; os
-// leitores rodam também no texto limpo e os achados voltam para o original (só os que
-// correspondem byte a byte, para a troca e a volta ficarem exatas).
+// Transport normalization: content almost always arrives wrapped by a command or a tool (line
+// number of the read tool, cat -n, grep -n, diff, markdown quote, log stamp, code fence, ANSI
+// colors, box borders, JSON-escaped text, CRLF). No reader handles this, and each one would have to
+// handle all of it: so it is a layer before them. It returns the clean text and, for each position
+// of it, the position in the original; the readers also run on the clean text and the findings go
+// back to the original (only those that match byte for byte, so the swap and the return are exact).
 
-// normText: o texto limpo e o mapa posição limpa -> posição original (len(t)+1 posições).
+// normText: the clean text and the map clean position -> original position (len(t)+1 positions).
 type normText struct {
 	t  string
 	mp []int
-	// o original também precisa ser lido: a normalização tirou algo que traz nome (o arquivo
-	// do grep, o cabeçalho do diff) ou mudou a estrutura (JSON decodificado). Sem isso (número
-	// de linha, carimbo de log, cores, bordas, CRLF), o texto limpo basta e o original não é lido.
+	// the original also needs to be read: normalization removed something that carries a name (the
+	// grep file, the diff header) or changed the structure (decoded JSON). Without that (line
+	// number, log stamp, colors, borders, CRLF), the clean text is enough and the original is not
+	// read.
 	alsoRaw bool
 }
 
-// original: o trecho [a, b) do texto limpo no original, se corresponde byte a byte.
+// original: the piece [a, b) of the clean text in the original, if it matches byte for byte.
 func (n *normText) original(s string, a, b int) (int, int, bool) {
 	if a < 0 || b > len(n.t) || a >= b {
 		return 0, 0, false
@@ -37,7 +37,7 @@ func (n *normText) original(s string, a, b int) (int, int, bool) {
 	return oa, ob, true
 }
 
-// limpo: o trecho [oa, ob) do original no texto limpo, se corresponde byte a byte.
+// cleaned: the piece [oa, ob) of the original in the clean text, if it matches byte for byte.
 func (n *normText) cleaned(s string, oa, ob int) (int, int, bool) {
 	a := sort.SearchInts(n.mp[:len(n.t)], oa)
 	if a >= len(n.t) || n.mp[a] != oa {
@@ -50,7 +50,7 @@ func (n *normText) cleaned(s string, oa, ob int) (int, int, bool) {
 	return a, b, true
 }
 
-// construtor de texto com mapa
+// text builder with a map
 type builder struct {
 	b  []byte
 	mp []int
@@ -69,7 +69,8 @@ func (m *builder) snippet(s string, a, b int) {
 
 func (m *builder) end(n int) (string, []int) { return string(m.b), append(m.mp, n) }
 
-// compor: o mapa da etapa (posição na etapa -> posição na entrada da etapa) depois do mapa anterior.
+// composeAll: the stage's map (position in the stage -> position in the stage input) after the
+// previous map.
 func composeAll(prev, newOne []int) []int {
 	if prev == nil {
 		return newOne
@@ -80,7 +81,8 @@ func composeAll(prev, newOne []int) []int {
 	return newOne
 }
 
-// normalizar: o texto sem o transporte. ok=false quando não há nada para tirar (o caso comum).
+// normalize: the text without the transport. ok=false when there is nothing to remove (the common
+// case).
 func normalize(s string) (*normText, bool) {
 	if len(s) < 8 || !maybeTransport(s) {
 		return nil, false
@@ -92,7 +94,7 @@ func normalize(s string) (*normText, bool) {
 		}
 	}
 	rawValue := false
-	for k := 0; k < 3; k++ { // texto escapado dentro de texto escapado
+	for k := 0; k < 3; k++ { // escaped text inside escaped text
 		before := t
 		stage(unescapeJSON)
 		if t == before {
@@ -113,7 +115,7 @@ func normalize(s string) (*normText, bool) {
 	return &normText{t, mp, rawValue}, true
 }
 
-// maybeTransport: teste barato antes do trabalho (o texto comum não paga nada).
+// maybeTransport: a cheap test before the work (common text pays nothing).
 func maybeTransport(s string) bool {
 	if strings.Contains(s, `\n`) || strings.Contains(s, `\"`) || strings.IndexByte(s, 0x1b) >= 0 || strings.IndexByte(s, '\r') >= 0 ||
 		strings.Contains(s, "\xe2\x94") || strings.Contains(s, "\xe2\x95") || strings.HasPrefix(s, "\ufeff") ||
@@ -122,7 +124,7 @@ func maybeTransport(s string) bool {
 		strings.Contains(s, `"""`) || strings.Contains(s, "'''") || strings.IndexByte(s, '`') >= 0 {
 		return true
 	}
-	// prefixo numérico ou de arquivo nas primeiras linhas (cat -n, grep -n, blame, log)
+	// numeric or file prefix in the first lines (cat -n, grep -n, blame, log)
 	n, with := 0, 0
 	for i := 0; i < len(s) && n < 6; n++ {
 		j := strings.IndexByte(s[i:], '\n')
@@ -141,12 +143,12 @@ func maybeTransport(s string) bool {
 	return with > 0
 }
 
-// unescapeJSON: string de JSON com \n, \t, \" (saída de comando dentro de JSON, resultado de
-// ferramenta serializado, célula de notebook) vira o texto decodificado. Cada string com
-// quebra de linha escapada vira um bloco próprio (o resto, a estrutura do JSON, os leitores já
-// leem no original); sem aspas em volta, o texto inteiro é decodificado.
+// unescapeJSON: a JSON string with \n, \t, \" (command output inside JSON, serialized tool result,
+// notebook cell) becomes the decoded text. Each string with an escaped line break becomes a block
+// of its own (the rest, the JSON structure, the readers already read in the original); without
+// quotes around it, the whole text is decoded.
 func unescapeJSON(s string) (string, []int, bool) {
-	// num objeto JSON, uma string de uma linha com aspas escapadas ("relation \"x\"") já basta
+	// in a JSON object, a one-line string with escaped quotes ("relation \"x\"") is already enough
 	pj := looksLikeJSON(s)
 	if strings.Count(s, `\n`) < 2 && strings.Count(s, `\"`) < 4 && !(pj && (strings.Contains(s, `\n`) || strings.Count(s, `\"`) >= 2)) {
 		return s, nil, false
@@ -169,7 +171,7 @@ func unescapeJSON(s string) (string, []int, bool) {
 			case 'r':
 			case '"', '\\', '/', '\'':
 				m.byte(s[i+1], i+1)
-			case 'u': // \u003c: só os de ASCII (o resto fica como está)
+			case 'u': // <: only the ASCII ones (the rest stays as it is)
 				if i+5 < b && s[i+2] == '0' && s[i+3] == '0' && s[i+4] <= '7' && isHex(s[i+4]) && isHex(s[i+5]) {
 					m.byte(byte(hexVal(s[i+4])<<4|hexVal(s[i+5])), i)
 					i += 4
@@ -217,7 +219,7 @@ func unescapeJSON(s string) (string, []int, bool) {
 	return t, mp, true
 }
 
-// looksLikeJSON: o texto é um objeto ou lista de JSON (uma só quebra de linha escapada já basta).
+// looksLikeJSON: the text is a JSON object or list (a single escaped line break is enough).
 func looksLikeJSON(s string) bool {
 	t := strings.TrimSpace(s)
 	return len(t) > 2 && (t[0] == '{' || t[0] == '[') && strings.Contains(t, `":`)
@@ -225,8 +227,8 @@ func looksLikeJSON(s string) bool {
 
 var reANSI = regexp.MustCompile(`\x1b(?:\[[0-9;?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\)|[@-Z\\-_])`)
 
-// stripANSIAndCase: cores e movimentos do terminal saem; CR antes de LF sai; BOM sai; as bordas
-// de caixa (desenho de tabela) viram "|" e "-", que os leitores de tabela já entendem.
+// stripANSIAndCase: terminal colors and movements go; CR before LF goes; BOM goes; box borders
+// (table drawing) become "|" and "-", which the table readers already understand.
 func stripANSIAndCase(s string) (string, []int, bool) {
 	if strings.IndexByte(s, 0x1b) < 0 && strings.IndexByte(s, '\r') < 0 && !strings.Contains(s, "\xe2\x94") &&
 		!strings.Contains(s, "\xe2\x95") && !strings.HasPrefix(s, "\ufeff") {
@@ -257,9 +259,9 @@ func stripANSIAndCase(s string) (string, []int, bool) {
 			i++
 			continue
 		}
-		// U+2500..U+257F (desenho de caixa): E2 94 80..E2 95 BF
+		// U+2500..U+257F (box drawing): E2 94 80..E2 95 BF
 		if c == 0xe2 && i+2 < len(s) && (s[i+1] == 0x94 || s[i+1] == 0x95) {
-			r := rune(s[i+1]-0x94)<<6 | rune(s[i+2]&0x3f) // 0..127 dentro do bloco
+			r := rune(s[i+1]-0x94)<<6 | rune(s[i+2]&0x3f) // 0..127 inside the block
 			switch r {
 			case 0x00, 0x01, 0x04, 0x05, 0x08, 0x09, 0x4c, 0x4d, 0x50: // ─ ━ ┄ ┅ ┈ ┉ ╌ ╍ ═
 				m.byte('-', i)
@@ -277,20 +279,21 @@ func stripANSIAndCase(s string) (string, []int, bool) {
 }
 
 var (
-	// número de linha da ferramenta de leitura ("   12→") e do cat -n / nl ("    12\t")
+	// line number of the read tool (" 12→") and of cat -n / nl (" 12\t")
 	reLineNum = regexp.MustCompile(`^ *\d{1,7}(?:→|\t)`)
-	// grep -n com e sem arquivo ("a/b.py:12:", "12:"), linha de contexto ("a/b.py-12-", só com
-	// caminho de arquivo: "x-2024-01-" de um CSV não é contexto); vírgula, ";" e "=" não são de arquivo
+	// grep -n with and without a file ("a/b.py:12:", "12:"), context line ("a/b.py-12-", only with
+	// a file path: "x-2024-01-" of a CSV is not context); comma, ";" and "=" are not part of a file
 	reGrepN = regexp.MustCompile(`^(?:[^\s:,;=]*[^\s:\d,;=][^\s:,;=]*:\d+:|[^\s:,;=]*[./][^\s:,;=]*?-\d+-|\d+[:-](?:\D|$))`)
 	// git blame: "1a2b3c4d (Fulano 2024-01-02 10:11:12 -0300  12) "
 	reBlame = regexp.MustCompile(`^\^?[0-9a-f]{7,40}(?: [^\s(]+)? \([^)]*\d{4}-\d\d-\d\d[^)]*?\d+\) `)
-	// carimbo de log no começo da linha, com o nível depois
+	// log stamp at the start of the line, with the level after it
 	reStamp    = regexp.MustCompile(`^\[?\d{4}-\d\d-\d\d[T ]\d\d:\d\d:\d\d(?:[.,]\d+)?(?:Z|[+-]\d\d:?\d\d)?\]?(?:\s+\[?(?:TRACE|DEBUG|INFO|NOTICE|WARN|WARNING|ERROR|FATAL|CRITICAL)\]?)?[ \t]`)
 	reGrepFile = regexp.MustCompile(`(?m)^(?:[^\s:,;=]*[^\s:\d,;=][^\s:,;=]*:\d+:|[^\s:,;=]*[./][^\s:,;=]*?-\d+-)`)
 	reDiffCab  = regexp.MustCompile(`^(?:@@ .*@@|diff --git |index [0-9a-f]+\.\.|\+\+\+ |--- (?:a/|/dev/null|\S+\t)|new file mode|deleted file mode)`)
 )
 
-// linePrefix: o tamanho do prefixo de transporte da linha (sem diff, que depende do bloco).
+// linePrefix: the length of the transport prefix of the line (without diff, which depends on the
+// block).
 func linePrefix(l string) (int, bool) {
 	if l == "" {
 		return 0, false
@@ -314,9 +317,9 @@ func linePrefix(l string) (int, bool) {
 	return 0, false
 }
 
-// stripPrefixes: prefixos de linha (número, grep, blame, log, citação, diff) e cercas de código.
-// Um prefixo de grep ou numérico só vale quando a maioria das linhas o tem (senão "12: x" de um
-// YAML viraria prefixo); o de diff, quando há cabeçalho de diff no texto.
+// stripPrefixes: line prefixes (number, grep, blame, log, quote, diff) and code fences. A grep or
+// numeric prefix only counts when most lines have it (otherwise "12: x" of a YAML would become a
+// prefix); the diff one, when there is a diff header in the text.
 func stripPrefixes(s string) (string, []int, bool) {
 	ls := wrapLines(s)
 	pfx := make([]int, len(ls))
@@ -347,7 +350,7 @@ func stripPrefixes(s string) (string, []int, bool) {
 		if majority && pfx[k] > 0 {
 			a += pfx[k]
 			changed = true
-		} else if majority && line == "--" { // separador de grupos do grep
+		} else if majority && line == "--" { // grep group separator
 			a = b
 			changed = true
 		}
@@ -360,7 +363,7 @@ func stripPrefixes(s string) (string, []int, bool) {
 		case strings.HasPrefix(line, "```") || strings.HasPrefix(strings.TrimLeft(line, " "), "```"):
 			a, changed = b, true
 		}
-		for a < b && s[a] == '>' { // citação de markdown, inclusive aninhada
+		for a < b && s[a] == '>' { // markdown quote, including nested
 			a++
 			if a < b && s[a] == ' ' {
 				a++
@@ -403,13 +406,13 @@ func hexVal(c byte) byte {
 	return c - '0'
 }
 
-// cutStrings: o conteúdo de uma string de várias linhas no código (aspas triplas de Python,
-// Java, Kotlin, Scala e C#; crase de JS, TS e Go) começa e termina numa linha própria. A primeira
-// linha do conteúdo divide a linha com o código que abre a string (dados = """tabela,coluna,tipo)
-// e a última com o que fecha (col_x VARCHAR(14)`); os leitores de estrutura (tabela, esquema,
-// YAML) leem linhas inteiras. Só se quebra a linha: o código e o delimitador continuam no texto
-// (o leitor de SQL usa o delimitador para saber onde a instrução acaba). O delimitador só abre
-// quando é ímpar na linha (aberto e fechado na mesma linha não muda nada).
+// cutStrings: the content of a multi-line string in code (triple quotes of Python, Java, Kotlin,
+// Scala and C#; backtick of JS, TS and Go) starts and ends on a line of its own. The first line of
+// the content shares the line with the code that opens the string (dados = """tabela,coluna,tipo)
+// and the last one with what closes it (col_x VARCHAR(14)`); the structure readers (table, schema,
+// YAML) read whole lines. Only the line is broken: the code and the delimiter stay in the text (the
+// SQL reader uses the delimiter to know where the statement ends). The delimiter only opens when it
+// is odd on the line (opened and closed on the same line changes nothing).
 func cutStrings(s string) (string, []int, bool) {
 	ls := wrapLines(s)
 	isOpen := ""
@@ -420,7 +423,7 @@ func cutStrings(s string) (string, []int, bool) {
 	for _, l := range ls {
 		a, b := l[0], l[1]
 		line := s[a:b]
-		cut := -1 // onde a linha é quebrada (posição na linha)
+		cut := -1 // where the line is broken (position in the line)
 		if isOpen == "" {
 			for _, q := range []string{`"""`, "'''", "`"} {
 				if n := countQuotes(line, q); n%2 == 1 {
@@ -439,7 +442,7 @@ func cutStrings(s string) (string, []int, bool) {
 		}
 		if cut > 0 {
 			m.snippet(s, a, a+cut)
-			m.byte('\n', a+cut-1) // a quebra nova fica no lugar do último byte antes dela
+			m.byte('\n', a+cut-1) // the new break takes the place of the last byte before it
 			a, changed = a+cut, true
 		}
 		m.snippet(s, a, b)
@@ -454,7 +457,7 @@ func cutStrings(s string) (string, []int, bool) {
 	return t, mp, true
 }
 
-// lastQuote: a posição da última ocorrência não escapada de q em s (-1 se não há).
+// lastQuote: the position of the last unescaped occurrence of q in s (-1 if none).
 func lastQuote(s, q string) int {
 	u := -1
 	for p := 0; p+len(q) <= len(s); {

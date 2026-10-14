@@ -27,10 +27,10 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/config"
 )
 
-// atualizar e recarregar: a troca não deixa a porta vazia nem corta resposta, e volta sozinha
-// quando a versão nova não sobe. Os testes compilam o llm-dlp duas vezes (commits diferentes) e
-// rodam supervisor e proxy de verdade, com a pasta pessoal num diretório temporário e uma API
-// falsa no lugar da Anthropic.
+// update and reload: the swap does not leave the port empty nor cut a response, and goes back by
+// itself when the new version does not start. The tests build llm-dlp twice (different commits) and
+// run a real supervisor and proxy, with the home folder in a temporary directory and a fake API in
+// place of Anthropic's.
 
 var binaries struct {
 	once sync.Once
@@ -38,9 +38,9 @@ var binaries struct {
 	err  error
 }
 
-// TestMain põe a pasta pessoal num diretório temporário: install, uninstall e update mexem no
-// ~/.claude e no ~/.local/bin, e um teste não pode tocar nos de verdade. Os caches do Go ficam
-// nos de sempre (o go build dos testes de troca não recompila nem baixa tudo de novo).
+// TestMain puts the home folder in a temporary directory: install, uninstall and update touch
+// ~/.claude and ~/.local/bin, and a test cannot touch the real ones. The Go caches stay in the
+// usual ones (the go build of the swap tests does not recompile nor download everything again).
 func TestMain(m *testing.M) {
 	if os.Getenv("GOPATH") == "" {
 		if h, err := os.UserHomeDir(); err == nil {
@@ -68,7 +68,7 @@ func TestMain(m *testing.M) {
 	os.Exit(c)
 }
 
-// compilados: o llm-dlp com o commit "aaaaaaa" e com o "bbbbbbb".
+// compiled: llm-dlp with commit "aaaaaaa" and with "bbbbbbb".
 func compiled(t *testing.T) (a, b string) {
 	t.Helper()
 	if testing.Short() {
@@ -107,8 +107,8 @@ type environment struct {
 	env               []string
 }
 
-// fakeAPI responde em streaming, devagar: 300 ms; 8 s se a mensagem pede uma resposta longa
-// (mais que graceDeadline: a resposta tem de sobreviver ao fim da graça do proxy antigo).
+// fakeAPI answers in streaming, slowly: 300 ms; 8 s if the message asks for a long answer (longer
+// than graceDeadline: the answer has to survive the end of the old proxy's grace).
 func fakeAPI(w http.ResponseWriter, r *http.Request) {
 	b, _ := io.ReadAll(r.Body)
 	dur := 300 * time.Millisecond
@@ -166,7 +166,7 @@ func (e *environment) install(bin string) {
 	}
 }
 
-// log: o fim do log do llm-dlp do teste (só a API falsa passou por ele).
+// log: the end of the test llm-dlp's log (only the fake API went through it).
 func (e *environment) log() string {
 	b, _ := os.ReadFile(filepath.Join(e.home, ".config", "llm-dlp", "llm-dlp.log"))
 	var ls []string
@@ -194,7 +194,7 @@ func (e *environment) supervisor() int {
 	return pid
 }
 
-// encerrar para o supervisor (e o proxy) que o teste deixou no ar.
+// shutdown stops the supervisor (and the proxy) the test left running.
 func (e *environment) shutdown() {
 	e.runIt(e.destination, "stop")
 	if pid := e.supervisor(); pid > 0 {
@@ -212,8 +212,8 @@ type testHealth struct {
 
 func (e *environment) health() (testHealth, bool) {
 	var s testHealth
-	// conexão nova: uma reaproveitada podia ser com o proxy antigo, que ainda atende as
-	// conexões já abertas durante a graça
+	// a new connection: a reused one could be with the old proxy, which still serves the
+	// connections already open during the grace
 	c := http.Client{Timeout: time.Second, Transport: &http.Transport{DisableKeepAlives: true}}
 	r, err := c.Get(fmt.Sprintf("http://127.0.0.1:%d/__llm-dlp/saude", e.port))
 	if err != nil {
@@ -234,7 +234,7 @@ func (e *environment) waitCommit(commit string) testHealth {
 	return testHealth{}
 }
 
-// pedir manda uma mensagem pelo proxy e confere que a resposta veio inteira.
+// ask sends a message through the proxy and checks that the answer came whole.
 func (e *environment) ask(cli *http.Client, text string) error {
 	body := `{"model":"x","max_tokens":10,"stream":true,"messages":[{"role":"user","content":"` + text + `"}]}`
 	r, err := cli.Post(fmt.Sprintf("http://127.0.0.1:%d/v1/messages", e.port), "application/json", strings.NewReader(body))
@@ -252,7 +252,7 @@ func (e *environment) ask(cli *http.Client, text string) error {
 	return nil
 }
 
-// carga: n clientes mandando mensagens sem parar, reaproveitando conexões como o Claude Code.
+// load: n clients sending messages nonstop, reusing connections like Claude Code.
 type load struct {
 	stopped  chan struct{}
 	wg       sync.WaitGroup
@@ -300,7 +300,7 @@ func (c *load) stop(t *testing.T, what string) {
 	}
 }
 
-// pacote: um .tar.gz com o arquivo bin como "llm-dlp", como o da release.
+// pkgName: a .tar.gz with the file bin as "llm-dlp", like the release one.
 func pkgName(t *testing.T, bin string) string {
 	t.Helper()
 	b, err := os.ReadFile(bin)
@@ -330,9 +330,9 @@ func wentOut(pid int, deadline time.Duration) bool {
 	return false
 }
 
-// A troca de versão com mensagens chegando o tempo todo e uma resposta longa no meio: nenhuma
-// mensagem falha, a resposta longa termina inteira (pelo proxy antigo), e depois só o novo
-// responde. O mesmo para o recarregar.
+// A version swap with messages arriving all the time and a long answer in the middle: no message
+// fails, the long answer finishes whole (through the old proxy), and after that only the new one
+// answers. The same for reload.
 func TestUpdateWithoutPause(t *testing.T) {
 	a, b := compiled(t)
 	e := newEnvironment(t)
@@ -346,7 +346,7 @@ func TestUpdateWithoutPause(t *testing.T) {
 	longOne := make(chan error, 1)
 	go func() { longOne <- e.ask(&http.Client{Timeout: time.Minute}, "LONGA") }()
 	time.Sleep(500 * time.Millisecond)
-	// como o install.sh: o binário novo, de fora, atualiza o instalado
+	// like install.sh: the new binary, from outside, updates the installed one
 	out, err := e.runIt(b, "update", "--file", pkgName(t, b))
 	if err != nil {
 		t.Fatalf("atualizar: %v\n%s\nlog:\n%s", err, out, e.log())
@@ -369,12 +369,12 @@ func TestUpdateWithoutPause(t *testing.T) {
 	if !wentOut(old.PID, graceDeadline+5*time.Second) {
 		t.Errorf("o proxy antigo (pid %d) não saiu", old.PID)
 	}
-	// o supervisor também passou para o binário novo (reexecutado, sem soltar a porta)
+	// the supervisor also moved to the new binary (re-executed, without releasing the port)
 	if exe, _ := os.Readlink(fmt.Sprintf("/proc/%d/exe", e.supervisor())); exe != e.destination {
 		t.Errorf("o supervisor roda %q; esperado o binário instalado %s\nlog:\n%s", exe, e.destination, e.log())
 	}
 
-	// recarregar: o mesmo binário num processo novo, também sem nenhuma falha
+	// reload: the same binary in a new process, also without any failure
 	c = e.load(4)
 	time.Sleep(200 * time.Millisecond)
 	if out, err := e.runIt(e.destination, "reload"); err != nil {
@@ -386,7 +386,7 @@ func TestUpdateWithoutPause(t *testing.T) {
 		t.Errorf("depois do recarregar responde %+v; esperado o bbbbbbb num processo novo", r)
 	}
 
-	// a trava e o supervisor.pid passaram para o supervisor novo: o parar funciona
+	// the lock and supervisor.pid moved to the new supervisor: stop works
 	if out, err := e.runIt(e.destination, "stop"); err != nil {
 		t.Fatalf("parar depois da troca: %v\n%s", err, out)
 	}
@@ -395,9 +395,9 @@ func TestUpdateWithoutPause(t *testing.T) {
 	}
 }
 
-// O proxy cai no meio da carga: a porta é do supervisor e continua aberta, então nenhuma
-// mensagem recebe "connection refused"; elas esperam o proxy seguinte. (As que estavam no
-// meio, no proxy que caiu, são cortadas: isso não há como evitar.)
+// The proxy goes down in the middle of the load: the port belongs to the supervisor and stays open,
+// so no message gets "connection refused"; they wait for the next proxy. (Those in the middle, in
+// the proxy that went down, are cut: that cannot be avoided.)
 func TestProxyDownWithoutRefusing(t *testing.T) {
 	a, _ := compiled(t)
 	e := newEnvironment(t)
@@ -431,8 +431,8 @@ func TestProxyDownWithoutRefusing(t *testing.T) {
 	}
 }
 
-// A versão nova não sobe: o atualizar desiste, põe o binário anterior de volta, e o proxy
-// anterior nunca saiu do ar.
+// The new version does not start: update gives up, puts the previous binary back, and the previous
+// proxy never went offline.
 func TestUpdateRollsBackIfNotUp(t *testing.T) {
 	a, _ := compiled(t)
 	e := newEnvironment(t)
@@ -445,7 +445,7 @@ func TestUpdateRollsBackIfNotUp(t *testing.T) {
 	os.WriteFile(broken, []byte("#!/bin/sh\n[ \"$1\" = versao ] && echo 'llm-dlp 9.9.9 (quebrado)' && exit 0\nexit 1\n"), 0o755)
 
 	c := e.load(2)
-	// (com os nomes de antes da 0.9.0, que continuam aceitos)
+	// (with the names from before 0.9.0, which are still accepted)
 	out, err := e.runIt(e.destination, "atualizar", "--arquivo", pkgName(t, broken))
 	updateOutput := out
 	time.Sleep(time.Second)
@@ -464,7 +464,8 @@ func TestUpdateRollsBackIfNotUp(t *testing.T) {
 	}
 }
 
-// O download confere o pacote com o checksums.txt da release: um pacote diferente não é usado.
+// The download checks the archive against the release's checksums.txt: a different archive is not
+// used.
 func TestDownloadReleaseChecksChecksum(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("só há binário pronto para Linux")
@@ -504,9 +505,9 @@ func TestDownloadReleaseChecksChecksum(t *testing.T) {
 	}
 }
 
-// Sem o supervisor.pid (na passagem da 0.7.0 para a 0.8.0, o supervisor antigo o apagava ao
-// sair): reload e stop acham o supervisor pela trava. O reload faz a troca sem pausa, com o
-// supervisor passando para o binário instalado, e o arquivo volta.
+// Without supervisor.pid (when going from 0.7.0 to 0.8.0, the old supervisor deleted it on exit):
+// reload and stop find the supervisor by the lock. reload swaps without a pause, with the
+// supervisor moving to the installed binary, and the file comes back.
 func TestSupervisorWithoutPidFile(t *testing.T) {
 	a, b := compiled(t)
 	e := newEnvironment(t)

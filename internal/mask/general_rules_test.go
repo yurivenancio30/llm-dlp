@@ -6,9 +6,9 @@ import (
 	"time"
 )
 
-// Regras que valem para todos os leitores. Todos os nomes são fictícios.
+// Rules that apply to every reader. All names are fictitious.
 
-// pseudoOf: o pseudônimo que substituiu real (pelas entradas).
+// pseudoOf: the pseudonym that replaced real (by the entries).
 func pseudoOf(m *Masker, s, real string) (ps, typ string) {
 	_, ents := m.Mask(s)
 	for _, e := range ents {
@@ -19,11 +19,12 @@ func pseudoOf(m *Masker, s, real string) (ps, typ string) {
 	return "", ""
 }
 
-// Duas regras que discordam do tipo do mesmo nome. No mesmo texto, um tipo só; depois
-// de aprendido, o tipo (e o pseudônimo) ficam, também depois de um reinício.
+// Two rules that disagree on the type of the same name. In the same text, one type only; once
+// learned, the type (and the pseudonym) stay, also after a restart.
 func TestTypeConsistentAcrossRules(t *testing.T) {
 	const name = "xq-ped-api01"
-	// leitores sintéticos: um acha o nome como pasta na 1ª ocorrência, o outro como serviço na 2ª
+	// synthetic readers: one finds the name as a folder in the 1st occurrence, the other as a
+	// service in the 2nd
 	m := newTest(t)
 	m.UseReaders([]Reader{
 		{Name: "a", Find: func(s string, add func(ObjFinding)) {
@@ -45,7 +46,7 @@ func TestTypeConsistentAcrossRules(t *testing.T) {
 		t.Errorf("o mesmo nome com dois pseudônimos no mesmo texto: %s", out)
 	}
 
-	// regras reais: o nome aprendido como serviço (linha de comando) e depois achado como pasta
+	// real rules: the name learned as a service (command line) and later found as a folder
 	dir := t.TempDir()
 	vs, _ := LoadSeen(dir + "/v.json")
 	m1, _ := NewMasker(newTest(t).cfg, testKey, nil, vs)
@@ -56,14 +57,14 @@ func TestTypeConsistentAcrossRules(t *testing.T) {
 	if ps2, tp2 := pseudoOf(m1, "ls /srv/"+name+"/conf", name); ps2 != ps1 || tp2 != tp1 {
 		t.Errorf("pasta depois de aprendido como serviço: %q %q (esperado %q %q)", ps2, tp2, ps1, tp1)
 	}
-	// depois do reinício (só o vistos.json)
+	// after the restart (only vistos.json)
 	vs.SaveIfDirty()
 	vs2, _ := LoadSeen(dir + "/v.json")
 	m2, _ := NewMasker(m1.cfg, testKey, nil, vs2)
 	if ps3, tp3 := pseudoOf(m2, "ls /srv/"+name+"/conf", name); ps3 != ps1 || tp3 != tp1 {
 		t.Errorf("depois do reinício: %q %q (esperado %q %q)", ps3, tp3, ps1, tp1)
 	}
-	// e na ordem contrária, no mesmo texto e sem nada aprendido: um pseudônimo só
+	// and in the opposite order, in the same text and with nothing learned: one pseudonym only
 	m3, _ := NewMasker(m1.cfg, testKey, nil, nil)
 	out, ents := m3.Mask("ls /srv/" + name + "/conf\nkubectl rollout restart deployment/" + name + " -n xq-ns01")
 	types := map[string]bool{}
@@ -77,8 +78,8 @@ func TestTypeConsistentAcrossRules(t *testing.T) {
 	}
 }
 
-// Prefixo de literal de string do Python não é o valor do campo; valor de 1 ou 2
-// letras não é mascarado; padrão de regex no valor não é dado.
+// A Python string literal prefix is not the field value; a value of 1 or 2 letters is not masked; a
+// regex pattern in the value is not data.
 func TestLiteralPrefixField(t *testing.T) {
 	m := newTest(t)
 	q := "'"
@@ -94,7 +95,7 @@ func TestLiteralPrefixField(t *testing.T) {
 			t.Errorf("máscara a mais:\n   %q\n-> %q", s, out)
 		}
 	}
-	// o valor de verdade, com ou sem prefixo, continua mascarado (e o prefixo fica)
+	// the real value, with or without prefix, stays masked (and the prefix stays)
 	value := "Parda"
 	for _, s := range []string{"{'RACA': " + "u" + q + value + q + "}", "{'RACA': " + q + value + q + "}", "raca: " + value} {
 		out, _ := m.Mask(s)
@@ -107,7 +108,7 @@ func TestLiteralPrefixField(t *testing.T) {
 	}
 }
 
-// Name aprendido com ponto é reconhecido em prosa depois do reinício.
+// A name learned with a dot is recognized in prose after the restart.
 func TestDottedNameAfterRestart(t *testing.T) {
 	dir := t.TempDir()
 	vs, _ := LoadSeen(dir + "/v.json")
@@ -127,13 +128,14 @@ func TestDottedNameAfterRestart(t *testing.T) {
 	if strings.Contains(out, "xq_topico01") || strings.Contains(out, "eventos") {
 		t.Errorf("depois do reinício: %s", out)
 	}
-	// o pedaço sozinho não é o nome: "xq_topico01" em outro contexto não vira o pseudônimo do nome com ponto
+	// the piece alone is not the name: "xq_topico01" in another context does not become the
+	// pseudonym of the dotted name
 	if out, _ := m2.Mask("eventos de hoje"); out != "eventos de hoje" {
 		t.Errorf("palavra comum mascarada: %s", out)
 	}
 }
 
-// URLs coladas sem separador e "a://" repetido não são quadráticos.
+// URLs glued without a separator and repeated "a://" are not quadratic.
 func TestGluedURLsLinear(t *testing.T) {
 	if testing.Short() {
 		t.Skip("mede tempo")
@@ -149,12 +151,12 @@ func TestGluedURLsLinear(t *testing.T) {
 	}
 }
 
-// DatabaseName= dentro de URL JDBC em string Java (a URI conta como o outro par).
+// DatabaseName= inside a JDBC URL in a Java string (the URI counts as the other pair).
 func TestJDBCDatabaseNameInString(t *testing.T) {
 	m := newTest(t)
 	check(t, m, `props.put("url", "jdbc:sqlserver://xq-srv01;databaseName=xq_banco01");`, []string{"xq_banco01", "xq-srv01"}, []string{"props.put", "databaseName="})
 	check(t, m, `String url = "jdbc:sqlserver://xq-srv01:1433;databaseName=xq_banco02;encrypt=true";`, []string{"xq_banco02", "xq-srv01"}, []string{"encrypt=true"})
 	check(t, m, `url = 'jdbc:postgresql://xq-srv02:5432/xq_banco03?currentSchema=xq_esq01'`, []string{"xq_banco03", "xq_esq01", "xq-srv02"}, nil)
-	// sem URI de banco, um par só não é string de conexão
+	// without a database URI, a single pair is not a connection string
 	check(t, m, `veja o campo databaseName=exemplo no formulário`, nil, []string{"databaseName=exemplo"})
 }

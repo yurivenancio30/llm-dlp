@@ -6,9 +6,9 @@ import (
 	"testing"
 )
 
-// SQL embutido em código (string, concatenação, heredoc) de várias linguagens, com código
-// depois da string: o SQL é lido (nomes inventados do cliente mascarados) e o código depois
-// da string não é lido como SQL (chaves e nomes da linguagem ficam).
+// SQL embedded in code (string, concatenation, heredoc) of several languages, with code after the
+// string: the SQL is read (made-up customer names masked) and the code after the string is not read
+// as SQL (language keys and names stay).
 var hostSQLCases = []struct{ name, src string }{
 	{"python aspas triplas em outra linha", "cur.execute(\n    \"\"\"\n    SELECT p.col_valor_hx, p.col_data_hx\n    FROM sch_vendas_hx.tb_pedido_hx p\n    WHERE p.col_valor_hx > 10\n    \"\"\")\nfor row in cur.fetchall():\n    item = {}\n    item['urn'] = f\"urn:li:dataset:({row['payload']})\"\n"},
 	{"python f-string na linha", "cur.execute(f\"SELECT col_valor_hx FROM sch_vendas_hx.tb_pedido_hx WHERE id = {x}\")\nitem['urn'] = row['payload']\n"},
@@ -49,8 +49,8 @@ func TestSQLEmbeddedInCode(t *testing.T) {
 	}
 }
 
-// Uma string que fecha na linha de cima não é abertura: o SQL solto que vem depois continua
-// sendo lido inteiro (as linhas de continuação também).
+// A string that closes on the line above is not an opening: the loose SQL that comes after is still
+// read in full (the continuation lines too).
 func TestSQLAfterClosedString(t *testing.T) {
 	m := newTest(t)
 	out, _ := m.Mask("x = \"abc\"\nSELECT col_valor_hx FROM sch_vendas_hx.tb_pedido_hx\nWHERE col_data_hx > 1\n")
@@ -61,8 +61,8 @@ func TestSQLAfterClosedString(t *testing.T) {
 	}
 }
 
-// Outros formatos (CSV, JSON, YAML, esquema, conexão, linha de comando) em string de código,
-// seguidos de código: os nomes do cliente (_hx, -hx) são mascarados e o código depois não.
+// Other formats (CSV, JSON, YAML, schema, connection, command line) in a code string, followed by
+// code: the customer names (_hx, -hx) are masked and the code after is not.
 var embeddedCases = []struct{ name, src string }{
 	{"csv em aspas triplas", "dados = \"\"\"tabela,coluna,tipo\ntb_pedido_hx,col_valor_hx,NUMBER\ntb_cliente_hx,col_doc_hx,VARCHAR\n\"\"\"\nfor linha in dados.splitlines():\n    item['urn'] = row['payload']\n"},
 	{"json em string java", "String body = \"{\\\"database\\\": \\\"dw_vendas_hx\\\", \\\"schema\\\": \\\"sch_vendas_hx\\\", \\\"table\\\": \\\"tb_pedido_hx\\\"}\";\nitem.put(\"urn\", rs.getString(\"payload\"));\n"},

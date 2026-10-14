@@ -5,31 +5,32 @@ import (
 	"strings"
 )
 
-// Listas compartilhadas pelos leitores de desenvolvimento, configuração e código: palavras de
-// tipo (o que um nome de chave ou de função indica), sufixos de rede interna, TLDs públicos,
-// nomes públicos que nunca são mascarados (software, padrões de sistema, pastas e prefixos
-// públicos de pacote). Listas curtas, de padrões e documentações públicas; nada por cliente.
+// Lists shared by the development, configuration and code readers: type words (what a key or
+// function name points to), internal network suffixes, public TLDs, public names that are never
+// masked (software, system standards, public folders and package prefixes). Short lists, from
+// public standards and documentation; nothing per customer.
 
-// Sufixos de nome interno: RFC 6762 (.local, mDNS), RFC 8375 (.home.arpa), a reserva da ICANN
-// para .internal (2024), o DNS do Kubernetes (.svc, .cluster.local) e as convenções de rede
-// privada mais comuns (.intra, .intranet, .interno, .corp, .lan, .localdomain).
+// Internal name suffixes: RFC 6762 (.local, mDNS), RFC 8375 (.home.arpa), ICANN's reservation for
+// .internal (2024), the Kubernetes DNS (.svc, .cluster.local) and the most common private network
+// conventions (.intra, .intranet, .interno, .corp, .lan, .localdomain).
 var internalSuffixes = []string{".cluster.local", ".home.arpa", ".local", ".internal", ".intra", ".intranet",
 	".interno", ".corp", ".lan", ".svc", ".localdomain"}
 
-// TLDs genéricos mais usados (lista da IANA, https://data.iana.org/TLD/tlds-alpha-by-domain.txt,
-// recortada nos de uso comum). Todo TLD de 2 letras é de país (ISO 3166) e também é público.
+// Most used generic TLDs (IANA list, https://data.iana.org/TLD/tlds-alpha-by-domain.txt, trimmed to
+// the commonly used ones). Every 2-letter TLD is a country (ISO 3166) and is also public.
 var publicTLDs = setOf("com", "net", "org", "edu", "gov", "mil", "int", "info", "biz", "io", "ai", "app", "dev",
 	"cloud", "tech", "online", "site", "xyz", "name", "pro", "aero", "coop", "museum", "mobi", "asia", "tel", "travel",
 	"jobs", "page", "blog", "store", "shop", "web", "news", "live", "art", "design", "digital", "network", "systems",
 	"solutions", "software", "codes", "tools", "run", "build", "google", "aws", "azure", "microsoft", "amazon", "apple")
 
-// Names reservados para documentação e teste (RFC 2606, RFC 6761): nunca são recurso real.
+// Names reserved for documentation and testing (RFC 2606, RFC 6761): never a real resource.
 var reservedTLDs = setOf("invalid", "example", "test", "localhost")
 
-// Words genéricas ("user", "bucket") e nomes de software ou padrões públicos que aparecem na
-// posição de um recurso. Nada é deixado em claro por "parecer exemplo" (my-*, example-*): um
-// nome desses pode ser real; na dúvida, mascara. Fontes: os usuários padrão das imagens de nuvem e de CI (ec2-user, ubuntu, azureuser, opc, runner,
-// jovyan, vagrant, linuxbrew) e os namespaces do Kubernetes (default, kube-system...).
+// Generic words ("user", "bucket") and names of public software or standards that appear in a
+// resource position. Nothing is left in plain text for "looking like an example" (my-*, example-*):
+// such a name may be real; when in doubt, mask. Sources: the default users of cloud and CI images
+// (ec2-user, ubuntu, azureuser, opc, runner, jovyan, vagrant, linuxbrew) and the Kubernetes
+// namespaces (default, kube-system...).
 var vocabDev = setOf(
 	"localhost", "test", "testing", "host", "hostname", "server", "domain", "user", "username", "usuario",
 	"name", "value", "nobody", "anonymous", "guest", "admin", "administrator", "administrators", "root",
@@ -44,32 +45,32 @@ var vocabDev = setOf(
 	"namespace", "repo", "owner", "org", "database", "db", "dbo", "schema", "table",
 )
 
-// Pastas de sistema e convenções públicas que têm cara de identificador (as palavras simples
-// como Documents, Desktop, bin, src não têm, e já ficam). Fontes: layout do Windows (Known
-// Folders), do macOS (File System Programming Guide), do Python (site-packages,
-// dist-packages, __pycache__), do Node (node_modules), do Go (go-build) e das IDEs da JetBrains.
+// System folders and public conventions that look like an identifier (plain words such as
+// Documents, Desktop, bin, src do not, and already stay). Sources: Windows layout (Known Folders),
+// macOS (File System Programming Guide), Python (site-packages, dist-packages, __pycache__), Node
+// (node_modules), Go (go-build) and the JetBrains IDEs.
 var publicFolders = setOf("node_modules", "site-packages", "dist-packages", "__pycache__", "appdata", "locallow",
 	"onedrive", "ideaprojects", "pycharmprojects", "androidstudioprojects", "go-build", "lost+found",
 	"application data", "my documents", "program files", "programdata", "windowsapps", "microsoft",
 	"github.com", "gitlab.com", "bitbucket.org", "golang.org", "google.golang.org", "gopkg.in", "go.uber.org",
 	"k8s.io", "sigs.k8s.io", "pkg", "mod", "cache", "go-mod", "vscode-server", "jetbrains",
-	// pastas de convenção de repositório (todo projeto tem; não dizem nada do cliente)
+	// repository convention folders (every project has them; they say nothing about the customer)
 	"examples", "example", "samples", "sample", "demo", "demos", "tests", "test", "testdata", "test_data",
 	"fixtures", "scripts", "tools", "vendor", "third_party", "resources", "templates", "benchmarks", "migrations", "internal", "cmd")
 
-// domínios e contas embutidos do Windows (Well-known SIDs e as raízes do Registro)
+// built-in Windows domains and accounts (Well-known SIDs and the Registry roots)
 var publicDomains = setOf("AUTHORITY", "BUILTIN", "SERVICE", "WORKGROUP", "HKLM", "HKCU", "HKCR", "HKU", "HKCC",
 	"SOFTWARE", "SYSTEM", "MACHINE", "WINDOWS", "SYSTEM32", "PROGRA~1", "FONT", "DEVICE", "GLOBAL", "LOCAL", "PIPE")
 
 var packageRoots = setOf("com", "org", "net", "io", "java", "javax", "jakarta", "sun", "jdk", "android", "androidx",
 	"kotlin", "scala", "akka", "golang", "std", "self", "this", "cls", "os", "sys", "threading", "asyncio")
 
-// esquemas cujo "host" não é servidor, ou que outro leitor já cobre
+// schemes whose "host" is not a server, or that another reader already covers
 var databaseSchemes = setOf("jdbc", "postgres", "postgresql", "mysql", "mariadb", "mssql", "sqlserver", "oracle",
 	"redshift", "snowflake", "mongodb", "mongodb+srv", "clickhouse", "db2", "teradata", "presto", "trino", "hive",
 	"cockroachdb", "sqlite", "file")
 
-// último pedaço do nome da chave (minúsculas) -> entidade
+// last piece of the key name (lowercase) -> entity
 var entPiece = map[string]string{
 	"host": "servidor", "hostname": "servidor", "server": "servidor", "servidor": "servidor", "endpoint": "servidor",
 	"address": "servidor", "addr": "servidor", "fqdn": "servidor", "broker": "servidor", "bootstrap": "servidor",
@@ -91,7 +92,7 @@ var entPiece = map[string]string{
 	"procedure": "procedure", "routine": "procedure", "view": "tabela",
 }
 
-// "<x>_name": o pedaço antes de "name" diz a entidade (db_name, table_name...)
+// "<x>_name": the piece before "name" gives the entity (db_name, table_name...)
 var entBeforeName = map[string]string{"db": "database", "database": "database", "table": "tabela", "schema": "schema",
 	"host": "servidor", "server": "servidor", "user": "usuario", "service": "servico", "bucket": "bucket", "queue": "fila",
 	"topic": "fila", "group": "servico", "namespace": "namespace", "cluster": "servidor", "collection": "tabela",
@@ -100,29 +101,29 @@ var entBeforeName = map[string]string{"db": "database", "database": "database", 
 	"view": "tabela", "procedure": "procedure", "function": "procedure", "index": "indice", "constraint": "indice", "catalog": "database",
 	"dataset": "schema", "project": "conta_nuvem"}
 
-// sufixos colados a uma palavra de tipo ("rolename", "warehousename", "fieldpath")
+// suffixes glued to a type word ("rolename", "warehousename", "fieldpath")
 var gluedSuffixes = []string{"names", "name", "nome", "path", "fqn"}
 
-// plurais aceitos como o tipo (o nome guarda uma lista desse tipo)
+// plurals accepted as the type (the name holds a list of that type)
 var pluralType = setOf("topics", "queues", "buckets", "hosts", "servers", "brokers", "tables", "databases", "schemas",
 	"namespaces", "clusters", "subjects", "streams", "exchanges", "columns", "fields", "roles", "warehouses", "views",
 	"accounts", "repositories", "repos", "procedures", "routines", "users",
 	"tabelas", "colunas", "filas", "topicos", "servidores", "bancos", "usuarios")
 
-// atributos: último pedaço de chave que não é o nome do recurso ("db.port", "host.timeout")
+// attributes: last key piece that is not the resource name ("db.port", "host.timeout")
 var keyAttribute = setOf("name", "names", "id", "ids", "port", "ports", "timeout", "timeouts", "count", "size", "enabled", "enable", "disabled", "max",
 	"min", "version", "type", "mode", "ttl", "retries", "retry", "interval", "pass"+"word", "passwd", "pwd", "secret",
 	"token", "key", "keys", "agent", "format", "level", "limit", "suffix", "encoding", "charset", "ssl", "tls",
 	"protocol", "scheme", "driver", "class", "dialect", "pool", "timezone", "locale", "lang", "url", "uri", "path",
 	"file", "dir", "region", "zone", "weight", "priority", "delay", "length", "capacity", "batch", "concurrency")
 
-// prefixos de nuvem que tornam "project" o projeto do provedor (GCP_PROJECT, bq_project)
+// cloud prefixes that make "project" the provider's project (GCP_PROJECT, bq_project)
 var cloudProjectPrefix = setOf("gcp", "gcloud", "google", "bq", "bigquery", "cloud", "billing", "firebase", "gke", "dataproc")
 
-// fieldName: o valor é o nome de um campo, não um dado: só palavras de tipo e de atributo,
-// em dois ou mais pedaços ("project_id", "container_name", "datasetId", "account_id"). Aparece
-// como valor quando o código guarda o nome da chave numa constante (CONTAINER_NAME =
-// "container_name") ou descreve um formulário ({"name": "project_id"}).
+// fieldName: the value is the name of a field, not data: only type and attribute words, in two or
+// more pieces ("project_id", "container_name", "datasetId", "account_id"). It shows up as a value
+// when code stores the key name in a constant (CONTAINER_NAME = "container_name") or describes a
+// form ({"name": "project_id"}).
 func fieldName(v string) bool {
 	if len(v) < 4 || len(v) > 40 {
 		return false
@@ -153,9 +154,9 @@ func fieldName(v string) bool {
 	return true
 }
 
-// papéis de vocabulário padrão: WAI-ARIA 1.2 (https://www.w3.org/TR/wai-aria-1.2/#role_definitions)
-// e mensagens de chat de LLM. Quando o tipo do achado vem de "role" (usuário/role de banco),
-// um destes valores é o papel de um elemento ou de uma mensagem, não um usuário.
+// standard vocabulary roles: WAI-ARIA 1.2 (https://www.w3.org/TR/wai-aria-1.2/#role_definitions)
+// and LLM chat messages. When the finding's type comes from "role" (database user/role), one of
+// these values is the role of an element or of a message, not a user.
 var defaultRoles = setOf("alert", "alertdialog", "application", "article", "banner", "blockquote", "button", "caption",
 	"cell", "checkbox", "code", "columnheader", "combobox", "complementary", "contentinfo", "definition", "deletion",
 	"dialog", "directory", "document", "emphasis", "feed", "figure", "form", "generic", "grid", "gridcell", "group",
@@ -167,23 +168,23 @@ var defaultRoles = setOf("alert", "alertdialog", "application", "article", "bann
 	"tooltip", "tree", "treegrid", "treeitem",
 	"system", "user", "assistant", "tool", "function", "developer", "model", "human", "ai")
 
-// TLDs genéricos originais (RFC 1591): sozinhos, são pedaço de domínio, nunca nome
+// original generic TLDs (RFC 1591): alone, they are a piece of a domain, never a name
 var genericTLDs = setOf("com", "net", "org", "edu", "gov", "mil")
 
-// esquemas de URI: valor de uma chave "schema"/"scheme" que é o protocolo, não um schema de banco
+// URI schemes: value of a "schema"/"scheme" key that is the protocol, not a database schema
 var uriSchemes = setOf("http", "https", "ftp", "ftps", "sftp", "ssh", "file", "ws", "wss", "s3", "s3a", "s3n", "gs",
 	"abfs", "abfss", "wasb", "wasbs", "adl", "hdfs", "jdbc", "odbc", "grpc", "grpcs", "tcp", "udp", "smtp", "smtps")
 
-// reReversedGroup: nome em notação de domínio invertido (groupId do Maven, pacote Java):
-// org.slf4j, com.google.guava, io.netty. O leitor de pacotes separa o prefixo público do nome
-// da empresa (groupIn); os outros leitores não o tomam como serviço.
+// reReversedGroup: a name in reversed domain notation (Maven groupId, Java package): org.slf4j,
+// com.google.guava, io.netty. The packages reader separates the public prefix from the company name
+// (groupIn); the other readers do not take it as a service.
 var reReversedGroup = regexp.MustCompile(`^(?:org|com|io|net|edu|gov|dev|br|de|uk|fr|jp)(?:\.[a-z][a-z0-9_-]*)+$`)
 
-// Valor sem dono: um nome feito só de vocabulário de papel (placeholder, ambiente, origem e
-// destino) e de tipo (o próprio tipo do recurso, um atributo, o provedor), mais numeração, não é
-// nome de ninguém: "test-staging-bucket", "source_host", "stub-user", "MY_DATABASE", "ns-1",
-// "imported_user1", "the_account". Basta um pedaço fora disso para ser nome do dono
-// ("insurance_claims_db", "count_drink_items", "orders_hx", "risk_data_access_opr").
+// Ownerless value: a name made only of role vocabulary (placeholder, environment, source and
+// destination) and type vocabulary (the resource type itself, an attribute, the provider), plus
+// numbering, is nobody's name: "test-staging-bucket", "source_host", "stub-user", "MY_DATABASE",
+// "ns-1", "imported_user1", "the_account". One piece outside that is enough to make it the owner's
+// name ("insurance_claims_db", "count_drink_items", "orders_hx", "risk_data_access_opr").
 var roleVocab = setOf("test", "tests", "testing", "stub", "stubbed", "mock", "mocked", "dummy", "fake", "sample",
 	"samples", "example", "examples", "placeholder", "my", "your", "our", "the", "some", "any", "foo", "bar",
 	"baz", "qux", "source", "src", "target", "tgt", "dest", "dst", "destination", "actual", "expected", "different",
@@ -192,18 +193,18 @@ var roleVocab = setOf("test", "tests", "testing", "stub", "stubbed", "mock", "mo
 	"sandbox", "conn", "connection", "client", "server", "service", "app", "api", "data", "base", "system", "main",
 	"first", "second", "third", "release")
 
-// "demo" fica fora: nos testes do projeto, "app-demo", "repo-demo" fazem o papel do nome do cliente
+// "demo" is left out: in the project's tests, "app-demo", "repo-demo" play the customer's name
 
-// abreviações e sinônimos do tipo do recurso que não estão no vocabulário das chaves
+// abbreviations and synonyms of the resource type that are not in the key vocabulary
 var typeVocab = setOf("ns", "acct", "proj", "tbl", "svc", "srv", "usr", "inst", "keyspace", "instance", "index",
 	"queue", "topic", "wh", "storage", "aws", "azure", "gcp", "cloud",
-	// tipos de objeto do Kubernetes/compose que vão no fim do nome (minio-deployment, redis-svc)
+	// Kubernetes/compose object types that go at the end of the name (minio-deployment, redis-svc)
 	"deployment", "controller", "rc", "hpa", "pod", "ingress", "secret", "claim", "pvc", "pv", "job", "worker",
 	"node", "consumer", "producer", "gateway", "proxy", "exporter", "operator", "replica", "replicas", "master",
 	"slave", "leader", "follower", "standalone", "headless")
 
-// valuePieces: os pedaços de v em minúsculas, separados por pontuação, por troca de caixa
-// (camelCase) e por troca entre letra e dígito.
+// valuePieces: the lowercase pieces of v, split by punctuation, by case change (camelCase) and by
+// letter/digit change.
 func valuePieces(v string) []string {
 	var ps []string
 	ini := -1
@@ -232,9 +233,9 @@ func valuePieces(v string) []string {
 
 func isDigit(c byte) bool { return c >= '0' && c <= '9' }
 
-// ownerless: v tem dois ou mais pedaços, todos de papel, de tipo ou de numeração, com um de papel
-// ou duas palavras de tipo; ou só X/x de preenchimento ("XXXXXXXXX"). extra: nomes de software
-// público vistos no mesmo texto.
+// ownerless: v has two or more pieces, all of them role, type or numbering, with one role piece or
+// two type words; or only filler X/x ("XXXXXXXXX"). extra: public software names seen in the same
+// text.
 func ownerless(v string, extra map[string]bool) bool {
 	if len(v) >= 3 && strings.Trim(v, "Xx") == "" {
 		return true
@@ -243,13 +244,13 @@ func ownerless(v string, extra map[string]bool) bool {
 	if len(ps) == 0 || len(ps) > 8 {
 		return false
 	}
-	if extra[strings.ToLower(v)] { // o nome exato da imagem oficial ("redis", "minio")
+	if extra[strings.ToLower(v)] { // the exact name of the official image ("redis", "minio")
 		return true
 	}
 	hostRole, letters := false, 0
 	for _, p := range ps {
 		switch {
-		case isDigit(p[0]) || len(p) <= 2 && p[0] == 'v' && len(ps) > 1: // numeração, versão (_v1)
+		case isDigit(p[0]) || len(p) <= 2 && p[0] == 'v' && len(ps) > 1: // numbering, version (_v1)
 			continue
 		case roleVocab[p] || extra[p]:
 			hostRole = true
@@ -263,16 +264,16 @@ func ownerless(v string, extra map[string]bool) bool {
 		}
 		letters++
 	}
-	// uma palavra sozinha ("SRC", "main") e tipo + número ("INST01", "ns-1") seguem os outros freios
+	// a single word ("SRC", "main") and type + number ("INST01", "ns-1") follow the other brakes
 	return len(ps) >= 2 && (hostRole || letters >= 2)
 }
 
-// exampleNumber: número de conta de documentação, não de alguém: só blocos de um dígito
-// repetido, do mesmo tamanho ("111122223333", "000000000000"). A sequência "123456789012" fica
-// de fora: os testes do projeto a usam como conta do cliente.
+// exampleNumber: a documentation account number, not someone's: only blocks of one repeated digit,
+// of the same size ("111122223333", "000000000000"). The sequence "123456789012" is left out: the
+// project's tests use it as the customer's account.
 //
-// Só vale para o valor que é o número (até 3 letras de prefixo e separadores): com um nome junto
-// ("srv_vendas-99999999-...") o nome é do dono e o valor continua mascarado.
+// Applies only to a value that is the number (up to 3 prefix letters and separators): with a name
+// attached ("srv_vendas-99999999-...") the name belongs to the owner and the value is still masked.
 func exampleNumber(v string) bool {
 	var d []byte
 	letters := 0
@@ -292,7 +293,7 @@ func exampleNumber(v string) bool {
 	if len(d) < 8 {
 		return false
 	}
-	// blocos de um dígito repetido, todos do mesmo tamanho
+	// blocks of one repeated digit, all of the same size
 	var runs []int
 	for i := 0; i < len(d); i++ {
 		if i == 0 || d[i] != d[i-1] {
@@ -311,15 +312,15 @@ func exampleNumber(v string) bool {
 	return true
 }
 
-// tldOnlyGroups: os prefixos de publicGroups que são um TLD inteiro. Valem para o leitor de
-// pacotes (o groupId io.x de uma dependência) e para a linha de traceback, mas não provam que um
-// nome é público: a empresa com domínio .io ou .dev escreve io.<empresa>.<sistema>.
+// tldOnlyGroups: the publicGroups prefixes that are a whole TLD. They count for the packages reader
+// (the io.x groupId of a dependency) and for the traceback line, but do not prove a name is public:
+// a company with a .io or .dev domain writes io.<company>.<system>.
 var tldOnlyGroups = setOf("io.", "dev.")
 
-// publicJavaGroup: pkg (minúsculas, com pontos) começa por um grupo público do Maven, pedaço
-// inteiro ("com.google" não vale para "com.googlehx"). estrito: sem os prefixos de tldOnlyGroups.
+// publicJavaGroup: pkg (lowercase, with dots) starts with a public Maven group, as a whole piece
+// ("com.google" does not count for "com.googlehx"). strict: without the tldOnlyGroups prefixes.
 func publicJavaGroup(pkg string, strict bool) bool {
-	for _, g := range publicGroups { // os mesmos grupos públicos do leitor de pacotes (groupIn)
+	for _, g := range publicGroups { // the same public groups as the packages reader (groupIn)
 		if strict && tldOnlyGroups[g] {
 			continue
 		}
@@ -330,8 +331,8 @@ func publicJavaGroup(pkg string, strict bool) bool {
 	return false
 }
 
-// publicGroup: domínio invertido (org.apache.airflow, com.linkedin.metadata) cujo dono, o segundo
-// rótulo, é público; com.<empresa>.x e io.<empresa>.x continuam com o nome da empresa.
+// publicGroup: reversed domain (org.apache.airflow, com.linkedin.metadata) whose owner, the second
+// label, is public; com.<company>.x and io.<company>.x still carry the company name.
 func publicGroup(v string) bool {
 	if !reReversedGroup.MatchString(v) {
 		return false
@@ -344,17 +345,17 @@ func publicGroup(v string) bool {
 	return publicDev(ps[1]) || publicRef[ps[1]]
 }
 
-// vocabularyFinding: freios comuns a todos os leitores, pelo tipo do achado. sw: nomes de
-// software público vistos no mesmo texto (ver textSoftware).
+// vocabularyFinding: brakes common to all readers, by the finding's type. sw: public software names
+// seen in the same text (see textSoftware).
 func vocabularyFinding(l Reader, o ObjFinding, v string, sw map[string]bool) bool {
-	// (rótulo em escrita não latina, "スキーマ", fica mascarado: para um cliente russo, chinês ou
-	// israelense o nome real da tabela também é nessa escrita)
+	// (a label in a non-Latin script, "スキーマ", stays masked: for a Russian, Chinese or Israeli
+	// customer the real table name is also in that script)
 	if fieldName(v) || ownerless(v, sw) {
 		return true
 	}
 	lv := strings.ToLower(v)
-	// pedaço de URL ou de domínio sozinho: TLD genérico ("com" de docs.aws.amazon.com) e esquema
-	// de URI ("https" de https://...) nunca são nome do cliente
+	// a URL or domain piece alone: a generic TLD ("com" of docs.aws.amazon.com) and a URI scheme
+	// ("https" of https://...) are never a customer name
 	if genericTLDs[lv] || uriSchemes[lv] && (o.Ent == "schema" || o.Ent == "pasta" || o.Ent == "servidor" || o.Ent == "coluna") {
 		return true
 	}
@@ -369,29 +370,29 @@ func vocabularyFinding(l Reader, o ObjFinding, v string, sw map[string]bool) boo
 	return false
 }
 
-// receptores comuns de código: "self.host", "cfg.user", "process.env" são acesso a atributo
+// common code receivers: "self.host", "cfg.user", "process.env" are attribute access
 var codeReceivers = setOf("self", "this", "cls", "cfg", "conf", "config", "settings", "options", "opts", "args",
 	"os", "env", "process", "req", "request", "ctx", "params", "props", "state", "data", "obj", "window", "document",
 	"module", "exports", "super", "m", "c", "r", "s", "t", "u", "x", "v", "p")
 
-// palavras de tipo (anotações "host: str", ajuda de flags "--host string")
+// type words (annotations "host: str", flag help "--host string")
 var typeWords = setOf("str", "string", "int", "integer", "bool", "boolean", "float", "number", "bytes", "any",
 	"object", "list", "dict", "map", "array", "optional", "none", "text", "uri", "url", "duration")
 
-// extensões de arquivo comuns: "config.yaml" não é host
+// common file extensions: "config.yaml" is not a host
 var fileExtensions = setOf("json", "yaml", "yml", "toml", "ini", "txt", "csv", "tsv", "go", "py", "js", "ts", "jsx",
 	"tsx", "sql", "sh", "md", "xml", "html", "htm", "conf", "cfg", "properties", "env", "log", "jar", "war", "zip",
 	"gz", "tgz", "tar", "pem", "key", "crt", "java", "rb", "rs", "c", "h", "cpp", "php", "pdf", "png", "jpg", "parquet",
 	"avro", "lock", "mod", "sum", "exe", "dll", "so", "class", "pyc", "whl", "proto")
 
-// Hosts públicos de módulos Go (o pedido do lote: a lista pequena dos mais comuns; mais
-// example.com/org/net, reservados para documentação pela RFC 2606).
+// Public Go module hosts (the batch request: the short list of the most common ones; plus
+// example.com/org/net, reserved for documentation by RFC 2606).
 var publicCodeHosts = setOf("github.com", "gitlab.com", "bitbucket.org", "golang.org", "google.golang.org",
 	"gopkg.in", "go.uber.org", "k8s.io", "sigs.k8s.io", "example.com", "example.org", "example.net")
 
-// Prefixos públicos de groupId (Maven Central: as regras de coordenadas em
-// https://central.sonatype.org/publish/requirements/coordinates/ e os grupos mais usados em
-// https://mvnrepository.com/popular). "io." inteiro: domínios .io de projetos abertos.
+// Public groupId prefixes (Maven Central: the coordinate rules at
+// https://central.sonatype.org/publish/requirements/coordinates/ and the most used groups at
+// https://mvnrepository.com/popular). Whole "io.": .io domains of open projects.
 var publicGroups = []string{"org.apache", "org.springframework", "com.google", "io.", "javax", "jakarta", "java.",
 	"org.jetbrains", "org.junit", "junit", "org.slf4j", "ch.qos", "com.fasterxml", "org.hibernate", "org.projectlombok",
 	"org.mockito", "org.eclipse", "com.amazonaws", "software.amazon", "com.microsoft", "com.azure", "org.postgresql",
@@ -404,8 +405,8 @@ var publicGroups = []string{"org.apache", "org.springframework", "com.google", "
 	"com.jayway", "org.hamcrest", "org.awaitility", "org.objenesis", "org.checkerframework", "com.puppycrawl",
 	"org.freemarker", "org.thymeleaf", "org.quartz-scheduler", "org.apache.", "dev.", "net.sourceforge"}
 
-// Escopos públicos do npm (os mais baixados em https://www.npmjs.com, organizações de
-// frameworks e SDKs).
+// Public npm scopes (the most downloaded at https://www.npmjs.com, framework and SDK
+// organizations).
 var publicNpmScopes = setOf("types", "angular", "babel", "vue", "nestjs", "aws-sdk", "aws-cdk", "google-cloud", "azure",
 	"mui", "emotion", "testing-library", "typescript-eslint", "rollup", "vitejs", "storybook", "reduxjs", "tanstack",
 	"octokit", "anthropic-ai", "sentry", "nuxt", "sveltejs", "prisma", "apollo", "graphql-tools", "jest", "playwright",

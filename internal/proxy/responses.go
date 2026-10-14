@@ -11,37 +11,37 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/mask"
 )
 
-// Format Responses da OpenAI (/v1/responses): o do Codex CLI, com a chave de API da OpenAI e com
-// a assinatura do ChatGPT (chatgpt.com/backend-api/codex/responses). Vale para todo caminho
-// terminado em /responses, de qualquer provedor.
+// OpenAI Responses format (/v1/responses): Codex CLI's, with the OpenAI API key and with the
+// ChatGPT subscription (chatgpt.com/backend-api/codex/responses). It applies to every path ending
+// in /responses, from any provider.
 //
-// Como no Gemini e no Chat Completions, a ida é vista na forma da Anthropic (responsesBridge) e
-// passa pelo mesmo caminho de /v1/messages. O que muda de nome:
+// As with Gemini and Chat Completions, the outbound side is seen in the Anthropic shape
+// (responsesBridge) and goes through the same path as /v1/messages. What changes name:
 //
-//	instructions e mensagens "system"/"developer"     -> system
-//	tools[] (function, custom)                         -> tools (descrição e schema; o formato
-//	                                                      de uma ferramenta custom não muda)
-//	input[] "message" (texto, imagem, arquivo)         -> blocos de texto, imagem e PDF
-//	input[] "function_call" (arguments é um JSON)      -> tool_use
-//	input[] "custom_tool_call" (input é texto livre)   -> tool_use (apply_patch do Codex)
+//	instructions and "system"/"developer" messages     -> system
+//	tools[] (function, custom)                         -> tools (description and schema; the format
+//	                                                      of a custom tool does not change)
+//	input[] "message" (text, image, file)              -> text, image and PDF blocks
+//	input[] "function_call" (arguments is JSON)        -> tool_use
+//	input[] "custom_tool_call" (input is free text)    -> tool_use (Codex's apply_patch)
 //	input[] "local_shell_call" (action.command)        -> tool_use
 //	input[] "function_call_output", "custom_..._output"-> tool_result
-//	input[] "reasoning", "web_search_call" e afins     -> não mudam (o modelo só viu pseudônimos)
+//	input[] "reasoning", "web_search_call" and similar -> unchanged (the model only saw pseudonyms)
 
-// parâmetros do Responses que não levam dado do usuário (ou que não podem mudar)
+// Responses parameters that carry no user data (or that cannot change)
 var responsesParams = map[string]bool{"model": true, "input": true, "instructions": true, "tools": true,
 	"tool_choice": true, "parallel_tool_calls": true, "reasoning": true, "store": true, "stream": true,
 	"include": true, "prompt_cache_key": true, "text": true, "service_tier": true, "max_output_tokens": true,
 	"temperature": true, "top_p": true, "truncation": true, "previous_response_id": true, "background": true,
 	"top_logprobs": true, "safety_identifier": true, "prompt_cache_retention": true}
 
-// itens que já estão do lado da API, ou que o modelo escreveu a partir de pseudônimos: não mudam
+// items already on the API side, or that the model wrote from pseudonyms: unchanged
 var intactResponsesItems = map[string]bool{"reasoning": true, "web_search_call": true, "image_generation_call": true,
 	"compaction": true, "compaction_summary": true, "context_compaction": true, "compaction_trigger": true,
 	"item_reference": true, "configuration_update": true, "tool_search_call": true, "tool_search_output": true,
 	"file_search_call": true, "code_interpreter_call": true, "mcp_list_tools": true}
 
-// responsesBlocks: o conteúdo de uma mensagem (texto ou lista de partes) como blocos da Anthropic.
+// responsesBlocks: the content of a message (text or list of parts) as Anthropic blocks.
 func responsesBlocks(content any) (blocks []any, parts []map[string]any) {
 	blocks = []any{}
 	switch c := content.(type) {
@@ -60,7 +60,7 @@ func responsesBlocks(content any) (blocks []any, parts []map[string]any) {
 				typ, data, ok := dataURL(u)
 				switch {
 				case !ok:
-					b["type"] = "server_tool_use" // endereço ou arquivo já do lado da API: não muda
+					b["type"] = "server_tool_use" // address or file already on the API side: unchanged
 					return
 				case typ == "application/pdf":
 					b["type"] = "document"
@@ -83,12 +83,12 @@ func responsesBlocks(content any) (blocks []any, parts []map[string]any) {
 				u, _ := pm["file_data"].(string)
 				media(u)
 			case "input_audio":
-				delete(b, partMark) // áudio: não há como verificar; não sai (falha fechada)
+				delete(b, partMark) // audio: there is no way to check; does not go out (fail closed)
 				b["type"], b["text"] = "text", openAIFileNote
 			case "refusal":
-				b["type"] = "server_tool_use" // recusa do próprio modelo: não muda
+				b["type"] = "server_tool_use" // refusal of the model itself: unchanged
 			default:
-				b["type"], b["parte"] = "parte desconhecida", pm // mascara todo texto dela, por precaução
+				b["type"], b["parte"] = "parte desconhecida", pm // masks all of its text, as a precaution
 			}
 			blocks = append(blocks, b)
 		}
@@ -96,8 +96,8 @@ func responsesBlocks(content any) (blocks []any, parts []map[string]any) {
 	return blocks, parts
 }
 
-// responsesContent: os blocos já mascarados, de volta como o conteúdo de uma mensagem do
-// Responses. Com partes == nil o conteúdo era um texto.
+// responsesContent: the already masked blocks, back as the content of a Responses message. With
+// parts == nil the content was a text.
 func responsesContent(blocks any, parts []map[string]any) any {
 	bs, _ := blocks.([]any)
 	if parts == nil {
@@ -128,7 +128,7 @@ func responsesContent(blocks any, parts []map[string]any) any {
 			}
 			pm["text"] = b["text"]
 		case "image", "document":
-			if src["type"] != "base64" { // PDF que virou texto mascarado
+			if src["type"] != "base64" { // PDF that became masked text
 				t, _ := src["data"].(string)
 				if title, _ := b["title"].(string); title != "" {
 					t = title + "\n\n" + t
@@ -153,9 +153,9 @@ func responsesContent(blocks any, parts []map[string]any) any {
 	return out
 }
 
-// responsesBridge devolve a requisição do Responses na forma da Anthropic e a função que, depois de
-// mascarada, copia o resultado de volta. ok = false: não é uma requisição com "input" (cai no modo
-// genérico, que mascara todo texto).
+// responsesBridge returns the Responses request in the Anthropic shape and the function that, after
+// masking, copies the result back. ok = false: not a request with "input" (falls into generic mode,
+// which masks all text).
 func responsesBridge(v any) (map[string]any, func(), bool) {
 	req, _ := v.(map[string]any)
 	entry, ok := req["input"]
@@ -169,7 +169,7 @@ func responsesBridge(v any) (map[string]any, func(), bool) {
 		tools := []any{}
 		for _, t := range ts {
 			if tm, ok := t.(map[string]any); ok {
-				tools = append(tools, tm) // o mesmo mapa: descrição e schema são mascarados no lugar
+				tools = append(tools, tm) // the same map: description and schema are masked in place
 			}
 		}
 		anth["tools"] = tools
@@ -209,7 +209,7 @@ func responsesBridge(v any) (map[string]any, func(), bool) {
 			hostRole, _ := it["role"].(string)
 			blocks, parts := responsesBlocks(it["content"])
 			if hostRole == "system" || hostRole == "developer" {
-				// instruções do cliente: cada texto é mascarado no lugar
+				// client instructions: each text is masked in place
 				for _, bx := range blocks {
 					b, _ := bx.(map[string]any)
 					if b == nil || b["type"] != "text" {
@@ -238,14 +238,15 @@ func responsesBridge(v any) (map[string]any, func(), bool) {
 				if dec, ok := decode([]byte(args)); ok {
 					entry = dec
 				} else {
-					entry = map[string]any{"\x00cru": args} // não é JSON: mascara o texto como veio
+					entry = map[string]any{"\x00cru": args} // not JSON: mask the text as it came
 				}
 			}
 			before := encode(entry)
 			b := map[string]any{"type": "tool_use", "id": it["call_id"], "name": it["name"], "input": entry}
 			msgs = append(msgs, map[string]any{"role": "assistant", "content": []any{b}})
 			returns = append(returns, func() {
-				// só reescreve os argumentos que mudaram (o texto original fica como o cliente mandou)
+				// only rewrites the arguments that changed (the original text stays as the client
+				// sent it)
 				if newOne := encode(b["input"]); string(newOne) != string(before) {
 					if m, _ := b["input"].(map[string]any); m != nil && len(m) == 1 && m["\x00cru"] != nil {
 						it["arguments"] = m["\x00cru"]
@@ -274,7 +275,7 @@ func responsesBridge(v any) (map[string]any, func(), bool) {
 				returns = append(returns, func() { it["output"] = responsesContent(res["content"], parts) })
 			}
 		default:
-			// item que não conheço: mascara todo texto dele, por precaução
+			// item I do not know: mask all of its text, as a precaution
 			b := map[string]any{"type": "parte desconhecida", "parte": it}
 			msgs = append(msgs, map[string]any{"role": "user", "content": []any{b}})
 		}
@@ -285,7 +286,7 @@ func responsesBridge(v any) (map[string]any, func(), bool) {
 	anth["messages"] = msgs
 
 	for _, k := range keys(req) {
-		if !responsesParams[k] { // campo que não conheço: mascara por precaução, como na Anthropic
+		if !responsesParams[k] { // field I do not know: mask as a precaution, as with Anthropic
 			k := k
 			anth["responses:"+k] = req[k]
 			returns = append(returns, func() { req[k] = anth["responses:"+k] })
@@ -300,23 +301,23 @@ func responsesBridge(v any) (map[string]any, func(), bool) {
 
 // ---- volta --------------------------------------------------------------------------------
 
-// responsesReturn desmascara a resposta do Responses. Em streaming, o texto, os argumentos de uma
-// chamada (pedaços de um JSON) e a entrada de uma ferramenta custom (o patch do apply_patch)
-// chegam em pedaços e passam cada um por um Stream, que segura o pseudônimo cortado entre dois
-// pedaços. Os eventos que trazem o item inteiro (*.done, output_item.done, response.completed)
-// são desmascarados inteiros: o cliente pode usar tanto os pedaços quanto o item.
+// responsesReturn unmasks the Responses response. In streaming, the text, the arguments of a call
+// (pieces of a JSON) and the input of a custom tool (the apply_patch patch) arrive in pieces and
+// each goes through a Stream, which holds a pseudonym cut between two pieces. The events that carry
+// the whole item (*.done, output_item.done, response.completed) are unmasked whole: the client may
+// use either the pieces or the item.
 type responsesReturn struct {
 	p       *Proxy
 	tab     *mask.Table
-	streams map[string]*responsesStream // por item (e parte, no texto)
+	streams map[string]*responsesStream // per item (and part, in the text)
 }
 
 type responsesStream struct {
 	f        *mask.Stream
-	event    string         // o tipo do evento de pedaço, para o pedaço a mais no fim
+	event    string         // the type of the piece event, for the extra piece at the end
 	fields   map[string]any // item_id, output_index, content_index
 	field    string         // "delta"
-	rawValue bool           // ferramenta que vai para a internet: segue com os pseudônimos
+	rawValue bool           // tool that goes to the internet: keeps the pseudonyms
 	isText   bool
 	isJSON   bool
 	original strings.Builder
@@ -328,7 +329,7 @@ func (p *Proxy) newResponsesReturn(tab *mask.Table) *responsesReturn {
 
 func (g *responsesReturn) reg(s string) string { return g.p.m.RecordResponse(s, g.tab) }
 
-// cru: o item é de uma ferramenta que vai para a internet (segue com os pseudônimos).
+// raw: the item belongs to a tool that goes to the internet (keeps the pseudonyms).
 func (g *responsesReturn) rawValue(k string) bool {
 	fx := g.streams[k]
 	return fx != nil && fx.rawValue
@@ -342,8 +343,8 @@ func itemKey(ev map[string]any) string {
 	return id
 }
 
-// unmaskArgs: os argumentos (um JSON em texto) com os valores reais, no mesmo formato em que
-// vieram; cada string é registrada (quem escreveu).
+// unmaskArgs: the arguments (JSON in text) with the real values, in the same format they came in;
+// each string is recorded (who wrote it).
 func (g *responsesReturn) unmaskArgs(args string) string {
 	if dec, ok := decode([]byte(args)); ok {
 		recordAll(dec, g.reg)
@@ -351,7 +352,7 @@ func (g *responsesReturn) unmaskArgs(args string) string {
 	return g.tab.Unmask(args, true)
 }
 
-// item: desmascara um item inteiro da saída, no lugar.
+// item: unmasks a whole output item, in place.
 func (g *responsesReturn) item(it map[string]any) {
 	name, _ := it["name"].(string)
 	switch it["type"] {
@@ -377,7 +378,7 @@ func (g *responsesReturn) item(it map[string]any) {
 	}
 }
 
-// soltar: o que os fluxos de um item ainda seguravam, como eventos de pedaço a mais.
+// release: what the streams of an item were still holding, as extra piece events.
 func (g *responsesReturn) release(prefixP string) []map[string]any {
 	var ks []string
 	for k := range g.streams {
@@ -404,8 +405,8 @@ func (g *responsesReturn) release(prefixP string) []map[string]any {
 	return out
 }
 
-// evento desmascara um evento do streaming, no lugar. Devolve os eventos de pedaço a mais que
-// têm de sair antes dele (o resto que um fluxo segurava quando o item acabou).
+// event unmasks a streaming event, in place. Returns the extra piece events that must go out before
+// it (the rest a stream was holding when the item ended).
 func (g *responsesReturn) event(ev map[string]any) []map[string]any {
 	typ, _ := ev["type"].(string)
 	piece := func(isJSON bool, k string) {
@@ -472,7 +473,7 @@ func (g *responsesReturn) event(ev map[string]any) []map[string]any {
 		if it != nil {
 			name, _ := it["name"].(string)
 			if typ == "response.output_item.added" && g.p.bridgeNoUnmask(name) {
-				// os pedaços dos argumentos de uma ferramenta de internet seguem com os pseudônimos
+				// the argument pieces of an internet tool keep the pseudonyms
 				id, _ := it["id"].(string)
 				g.streams[id] = &responsesStream{f: g.tab.NewStream(true), rawValue: true}
 			}
@@ -492,7 +493,7 @@ func (g *responsesReturn) event(ev map[string]any) []map[string]any {
 	return nil
 }
 
-// unmaskSSEResponses: streaming ("event: ..." e "data: {...}", um evento por bloco).
+// unmaskSSEResponses: streaming ("event: ..." and "data: {...}", one event per block).
 func (p *Proxy) unmaskSSEResponses(w http.ResponseWriter, body io.Reader, tab *mask.Table) error {
 	fl, _ := w.(http.Flusher)
 	rd := bufio.NewReaderSize(body, 64<<10)
@@ -519,14 +520,14 @@ func (p *Proxy) unmaskSSEResponses(w http.ResponseWriter, body io.Reader, tab *m
 		if v, ok := decode([]byte(data)); ok && !tab.Empty() {
 			ev, _ = v.(map[string]any)
 		}
-		if ev == nil { // sem nada para desmascarar: passa como veio
+		if ev == nil { // nothing to unmask: passes as it came
 			io.WriteString(w, strings.Join(lines, "\n")+"\n\n")
 			return
 		}
 		for _, extra := range g.event(ev) {
 			writeIt(extra)
 		}
-		// o nome do evento continua o que veio (o cliente lê o "type" de dentro dos dados)
+		// the event name stays what came (the client reads the "type" inside the data)
 		for _, l := range lines {
 			if !strings.HasPrefix(l, "data:") {
 				io.WriteString(w, l+"\n")
@@ -561,8 +562,8 @@ func (p *Proxy) unmaskSSEResponses(w http.ResponseWriter, body io.Reader, tab *m
 	}
 }
 
-// unmaskResponsesJSON: resposta sem streaming. O texto de cada mensagem e a entrada de cada
-// chamada de ferramenta voltam reais; o raciocínio não muda.
+// unmaskResponsesJSON: response without streaming. The text of each message and the input of each
+// tool call come back real; the reasoning does not change.
 func (p *Proxy) unmaskResponsesJSON(b []byte, tab *mask.Table) []byte {
 	v, ok := decode(b)
 	resp, _ := v.(map[string]any)

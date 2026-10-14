@@ -5,10 +5,9 @@ import (
 	"testing"
 )
 
-// Freios (esquema pelo tipo, SQL em prosa) e referência
-// pública derivada. Names inventados.
+// Brakes (schema by type, SQL in prose) and derived public reference. Made-up names.
 
-// "nome    tipo" decide pelo tipo, com ou sem recuo.
+// "name type" decides by the type, with or without indentation.
 func TestSchemaByType(t *testing.T) {
 	m := newTest(t)
 	block := "    cod_pessoa_x      object\n    vlr_saldo_dia       float64\n    dta_nsc_cli  datetime64[ns]\n"
@@ -17,15 +16,15 @@ func TestSchemaByType(t *testing.T) {
 		out, _ := m.Mask(block)
 		t.Errorf("bloco recuado: %d/%d\n%s", ok, tot, out)
 	}
-	// tipo de dado em maiúsculas (SQL) também decide; sem recuo, igual
+	// data type in uppercase (SQL) also decides; without indentation, the same
 	m = newTest(t)
 	ddl := "id_conta_x     NUMBER(12,2)\ndt_abertura_x  TIMESTAMP\nnm_titular_x   VARCHAR(80)\n"
 	if ok, tot := checkMasked(t, m, "ddl", ddl, []string{"id_conta_x", "dt_abertura_x", "nm_titular_x"}); ok != tot {
 		out, _ := m.Mask(ddl)
 		t.Errorf("tipos SQL: %d/%d\n%s", ok, tot, out)
 	}
-	// negativos: struct Go (tipos de linguagem, ponteiro, lista, qualificado), bloco de
-	// variáveis, dataclass Python
+	// negatives: Go struct (language types, pointer, list, qualified), variable block, Python
+	// dataclass
 	for _, s := range []string{
 		"type ContaX struct {\n\tSaldoDia    float64\n\tNomeX       string\n\tAtiva       bool\n\tTotalX      uint64\n\tIdade       int\n\tBuf         strings.Builder\n\tProx        *ContaX\n\tItens       []ItemX\n}\n",
 		"type ContaY struct {\n\tsaldo_dia   float64\n\ttotal_x     int64\n}\n",
@@ -37,7 +36,7 @@ func TestSchemaByType(t *testing.T) {
 			t.Errorf("não é esquema: %q -> %q", s, out)
 		}
 	}
-	// o rodapé do pandas decide mesmo só com tipos que também são de linguagem
+	// the pandas footer decides even with only types that are also language types
 	m = newTest(t)
 	dt := "qtd_itens_x      int64\nvlr_total_x    float64\ndtype: object\n"
 	if ok, tot := checkMasked(t, m, "rodapé", dt, []string{"qtd_itens_x", "vlr_total_x"}); ok != tot {
@@ -45,7 +44,7 @@ func TestSchemaByType(t *testing.T) {
 	}
 }
 
-// D2: SQL citado em prosa e comentário de código não é instrução.
+// D2: SQL quoted in prose and in a code comment is not a statement.
 func TestSQLInProseAndCode(t *testing.T) {
 	for _, s := range []string{
 		"// Use merr.Errors to get the list\n\tcount := 1\n",
@@ -64,7 +63,7 @@ func TestSQLInProseAndCode(t *testing.T) {
 			t.Errorf("não é SQL: %q -> %q", s, out)
 		}
 	}
-	// continuam valendo: instrução de verdade, em maiúsculas ou com forma inequívoca
+	// still apply: a real statement, in uppercase or with an unambiguous shape
 	for _, c := range []struct{ s, name string }{
 		{"CALL proc_fecha_mes_x(2024);\n", "proc_fecha_mes_x"},
 		{"call proc_fecha_mes_x();\n", "proc_fecha_mes_x"},
@@ -80,9 +79,9 @@ func TestSQLInProseAndCode(t *testing.T) {
 	}
 }
 
-// D3/D4: a referência pública é gerada (não vazia, com as formas esperadas, de tamanho
-// contido); palavra da referência é mascarada onde foi decidida, mas fica marcada como
-// genérica (não entra na memória da conversa).
+// D3/D4: the public reference is generated (not empty, with the expected forms, of contained size);
+// a reference word is masked where it was decided, but stays marked as generic (it does not enter
+// the conversation memory).
 func TestPublicReference(t *testing.T) {
 	if len(publicRef) == 0 || len(publicRef) > 2000 {
 		t.Fatalf("referência pública: %d palavras", len(publicRef))
@@ -145,8 +144,8 @@ func TestGenericInInventory(t *testing.T) {
 	if dn == nil || dn.Generic {
 		t.Fatalf("decisão do nome distintivo: %+v", ds)
 	}
-	// o mesmo pelo decisor (TextCtx.Decide)
-	// (com uma palavra da referência: "default" é vocabulário de sistema e nunca é decidido)
+	// the same through the decider (TextCtx.Decide) (with a reference word: "default" is system
+	// vocabulary and is never decided)
 	c := &TextCtx{S: "ns " + gen + " x", m: m}
 	c.Decide(3, 3+len(gen), "namespace", "teste")
 	if len(c.dec) != 1 || !c.dec[0].Generic || len(c.out) != 1 {

@@ -6,16 +6,16 @@ import (
 	"strings"
 )
 
-// IPv6 de rede interna (sempre) e IP público (opção objetos.ip_publico, desligada por padrão):
-// viram nome de servidor. O IPv4 interno é do detector "ip" (detectors_format.go).
+// Internal-network IPv6 (always) and public IP (option objects.public_ip, off by default): they
+// become a server name. Internal IPv4 belongs to the "ip" detector (detectors_format.go).
 
-// DNS públicos (Google, Cloudflare, Quad9, OpenDNS): aparecem em toda documentação. E os
-// endereços fixos da AWS em IPv6, iguais em toda VPC: o DNS (Route 53 Resolver) e o serviço
-// de metadados da instância (docs.aws.amazon.com: AmazonDNS-concepts, instancedata-data-retrieval).
+// Public DNS (Google, Cloudflare, Quad9, OpenDNS): they appear in all documentation. And AWS's
+// fixed IPv6 addresses, the same in every VPC: the DNS (Route 53 Resolver) and the instance
+// metadata service (docs.aws.amazon.com: AmazonDNS-concepts, instancedata-data-retrieval).
 var publicDNS = setOf("8.8.8.8", "8.8.4.4", "1.1.1.1", "1.0.0.1", "9.9.9.9", "208.67.222.222",
 	"2001:4860:4860::8888", "2606:4700:4700::1111", "fd00:ec2::253", "fd00:ec2::254")
 
-// faixas de documentação (RFC 5737, RFC 3849 e RFC 9637): não são endereço real
+// documentation ranges (RFC 5737, RFC 3849 and RFC 9637): not a real address
 var docNetworks = []netip.Prefix{netip.MustParsePrefix("192.0.2.0/24"), netip.MustParsePrefix("198.51.100.0/24"),
 	netip.MustParsePrefix("203.0.113.0/24"), netip.MustParsePrefix("2001:db8::/32"), netip.MustParsePrefix("3fff::/20")}
 
@@ -31,14 +31,14 @@ func publicIP(a netip.Addr) bool {
 	return true
 }
 
-// internalIPv6: IPv6 que identifica uma rede ou máquina interna:
-//   - endereço local único, fc00::/7 (RFC 4193), com o Global ID (40 bits, sorteado por quem
-//     cria a rede) diferente de zero: "fd00::/8" escrito numa explicação não é rede de ninguém;
-//   - link-local, fe80::/10 (RFC 4291), com o identificador de interface além dos 16 bits
-//     finais: o derivado do MAC (EUI-64, RFC 4291 apêndice A) ou sorteado (RFC 7217, RFC 8981)
-//     identifica a máquina (RFC 7721, seção 3); "fe80::1", posto à mão, não;
-//   - IPv4 interno escrito em hexadecimal dentro de IPv6 (::ffff:a2a:70f, RFC 4291 2.5.5.2).
-//     Com pontos (::ffff:10.42.7.15), o IPv4 já é do detector "ip".
+// internalIPv6: IPv6 that identifies an internal network or machine:
+//   - unique local address, fc00::/7 (RFC 4193), with a nonzero Global ID (40 bits, drawn at
+//     random by whoever creates the network): "fd00::/8" written in an explanation is nobody's network;
+//   - link-local, fe80::/10 (RFC 4291), with an interface identifier beyond the last 16
+//     bits: derived from the MAC (EUI-64, RFC 4291 appendix A) or random (RFC 7217, RFC 8981)
+//     it identifies the machine (RFC 7721, section 3); "fe80::1", set by hand, does not;
+//   - internal IPv4 written in hexadecimal inside IPv6 (::ffff:a2a:70f, RFC 4291 2.5.5.2).
+//     With dots (::ffff:10.42.7.15), the IPv4 already belongs to the "ip" detector.
 func internalIPv6(a netip.Addr) bool {
 	if !a.Is6() || publicDNS[a.String()] {
 		return false
@@ -55,7 +55,7 @@ func internalIPv6(a netip.Addr) bool {
 	return false
 }
 
-// findInternalIP: o leitor sempre ligado, de IPv6 interno (também no nome reverso, ip6.arpa).
+// findInternalIP: the always-on reader of internal IPv6 (also in the reverse name, ip6.arpa).
 func findInternalIP(s string, add func(ObjFinding)) {
 	ok := func(a netip.Addr, v string) bool { return internalIPv6(a) && !strings.Contains(v, ".") }
 	if strings.Count(s, ":") >= 2 {
@@ -81,7 +81,7 @@ func findPublicIP(s string, add func(ObjFinding)) {
 			if !numberEdge(s, ix[0], ix[1]) || ix[0] > 0 && (letterD(s[ix[0]-1]) || s[ix[0]-1] == '.') {
 				continue
 			}
-			// "6.0.6.1", "8.2.4.44": versão ou número de seção (três primeiros com um dígito)
+			// "6.0.6.1", "8.2.4.44": version or section number (first three with one digit)
 			if v := s[ix[0]:ix[1]]; len(v) >= 6 && v[1] == '.' && v[3] == '.' && v[5] == '.' {
 				continue
 			}
@@ -90,8 +90,8 @@ func findPublicIP(s string, add func(ObjFinding)) {
 			}
 		}
 	}
-	// no nome de máquina: ec2-52-14-88-21.compute-1.amazonaws.com (o rótulo inteiro, com o
-	// "ec2-": só os números seriam descartados como numeração, sem dono)
+	// in a machine name: ec2-52-14-88-21.compute-1.amazonaws.com (the whole label, with the "ec2-":
+	// the numbers alone would be discarded as numbering, with no owner)
 	if digitHyphenDigit(s) {
 		findHyphenIP(s, func(pre, _, k int, a netip.Addr) {
 			if publicIP(a) {
@@ -115,7 +115,7 @@ func findPublicIP(s string, add func(ObjFinding)) {
 	}
 }
 
-// scanIPv6 chama f para cada IPv6 de s (sem a zona "%eth0" e sem o "/64" depois).
+// scanIPv6 calls f for each IPv6 in s (without the "%eth0" zone and without the "/64" after it).
 func scanIPv6(s string, f func(i, k int, a netip.Addr)) {
 	hex := func(c byte) bool { return isDig(c) || c >= 'a' && c <= 'f' || c >= 'A' && c <= 'F' }
 	for i := 0; i < len(s); i++ {
@@ -153,11 +153,11 @@ func scanIPv6(s string, f func(i, k int, a netip.Addr)) {
 	}
 }
 
-// reReverseV6: nome reverso de IPv6 (RFC 3596, 2.5): os 32 dígitos hexadecimais ao contrário,
-// separados por ponto, mais ip6.arpa.
+// reReverseV6: IPv6 reverse name (RFC 3596, 2.5): the 32 hexadecimal digits reversed, separated by
+// dots, plus ip6.arpa.
 var reReverseV6 = regexp.MustCompile(`(?i)\b(?:[0-9a-f]\.){32}ip6\.arpa\b`)
 
-// findReverseV6 chama f com o trecho dos dígitos (sem o ".ip6.arpa") e o endereço.
+// findReverseV6 calls f with the digits part (without ".ip6.arpa") and the address.
 func findReverseV6(s string, f func(i, k int, a netip.Addr)) {
 	for _, ix := range reReverseV6.FindAllStringIndex(s, -1) {
 		if ix[0] > 0 && (isAlnum(s[ix[0]-1]) || s[ix[0]-1] == '.' || s[ix[0]-1] == '-') {
@@ -170,7 +170,7 @@ func findReverseV6(s string, f func(i, k int, a netip.Addr)) {
 			if c >= 'a' {
 				v = c - 'a' + 10
 			}
-			// o primeiro dígito do nome é o último do endereço
+			// the first digit of the name is the last one of the address
 			p := 31 - n
 			if p%2 == 0 {
 				b[p/2] |= v << 4

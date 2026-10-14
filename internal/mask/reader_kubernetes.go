@@ -5,22 +5,22 @@ import (
 	"strings"
 )
 
-// Kubernetes, Helm e contêineres: manifestos, kubeconfig, imagens de registro privado, nome
-// DNS de serviço e variável de ambiente em lista (ver docs/pt-BR/structures.md).
+// Kubernetes, Helm and containers: manifests, kubeconfig, private registry images, service DNS name
+// and environment variable in a list (see docs/structures.md).
 
-// registros públicos: no Docker Hub, ghcr.io, quay.io e public.ecr.aws qualquer um publica (a
-// organização pode ser do cliente, ver publicPath); nos de fornecedor (vendorRegistries)
-// tudo é do fornecedor e a imagem fica.
+// public registries: on Docker Hub, ghcr.io, quay.io and public.ecr.aws anyone publishes (the
+// organization may be the customer's, see publicPath); on vendor ones (vendorRegistries) everything
+// belongs to the vendor and the image stays.
 var publicRegistries = map[string]bool{"docker.io": true, "index.docker.io": true, "ghcr.io": true, "quay.io": true,
 	"registry.k8s.io": true, "k8s.gcr.io": true, "mcr.microsoft.com": true, "public.ecr.aws": true}
 
 var vendorRegistries = map[string]bool{"registry.k8s.io": true, "k8s.gcr.io": true, "mcr.microsoft.com": true}
 
-// addImage: [registro/]caminho[:tag][@digest]. Imagem sem registro (nginx, bitnami/redis) ou de
-// registro público (quay.io, ghcr.io): ver publicPath. Registro de nuvem: o host é do
-// provedor e o cliente está no host (conta do ECR, registro do ACR) ou no primeiro pedaço do
-// caminho (projeto do GCR e do Artifact Registry). Registro privado: o host é servidor. Cada
-// pedaço do caminho é serviço; a tag e o digest ficam.
+// addImage: [registry/]path[:tag][@digest]. Image without a registry (nginx, bitnami/redis) or from
+// a public registry (quay.io, ghcr.io): see publicPath. Cloud registry: the host belongs to the
+// provider and the customer is in the host (ECR account, ACR registry) or in the first piece of the
+// path (GCR and Artifact Registry project). Private registry: the host is a server. Each piece of
+// the path is a service; the tag and digest stay.
 func addImage(s string, a, b int, rule string, add func(ObjFinding)) {
 	v := s[a:b]
 	if strings.ContainsAny(v, " {}$") {
@@ -48,10 +48,10 @@ func addImage(s string, a, b int, rule string, add func(ObjFinding)) {
 		return
 	}
 	end := imagePathEnd(v, bar)
-	first := "servico" // tipo do primeiro pedaço do caminho
+	first := "servico" // type of the first piece of the path
 	switch {
 	case lh == "gcr.io" || strings.HasSuffix(lh, ".gcr.io") || strings.HasSuffix(lh, ".pkg.dev"):
-		first = "conta_nuvem" // gcr.io/<projeto>/..., <região>-docker.pkg.dev/<projeto>/<repo>/...
+		first = "conta_nuvem" // gcr.io/<project>/..., <region>-docker.pkg.dev/<project>/<repo>/...
 	case strings.HasSuffix(lh, ".amazonaws.com") && strings.Contains(lh, ".dkr.ecr."):
 		if p := strings.IndexByte(host, '.'); p == 12 && allDigits(host[:p]) {
 			addName(s, a, a+p, "conta_nuvem", rule, true, add)
@@ -74,7 +74,8 @@ func addImage(s string, a, b int, rule string, add func(ObjFinding)) {
 	}
 }
 
-// imagePathEnd: o fim do caminho de v (sem a tag e o digest); bar: a barra antes do caminho.
+// imagePathEnd: the end of the path of v (without the tag and digest); bar: the slash before the
+// path.
 func imagePathEnd(v string, bar int) int {
 	end := len(v)
 	if i := strings.IndexByte(v[max(bar, 0):], '@'); i >= 0 {
@@ -86,13 +87,13 @@ func imagePathEnd(v string, bar int) int {
 	return end
 }
 
-// publicPath: o caminho de uma imagem do Docker Hub ou de um registro público, s[a:b] =
-// [org/]nome[:tag][@digest]. Público só com prova: sem organização, uma Imagem Oficial do
-// Docker (redis) ou palavra da referência pública; com organização, as duas chaves: a
-// organização é pública (referência ou fornecedor) E cada pedaço do nome é software público
-// (bitnami/redis, grafana/loki, apache/airflow). Fora disso o caminho é do dono
-// (vendashx/api-cobranca, uma imagem local "api-x", e também bitnami/api-vendashx): cada
-// pedaço é serviço.
+// publicPath: the path of an image from Docker Hub or a public registry, s[a:b] =
+// [org/]name[:tag][@digest]. Public only with proof: without an organization, a Docker Official
+// Image (redis) or a word from the public reference; with an organization, both keys: the
+// organization is public (reference or vendor) AND each piece of the name is public software
+// (bitnami/redis, grafana/loki, apache/airflow). Otherwise the path belongs to the owner
+// (vendashx/api-cobranca, a local image "api-x", and also bitnami/api-vendashx): each piece is a
+// service.
 func publicPath(s string, a, b int, rule string, add func(ObjFinding)) {
 	v := s[a:b]
 	end := imagePathEnd(v, strings.LastIndexByte(v, '/'))
@@ -121,10 +122,9 @@ func publicPath(s string, a, b int, rule string, add func(ObjFinding)) {
 	}
 }
 
-// Referência de imagem em qualquer lugar: chave image/repository (YAML, JSON, Helm, valores de
-// chart, trecho de manifesto sem kind), FROM do Dockerfile e docker/podman pull, push, run, tag.
-// A forma da referência (registro com ponto ou porta antes da primeira barra) decide; o resto
-// é o addImage.
+// Image reference anywhere: image/repository key (YAML, JSON, Helm, chart values, manifest snippet
+// without kind), Dockerfile FROM and docker/podman pull, push, run, tag. The shape of the reference
+// (registry with a dot or port before the first slash) decides; the rest is addImage.
 var (
 	reImageRef    = `[A-Za-z0-9][A-Za-z0-9._\-]*(?::\d+)?/[A-Za-z0-9._\-/]*[A-Za-z0-9_](?::[A-Za-z0-9._\-]+)?(?:@sha256:[0-9a-f]{64})?`
 	reImageKey    = regexp.MustCompile(`(?m)(?:^|[\s{,\[])["']?(?:image|imageName|imageRepository|repository)["']?[ \t]*[:=][ \t]*["']?(` + reImageRef + `)`)
@@ -133,7 +133,7 @@ var (
 	reImageTok    = regexp.MustCompile(`^` + reImageRef + `$`)
 )
 
-// hasFrom: s tem a palavra FROM em qualquer caixa (a regex do Dockerfile não diferencia).
+// hasFrom: s has the word FROM in any case (the Dockerfile regex is case-insensitive).
 func hasFrom(s string) bool {
 	for i := 0; i+3 < len(s); i++ {
 		if c := s[i] | 0x20; c == 'f' && s[i+1]|0x20 == 'r' && s[i+2]|0x20 == 'o' && s[i+3]|0x20 == 'm' {
@@ -147,8 +147,8 @@ func findImages(s string, add func(ObjFinding)) {
 	if strings.IndexByte(s, '/') < 0 {
 		return
 	}
-	// cada regex só roda se o texto tem a palavra que ela exige (sem isso, o leitor custava um
-	// quarto do tempo de um texto comum)
+	// each regex only runs if the text has the word it requires (without this, the reader cost a
+	// quarter of the time of a common text)
 	var res []*regexp.Regexp
 	if strings.Contains(s, "mage") || strings.Contains(s, "repository") { // image, imageName, Image
 		res = append(res, reImageKey)
@@ -181,13 +181,13 @@ func findImages(s string, add func(ObjFinding)) {
 	}
 }
 
-// imagem em qualquer forma, com ou sem "/" (redis:7, minio/minio, quay.io/x/y)
+// image in any shape, with or without "/" (redis:7, minio/minio, quay.io/x/y)
 var reAnyImage = regexp.MustCompile(`(?m)(?:(?:^|[\s{,\[])["']?(?:image|imageName)["']?[ \t]*[:=]|^[ \t]*FROM(?:[ \t]+--platform=\S+)?)[ \t]*["']?([A-Za-z0-9][A-Za-z0-9._/:@\-]*)`)
 
-// textSoftware: os nomes de software público que o texto roda como imagem oficial — sem
-// organização (redis, postgres, nginx) ou com a organização igual ao nome (minio/minio,
-// hazelcast/hazelcast), num registro público. O serviço, host ou namespace com esse nome é o
-// software, não o cliente; imagem de organização (acme/acme-api) não conta.
+// textSoftware: the names of public software the text runs as an official image — without an
+// organization (redis, postgres, nginx) or with the organization equal to the name (minio/minio,
+// hazelcast/hazelcast), on a public registry. The service, host or namespace with that name is the
+// software, not the customer; an organization's image (acme/acme-api) does not count.
 func textSoftware(s string) map[string]bool {
 	if !strings.Contains(s, "image") && !strings.Contains(s, "FROM") {
 		return nil
@@ -209,9 +209,10 @@ func textSoftware(s string) map[string]bool {
 		if k := strings.IndexByte(last, ':'); k >= 0 {
 			last = last[:k]
 		}
-		// só com prova de que é software público: imagem oficial do Docker ("redis",
-		// "library/redis") ou organização igual ao nome e de palavra pública ("minio/minio").
-		// Imagem sem organização fora da lista é imagem local ("image: api-x" com build:).
+		// only with proof that it is public software: official Docker image ("redis",
+		// "library/redis") or organization equal to the name and a public word ("minio/minio"). An
+		// image without an organization outside the list is a local image ("image: api-x" with
+		// build:).
 		org := ""
 		if len(ps) == 2 {
 			org = strings.ToLower(ps[0])
@@ -328,8 +329,8 @@ func findK8sDNS(s string, add func(ObjFinding)) {
 	}
 }
 
-// Variável de ambiente em lista (Kubernetes, CI): "- name: DB_HOST" seguido de "value: x" no
-// mesmo item segue a mesma regra de "DB_HOST: x" (o nome da variável diz o tipo do valor).
+// Environment variable in a list (Kubernetes, CI): "- name: DB_HOST" followed by "value: x" in the
+// same item follows the same rule as "DB_HOST: x" (the variable name gives the value's type).
 var reEnvList = regexp.MustCompile(`(?m)^([ \t]*)-[ \t]+name:[ \t]*["']?([A-Za-z_][\w.\-]*)["']?[ \t]*\r?\n[ \t]+value:[ \t]*(["']?)([^\s"'#]+)`)
 
 func findEnvList(s string, add func(ObjFinding)) {
@@ -341,7 +342,7 @@ func findEnvList(s string, add func(ObjFinding)) {
 		if ent == "" {
 			continue
 		}
-		// a linha "value:" tem que estar dentro do item (mais recuada que o "-")
+		// the "value:" line has to be inside the item (more indented than the "-")
 		if m[0] > 0 && strings.LastIndexByte(s[m[0]-1:m[8]], '\n') < 0 {
 			continue
 		}

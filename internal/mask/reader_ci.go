@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// Pipelines de CI: runners, ambientes e o Jenkinsfile (ver docs/pt-BR/structures.md, Pipelines de CI).
+// CI pipelines: runners, environments and the Jenkinsfile (see docs/structures.md, CI pipelines).
 
 // ciRule: GitHub Actions, GitLab CI, Azure Pipelines.
 func ciRule(s string, ents []yEnt, e *yEnt, v string, child func(int, string) *yEnt, add func(ObjFinding)) {
@@ -45,7 +45,7 @@ func ciRule(s string, ents []yEnt, e *yEnt, v string, child func(int, string) *y
 	case k == "environment" && job(e.parent()):
 		addName(s, e.vi, e.vf, "servico", "ci", false, add)
 	case k == "name" && prev == "environment":
-		owner := e.root // o contêiner que tem a chave environment
+		owner := e.root // the container that has the environment key
 		if n >= 3 {
 			owner = e.ids[n-3]
 		}
@@ -56,7 +56,7 @@ func ciRule(s string, ents []yEnt, e *yEnt, v string, child func(int, string) *y
 }
 
 // ---------------------------------------------------------------------------------------
-// Terraform/HCL e saída do plan
+// Terraform/HCL and plan output
 
 var (
 	reJkLabel = regexp.MustCompile(`\blabel[ \t]+['"]([^'"\s]+)['"]`)
@@ -86,4 +86,4 @@ func findJenkins(s string, add func(ObjFinding)) {
 }
 
 // ---------------------------------------------------------------------------------------
-// Name DNS de serviço do Kubernetes: <svc>.<ns>.svc.cluster.local
+// Kubernetes service DNS name: <svc>.<ns>.svc.cluster.local

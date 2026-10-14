@@ -5,10 +5,10 @@ import (
 	"testing"
 )
 
-// Kubernetes, kubeconfig, Helm, compose, Terraform, Ansible, CloudFormation,
-// ARM, Bicep e pipelines de CI. Names fictícios.
+// Kubernetes, kubeconfig, Helm, compose, Terraform, Ansible, CloudFormation, ARM, Bicep and CI
+// pipelines. Made-up names.
 
-// yamlKeys: os caminhos das chaves de um YAML (para conferir que a estrutura não mudou).
+// yamlKeys: the key paths of a YAML (to check that the structure did not change).
 func yamlKeys(s string) [][]string {
 	w := &yCollector{}
 	w.readYAML(s)
@@ -21,8 +21,8 @@ func yamlKeys(s string) [][]string {
 	return out
 }
 
-// sameStructure: as mesmas chaves nos mesmos caminhos (uma chave pode ter virado pseudônimo)
-// e o mesmo número de linhas.
+// sameStructure: the same keys at the same paths (a key may have become a pseudonym) and the same
+// number of lines.
 func sameStructure(t *testing.T, before, after string) {
 	t.Helper()
 	a, d := yamlKeys(before), yamlKeys(after)
@@ -145,7 +145,7 @@ func TestK8sJSON(t *testing.T) {
 
 func TestK8sPublicNotMasked(t *testing.T) {
 	m := newTest(t)
-	// manifesto de exemplo da documentação: só vocabulário e imagens públicas
+	// example manifest from the documentation: only public vocabulary and images
 	s := `apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -173,11 +173,11 @@ spec:
 			t.Errorf("%q deveria ficar:\n%s", v, out)
 		}
 	}
-	// "nginx" em metadata.name é mascarado no lugar, mas palavra simples não propaga
+	// "nginx" in metadata.name is masked in place, but a plain word does not propagate
 	if o, _ := m.Mask("instale o nginx no servidor"); !strings.Contains(o, "nginx") {
 		t.Errorf("palavra simples propagou: %q", o)
 	}
-	// sem apiVersion/kind não é manifesto
+	// without apiVersion/kind it is not a manifest
 	for _, s := range []string{"metadata:\n  name: algo-x9\n", "kind: Pessoa\nnome: algo-x9\n", "apiVersion: str\nkind: str\nmetadata:\n  name: algo-x9\n"} {
 		if o, _ := m.Mask(s); !strings.Contains(o, "algo-x9") {
 			t.Errorf("não é manifesto, mas mascarou: %q", o)
@@ -240,7 +240,7 @@ func TestHelmChart(t *testing.T) {
 	s := "apiVersion: v2\nname: chart-pedidos-x9\ndescription: Um chart de exemplo\ntype: application\nversion: 0.1.0\nappVersion: \"1.16.0\"\n"
 	out := check(t, m, s, []string{"chart-pedidos-x9"}, []string{"apiVersion: v2", "type: application", "version: 0.1.0", "appVersion: \"1.16.0\""})
 	sameStructure(t, s, out)
-	// values.yaml (sem apiVersion) não é deste leitor
+	// values.yaml (without apiVersion) is not for this reader
 	if o, _ := m.Mask("replicaCount: 1\nimage:\n  repository: nginx\n"); !strings.Contains(o, "repository: nginx") {
 		t.Errorf("values.yaml mexido: %q", o)
 	}
@@ -273,7 +273,7 @@ volumes:
 	out := check(t, m, s, []string{"svc-pedidos-x9", "registry.exemplo.interno", "app-demo", "ctr-pedidos-x9", "srv-exemplo-01", "db-demo-x1", "rede-interna-x1", "dados-pg-x1"},
 		[]string{"services:\n", "image: postgres:16", ":1.2\n", `"8080:80"`, "POSTGRES_DB: ", "networks:\n", "volumes:\n", "depends_on:"})
 	sameStructure(t, s, out)
-	// YAML qualquer com "services:" sem cara de compose
+	// any YAML with "services:" that does not look like compose
 	if o, _ := m.Mask("services:\n  pagamento-x1:\n    descricao: algo\n"); !strings.Contains(o, "pagamento-x1") {
 		t.Errorf("não é compose, mas mascarou: %q", o)
 	}
@@ -365,7 +365,7 @@ func TestAnsibleINI(t *testing.T) {
 	if strings.Count(out, "\n") != strings.Count(s, "\n") {
 		t.Errorf("linhas mudaram: %q", out)
 	}
-	// INI comum (my.cnf, setup.cfg, tox.ini) não é inventário
+	// common INI (my.cnf, setup.cfg, tox.ini) is not an inventory
 	for _, s := range []string{"[mysqld]\nskip-name-resolve\nport=3306\n", "[tox]\nenvlist = py310\n[testenv]\ndeps =\n    pytest-x1\n", "[package]\nname = \"pacote-x1\"\n"} {
 		if o, _ := m.Mask(s); o != s {
 			t.Errorf("INI comum mexido:\n%q\n-> %q", s, o)
@@ -462,14 +462,14 @@ jobs:
 	}
 	jk := "pipeline {\n  agent { label 'agente-build-x6' }\n  stages {\n    stage('b') {\n      agent { docker { image 'registry.exemplo.interno/ci/mvn-x7:3' } }\n      steps { sh 'mvn package' }\n    }\n  }\n}\n"
 	check(t, m, jk, []string{"agente-build-x6", "registry.exemplo.interno", "mvn-x7"}, []string{"pipeline {", "stage('b')", "sh 'mvn package'", ":3'"})
-	// tags de tarefa do Ansible não são runner
+	// Ansible task tags are not runners
 	ans := "- hosts: all\n  tasks:\n    - name: x\n      script: run.sh\n      tags:\n        - configuracao-x1\n"
 	if o, _ := m.Mask(ans); !strings.Contains(o, "configuracao-x1") {
 		t.Errorf("tag de tarefa mascarada: %q", o)
 	}
 }
 
-// Name aprendido em posição forte de um formato é mascarado em prosa e em outro formato.
+// A name learned in a strong position of one format is masked in prose and in another format.
 func TestDevopsLearnedInOtherFormat(t *testing.T) {
 	m := newTest(t)
 	m.Mask("apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: cm-x\n  namespace: ns-tesouraria-x8\n")
@@ -486,7 +486,7 @@ func TestDevopsLearnedInOtherFormat(t *testing.T) {
 			t.Errorf("não propagou:\n   %q\n-> %q", s, out)
 		}
 	}
-	// evidência fraca (só um rótulo) não ensina
+	// weak evidence (just a label) does not teach
 	m2 := newTest(t)
 	m2.Mask("name: ci\njobs:\n  b:\n    runs-on: runner-fraco-x1\n    steps: []\n")
 	if out, _ := m2.Mask("o runner-fraco-x1 está fora"); !strings.Contains(out, "runner-fraco-x1") {
@@ -494,7 +494,7 @@ func TestDevopsLearnedInOtherFormat(t *testing.T) {
 	}
 }
 
-// Text comum, código Go e Python não são afetados pelos leitores de DevOps.
+// Common text, Go and Python code are not affected by the DevOps readers.
 func TestDevopsSkipsCodeAndProse(t *testing.T) {
 	ls := []Reader{}
 	for _, l := range defaultReaders() {
@@ -520,7 +520,7 @@ func TestDevopsSkipsCodeAndProse(t *testing.T) {
 	}
 }
 
-// Env em lista segue a mesma regra de "NOME: valor"; o resto do manifesto fica.
+// Env in a list follows the same rule as "NAME: value"; the rest of the manifest stays.
 func TestK8sEnvList(t *testing.T) {
 	m := newTest(t)
 	s := "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: app\nspec:\n  replicas: 3\n  template:\n    spec:\n      containers:\n        - name: app\n          env:\n            - name: DB_HOST\n              value: pgprd01\n            - name: QUEUE_NAME\n              value: \"fila-x1\"\n            - name: LOG_LEVEL\n              value: debug\n          ports:\n            - containerPort: 8080\n          resources:\n            limits:\n              cpu: 500m\n          volumeMounts:\n            - name: dados\n              mountPath: /app/dados\n      tier: backend\n"

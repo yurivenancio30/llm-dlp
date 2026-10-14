@@ -5,10 +5,10 @@ import (
 	"testing"
 )
 
-// Contrato da interface comum (decision.go): as trilhas A–D dependem disto.
+// Contract of the common interface (decision.go): tracks A–D depend on it.
 
 func TestContractDecider(t *testing.T) {
-	// um decisor de teste: a palavra "zz9" depois de "cofre " é bucket
+	// a test decider: the word "zz9" after "cofre " is a bucket
 	name := "teste-contrato"
 	registerDecider(Decider{Name: name, Decide: func(c *TextCtx) {
 		if c.Ext != "" && c.Ext != "ext-ok" {
@@ -47,12 +47,12 @@ func TestContractDecider(t *testing.T) {
 	if !foundIt {
 		t.Fatalf("decisão não ficou no memo: %+v", ds)
 	}
-	// a extensão da dica chega ao decisor, e a dica do leitor de tabela continua legível
+	// the hint extension reaches the decider, and the table reader's hint stays readable
 	r, _ := m.maskD("abre o cofre tesouro de novo", true, "f||| "+sepExt+"ext-ok")
 	if strings.Contains(r.text, "tesouro") || len(r.decidedSet) == 0 {
 		t.Fatalf("com dica estendida: %q %+v", r.text, r.decidedSet)
 	}
-	// palavra comum decidida não vai para o vistos (não tem cara de identificador)
+	// a decided common word does not go to vistos (it has no identifier shape)
 	if _, ok := m.learnedEnt("tesouro"); ok {
 		t.Fatalf("decisão de palavra comum foi aprendida")
 	}

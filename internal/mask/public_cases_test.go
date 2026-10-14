@@ -6,16 +6,16 @@ import (
 	"testing"
 )
 
-// Casos tirados da medição em repositórios públicos (datahub, airflow, dbt-core,
-// sfquickstarts, kubernetes/examples): o formato real, com os nomes do cliente trocados por
-// nomes inventados (_hx, -hx, contas e IDs falsos). "mascarar" tem de sair do texto; "manter"
-// é o público do mesmo trecho, que tem de ficar como está.
+// Cases taken from the measurement on public repositories (datahub, airflow, dbt-core,
+// sfquickstarts, kubernetes/examples): the real format, with the client names replaced by made-up
+// names (_hx, -hx, fake accounts and IDs). "mask" has to leave the text; "keep" is the public part
+// of the same piece, which has to stay as it is.
 type benchCase struct {
 	name     string
 	src      string
 	maskIt   []string
 	keep     []string
-	noReader bool // o caso não depende de leitor de estrutura (só para documentação)
+	noReader bool // the case does not depend on a structure reader (documentation only)
 }
 
 func checkBench(t *testing.T, cases []benchCase) {
@@ -39,8 +39,8 @@ func checkBench(t *testing.T, cases []benchCase) {
 	}
 }
 
-// L1: imagem de contêiner fora de manifesto completo, em Helm, JSON, Dockerfile e docker CLI;
-// registro de nuvem com o projeto ou a conta no caminho ou no host.
+// L1: container image outside a complete manifest, in Helm, JSON, Dockerfile and docker CLI; cloud
+// registry with the project or the account in the path or in the host.
 func TestBenchImages(t *testing.T) {
 	checkBench(t, []benchCase{
 		{name: "trecho de manifesto sem kind", src: "    spec:\n      containers:\n        - name: api\n          image: registry.vendas-hx.com.br/time-dados-hx/api-cobranca-hx:1.4.2\n",
@@ -60,7 +60,7 @@ func TestBenchImages(t *testing.T) {
 	})
 }
 
-// L2: o nome do recurso do cliente no host de serviço de nuvem.
+// L2: the name of the client resource in the cloud service host.
 func TestBenchCloudHosts(t *testing.T) {
 	checkBench(t, []benchCase{
 		{name: "RDS e Redshift", src: "\"host\": \"bd-pedidos-hx.c9akciq32.us-east-1.rds.amazonaws.com\",\nhost=\"dw-vendas-hx.abc123xyz.sa-east-1.redshift.amazonaws.com\"\n",
@@ -68,8 +68,8 @@ func TestBenchCloudHosts(t *testing.T) {
 		{name: "S3 no host", src: "Download https://dados-vendas-hx.s3.us-west-1.amazonaws.com/carga/arquivo.csv e https://relatorios-hx.s3.amazonaws.com/x.pdf\n",
 			maskIt: []string{"dados-vendas-hx", "relatorios-hx"}, keep: []string{"s3", "amazonaws.com"}},
 		{name: "Azure", src: "Server=tcp:sqlsrv-vendas-hx.database.windows.net,1433;\nacr: acrvendashx.azurecr.io/api:1\nvault: https://kv-pedidos-hx.vault.azure.net/\n",
-			// o host da connection string (Server=) é do cliente inteiro: o leitor de conexão o
-			// mascara todo, como qualquer servidor de conexão
+			// the host of the connection string (Server=) belongs wholly to the client: the
+			// connection reader masks all of it, like any connection server
 			maskIt: []string{"sqlsrv-vendas-hx", "acrvendashx", "kv-pedidos-hx"}, keep: []string{"azurecr.io", "vault.azure.net"}},
 		{name: "Databricks", src: "HOST = \"dbc-vendas-hx.cloud.databricks.com\"\nhost: adb-1234567890123456.7.azuredatabricks.net\n",
 			maskIt: []string{"dbc-vendas-hx", "adb-1234567890123456"}, keep: []string{"cloud.databricks.com", "azuredatabricks.net"}},
@@ -78,8 +78,8 @@ func TestBenchCloudHosts(t *testing.T) {
 	})
 }
 
-// L3 e L4: conta de nuvem em ARN com curinga, ARN codificado em URL, conta do Snowflake e da
-// AWS fora de URL.
+// L3 and L4: cloud account in an ARN with a wildcard, URL-encoded ARN, Snowflake and AWS account
+// outside a URL.
 func TestBenchCloudAccounts(t *testing.T) {
 	checkBench(t, []benchCase{
 		{name: "ARN com região curinga", src: "\"Resource\": [\n    \"arn:aws:glue:*:795512345678:schema/*\",\n    \"arn:aws:s3:::dados-vendas-hx/*\"\n]\n",
@@ -93,8 +93,8 @@ func TestBenchCloudAccounts(t *testing.T) {
 	})
 }
 
-// L5: o tipo pela chave, com prefixos e sufixos (TEST_GCP_PROJECT, GCP_PROJECT_ID, DATASET_ID)
-// e em dicionário.
+// L5: the type by the key, with prefixes and suffixes (TEST_GCP_PROJECT, GCP_PROJECT_ID,
+// DATASET_ID) and in a dictionary.
 func TestBenchKeyVariants(t *testing.T) {
 	checkBench(t, []benchCase{
 		{name: "constantes", src: "TEST_GCP_PROJECT = \"projeto-vendas-hx\"\nGCP_PROJECT_ID = \"projeto-carga-hx\"\nDATASET_ID = \"ds_vendas_hx\"\nBQ_DATASET = \"ds_pedidos_hx\"\n",
@@ -106,18 +106,18 @@ func TestBenchKeyVariants(t *testing.T) {
 	})
 }
 
-// L6 e F: SQL do dbt e do Snowflake (Jinja, comentários com traços, CTE).
+// L6 and F: dbt and Snowflake SQL (Jinja, dash comments, CTE).
 func TestBenchSQLDbt(t *testing.T) {
 	checkBench(t, []benchCase{
 		{name: "model do dbt", src: "with source as (\n\n    select * from {{ source('erp_hx','tb_pedido_hx') }}\n\n),\n\nrenamed as (\n\n    select\n\n        ----------  ids\n        id as order_id,\n        cod_loja_hx as location_id,\n\n        ---------- numerics\n        vl_total_hx as order_total\n\n    from source\n\n)\n\nselect * from renamed\n",
-			// o alias (order_id) também é nome do cliente: pode ser mascarado; o nome da CTE é local
+			// the alias (order_id) is also a client name: it may be masked; the CTE name is local
 			maskIt: []string{"erp_hx", "tb_pedido_hx", "cod_loja_hx", "vl_total_hx"}, keep: []string{"renamed", "source"}},
 		{name: "CTE não é tabela", src: "WITH vendas_dia AS (\n  SELECT dt, SUM(vl_venda_hx) AS total FROM dw_hx.fato_venda_hx GROUP BY dt\n)\nSELECT * FROM vendas_dia\n",
 			maskIt: []string{"vl_venda_hx", "dw_hx", "fato_venda_hx"}, keep: []string{"vendas_dia"}},
 	})
 }
 
-// L7: saída de kubectl get (a primeira coluna é o nome do objeto).
+// L7: kubectl get output (the first column is the object name).
 func TestBenchKubectlGet(t *testing.T) {
 	checkBench(t, []benchCase{
 		{name: "get svc", src: "$ kubectl get svc -n loja\nNAME             TYPE           CLUSTER-IP     EXTERNAL-IP   PORT(S)\napi-pedidos-hx   LoadBalancer   10.0.171.239   34.95.120.7   80:31380/TCP\nworker-carga-hx  ClusterIP      10.0.12.4      <none>        8080/TCP\n",
@@ -129,19 +129,20 @@ func TestBenchKubectlGet(t *testing.T) {
 	})
 }
 
-// L8: URN do DataHub com usuário, instância e nome de uma parte só.
+// L8: DataHub URN with a user, an instance and a single-part name.
 func TestBenchURNs(t *testing.T) {
 	checkBench(t, []benchCase{
 		{name: "urns", src: "\"actor\": \"urn:li:corpuser:joao.silva.hx\",\n\"instance\": \"urn:li:dataPlatformInstance:(urn:li:dataPlatform:airflow,airflow-prd-hx)\",\n\"dataset\": \"urn:li:dataset:(urn:li:dataPlatform:postgres,pedido_hx,PROD)\"\n",
 			maskIt: []string{"joao.silva.hx", "airflow-prd-hx", "pedido_hx"}, keep: []string{"airflow", "postgres", "PROD", "dataPlatform"}},
-		// a aplicação (sistema) do cliente, mesmo uma sigla curta
+		// the client's application (system), even a short acronym
 		{name: "urn de aplicação", src: "\"application\": \"urn:li:application:SGP\"\n",
 			maskIt: []string{"SGP"}, keep: []string{"application", "urn:li"}},
 	})
 }
 
-// IP público no contexto que diz que é da infraestrutura (EXTERNAL-IP, loadBalancer.ingress,
-// ExternalIP). Fora desse contexto, o IP público continua como está (opção ip_publico).
+// Public IP in the context that says it belongs to the infrastructure (EXTERNAL-IP,
+// loadBalancer.ingress, ExternalIP). Outside that context, the public IP stays as it is (public_ip
+// option).
 func TestBenchPublicIPInContext(t *testing.T) {
 	checkBench(t, []benchCase{
 		{name: "status do Service", src: "status:\n  loadBalancer:\n    ingress:\n    - ip: 34.95.120.7\n", maskIt: []string{"34.95.120.7"}},
@@ -150,7 +151,7 @@ func TestBenchPublicIPInContext(t *testing.T) {
 	})
 }
 
-// A e B: o SQL não é lido em prosa, e palavra comum decidida não se espalha pelo texto.
+// A and B: SQL is not read in prose, and a decided common word does not spread through the text.
 func TestBenchSQLInProse(t *testing.T) {
 	license := "# Licensed to the Apache Software Foundation (ASF) under one\n# or more contributor license agreements.  See the NOTICE file\n"
 	checkBench(t, []benchCase{
@@ -163,7 +164,7 @@ func TestBenchSQLInProse(t *testing.T) {
 	})
 }
 
-// C, D e E: vocabulário fixo, pedaços de URL e mock do Python não são nomes.
+// C, D and E: fixed vocabulary, URL pieces and Python mocks are not names.
 func TestBenchVocabularyAndCode(t *testing.T) {
 	checkBench(t, []benchCase{
 		{name: "papel de ARIA e de chat", src: "const b = await screen.findByRole(\"button\", { name: /confirm/i });\npage.getByRole(\"status\");\nconversation = [{\"role\": \"assistant\", \"content\": x}, {\"role\": \"user\"}]\n",
@@ -179,8 +180,8 @@ func TestBenchVocabularyAndCode(t *testing.T) {
 	})
 }
 
-// Os mesmos erros nos trechos reais (Apache Airflow, DataHub; licença Apache 2.0) em que a
-// medição os achou: a decisão errada vinha de outra linha do mesmo arquivo e se espalhava.
+// The same errors in the real snippets (Apache Airflow, DataHub; Apache 2.0 license) where the
+// measurement found them: the wrong decision came from another line of the same file and spread.
 func TestBenchRealSnippets(t *testing.T) {
 	checkBench(t, []benchCase{
 		{name: "doc da AWS (Select ... from scratch)", src: "6. Review your web identity information and then choose **Next: Permissions**.\n" +
@@ -210,8 +211,8 @@ func TestBenchRealSnippets(t *testing.T) {
 	})
 }
 
-// Schema aprendido numa mensagem não faz de "mock.<schema>.return_value = x" uma tabela na
-// seguinte: atribuição a atributo é código.
+// A schema learned in one message does not make "mock.<schema>.return_value = x" a table in the
+// next one: an assignment to an attribute is code.
 func TestBenchAttributeAssignment(t *testing.T) {
 	m := newTest(t)
 	m.Mask("select * from fin_contab.t_lanc_diario d join fin_contab.t_saldo_mes s on s.cd = d.cd join fin_contab.t_plano_contas p on p.cd = d.cd\n")
@@ -222,14 +223,14 @@ func TestBenchAttributeAssignment(t *testing.T) {
 			t.Errorf("%q mascarado:\n%s", w, out)
 		}
 	}
-	// o nome qualificado fora da atribuição continua pego
+	// the qualified name outside the assignment is still caught
 	if out, _ := m.Mask("copiado para hx_dw.fin_contab.vendas_hx ontem\n"); strings.Contains(out, "vendas_hx") {
 		t.Errorf("qualificado com schema conhecido em claro:\n%s", out)
 	}
 }
 
-// Valor sem dono (gabarito de nomes, ver docs): nome feito só de papel/placeholder, de tipo e de
-// numeração não é nome de ninguém; um pedaço distintivo basta para continuar nome do cliente.
+// Ownerless value (name template, see docs): a name made only of role/placeholder, type and
+// numbering is nobody's name; one distinctive piece is enough for it to stay a client name.
 func TestBenchOwnerlessValue(t *testing.T) {
 	checkBench(t, []benchCase{
 		{name: "placeholders de teste", src: "TEST_BUCKET = \"test-staging-bucket\"\nhook = Hook(username=\"stub-user\", host=\"source_host\", database=\"actual_database\")\n" +
@@ -242,11 +243,11 @@ func TestBenchOwnerlessValue(t *testing.T) {
 			maskIt: []string{"INST01", "SRC", "PEDIDOS_HX"}},
 		{name: "conta de exemplo da documentação", src: "AWS_ACCOUNT_ID = \"111122223333\"\nACCOUNT_ID = \"000000000000\"\nREAL_ACCOUNT_ID = \"339713033063\"\n",
 			keep: []string{"111122223333", "000000000000"}, maskIt: []string{"339713033063"}},
-		// número falso junto de um nome: o nome é do dono
+		// a fake number next to a name: the name belongs to the owner
 		{name: "nome com número de preenchimento", src: "ACCOUNT_ID = \"vendashx-99999999-9999\"\n",
 			maskIt: []string{"vendashx"}},
-		// escrita não latina não é sinal de tradução: para um cliente russo, chinês ou coreano o
-		// nome real também é nessa escrita
+		// non-Latin script is not a sign of translation: for a Russian, Chinese or Korean client
+		// the real name is also in that script
 		{name: "nome em escrita não latina", src: "{\"database\": \"Продажи_хх\", \"schema\": \"客户数据\", \"user\": \"판매팀\"}\n",
 			maskIt: []string{"Продажи_хх", "客户数据", "판매팀"}},
 		{name: "namespace de grupo público e de empresa", src: "LOGGER_NAMESPACE = \"org.apache.airflow\"\nAPP_NAMESPACE = \"com.vendashx.billing\"\n",
@@ -254,8 +255,8 @@ func TestBenchOwnerlessValue(t *testing.T) {
 	})
 }
 
-// Serviço com o nome da imagem oficial que roda é o software, não o cliente; imagem de
-// organização (acme/acme-api) não libera o nome.
+// A service with the name of the official image it runs is the software, not the client; an
+// organization's image (acme/acme-api) does not release the name.
 func TestBenchImageSoftware(t *testing.T) {
 	checkBench(t, []benchCase{
 		{name: "compose com imagens oficiais", src: "services:\n  redis:\n    image: redis:7.2\n  postgres:\n    image: postgres:16\n  minio:\n    image: minio/minio:latest\n" +
@@ -263,14 +264,16 @@ func TestBenchImageSoftware(t *testing.T) {
 			keep: []string{"redis", "postgres", "minio"}, maskIt: []string{"api-cobranca-hx"}},
 		{name: "k8s com nome derivado do software", src: "kind: Deployment\nmetadata:\n  name: redis-master\nspec:\n  template:\n    spec:\n      containers:\n      - name: redis\n        image: redis:7\n",
 			keep: []string{"redis-master"}},
-		// imagem sem organização fora das Imagens Oficiais do Docker é imagem local: o nome é do dono
+		// an image without an organization outside the Docker Official Images is a local image: the
+		// name belongs to the owner
 		{name: "imagem local construída", src: "services:\n  server:\n    container_name: yudao-server\n    build:\n      context: ./yudao-server/\n    image: yudao-server\n",
 			maskIt: []string{"yudao-server"}},
-		// organização igual ao nome só prova software com palavra pública; "acme/acme" não
+		// an organization equal to the name only proves software with a public word; "acme/acme"
+		// does not
 		{name: "organização igual ao nome, de empresa", src: "services:\n  vendashx:\n    image: vendashx/vendashx:2.1\n",
 			maskIt: []string{"vendashx"}},
-		// imagem de fornecedor: as duas chaves (organização fornecedora e nome de software); um
-		// pedaço do dono no nome, ou uma organização desconhecida, mascara
+		// vendor image: the two keys (vendor organization and software name); a piece of the owner
+		// in the name, or an unknown organization, masks
 		{name: "imagem de fornecedor", src: "image: clickhouse/clickhouse-server:24.3\nimage: quay.io/prometheus/statsd-exporter:v0.26\n",
 			keep: []string{"clickhouse/clickhouse-server", "prometheus/statsd-exporter"}},
 		{name: "pedaço do dono na imagem de fornecedor", src: "image: grafana/billing-vendashx:1.0\n", maskIt: []string{"billing-vendashx"}},
@@ -280,8 +283,8 @@ func TestBenchImageSoftware(t *testing.T) {
 
 var _ = strings.TrimSpace
 
-// Name em escrita não latina é nome como outro qualquer, em toda estrutura que o lê: para um
-// cliente russo, chinês ou coreano o banco, a tabela e o usuário reais são nessa escrita.
+// A name in non-Latin script is a name like any other, in every structure that reads it: for a
+// Russian, Chinese or Korean client the real database, table and user are in that script.
 func TestBenchNonLatinScript(t *testing.T) {
 	checkBench(t, []benchCase{
 		{name: "SQL", src: "SELECT сумма FROM продажи_хх.клиенты;\nCREATE TABLE 客户数据 (编号 INT);\nUSE 판매DB;\n",
@@ -292,8 +295,8 @@ func TestBenchNonLatinScript(t *testing.T) {
 	})
 }
 
-// Serviço do Compose é qualquer filho de "services:" com uma chave de serviço da especificação,
-// inclusive o que só herda de uma âncora ("<<: *comum") e não tem imagem própria.
+// A Compose service is any child of "services:" with a service key of the specification, including
+// one that only inherits from an anchor ("<<: *comum") and has no image of its own.
 func TestBenchComposeService(t *testing.T) {
 	checkBench(t, []benchCase{
 		{name: "herança e depends_on", src: "x-comum: &comum\n  restart: always\nservices:\n  api-cobranca-hx:\n    <<: *comum\n" +
@@ -304,11 +307,11 @@ func TestBenchComposeService(t *testing.T) {
 	})
 }
 
-// JSON de dados com rótulos que são frases ("Name do Cliente", como sai de uma planilha): tem a
-// mesma forma de um catálogo de tradução ("Manage Role": "Gestionați Rolul"), e por isso
-// nenhuma regra libera o valor pela forma da chave. Um freio assim existiu e deixava passar o
-// nome da pessoa, o usuário e o servidor; o custo de não tê-lo é o rótulo traduzido de "User"
-// ou "Role" sair mascarado num catálogo em outra escrita.
+// Data JSON with labels that are sentences ("Nome do Cliente", as it comes out of a spreadsheet):
+// it has the same shape as a translation catalog ("Manage Role": "Gestionați Rolul"), and so no
+// rule releases the value by the shape of the key. A brake like that existed and let through the
+// person's name, the user and the server; the cost of not having it is the translated label of
+// "User" or "Role" going out masked in a catalog in another script.
 func TestBenchLabelsInSentence(t *testing.T) {
 	checkBench(t, []benchCase{
 		{name: "registro único", src: "{\n  \"Nome do Cliente\": \"Marilda Quixabeira\",\n  \"Nome da Mãe\": \"Ana Quixabeira\",\n" +
@@ -324,8 +327,8 @@ func TestBenchLabelsInSentence(t *testing.T) {
 	})
 }
 
-// Comando à vista acima da tabela (terminal colado): a listagem de qualquer tipo tipa a coluna
-// de identidade (dags -> dag_id) e o cabeçalho é da ferramenta; SQL no comando não.
+// A command in view above the table (pasted terminal): the listing of any type types the identity
+// column (dags -> dag_id) and the header belongs to the tool; SQL in the command does not.
 func TestBenchCommandInView(t *testing.T) {
 	checkBench(t, []benchCase{
 		{name: "airflow dags list", src: "$ airflow dags list\ndag_id                | owners  | is_paused\n======================+=========+==========\n" +
@@ -336,7 +339,8 @@ func TestBenchCommandInView(t *testing.T) {
 		{name: "SQL no comando: cabeçalho é coluna", src: "$ psql -c \"select cod_sinistro_hx, vlr_pago_hx from apolice_hx\"\n cod_sinistro_hx | vlr_pago_hx\n-----------------+-------------\n 1               | 2\n",
 			maskIt: []string{"cod_sinistro_hx"}},
 		{name: "frase não é comando", src: "Then list the tables below\nname | rows\n-----+-----\nfoo  | 3\n", keep: []string{"foo"}},
-		// só listagem: debaixo de um comando que mostra arquivo ou roda script, o cabeçalho é do dono
+		// only a listing: under a command that shows a file or runs a script, the header belongs to
+		// the owner
 		{name: "cat de CSV: cabeçalho é coluna", src: "$ cat apolices.csv\ncod_apolice_hx,vlr_premio_hx,nome_segurado\n1,2,3\n4,5,6\n7,8,9\n",
 			maskIt: []string{"cod_apolice_hx", "vlr_premio_hx"}},
 		{name: "script: cabeçalho é coluna", src: "$ python relatorio.py\ncod_apolice_hx   vlr_premio_hx   dt_emissao_hx\n1                2               3\n4                5               6\n7                8               9\n",
@@ -344,8 +348,9 @@ func TestBenchCommandInView(t *testing.T) {
 	})
 }
 
-// Traceback: a linha que aponta para dependência ou biblioteca padrão é do fornecedor e fica; a
-// que aponta para o projeto é do cliente (função, módulo, código e o valor citado no erro).
+// Traceback: the line that points to a dependency or the standard library belongs to the vendor and
+// stays; the one that points to the project belongs to the client (function, module, code and the
+// value cited in the error).
 func TestBenchTraceback(t *testing.T) {
 	checkBench(t, []benchCase{
 		{name: "python", src: "Traceback (most recent call last):\n" +
@@ -356,8 +361,8 @@ func TestBenchTraceback(t *testing.T) {
 			"  File \"/usr/lib/python3.11/json/decoder.py\", line 337, in decode\n" +
 			"    obj, end = self.raw_decode(s, idx=_w(s, 0).end())\n" +
 			"KeyError: 'COD_APOLICE_HX'\n",
-			// a linha do pandas fica (função e código); as pastas "pandas/core" do caminho seguem
-			// a regra de caminho de sempre (pandas é palavra de dicionário: não para o leitor)
+			// the pandas line stays (function and code); the "pandas/core" folders of the path
+			// follow the usual path rule (pandas is a dictionary word: it does not stop the reader)
 			keep:   []string{"__getitem__", "get_loc", "raw_decode", "json/decoder.py", "ubuntu"},
 			maskIt: []string{"seguradora-hx", "carga_sinistros_hx", "calcular_premio_hx", "apolice_hx", "premio_liquido", "COD_APOLICE_HX"}},
 		{name: "python: dependência que não é palavra de dicionário fica inteira", src: "Traceback (most recent call last):\n" +
@@ -403,15 +408,16 @@ func TestBenchTraceback(t *testing.T) {
 			"github.com/seguradorahx/faturahx/servico.(*CargaSinistrosHx).Calcular(0x1)\n\t/srv/build/servico/carga.go:7 +0x1d\n" +
 			"net/http.(*conn).serve(0xc0001)\n\t/usr/local/go/src/net/http/server.go:2009 +0x5f4\n",
 			keep: []string{"net/http.(*conn).serve"}, maskIt: []string{"CargaSinistrosHx", "seguradorahx"}},
-		// no cache de módulos, o módulo privado do cliente é do cliente; o público (dono
-		// fornecedor e repositório popular) é do fornecedor
+		// in the module cache, the client's private module belongs to the client; the public one
+		// (vendor owner and popular repository) belongs to the vendor
 		{name: "go: módulo privado no cache", src: "goroutine 1 [running]:\n" +
 			"github.com/seguradora-hx/lib-tarifas-hx/calc.CalcularPremioHx(0x1)\n\t/home/ubuntu/go/pkg/mod/github.com/seguradora-hx/lib-tarifas-hx@v1.2.0/calc/calc.go:12 +0x1d\n",
 			maskIt: []string{"seguradora-hx", "lib-tarifas-hx", "CalcularPremioHx"}},
 		{name: "go: módulo público no cache", src: "goroutine 1 [running]:\n" +
 			"github.com/stretchr/testify/assert.ObjectsAreEqual(0x1)\n\t/home/ubuntu/go/pkg/mod/github.com/stretchr/testify@v1.8.4/assert/assertions.go:65 +0x1d\n" +
 			"golang.org/x/sync/errgroup.(*Group).Go.func1()\n\t/home/ubuntu/go/pkg/mod/golang.org/x/sync@v0.6.0/errgroup/errgroup.go:78 +0x56\n",
-			// ("testify@v1.8.4" no caminho sai como e-mail: é do detector de e-mail, não daqui)
+			// ("testify@v1.8.4" in the path goes out as an e-mail: that is the e-mail detector's,
+			// not this one's)
 			keep: []string{"github.com/stretchr/testify/assert.ObjectsAreEqual", "assert/assertions.go", "errgroup.(*Group).Go"}},
 		{name: "maven: artefato privado no repositório local", src: "lendo /home/ubuntu/.m2/repository/br/com/seguradora-hx/tarifas-hx/1.0/pom.xml\n",
 			maskIt: []string{"seguradora-hx", "tarifas-hx"}},
@@ -423,9 +429,9 @@ func TestBenchTraceback(t *testing.T) {
 	})
 }
 
-// Os freios de prosa e de código do leitor de SQL não podem cortar SQL de verdade: apelido de
-// tabela que é artigo do inglês (an, the, this), SELECT colado ao parêntese e a lista de SET
-// com a coluna qualificada no começo da linha. O construtor de consultas continua fora.
+// The prose and code brakes of the SQL reader cannot cut real SQL: a table alias that is an English
+// article (an, the, this), SELECT glued to the parenthesis and the SET list with the qualified
+// column at the start of the line. The query builder stays out.
 func TestBenchSQLTheBrakesDoNotCut(t *testing.T) {
 	checkBench(t, []benchCase{
 		{name: "apelido an", src: "SELECT an.cod_apolice_hx, an.vlr_hx FROM apolices_hx an WHERE an.dt_emissao_hx > 1 AND an.cd_filial_hx = 2;\n",
@@ -446,8 +452,8 @@ func TestBenchSQLTheBrakesDoNotCut(t *testing.T) {
 	})
 }
 
-// Grupo em domínio invertido: io.<empresa> e dev.<empresa> são da empresa (o domínio .io ou .dev
-// é dela), como com.<empresa>; só o grupo público conhecido fica.
+// Group in a reversed domain: io.<company> and dev.<company> belong to the company (the .io or .dev
+// domain is its own), like com.<company>; only the known public group stays.
 func TestBenchCompanyGroup(t *testing.T) {
 	checkBench(t, []benchCase{
 		{name: "namespace io da empresa", src: "{\"type\": \"record\", \"namespace\": \"io.empresahx.pagamentos\", \"name\": \"PedidoHx\"}\n",

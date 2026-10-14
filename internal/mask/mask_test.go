@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// O memo tem teto e não esquece o que está em uso quando troca de geração.
+// The memo has a ceiling and does not forget what is in use when it switches generations.
 func TestMemoTwoGenerations(t *testing.T) {
 	m := newTest(t)
 	inUse := "texto em uso joao.silva@empresa-ficticia.com.br"
@@ -14,8 +14,8 @@ func TestMemoTwoGenerations(t *testing.T) {
 	k := func() int { m.mu.Lock(); defer m.mu.Unlock(); return len(m.memo) + len(m.stale) }
 	large := strings.Repeat("x", 1<<20)
 	larger := 0
-	for i := 0; i < 300; i++ { // 300 MB de texto distinto
-		m.mu.Lock() // põe direto no memo (detectar 1 MB a cada volta deixaria o teste lento)
+	for i := 0; i < 300; i++ { // 300 MB of distinct text
+		m.mu.Lock() // puts it straight in the memo (detecting 1 MB each round would make the test slow)
 		m.store(sha(fmt.Sprint(i)), result{text: fmt.Sprint(i, large)})
 		m.mu.Unlock()
 		m.Mask(inUse)

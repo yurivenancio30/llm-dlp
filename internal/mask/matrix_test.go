@@ -7,29 +7,29 @@ import (
 	"testing"
 )
 
-// Matriz de cobertura: o mesmo conjunto de nomes internos fictícios escrito em várias
-// linguagens e formatos, nas formas constante, parâmetro nomeado, anotação, chamada de função e
-// linha de comando, mais AWS, GCP e Azure. Roda SEM nada no config (sem domínio interno, sem
-// termos). Meta: pelo menos 90% das ocorrências mascaradas.
+// Coverage matrix: the same set of fictitious internal names written in several languages and
+// formats, in the forms constant, named parameter, annotation, function call and command line, plus
+// AWS, GCP and Azure. Runs WITHOUT anything in the config (no internal domain, no terms). Target:
+// at least 90% of the occurrences masked.
 
-// os nomes (todos fictícios)
+// the names (all fictitious)
 var matrixNames = []string{
 	"pgsrv-vendas-01",       // servidor
 	"vendas_prd",            // banco
 	"tb_pedidos_x9",         // tabela
-	"svc_relatorio_x9",      // usuário
+	"svc_relatorio_x9",      // user
 	"bkt-relatorios-x9",     // bucket
 	"fila-pedidos-x9",       // fila
-	"topico-eventos-x9",     // tópico
+	"topico-eventos-x9",     // topic
 	"ns-pagamentos-x9",      // namespace
-	"svc-cobranca-x9",       // serviço
+	"svc-cobranca-x9",       // service
 	"relatorios_x9",         // pasta (/srv/relatorios_x9)
-	"api-x9.vendas.interno", // domínio interno
-	// ajustes finais: caixa de servidor, placeholder, lista aninhada, host+porta, caminho fora da lista
+	"api-x9.vendas.interno", // internal domain
+	// final adjustments: server case, placeholder, nested list, host+port, path outside the list
 	"sqlprd01", "SQLPRD01", "SqlPrd01", "erpprd01", "pedidos-criados", "pedidos-pagos", "cacheprd01", "Relatorios_x9",
 	// nuvem
 	"proj-vendas-x9", "rg-vendas-x9", "stvendasx9", "sb-vendas-x9", "123456789012",
-	// revisão 68d44da: tópico com ponto
+	// review 68d44da: dotted topic
 	"fin.notas.emitidas",
 }
 
@@ -230,7 +230,8 @@ kafka.topic=fin.notas.emitidas
 `},
 }
 
-// matrixCoverage devolve, por caso, quantas ocorrências dos nomes havia e quantas sobraram.
+// matrixCoverage returns, per case, how many occurrences of the names there were and how many were
+// left.
 func matrixCoverage(t *testing.T) (map[string][2]int, map[string]int) {
 	cov := map[string][2]int{}
 	leftover := map[string]int{}

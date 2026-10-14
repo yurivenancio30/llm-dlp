@@ -15,7 +15,7 @@ func TestLabelClass(t *testing.T) {
 		"religiao": "sensivel", "raca_cor": "sensivel", "orientacao_sexual": "sensivel", "tipo_sanguineo": "sensivel", "user_name": "usuario",
 		"id_cliente": "usuario", "nome_usuario": "usuario",
 		"titulo_eleitor": "doc", "passaporte": "doc", "placa": "doc", "endereco_residencial": "endereco", "CEP": "cep", "num_rg": "rg",
-		// nomes de coisas e campos comuns: nada
+		// names of things and common fields: nothing
 		"NOM_SISTEMA": "", "table_name": "", "nome": "nomesolto", "name": "nomesolto", "Cliente": "nomecompleto", "CPF/CNPJ": "cpf", "NOM_CATEGORIA": "", "schema_name": "", "TABLE_NAME": "", "user": "",
 		"owner": "nomecompleto", "Data Steward": "nomecompleto", "nome_coluna": "", "tipo_usuario": "", "role_name": "", "file_name": "", "display_name": "", "hostname": "",
 		"database_name": "", "status": "", "id": "", "tool_name": "", "model_name": "", "ip_address": "", "email_address": "",
@@ -56,9 +56,9 @@ func TestLabeledFields(t *testing.T) {
 			}
 		}
 	}
-	// o que NÃO é sensível fica como está (valores, nomes de sistema). Names de coluna de
-	// cabeçalho, schema/tabela de catálogo e "table_name" são nomes de recursos e são
-	// mascarados de propósito (ver TestLayoutMasksResources).
+	// what is NOT sensitive stays as it is (values, system names). Header column names, catalog
+	// schema/table and "table_name" are resource names and are masked on purpose (see
+	// TestLayoutMasksResources).
 	stays := map[string][]string{
 		"NOM_SISTEMA;COD_USU_OWNER;NOM_OWNER\nSISTEMA_X;B123456;Carlos Eduardo Nunes\n": {"SISTEMA_X"},
 		"NOM_CLIENTE,NUM_CPF,VL_SALDO\nMaria Aparecida Lopes,52998224725,10.50\n":       {"10.50"},
@@ -77,8 +77,8 @@ func TestLabeledFields(t *testing.T) {
 	}
 }
 
-// Name achado pelo rótulo entra no registro: depois é reconhecido solto, em outra grafia,
-// e a ida e volta devolve o que foi escrito.
+// A name found by the label enters the registry: later it is recognized loose, in another spelling,
+// and the round trip returns what was written.
 func TestFieldNameBecomesKnownPerson(t *testing.T) {
 	m := newTest(t)
 	m.Mask("NOM_CLIENTE;SALDO\nMaria Aparecida Lopes;10\n")
@@ -89,29 +89,28 @@ func TestFieldNameBecomesKnownPerson(t *testing.T) {
 	if back := NewTable(ents).Unmask(out, false); !strings.Contains(back, "MARIA APARECIDA LOPES") {
 		t.Fatalf("duas grafias do mesmo nome não voltaram: %s", back)
 	}
-	// código aprendido pelo campo: reconhecido solto, em qualquer caixa
+	// a code learned by the field: recognized loose, in any case
 	m.Mask("COD_USU_OWNER=B123456")
 	if out, _ := m.Mask("o usuário b123456 e B123456 travaram"); strings.Contains(strings.ToUpper(out), "B123456") {
 		t.Fatalf("código aprendido passou solto: %s", out)
 	}
 }
 
-// Código de usuário de pessoa importada: reconhecido em qualquer lugar, com o mesmo id do nome.
+// User code of an imported person: recognized anywhere, with the same id as the name.
 func TestImportedPersonCode(t *testing.T) {
-	m := newTest(t) // importa "João Carlos Silva" com o código U1001
+	m := newTest(t) // imports "João Carlos Silva" with the code U1001
 	out, _ := m.Mask("o usuário U1001 (JOAO CARLOS SILVA) abriu o chamado")
 	if strings.Contains(out, "U1001") {
 		t.Fatalf("código importado passou: %s", out)
 	}
 	i := strings.Index(out, "USUARIO-")
-	if i < 0 || !strings.Contains(strings.ToLower(out), "pessoa "+out[i+8:i+16]) { // o nome em maiúsculas: PESSOA ID
+	if i < 0 || !strings.Contains(strings.ToLower(out), "pessoa "+out[i+8:i+16]) { // the name in uppercase: PESSOA ID
 		t.Errorf("código e nome da mesma pessoa sem o mesmo id: %s", out)
 	}
 }
 
-// O detector por nome de campo tem que valer para qualquer origem: vários formatos de
-// arquivo e várias convenções de nome (português, inglês, camelCase, abreviações). Todos os
-// dados aqui são fictícios.
+// The detector by field name has to work for any origin: several file formats and several naming
+// conventions (Portuguese, English, camelCase, abbreviations). All data here is fictitious.
 func TestGenericFormats(t *testing.T) {
 	cpf := strings.NewReplacer(".", "", "-", "").Replace(genCPF("529982247"))
 	cases := []struct {
@@ -148,7 +147,7 @@ func TestGenericFormats(t *testing.T) {
 		{"SQL INSERT lido pelo Claude Code (número de linha)", "1\t-- dump\n2\tINSERT INTO clientes (id, nome_cliente, num_cpf, dt_nascimento) VALUES\n3\t(1, 'Maria Aparecida Lopes', '" + cpf + "', '1998-04-13'),\n4\t(2, 'Jose Antonio Reis', '" + cpf + "', '1984-08-17');\n", []string{"Maria Aparecida Lopes", "Jose Antonio Reis", cpf, "1998-04-13", "1984-08-17"}},
 		{"linhas coladas sem cabeçalho, com CPF", "Maria Aparecida Lopes | " + genCPF("529982247") + " | maria.3@gmail.com\nJose Antonio Reis | " + genCPF("529982247") + " | jose.4@gmail.com\n", []string{"Maria Aparecida Lopes", "Jose Antonio Reis"}},
 		{"dado pessoal sensível em tabela", "paciente\ttipo_sanguineo\tdeficiencia\nMarcos Vinicius Paz\tAB-\tauditiva\n", []string{"Marcos Vinicius Paz", "AB-", "auditiva"}},
-		// "nome" sozinho num registro chave-valor com outro campo de pessoa, como na tabela
+		// "nome" alone in a key-value record with another person field, as in the table
 		{"campo 'nome' em JSON com cpf no mesmo registro", "{\n  \"nome\": \"Fabio Augusto Leme\",\n  \"cpf\": \"" + cpf + "\"\n}", []string{"Fabio Augusto Leme", cpf}},
 		{"idem, JSON minificado numa lista", `[{"id":1,"nome":"Fabio Augusto Leme","documento":"` + cpf + `"}]`, []string{"Fabio Augusto Leme", cpf}},
 		{"idem, dict do Python", "{'nome': 'Fabio Augusto Leme', 'cpf': '" + cpf + "'}", []string{"Fabio Augusto Leme", cpf}},
@@ -163,28 +162,28 @@ func TestGenericFormats(t *testing.T) {
 			}
 		}
 	}
-	// O que não é dado de pessoa fica como está, em qualquer formato.
+	// What is not personal data stays as it is, in any format.
 	intact := []string{
 		"name,type,size\nreport.pdf,file,1024\nimages,dir,4096\n",
 		`{"name": "build", "steps": [{"name": "Run tests", "run": "go test ./..."}]}`,
 		"name: Deploy to Production\non: push\njobs:\n  build:\n    name: Build and Test\n",
 		"| Sistema | Status | Dono do processo |\n|---|---|---|\n| SIS_A | ativo | TI |\n",
 		"<produto><nome>CDB Liquidez</nome><tipo>renda fixa</tipo></produto>",
-		"{\n  \"nome\": \"Plano Ouro Anual\",\n  \"preco\": 10\n}", // "nome" sem outro campo de pessoa no registro
+		"{\n  \"nome\": \"Plano Ouro Anual\",\n  \"preco\": 10\n}", // "nome" without another person field in the record
 		"func login(user string) error { return nil } // login: ver docs",
 		"cliente = buscar_cliente(id)\nresponsavel = None\n",
-		// listas de colunas em SQL e em texto não são cabeçalho de tabela
+		// lists of columns in SQL and in text are not table headers
 		"select start_time, user_name, role_name, query_type\nfrom account_usage.query_history\nwhere user_name, ROLE_NAME, QUERY_TYPE\n",
 		"select\n    start_time,\n    user_name,\n    role_name,\n    WAREHOUSE_NAME,\n    QUERY_TYPE\nfrom t\n",
 		"start_time, user_name, role_name,\nQUERY_TYPE, WAREHOUSE_NAME, DATABASE_NAME,\n",
 		"`user_id`, `user_name`, `role_name`\n`REQUEST_ID`, `USER_TAGS`, `TOKENS`\n",
 		"group by user_name, role_name\norder by total_elapsed, QUERY_TYPE\n",
-		// linha de dados de uma tabela não vira cabeçalho, mesmo com nome de campo numa célula
-		// data numa coluna de documento não é documento
+		// a data line of a table does not become a header, even with a field name in a cell; a date
+		// in a document column is not a document
 		"cep,cidade\n2026-10-03,Belo Horizonte\n",
 		"num_cpf: 2026-10-03T12:30:00",
 		"telefone;obs\n12:30:00;ok\n",
-		"   produto  preco   estoque\n0      CDB  10.50       100\n1      LCI   7.00        50\n", // planilha sem coluna de pessoa
+		"   produto  preco   estoque\n0      CDB  10.50       100\n1      LCI   7.00        50\n", // spreadsheet without a person column
 		"NAME          STATUS    AGE\nmysql-0       Running   3d\nredis-0       Running   9d\n",   // kubectl get pods
 		"('id', 'produto')\n(1, 'CDB')\n",
 		"total  used  free\n  16G    8G    8G\n",
@@ -196,7 +195,8 @@ func TestGenericFormats(t *testing.T) {
 	}
 }
 
-// O vocabulário de nomes de campo é extensível pelo config, e os quase identificadores são opcionais.
+// The field name vocabulary is extensible through the config, and the quasi-identifiers are
+// optional.
 func TestExtraAndOptionalFields(t *testing.T) {
 	cfg := config.Default()
 	cfg.ExtraFields = []config.ExtraField{{Type: "usuario", Words: []string{"RE", "num_chapa_func"}}, {Type: "pessoa", Words: []string{"cooperado"}}}
@@ -224,7 +224,7 @@ func TestExtraAndOptionalFields(t *testing.T) {
 	}
 }
 
-// Item 3 (revisão externa): nomes de coluna de documento genéricos.
+// Item 3 (external review): generic document column names.
 func TestDocumentLabels(t *testing.T) {
 	for _, r := range []string{"document", "documento", "userDocument", "user_document", "num_documento", "tax_id", "taxpayer", "taxpayer_id", "nr_documento_cliente", "CPF_CNPJ"} {
 		if labelClass(r) == "" {
@@ -238,14 +238,13 @@ func TestDocumentLabels(t *testing.T) {
 	}
 }
 
-// O desenho mascara nomes de recursos (tabela, coluna de cabeçalho, schema de catálogo) de
-// propósito. Nesses textos, o que sai mascarado tem que ser só pseudônimo de objeto: nenhum
-// detector de dado pessoal pode disparar.
+// The design masks resource names (table, header column, catalog schema) on purpose. In these
+// texts, what goes out masked has to be only object pseudonyms: no personal data detector may fire.
 func TestLayoutMasksResources(t *testing.T) {
 	for _, s := range []string{
 		"table_name;row_count\nTB_CLIENTE;1500\nTB_CONTA;90\n",
 		"INSERT INTO produtos (id, nome_produto, preco) VALUES (1, 'CDB Liquidez Diaria', 10.5);",
-		"SELECT nome_cliente, cpf FROM clientes WHERE dt_nascimento > '1990-01-01'", // nomes de coluna numa consulta
+		"SELECT nome_cliente, cpf FROM clientes WHERE dt_nascimento > '1990-01-01'", // column names in a query
 		"| Column | Data Type | Description |\n|---|---|---|\n| REQUEST_ID | VARCHAR | id |\n| USER_ID | NUMBER | Identifier of the user |\n| USER_NAME | VARCHAR | Name of the user |\n| USAGE_TIME | TIMESTAMP | when |\n",
 		"coluna;tipo;descricao\nNOM_CLIENTE;VARCHAR;nome\nNUM_CPF;VARCHAR;documento\nVL_SALDO;NUMBER;saldo\n",
 		"NOM_SISTEMA;COD_USU_OWNER;NOM_OWNER\nSISTEMA_X;x;y\n",

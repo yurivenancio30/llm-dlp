@@ -2,29 +2,27 @@ package mask
 
 import "strings"
 
-// Leitores de código: iguais para qualquer linguagem. Não leem a
-// gramática de uma linguagem; leem a estrutura comum a todas: um texto entre aspas ao lado de
-// um nome. Se o nome contém uma palavra de tipo (host, db, table, queue, topic, bucket,
-// namespace, user...) em qualquer estilo (DB_HOST, queueName, queue_name, QueueName, topics,
-// groupId), o texto entre aspas é desse tipo. O nome da variável, da função ou da classe nunca
-// é mascarado: só o valor entre aspas.
+// Code readers: the same for any language. They do not read the grammar of a language; they read
+// the structure common to all of them: a quoted text next to a name. If the name contains a type
+// word (host, db, table, queue, topic, bucket, namespace, user...) in any style (DB_HOST,
+// queueName, queue_name, QueueName, topics, groupId), the quoted text is of that type. The name of
+// the variable, function or class is never masked: only the quoted value.
 //
-// 9. o nome ao lado diz o tipo:
-//	atribuição e constante   DB_HOST = "x"   const dbHost = "x"   #define DB_HOST "x"
+// 9. the name next to it gives the type:
+//	assignment and constant  DB_HOST = "x"   const dbHost = "x"   #define DB_HOST "x"
 //	                         static final String DB_HOST = "x";   val/let/var x = "x"
-//	parâmetro nomeado        connect(host="x")   f(host: "x")   new X { Namespace = "x" }
-//	chave de dicionário      {"host": "x"}   { host: 'x' }   'queue' => 'x'   config["Kafka:Topic"] = "x"
-//	anotação/decorator       @Table(name = "x")   @KafkaListener(topics = "x")   [Table("x", Schema = "x")]
-//	chave e valor em chamada setProperty("user", "x")   define('DB_HOST', 'x')   getenv("BUCKET", "x")
-//	default de ambiente      process.env.DB_HOST || 'x'   os.getenv("X") or "x"
-//	valor embrulhado         Bucket: aws.String("x")
+//	named parameter          connect(host="x")   f(host: "x")   new X { Namespace = "x" }
+//	dictionary key           {"host": "x"}   { host: 'x' }   'queue' => 'x'   config["Kafka:Topic"] = "x"
+//	annotation/decorator     @Table(name = "x")   @KafkaListener(topics = "x")   [Table("x", Schema = "x")]
+//	key and value in a call  setProperty("user", "x")   define('DB_HOST', 'x')   getenv("BUCKET", "x")
+//	environment default      process.env.DB_HOST || 'x'   os.getenv("X") or "x"
+//	wrapped value            Bucket: aws.String("x")
 //
-// 10. a função chamada diz o tipo: o texto entre aspas passado a uma chamada ou construtor
-// cujo nome contém a palavra de tipo (assertQueue("x"), new QueueClient(c, "x"),
-// getQueueUrl("x"), createBucket("x"), bucket("x"), Table("x"), inNamespace("x"),
-// subscribe(["x"])).
+// 10. the called function gives the type: the quoted text passed to a call or constructor
+// whose name contains the type word (assertQueue("x"), new QueueClient(c, "x"), getQueueUrl("x"),
+// createBucket("x"), bucket("x"), Table("x"), inNamespace("x"), subscribe(["x"])).
 
-// literal: um texto entre aspas na mesma linha. Devolve o fim (aspa de fechamento) ou -1.
+// literal: a quoted text on the same line. Returns the end (closing quote) or -1.
 func literal(s string, i int) int {
 	q := s[i]
 	lim := min(len(s), i+1+300)
@@ -43,7 +41,7 @@ func literal(s string, i int) int {
 
 func isQuote(c byte) bool { return c == '"' || c == '\'' || c == '`' }
 
-// beforeBlank: a posição do último caractere antes de i que não é espaço (ou -1).
+// beforeBlank: the position of the last character before i that is not a space (or -1).
 func beforeBlank(s string, i int) int {
 	k := i - 1
 	for k >= 0 && (s[k] == ' ' || s[k] == '\t') {
@@ -52,8 +50,8 @@ func beforeBlank(s string, i int) int {
 	return k
 }
 
-// identBefore: o identificador que termina em s[k] (inclusive): letras, dígitos, _ $ .
-// Devolve o início e o último pedaço depois de "." ou "->" (self.table_name -> table_name).
+// identBefore: the identifier that ends at s[k] (inclusive): letters, digits, _ $ . Returns the
+// start and the last piece after "." or "->" (self.table_name -> table_name).
 func identBefore(s string, k int) (ini int, lastPos string) {
 	a := k
 	for a >= 0 && (isAlnum(s[a]) || s[a] == '_' || s[a] == '$' || s[a] == '.' || s[a] == '>' && a > 0 && s[a-1] == '-' || s[a] == '-' && a+1 <= k && s[a+1] == '>') {
@@ -66,9 +64,9 @@ func identBefore(s string, k int) (ini int, lastPos string) {
 	return a + 1, strings.TrimLeft(name, "$")
 }
 
-// nameBefore: o nome que fica à esquerda de um operador que termina em s[k]: um identificador,
-// um texto entre aspas ('queue' =>, "host":), um índice (config["Kafka:Topic"]) ou um
-// símbolo do Ruby (:host =>). Pula a anotação de tipo ("NAME: str =", "x: String =").
+// nameBefore: the name to the left of an operator that ends at s[k]: an identifier, a quoted text
+// ('queue' =>, "host":), an index (config["Kafka:Topic"]) or a Ruby symbol (:host =>). Skips the
+// type annotation ("NAME: str =", "x: String =").
 func nameBefore(s string, k int) string {
 	k = beforeBlank(s, k+1)
 	if k < 0 {
@@ -99,7 +97,7 @@ func nameBefore(s string, k int) string {
 		return ""
 	case isAlnum(s[k]) || s[k] == '_':
 		a, name := identBefore(s, k)
-		// "NAME: str =": o tipo está à direita do ":"; o nome vem antes
+		// "NAME: str =": the type is to the right of the ":"; the name comes before
 		if typeWords[strings.ToLower(name)] || commonType(name) {
 			if p := beforeBlank(s, a); p >= 0 && s[p] == ':' {
 				if _, n2 := identBefore(s, beforeBlank(s, p)); n2 != "" {
@@ -112,13 +110,13 @@ func nameBefore(s string, k int) string {
 	return ""
 }
 
-// markedValue: em código, só ensina sozinho o valor com dígito, "_" ou "." (pgsrv-01, vendas_prd,
-// db.interno); "payments-api" é mascarado no lugar e só é aprendido se aparecer em duas regras
-// (duas palavras com hífen aparecem demais em código público).
+// markedValue: in code, only a value with a digit, "_" or "." teaches by itself (pgsrv-01,
+// vendas_prd, db.interno); "payments-api" is masked in place and is only learned if it appears in
+// two rules (two words with a hyphen appear too often in public code).
 func markedValue(v string) bool { return strings.ContainsAny(v, "0123456789_.") }
 
-// ambiguousInCode: o último pedaço do nome é uma palavra de tipo que, em código, quase sempre
-// quer dizer outra coisa: stream (fluxo de entrada e saída), subject (assunto de e-mail)
+// ambiguousInCode: the last piece of the name is a type word that, in code, almost always means
+// something else: stream (input and output stream), subject (e-mail subject)
 func ambiguousInCode(name string) bool {
 	switch strings.ToLower(lastPiece(name)) {
 	case "stream", "streams", "subject", "subjects":
@@ -127,12 +125,12 @@ func ambiguousInCode(name string) bool {
 	return false
 }
 
-// embrulho: funções que só embrulham o valor (aws.String("x"), to.Ptr("x"), Optional.of("x"))
+// wrapper: functions that only wrap the value (aws.String("x"), to.Ptr("x"), Optional.of("x"))
 var wrapper = setOf("string", "str", "ptr", "toptr", "stringptr", "pointer", "some", "of", "value", "valueof",
 	"stringvalue", "new", "text", "s")
 
-// shapedKey: uma chave entre aspas que é um nome ("host", "Kafka:Topic", "db.host"), e não
-// uma URL ou uma frase
+// shapedKey: a quoted key that is a name ("host", "Kafka:Topic", "db.host"), and not a URL or a
+// sentence
 func shapedKey(v string) bool {
 	if v == "" || len(v) > 80 || strings.Contains(v, "//") || !(letterD(v[0]) || v[0] == '_') {
 		return false
@@ -145,8 +143,8 @@ func shapedKey(v string) bool {
 	return true
 }
 
-// commonType: nomes de tipo que aparecem entre o nome e o "=" ("String x =" fica com x, mas
-// "x: String =" precisa pular "String").
+// commonType: type names that appear between the name and the "=" ("String x =" stays with x, but
+// "x: String =" needs to skip "String").
 func commonType(v string) bool {
 	switch v {
 	case "String", "str", "string", "Str", "&str", "text", "Text", "char", "Optional", "Any", "any":
@@ -160,7 +158,7 @@ func findCodeName(s string, add func(ObjFinding)) {
 		return
 	}
 	for i := 0; i < len(s); i++ {
-		// crase: em prosa (markdown) marca código, não um valor
+		// backtick: in prose (markdown) it marks code, not a value
 		if s[i] != '"' && s[i] != '\'' {
 			continue
 		}
@@ -174,7 +172,7 @@ func findCodeName(s string, add func(ObjFinding)) {
 			continue
 		}
 		k := beforeBlank(s, a-1)
-		// prefixo de literal: r"", f"", b"", u"", @"" (C#)
+		// literal prefix: r"", f"", b"", u"", @"" (C#)
 		if k >= 0 && strings.IndexByte("rRfFbBuU@", s[k]) >= 0 && k == a-2 && (k == 0 || !isAlnum(s[k-1])) {
 			k = beforeBlank(s, k)
 		}
@@ -193,7 +191,7 @@ func findCodeName(s string, add func(ObjFinding)) {
 			name = nameBefore(s, p)
 		case c == ':' && (k == 0 || s[k-1] != ':') && (k+1 >= len(s) || s[k+1] != ':'):
 			name = nameBefore(s, k-1)
-			// "? 'x' : 'y'" (operador ternário) não é chave
+			// "? 'x' : 'y'" (ternary operator) is not a key
 			if p := beforeBlank(s, k); p >= 0 && isQuote(s[p]) {
 				a := max(0, p-lineWindow)
 				if o := strings.LastIndexByte(s[a:p], s[p]); o >= 0 {
@@ -203,7 +201,7 @@ func findCodeName(s string, add func(ObjFinding)) {
 				}
 			}
 		case c == ',':
-			// chave e valor em chamada: f("KEY", "v")
+			// key and value in a call: f("KEY", "v")
 			p := beforeBlank(s, k)
 			if p >= 0 && isQuote(s[p]) {
 				q := strings.LastIndexByte(s[max(0, p-120):p], s[p])
@@ -219,7 +217,7 @@ func findCodeName(s string, add func(ObjFinding)) {
 		case c == 'r' && k >= 1 && s[k-1] == 'o' && (k < 2 || !isAlnum(s[k-2])): // "... or 'v'"
 			name = defaultName(s, k-2)
 		case c == '(':
-			// valor embrulhado: KEY: fn("v") / KEY = fn("v") com um argumento só
+			// wrapped value: KEY: fn("v") / KEY = fn("v") with a single argument
 			r := b + 1
 			for r < len(s) && (s[r] == ' ' || s[r] == '\t') {
 				r++
@@ -245,7 +243,7 @@ func findCodeName(s string, add func(ObjFinding)) {
 		}
 		ent, strong := entKey(name)
 		if ent == "" && (name == "name" || name == "value" || name == "names") {
-			// @Table(name = "x"), Queue(name="x"): o tipo vem de quem é chamado
+			// @Table(name = "x"), Queue(name="x"): the type comes from who is called
 			if f := enclosingCall(s, k); f != "" {
 				ent, strong = entFunc(f), true
 			}
@@ -257,8 +255,8 @@ func findCodeName(s string, add func(ObjFinding)) {
 	}
 }
 
-// Default de placeholder: ${NOME:valor} (Spring, Micronaut), ${NOME:-valor} e ${NOME-valor}
-// (shell, docker-compose). O nome da variável diz o tipo do valor, como em "NOME = valor".
+// Placeholder default: ${NAME:value} (Spring, Micronaut), ${NAME:-value} and ${NAME-value} (shell,
+// docker-compose). The variable name gives the type of the value, as in "NAME = value".
 func findPlaceholder(s string, add func(ObjFinding)) {
 	for i := strings.Index(s, "${"); i >= 0; {
 		a := i + 2
@@ -272,7 +270,7 @@ func findPlaceholder(s string, add func(ObjFinding)) {
 				v++
 			}
 			end := strings.IndexByte(s[v:min(len(s), v+300)], '}')
-			if end > 0 && !strings.Contains(s[v:v+end], "://") { // URL: fica com o leitor de URL
+			if end > 0 && !strings.Contains(s[v:v+end], "://") { // URL: stays with the URL reader
 				if ent, strong := entKey(s[a:b]); ent != "" {
 					markValue(s, v, v+end, ent, "placeholder", strong, add)
 				}
@@ -286,7 +284,8 @@ func findPlaceholder(s string, add func(ObjFinding)) {
 	}
 }
 
-// defaultPlaceholder: s[k] é o ":" (ou o "-" de ":-") que separa o nome do default em ${NOME:...}.
+// defaultPlaceholder: s[k] is the ":" (or the "-" of ":-") that separates the name from the default
+// in ${NAME:...}.
 func defaultPlaceholder(s string, k int) bool {
 	if k > 0 && s[k] == '-' && s[k-1] == ':' {
 		k--
@@ -304,8 +303,8 @@ func defaultPlaceholder(s string, k int) bool {
 	return k > a
 }
 
-// enclosingCall: o nome da função, construtor ou anotação cujo "(" ainda está aberto
-// antes de s[k] (na mesma instrução, até 300 bytes atrás).
+// enclosingCall: the name of the function, constructor or annotation whose "(" is still open before
+// s[k] (in the same statement, up to 300 bytes back).
 func enclosingCall(s string, k int) string {
 	depth := 0
 	for i := k; i >= 0 && i > k-300; i-- {
@@ -318,7 +317,7 @@ func enclosingCall(s string, k int) string {
 					return ""
 				}
 				p := beforeBlank(s, i)
-				if s[i] == '[' { // [Table("x", Schema = "y")] do C#: o nome vem depois do "["
+				if s[i] == '[' { // C#'s [Table("x", Schema = "y")]: the name comes after the "["
 					e := i + 1
 					for e < len(s) && (isAlnum(s[e]) || s[e] == '_') {
 						e++
@@ -341,13 +340,13 @@ func enclosingCall(s string, k int) string {
 	return ""
 }
 
-// palavras do nome de uma função que recebe (chave, valor): setProperty, define, getenv,
+// words of the name of a function that receives (key, value): setProperty, define, getenv,
 // os.environ.get, ENV.fetch, getOrDefault, Setenv, put, config.set...
 var keyValueFunc = setOf("set", "put", "define", "getenv", "env", "environ", "get", "fetch", "default",
 	"property", "properties", "setting", "settings", "config", "option", "options", "param", "attr", "setenv",
 	"header", "add", "with", "or")
 
-// keyValueCall: o "(" em s[i] abre a chamada de uma função de (chave, valor)?
+// keyValueCall: does the "(" at s[i] open the call of a (key, value) function?
 func keyValueCall(s string, i int) bool {
 	k := beforeBlank(s, i)
 	if k < 0 || !(isAlnum(s[k]) || s[k] == '_') {
@@ -368,7 +367,7 @@ func keyValueCall(s string, i int) bool {
 	return false
 }
 
-// defaultName: o nome da variável de ambiente antes de "||", "??" ou "or" (process.env.X,
+// defaultName: the name of the environment variable before "||", "??" or "or" (process.env.X,
 // os.getenv("X"), ENV["X"]).
 func defaultName(s string, k int) string {
 	k = beforeBlank(s, k+1)
@@ -394,21 +393,22 @@ func defaultName(s string, k int) string {
 	return ""
 }
 
-// palavras do fim do nome de uma função que não dizem o tipo ("getQueueUrl", "QueueClient")
+// words at the end of a function name that do not give the type ("getQueueUrl", "QueueClient")
 var funcTail = setOf("client", "url", "uri", "name", "names", "id", "arn", "by", "get", "set", "put", "info", "exists",
 	"async", "sync", "request", "input", "command", "builder", "new", "create", "delete", "list", "of", "for", "from",
 	"with", "to", "record", "options", "config", "attributes", "properties", "service", "ref", "reference", "handle")
 
-// palavras de tipo que, no nome de uma FUNÇÃO, não dizem o tipo do argumento: ParseAddr("::1")
-// recebe um endereço IP, mo.group("x") é grupo de regex, serviceOf/userOf recebem outra coisa
+// type words that, in the name of a FUNCTION, do not give the type of the argument:
+// ParseAddr("::1") receives an IP address, mo.group("x") is a regex group, serviceOf/userOf receive
+// something else
 var notFuncType = setOf("service", "app", "application", "user", "login", "addr", "address", "group", "instance",
 	"stream", "subject", "exchange", "catalog", "principal", "endpoint", "fqdn", "consumergroup")
 
-// verbos de mensageria: o primeiro texto entre aspas é uma fila ou tópico
+// messaging verbs: the first quoted text is a queue or topic
 var queueVerbs = setOf("subscribe", "publish", "consume", "produce", "producer", "consumer", "unsubscribe")
 
-// entFunc: o tipo que o nome da função indica (do último pedaço para o primeiro, pulando os
-// que não dizem o tipo).
+// entFunc: the type the function name indicates (from the last piece to the first, skipping those
+// that do not give the type).
 func entFunc(name string) string {
 	var ps [16][2]int
 	n, ok := keyPieces(name, &ps)
@@ -438,13 +438,13 @@ func entFunc(name string) string {
 	return ""
 }
 
-// construtores de lista: o texto dentro deles conta como argumento da chamada de fora
+// list constructors: the text inside them counts as an argument of the outer call
 // (subscribe(List.of("x")), Arrays.asList("x"), listOf("x"), []string{"x"}, new String[]{"x"})
 var listConstructor = setOf("of", "aslist", "listof", "setof", "arrayof", "mutablelistof", "singletonlist", "singleton",
 	"list", "tuple", "set", "frozenset", "array", "vec")
 
-// palavras do nome de uma chamada de conexão: o texto seguido de um número de porta é o
-// servidor ($redis->connect('cache01', 6379), redis.Redis("cache01", 6379), net.Dial(...))
+// words of the name of a connection call: the text followed by a port number is the server
+// ($redis->connect('cache01', 6379), redis.Redis("cache01", 6379), net.Dial(...))
 var connectionWords = setOf("connect", "connection", "conn", "dial", "open", "client", "socket", "session", "pool",
 	"link", "redis", "mongo", "connector", "strictredis")
 
@@ -456,7 +456,7 @@ func findCodeCall(s string, add func(ObjFinding)) {
 		if s[i] != '(' {
 			continue
 		}
-		// em código o nome vem colado no "(": "namespace (for x)" é prosa
+		// in code the name comes glued to the "(": "namespace (for x)" is prose
 		k := i - 1
 		if k < 0 || !(isAlnum(s[k]) || s[k] == '_') {
 			continue
@@ -470,9 +470,9 @@ func findCodeCall(s string, add func(ObjFinding)) {
 		if ent == "" && !conn {
 			continue
 		}
-		// argumentos de primeiro nível, e dentro de listas ([..] e construtores de lista), até o
-		// ")" correspondente
-		var levels []bool // cada nível aberto: é lista?
+		// top-level arguments, and inside lists ([..] and list constructors), up to the matching
+		// ")"
+		var levels []bool // each open level: is it a list?
 		allList := func() bool {
 			for _, l := range levels {
 				if !l {
@@ -511,7 +511,7 @@ func findCodeCall(s string, add func(ObjFinding)) {
 					continue
 				}
 				if allList() {
-					// "nome: 'v'" / "nome = 'v'" dentro da chamada é parâmetro nomeado
+					// "name: 'v'" / "name = 'v'" inside the call is a named parameter
 					if p := beforeBlank(s, j); p >= 0 && (s[p] == ':' || s[p] == '=') {
 						j = e
 						continue
@@ -529,7 +529,7 @@ func findCodeCall(s string, add func(ObjFinding)) {
 	}
 }
 
-// followedByPort: depois de s[i] vem ", <número de porta>" e o fim do argumento.
+// followedByPort: after s[i] comes ", <port number>" and the end of the argument.
 func followedByPort(s string, i int) bool {
 	for i < len(s) && (s[i] == ' ' || s[i] == '\t') {
 		i++
@@ -554,7 +554,7 @@ func followedByPort(s string, i int) bool {
 	return i < len(s) && (s[i] == ',' || s[i] == ')')
 }
 
-// hasWord: algum pedaço do nome (camelCase, _, .) está em ws.
+// hasWord: some piece of the name (camelCase, _, .) is in ws.
 func hasWord(name string, ws map[string]bool) bool {
 	var ps [16][2]int
 	n, ok := keyPieces(name, &ps)

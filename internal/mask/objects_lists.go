@@ -5,22 +5,22 @@ import (
 	"strings"
 )
 
-// Listas homogêneas (ver docs/pt-BR/structures.md, seção Saídas soltas de script e de shell): numa
-// lista de nomes, se pelo menos metade dos itens já são nomes de um mesmo tipo (aprendidos
-// antes ou achados pelos leitores neste texto), os outros itens com cara de identificador são
-// do mesmo tipo. Não é um leitor: depende do que já se sabe, e por isso roda depois dos
-// leitores, como a propagação. As formas de lista são só de formato:
-//   - coluna solta: um item por linha (com marcador "- ", "* " e aspas/vírgula no fim);
-//   - contagem + valor ("   12 t_x" de sort | uniq -c, "t_x    12" de value_counts);
-//   - linha decorada de laço ("== t_x ==", "--- t_x", "## t_x"), agrupada pela decoração;
-//   - lista entre vírgulas numa linha, com ou sem aspas e colchetes (json.dumps, print).
-// E o nome qualificado em que uma parte já é conhecida: "fin.<x>" com fin aprendido como
-// schema faz de <x> uma tabela.
+// Homogeneous lists (see docs/structures.md, section Loose script and shell outputs): in a list of
+// names, if at least half of the items are already names of the same type (learned before or found
+// by the readers in this text), the other identifier-shaped items are of the same type. It is not a
+// reader: it depends on what is already known, and so it runs after the readers, like propagation.
+// The list forms are format only:
+//   - loose column: one item per line (with a "- ", "* " marker and quotes/comma at the end);
+//   - count + value ("   12 t_x" from sort | uniq -c, "t_x    12" from value_counts);
+//   - decorated loop line ("== t_x ==", "--- t_x", "## t_x"), grouped by the decoration;
+//   - comma-separated list on a line, with or without quotes and brackets (json.dumps, print).
+// And the qualified name in which one part is already known: "fin.<x>" with fin learned as a schema
+// makes <x> a table.
 
 const minList = 3
 
 var (
-	// item de lista: identificador, talvez qualificado (sem espaço)
+	// list item: an identifier, maybe qualified (without spaces)
 	reListItem      = `["'\x60]?[A-Za-z_][\w$#\-]*(?:\.[A-Za-z_][\w$#\-]*){0,2}["'\x60]?`
 	reItemLine      = regexp.MustCompile(`^[ \t]*(?:[-*•][ \t]+)?(` + reListItem + `)[ \t]*[,;]?[ \t]*$`)
 	reLeftContLine  = regexp.MustCompile(`^[ \t]*\d+[ \t]+(` + reListItem + `)[ \t]*$`)
@@ -29,7 +29,7 @@ var (
 	reWholeItem     = regexp.MustCompile(`^` + reListItem + `$`)
 )
 
-// listItem: o nome de um item (sem aspas), nas posições de s.
+// listItem: the name of an item (without quotes), at positions of s.
 func listItem(s string, a, b int) cell {
 	for a < b && (s[a] == '"' || s[a] == '\'' || s[a] == '`') {
 		a++
@@ -40,7 +40,7 @@ func listItem(s string, a, b int) cell {
 	return cell{a, b}
 }
 
-// listsIn: os grupos de itens de s nas formas acima.
+// listsIn: the groups of items of s in the forms above.
 func listsIn(s string) [][]cell {
 	var groups [][]cell
 	var race []cell
@@ -55,7 +55,7 @@ func listsIn(s string) [][]cell {
 	var decorOrder []string
 	for _, l := range wrapLines(s) {
 		line := s[l[0]:l[1]]
-		if len(line) > 260 || words(line) > 3 { // nenhuma das formas tem mais de 3 palavras
+		if len(line) > 260 || words(line) > 3 { // none of the forms has more than 3 words
 			closeIt()
 			continue
 		}
@@ -101,8 +101,8 @@ func listsIn(s string) [][]cell {
 	return groups
 }
 
-// commaLists: as listas entre vírgulas da linha [a, b): itens inteiros entre as vírgulas; o
-// primeiro pode vir depois de um rótulo ("carregadas: a, b, c") e o último antes de um fecho.
+// commaLists: the comma-separated lists of line [a, b): whole items between the commas; the first
+// may come after a label ("carregadas: a, b, c") and the last before a closing.
 func commaLists(s string, a, b int) [][]cell {
 	var sgms []cell
 	for i := a; i <= b; i++ {
@@ -119,7 +119,7 @@ func commaLists(s string, a, b int) [][]cell {
 		}
 	}
 	whole := func(c cell) bool { return c.b > c.a && c.b-c.a <= 200 && reWholeItem.MatchString(s[c.a:c.b]) }
-	edge := func(c cell, tail bool) (cell, bool) { // a palavra do fim (ou do começo) do pedaço
+	edge := func(c cell, tail bool) (cell, bool) { // the word at the end (or start) of the piece
 		if tail {
 			k := c.b
 			for k > c.a && !strings.ContainsRune(" \t[(:={", rune(s[k-1])) {
@@ -161,7 +161,7 @@ func commaLists(s string, a, b int) [][]cell {
 	return out
 }
 
-// palavras: quantas palavras separadas por espaço há em l (para de contar em 4).
+// words: how many space-separated words there are in l (stops counting at 4).
 func words(l string) int {
 	n, inside := 0, false
 	for i := 0; i < len(l) && n < 4; i++ {
@@ -174,7 +174,7 @@ func words(l string) int {
 	return n
 }
 
-// callBefore: a lista que começa em i está entre os parênteses de uma chamada ("f(a, b").
+// callBefore: the list that starts at i is between the parentheses of a call ("f(a, b").
 func callBefore(s string, i int) bool {
 	k := i - 1
 	for k >= 0 && (s[k] == ' ' || s[k] == '\t') {
@@ -183,7 +183,7 @@ func callBefore(s string, i int) bool {
 	return k >= 1 && s[k] == '(' && (isAlnum(s[k-1]) || s[k-1] == '_')
 }
 
-// knownType: o tipo de v se é um nome aprendido (em RAM ou, só o hash, no vistos.json).
+// knownType: the type of v if it is a learned name (in RAM or, hash only, in vistos.json).
 func (m *Masker) knownType(v string) (string, bool) {
 	c := m.known
 	c.mu.RLock()
@@ -211,10 +211,10 @@ func (m *Masker) knownType(v string) (string, bool) {
 	return ent, true
 }
 
-// publicList: o vocabulário que nunca vira item de lista.
+// publicList: the vocabulary that never becomes a list item.
 func publicList(v string) bool { return publicSQL(v) || publicDev(v) || publicDevops(v) }
 
-// findLists: as listas homogêneas e os nomes qualificados com uma parte conhecida (aprendida).
+// findLists: the homogeneous lists and the qualified names with a known (learned) part.
 func (m *Masker) findLists(s string, learn bool, add func(ini, end int, typ string)) {
 	if !m.cfg.Objects.Enabled {
 		return
@@ -226,8 +226,8 @@ func (m *Masker) findLists(s string, learn bool, add func(ini, end int, typ stri
 	if nRAM == 0 && (m.seenSet == nil || !m.seenSet.HasObj()) {
 		return
 	}
-	// só o que já foi APRENDIDO (com os freios: evidência forte ou duas regras), e não qualquer
-	// achado deste texto: um achado fraco errado puxaria a lista inteira junto
+	// only what was already LEARNED (with the brakes: strong evidence or two rules), and not any
+	// finding of this text: a wrong weak finding would pull the whole list along
 	knownOne := m.knownType
 	m.runReader(Reader{Name: "lista", Public: publicList, Find: func(s string, add func(ObjFinding)) {
 		homogeneousLists(s, knownOne, add)
@@ -235,7 +235,7 @@ func (m *Masker) findLists(s string, learn bool, add func(ini, end int, typ stri
 	}}, s, learn, add)
 }
 
-// homogeneousLists: em cada lista, o tipo da maioria conhecida vale para os itens que faltam.
+// homogeneousLists: in each list, the type of the known majority applies to the missing items.
 func homogeneousLists(s string, knownOne func(string) (string, bool), add func(ObjFinding)) {
 	for _, g := range listsIn(s) {
 		n := map[string]int{}
@@ -283,8 +283,9 @@ func homogeneousLists(s string, knownOne func(string) (string, bool), add func(O
 	}
 }
 
-// assignsAttribute: o nome s[a:b] abre a linha e recebe uma atribuição ("mock.scalars.return_value
-// = x", "self.cfg.schema = y"): é atributo de objeto no código, não nome de tabela.
+// assignsAttribute: the name s[a:b] opens the line and receives an assignment
+// ("mock.scalars.return_value = x", "self.cfg.schema = y"): it is an object attribute in code, not
+// a table name.
 func assignsAttribute(s string, a, b int) bool {
 	for k := a - 1; k >= 0 && s[k] != '\n'; k-- {
 		if s[k] != ' ' && s[k] != '\t' {
@@ -297,8 +298,8 @@ func assignsAttribute(s string, a, b int) bool {
 	return b+1 < len(s) && s[b] == '=' && s[b+1] != '='
 }
 
-// knownQualified: "a.b" ou "a.b.c" em que uma parte é um schema ou banco conhecido na
-// posição em que fica num nome de tabela: as outras partes ganham o tipo da posição.
+// knownQualified: "a.b" or "a.b.c" in which one part is a known schema or database at the position
+// it has in a table name: the other parts get the position's type.
 func knownQualified(s string, knownOne func(string) (string, bool), add func(ObjFinding)) {
 	if strings.IndexByte(s, '.') < 0 {
 		return

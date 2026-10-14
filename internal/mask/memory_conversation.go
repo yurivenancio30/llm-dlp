@@ -5,53 +5,52 @@ import (
 	"strings"
 )
 
-// Memória da conversa (ver docs/pt-BR/structures.md): os nomes decididos em TODOS os textos de uma
-// requisição valem para os outros textos ainda não enviados dela. Um nome que um leitor ou um
-// decisor reconheceu num texto (o inventário de namespaces, o cabeçalho de um CSV) é mascarado
-// também onde aparece solto (na prosa, numa saída sem estrutura), palavra inteira.
+// Conversation memory (see docs/structures.md): the names decided in ALL the texts of a request
+// apply to its other texts not yet sent. A name a reader or a decider recognized in a text (the
+// namespace inventory, the header of a CSV) is also masked where it appears loose (in prose, in an
+// output without structure), as a whole word.
 //
-// A memória é recalculada a cada requisição a partir dos próprios textos dela (as decisões de
-// cada um estão no memo): nada fica guardado por conversa, e numa conversa nova ela começa
-// vazia. É um passo depois do memo: a chave do memo não muda, e o texto já enviado (congelado)
-// sai igual.
+// The memory is recomputed on every request from the request's own texts (the decisions of each one
+// are in the memo): nothing is kept per conversation, and in a new conversation it starts empty. It
+// is a step after the memo: the memo key does not change, and the text already sent (frozen) goes
+// out the same.
 //
-// Quem escreveu: um texto do assistente que o proxy desmascarou (registrado em
-// RecordResponse) volta como a API o mandou: voltam a ser pseudônimo exatamente os trechos
-// que o proxy traduziu, e a memória não se aplica ao resto (o modelo nunca viu o nome real; se
-// escreveu a palavra, é palavra comum). As palavras traduzidas entram na memória (regra
-// "traduzida", com o tipo do pseudônimo).
+// Who wrote it: an assistant text the proxy unmasked (recorded in RecordResponse) comes back as the
+// API sent it: exactly the pieces the proxy translated become pseudonyms again, and the memory does
+// not apply to the rest (the model never saw the real name; if it wrote the word, it is a common
+// word). The translated words enter the memory (rule "traduzida", with the type of the pseudonym).
 
-// memName: um nome da memória, indexado pela primeira palavra dele.
+// memName: a name of the memory, indexed by its first word.
 type memName struct {
 	name     string
-	off      int // onde começa a primeira palavra dentro do nome
+	off      int // where the first word starts inside the name
 	ent      string
-	caseless bool // tipo de SQL (ou servidor): casa em qualquer caixa
+	caseless bool // SQL type (or server): matches in any case
 }
 
 type memory struct {
-	exact    map[string][]memName // primeira palavra -> nomes (do maior para o menor)
-	caseless map[string][]memName // primeira palavra em minúsculas -> nomes
+	exact    map[string][]memName // first word -> names (from largest to smallest)
+	caseless map[string][]memName // first word in lowercase -> names
 	n        int
-	has      map[string]bool // chaves já na memória (adicionar)
-	// tamanhos das primeiras palavras (bit n = tamanho n; bit 63 = 63 ou mais): a palavra de
-	// outro tamanho nem é consultada
+	has      map[string]bool // keys already in the memory (add)
+	// lengths of the first words (bit n = length n; bit 63 = 63 or more): a word of another length
+	// is not even looked up
 	exactSize, caselessSize uint64
 }
 
 func bitSize(n int) uint64 { return 1 << min(n, 63) }
 
-// memMin: nome mais curto que a memória aplica fora do texto onde foi decidido (uma coluna
-// "a" de um SELECT não pode mascarar toda letra "a" da conversa).
+// memMin: the shortest name the memory applies outside the text where it was decided (a column "a"
+// of a SELECT cannot mask every letter "a" of the conversation).
 const memMin = 3
 
-// isWord: byte que faz parte de uma palavra (os limites de palavra da memória). Byte de
-// UTF-8 conta como letra: "ação" é uma palavra só.
+// isWord: a byte that is part of a word (the word boundaries of the memory). A UTF-8 byte counts as
+// a letter: "ação" is a single word.
 func isWord(c byte) bool {
 	return c == '_' || c >= '0' && c <= '9' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= 0x80
 }
 
-// newMemory: as decisões, na ordem (a primeira decisão de uma chave define o tipo).
+// newMemory: the decisions, in order (the first decision of a key defines the type).
 func (m *Masker) newMemory(decs []Decision) *memory {
 	mm := &memory{exact: map[string][]memName{}, caseless: map[string][]memName{}}
 	seen := map[string]bool{}
@@ -84,7 +83,7 @@ func (m *Masker) newMemory(decs []Decision) *memory {
 			j++
 		}
 		if i == j || !letter && j-i == len(d.Name) {
-			continue // sem palavra, ou só número
+			continue // without a word, or only a number
 		}
 		nm := memName{name: d.Name, off: i, ent: d.Ent, caseless: entSQL[d.Ent]}
 		if nm.caseless {
@@ -108,7 +107,7 @@ func (m *Masker) newMemory(decs []Decision) *memory {
 	return mm
 }
 
-// casar: o nome nm ocupa s a partir de ini (palavra inteira)?
+// matchIt: does name nm occupy s from start (whole word)?
 func (nm memName) matchIt(s string, ini int) bool {
 	end := ini + len(nm.name)
 	if ini < 0 || end > len(s) {
@@ -127,11 +126,11 @@ func (nm memName) matchIt(s string, ini int) bool {
 	return !(isWord(nm.name[len(nm.name)-1]) && end < len(s) && isWord(s[end]))
 }
 
-// varrer: os trechos de s em que a memória casa, fora dos trechos já trocados (ts, em ordem).
-// Uma passada: cada palavra de s é uma consulta no índice.
+// scan: the pieces of s where the memory matches, outside the pieces already swapped (ts, in
+// order). One pass: each word of s is one lookup in the index.
 func (mm *memory) scan(s string, ts []snippet) []snippet { return mm.scanF(s, ts, memFilter{}) }
 
-// scanF: como varrer, com os freios do texto (memory_conversation_brakes.go).
+// scanF: like scan, with the text brakes (memory_conversation_brakes.go).
 func (mm *memory) scanF(s string, ts []snippet, f memFilter) []snippet {
 	var out []snippet
 	var buf []byte
@@ -177,8 +176,8 @@ func (mm *memory) scanF(s string, ts []snippet, f memFilter) []snippet {
 		if best != nil {
 			end = ini + len(best.name)
 		} else if nm := mm.piece(s[i:j]); nm != nil {
-			// o nome é um pedaço de uma palavra maior ("LH_BRONZE_VENDA2024"): a palavra inteira
-			// é mascarada, com o tipo dele
+			// the name is a piece of a larger word ("LH_BRONZE_VENDA2024"): the whole word is
+			// masked, with its type
 			best, ini, end = nm, i, j
 		} else {
 			i = j
@@ -198,15 +197,15 @@ func (mm *memory) scanF(s string, ts []snippet, f memFilter) []snippet {
 	return out
 }
 
-// pedaco: o nome da memória que é uma sequência de partes de p (palavra com "_"), com cara de
-// identificador, se há; o mais longo. "VENDA2024" casa em "LH_BRONZE_VENDA2024" e em
-// "T01_VENDA2024"; "CLIENTES_PF" em "DIM_CLIENTES_PF_HIST". Word comum ("status" em
-// "user_status") fica de fora: só nome com "_", dígito ou mistura de caixa.
+// piece: the memory name that is a sequence of parts of p (a word with "_"), identifier-shaped, if
+// any; the longest. "VENDA2024" matches in "LH_BRONZE_VENDA2024" and in "T01_VENDA2024";
+// "CLIENTES_PF" in "DIM_CLIENTES_PF_HIST". A common word ("status" in "user_status") stays out:
+// only a name with "_", a digit or mixed case.
 func (mm *memory) piece(p string) *memName {
 	if strings.IndexByte(p, '_') < 0 || len(p) > 128 {
 		return nil
 	}
-	var cuts []int // início de cada parte e, no fim, len(p)+1
+	var cuts []int // start of each part and, at the end, len(p)+1
 	cuts = append(cuts, 0)
 	for x := 0; x < len(p); x++ {
 		if p[x] == '_' {
@@ -244,8 +243,8 @@ func (mm *memory) piece(p string) *memName {
 	return best
 }
 
-// withMemory: o resultado de s com a memória da conversa aplicada (os trechos novos entram
-// nas entradas e nos trechos, para a volta e para o congelamento).
+// withMemory: the result of s with the conversation memory applied (the new pieces enter the
+// entries and the snippets, for the return path and for freezing).
 func (l *Batch) withMemory(s string, r result, hint string) result {
 	if l.mem == nil {
 		l.mem = &memory{exact: map[string][]memName{}, caseless: map[string][]memName{}}
@@ -254,10 +253,11 @@ func (l *Batch) withMemory(s string, r result, hint string) result {
 	f.output = !l.prose && !l.writing
 	extra := l.mem.scanF(s, r.snippets, f)
 	if !l.writing && fileSource(l.currentSource) {
-		// coluna provada numa fonte não contamina OUTRO arquivo lido (o vocabulário do arquivo
-		// é dele: "status" no app.js não é a coluna do schema.sql); a conversa e as saídas sem
-		// arquivo (kubectl logs, git branch) recebem o contágio. Name de recurso (tabela,
-		// schema, banco...) provado nesta requisição vale em qualquer arquivo (procedência).
+		// a column proven in one source does not contaminate ANOTHER file read (the file's
+		// vocabulary is its own: "status" in app.js is not the column of schema.sql); the
+		// conversation and outputs without a file (kubectl logs, git branch) receive the contagion.
+		// A resource name (table, schema, database...) proven in this request applies in any file
+		// (provenance).
 		k := extra[:0]
 		for _, x := range extra {
 			if v := s[x.Start:x.End]; identifierShape(v) || l.provenAtSource(v) || !columnOrIndex(strings.TrimPrefix(x.Type, objTypePrefix)) {
@@ -280,7 +280,7 @@ func (l *Batch) withMemory(s string, r result, hint string) result {
 	ts = l.noPublics(s, ts)
 	ts2 := l.anchorPositions(s, ts, f)
 	if newOnes := l.learnAnchor(s, ts, ts2); len(newOnes) > 0 {
-		// o valor deduzido vale nas outras ocorrências deste texto (regra 2)
+		// the deduced value applies to the other occurrences of this text (rule 2)
 		ts2 = l.joinSnippets(ts2, l.noCommonsInProse(s, l.mem.scanF(s, ts2, f)))
 		r.decidedSet = append(append([]Decision{}, r.decidedSet...), newOnes...)
 		extra = append(extra, snippet{})
@@ -293,7 +293,7 @@ func (l *Batch) withMemory(s string, r result, hint string) result {
 			ts2[i].Pseudo = l.m.Pseudonym(ts2[i].Type, s[ts2[i].Start:ts2[i].End])
 		}
 	}
-	ts2 = noOverlapLong(l.noPublics(s, ts2)) // conflito se resolve; nunca se descarta tudo
+	ts2 = noOverlapLong(l.noPublics(s, ts2)) // a conflict is resolved; never discard everything
 	text, entries, ok := rebuild(s, ts2)
 	if !ok {
 		return r
@@ -301,9 +301,9 @@ func (l *Batch) withMemory(s string, r result, hint string) result {
 	return result{text: text, entries: entries, snippets: ts2, gen: r.gen, noLearn: r.noLearn, decidedSet: r.decidedSet}
 }
 
-// noCommonsInProse: na prosa (texto da mensagem), os trechos que a memória da conversa trouxe e
-// que são palavra comum saem: lá ela é a palavra (vocab_words.go). Os que um leitor decidiu
-// no próprio texto não passam por aqui.
+// noCommonsInProse: in prose (message text), the pieces the conversation memory brought that are
+// common words come out: there it is the word (vocab_words.go). Those a reader decided in the text
+// itself do not go through here.
 func (l *Batch) noCommonsInProse(s string, xs []snippet) []snippet {
 	if !l.prose {
 		return xs
@@ -317,10 +317,9 @@ func (l *Batch) noCommonsInProse(s string, xs []snippet) []snippet {
 	return out
 }
 
-// noCommonsInDocument: num arquivo de documentação (README, prompt de agente, notas), o texto
-// fora dos blocos de código é prosa, como a mensagem do usuário: a palavra comum que a memória
-// trouxe fica como palavra. Dentro de um bloco de código (``` ou ~~~), a procedência vale como
-// em qualquer código.
+// noCommonsInDocument: in a documentation file (README, agent prompt, notes), the text outside the
+// code blocks is prose, like the user message: the common word the memory brought stays a word.
+// Inside a code block (``` or ~~~), provenance applies as in any code.
 func (l *Batch) noCommonsInDocument(s string, xs []snippet) []snippet {
 	if len(xs) == 0 {
 		return xs
@@ -336,8 +335,8 @@ func (l *Batch) noCommonsInDocument(s string, xs []snippet) []snippet {
 	return out
 }
 
-// codeBlocks: os trechos de s entre cercas de código do Markdown (``` ou ~~~ no começo da
-// linha, depois do número de linha do Read, se houver). Cerca sem fechamento vai até o fim.
+// codeBlocks: the pieces of s between Markdown code fences (``` or ~~~ at the start of the line,
+// after the Read line number, if any). A fence without closing goes to the end.
 func codeBlocks(s string) [][2]int {
 	var out [][2]int
 	opened := -1
@@ -365,8 +364,8 @@ func codeBlocks(s string) [][2]int {
 	return out
 }
 
-// lineContent: onde começa o conteúdo da linha s[ini:fim], depois do recuo e do número de
-// linha que o Read do Claude Code põe ("    12→" ou "12\t").
+// lineContent: where the content of line s[start:end] starts, after the indentation and the line
+// number Claude Code's Read puts (" 12→" or "12\t").
 func lineContent(s string, ini, end int) int {
 	i := ini
 	for i < end && (s[i] == ' ' || s[i] == '\t') {
@@ -399,7 +398,7 @@ func insideOf(fs [][2]int, p int) bool {
 	return false
 }
 
-// typeChanged: algum trecho mudou de tipo (âncora por posição corrigiu o genérico).
+// typeChanged: some piece changed type (anchor by position corrected the generic one).
 func typeChanged(a, b []snippet) bool {
 	if len(a) != len(b) {
 		return true
@@ -412,7 +411,8 @@ func typeChanged(a, b []snippet) bool {
 	return false
 }
 
-// joinSnippets: os trechos do memo e os da memória, em ordem (sem pseudônimo nos novos).
+// joinSnippets: the memo pieces and the memory pieces, in order (without pseudonyms in the new
+// ones).
 func (l *Batch) joinSnippets(base, extra []snippet) []snippet {
 	r := struct{ snippets []snippet }{base}
 	ts := make([]snippet, 0, len(r.snippets)+len(extra))
@@ -429,9 +429,9 @@ func (l *Batch) joinSnippets(base, extra []snippet) []snippet {
 	return ts
 }
 
-// Memory monta a memória da conversa com os nomes decididos nos textos da requisição (depois
-// de Warm, quando todo texto novo já está no memo) e nos trechos traduzidos dos textos do
-// assistente (extras). Conteúdo da internet não entra (é mascarado, mas não ensina).
+// Memory builds the conversation memory with the names decided in the texts of the request (after
+// Warm, when every new text is already in the memo) and in the translated pieces of the assistant
+// texts (extras). Internet content does not enter (it is masked, but does not teach).
 func (l *Batch) Memory(items []BatchItem, extras []Decision) {
 	itSources := make([]string, len(items))
 	for i := range items {
@@ -442,7 +442,8 @@ func (l *Batch) Memory(items []BatchItem, extras []Decision) {
 	l.buildMemory(l.itemDecisions(items), extras)
 }
 
-// itemDecisions: as decisões de cada texto (do congelado, do memo ou recalculadas uma vez).
+// itemDecisions: the decisions of each text (from the frozen one, from the memo or recomputed
+// once).
 func (l *Batch) itemDecisions(items []BatchItem) [][]Decision {
 	m := l.m
 	decs := make([][]Decision, len(items))
@@ -457,15 +458,15 @@ func (l *Batch) itemDecisions(items []BatchItem) [][]Decision {
 			continue
 		}
 		if r, ok := m.inMemo(it.S, it.Hint); ok {
-			// o resultado vai direto para a montagem (MaskHint), sem calcular o hash de novo
+			// the result goes straight to assembly (MaskHint), without computing the hash again
 			l.pre[it.Pos] = r
 			if r.decidedSet != nil {
 				decs[i] = r.decidedSet
 				continue
 			}
 		}
-		// texto que saiu antes de um reinício (o enviados.log só tem os trechos) ou que saiu do
-		// memo: as decisões dele são recalculadas uma vez
+		// a text that went out before a restart (enviados.log only has the snippets) or that left
+		// the memo: its decisions are recomputed once
 		missingCount = append(missingCount, warmItem{it.S, true, it.Hint})
 		iMissing = append(iMissing, i)
 	}
@@ -475,8 +476,8 @@ func (l *Batch) itemDecisions(items []BatchItem) [][]Decision {
 			it := items[i]
 			decs[i], _ = m.decidedMemo(it.S, it.Hint)
 			if decs[i] == nil {
-				// saiu do memo enquanto os outros eram calculados (conversa maior que o memo):
-				// calcula de novo, sem depender do memo
+				// it left the memo while the others were being computed (a conversation larger than
+				// the memo): compute again, without depending on the memo
 				r, _ := m.maskD(it.S, true, it.Hint)
 				decs[i] = r.decidedSet
 			}
@@ -494,9 +495,9 @@ func (l *Batch) itemDecisions(items []BatchItem) [][]Decision {
 	return decs
 }
 
-// DecidedByText: para a anterioridade, os nomes que cada texto decidiu por si (leitores e
-// decisores daquele texto; nunca o que veio da memória da conversa ou do conhecimento
-// acumulado), por texto. Text sem decisões calculadas (da internet) fica de fora.
+// DecidedByText: for priority, the names each text decided by itself (readers and deciders of that
+// text; never what came from the conversation memory or from accumulated knowledge), per text. A
+// text without computed decisions (from the internet) stays out.
 func (l *Batch) DecidedByText(items []BatchItem) map[string][]string {
 	items = noSources(items)
 	decs := l.itemDecisions(items)
@@ -517,10 +518,10 @@ func (l *Batch) DecidedByText(items []BatchItem) map[string][]string {
 	return out
 }
 
-// joinDecisions: as decisões de todos os textos, cada texto repetido uma vez só.
+// joinDecisions: the decisions of all texts, each text repeated only once.
 func joinDecisions(decs [][]Decision) []Decision {
 	var allOf []Decision
-	seenOnes := map[*Decision]bool{} // o mesmo texto repetido traz as mesmas decisões (do memo)
+	seenOnes := map[*Decision]bool{} // the same repeated text brings the same decisions (from the memo)
 	for _, d := range decs {
 		if len(d) == 0 || seenOnes[&d[0]] {
 			continue
@@ -553,7 +554,7 @@ func (l *Batch) buildMemory(decs [][]Decision, extras []Decision) {
 	}
 }
 
-// decidedMemo: as decisões de s no memo (nil, false: s não está no memo).
+// decidedMemo: the decisions of s in the memo (nil, false: s is not in the memo).
 func (m *Masker) decidedMemo(s, hint string) ([]Decision, bool) {
 	r, ok := m.inMemo(s, hint)
 	if !ok || r.decidedSet == nil {
@@ -562,7 +563,7 @@ func (m *Masker) decidedMemo(s, hint string) ([]Decision, bool) {
 	return r.decidedSet, true
 }
 
-// inMemo: o resultado de s no memo, como maskKE o devolveria (sem detectar de novo).
+// inMemo: the result of s in the memo, as maskKE would return it (without detecting again).
 func (m *Masker) inMemo(s, hint string) (result, bool) {
 	k := memoKey(s, hint)
 	m.mu.Lock()
@@ -576,8 +577,8 @@ func (m *Masker) inMemo(s, hint string) (result, bool) {
 	if !ok {
 		return r, false
 	}
-	// valor aprendido depois que o resultado foi calculado e que aparece em s: refaz (como em
-	// maskKE; conferido, o resultado fica marcado com a geração atual)
+	// a value learned after the result was computed that appears in s: redo it (as in maskKE; once
+	// checked, the result is marked with the current generation)
 	if g := m.known.generation(); r.gen != g {
 		if m.known.containsSince(s, r.gen) {
 			return r, false
@@ -590,8 +591,8 @@ func (m *Masker) inMemo(s, hint string) (result, bool) {
 	return r, true
 }
 
-// Written: des é um texto do assistente desmascarado aqui (há registro)? Devolve as decisões
-// dos trechos traduzidos (regra "traduzida", com o tipo do pseudônimo), para a memória.
+// Written: is des an assistant text unmasked here (is there a record)? Returns the decisions of the
+// translated pieces (rule "traduzida", with the type of the pseudonym), for the memory.
 func (l *Batch) Written(des string) ([]Decision, bool) {
 	if len(des) < 4 {
 		return nil, false
@@ -615,27 +616,26 @@ func translatedDecisions(des string, ts []snippet) []Decision {
 	return out
 }
 
-// MaskHintProse: como MaskHint, para o texto que o usuário escreveu na mensagem (não a
-// saída de ferramenta): palavra comum que chega por contágio fica como palavra; a que um leitor
-// decide ali mesmo (um DDL colado, kubectl -n) continua nome (vocab_words.go).
+// MaskHintProse: like MaskHint, for the text the user wrote in the message (not tool output): a
+// common word that arrives by contagion stays a word; one a reader decides right there (a pasted
+// DDL, kubectl -n) stays a name (vocab_words.go).
 func (l *Batch) MaskHintProse(s string, fromWeb bool, pos Position, hint string) (string, []Entry) {
 	l.prose = true
 	defer func() { l.prose = false }()
 	return l.MaskHint(s, fromWeb, pos, hint)
 }
 
-// MaskProse: como MaskWritten, para um bloco de texto da resposta (não a entrada de
-// ferramenta): palavra comum decidida em outro lugar fica como palavra (vocab_words.go).
+// MaskProse: like MaskWritten, for a text block of the response (not tool input): a common word
+// decided elsewhere stays a word (vocab_words.go).
 func (l *Batch) MaskProse(des string, fromWeb bool, pos Position, hint string) (string, []Entry) {
 	l.prose = true
 	defer func() { l.prose = false }()
 	return l.MaskWritten(des, fromWeb, pos, hint)
 }
 
-// MaskWritten: como MaskHint, para um texto do assistente. Com registro (ver
-// RecordResponse), sai o que a API mandou: só os trechos traduzidos voltam a ser
-// pseudônimo. Sem registro (reinício sem enviados.log, outro processo), é um texto como
-// os outros.
+// MaskWritten: like MaskHint, for an assistant text. With a record (see RecordResponse), what the
+// API sent goes out: only the translated pieces become pseudonyms again. Without a record (restart
+// without enviados.log, another process), it is a text like the others.
 func (l *Batch) MaskWritten(des string, fromWeb bool, pos Position, hint string) (string, []Entry) {
 	if len(des) < 4 {
 		return des, nil
@@ -653,7 +653,7 @@ func (l *Batch) MaskWritten(des string, fromWeb bool, pos Position, hint string)
 		}
 	}
 	if !fromWeb {
-		return l.MaskContagion(des, fromWeb, pos) // regra 1: o assistente não é fonte
+		return l.MaskContagion(des, fromWeb, pos) // rule 1: the assistant is not a source
 	}
 	return l.MaskHint(des, fromWeb, pos, hint)
 }

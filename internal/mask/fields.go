@@ -6,12 +6,12 @@ import (
 	"unicode"
 )
 
-// Detecção pelo nome do campo, parte 2: "campo: valor", JSON, SQL INSERT e XML.
+// Detection by field name, part 2: "field: value", JSON, SQL INSERT and XML.
 
 var notValue = map[string]bool{"": true, "null": true, "none": true, "nil": true, "nan": true, "n/a": true, "na": true, "-": true, "--": true,
 	"true": true, "false": true, "undefined": true, "string": true, "varchar": true, "text": true, "number": true, "integer": true, "date": true}
 
-// contas de serviço e nomes genéricos: mascarar "user=root" só atrapalharia
+// service accounts and generic names: masking "user=root" would only get in the way
 
 var commonUser = map[string]bool{"root": true, "admin": true, "administrator": true, "postgres": true, "mysql": true, "sa": true, "app": true,
 	"user": true, "usuario": true, "test": true, "teste": true, "ubuntu": true, "ec2-user": true, "airflow": true, "datahub": true, "system": true,
@@ -20,11 +20,11 @@ var commonUser = map[string]bool{"root": true, "admin": true, "administrator": t
 
 var reReadyPseudo = regexp.MustCompile(`^(?:[A-Z:]+-[a-z2-7]{8}|[Pp]essoa [a-z2-7]{8}|PESSOA [A-Z2-7]{8}|\S+\.invalid)$`)
 
-// marcar aplica fieldValue ao trecho s[ini:fim] e registra o achado. Num campo de nome,
-// "Fulano de Tal / Beltrana Souza" são duas pessoas: cada parte é um achado.
+// markIt applies fieldValue to the piece s[start:end] and records the finding. In a name field,
+// "Fulano de Tal / Beltrana Souza" are two people: each part is a finding.
 func markIt(s string, ini, end int, class string, add func(ini, end int, typ string)) {
 	if class == "nomesolto" {
-		return // só vale em tabela ou registro com outro campo de pessoa, onde vira "nomecompleto" (ver cabecalho e nameInRegistry)
+		return // only counts in a table or record with another person field, where it becomes "nomecompleto" (see header and nameInRegistry)
 	}
 	if (class == "nome" || class == "nomecompleto") && strings.ContainsAny(s[ini:end], "/;&") {
 		for p := ini; p < end; {
@@ -53,7 +53,7 @@ func markIt(s string, ini, end int, class string, add func(ini, end int, typ str
 	}
 }
 
-// fieldValue decide se v, num campo da classe dada, deve ser mascarado, e com que tipo.
+// fieldValue decides whether v, in a field of the given class, must be masked, and with which type.
 func fieldValue(class, v string) (string, bool) {
 	if notValue[strings.ToLower(v)] || len(v) > 120 || reReadyPseudo.MatchString(v) || isPseudoObj(v) || isPseudoLabel(v) {
 		return "", false
@@ -73,19 +73,18 @@ func fieldValue(class, v string) (string, bool) {
 	case "quase":
 		return class, let+dig >= 1 && len(v) <= 60
 	case "cpf", "cnpj", "rg", "cnh", "pis", "telefone", "cep", "doc":
-		// uma data ou hora não é documento, por mais dígitos que tenha ("2026-10-03",
-		// "12:30:00"): sem isto, uma data numa coluna dessas seria lembrada e mascarada em
-		// todo lugar
+		// a date or time is not a document, however many digits it has ("2026-10-03", "12:30:00"):
+		// without this, a date in one of these columns would be remembered and masked everywhere
 		if looksLikeDateTime(v) {
 			return "", false
 		}
 		if class == "doc" && dig >= 3 && dig+let >= 6 {
 			return "doc", true
 		}
-		// quantidade de dígitos de cada documento (com folga para zeros à esquerda cortados)
+		// number of digits of each document (with slack for cut leading zeros)
 		rng := map[string][2]int{"cpf": {9, 11}, "cnpj": {12, 14}, "rg": {5, 14}, "cnh": {9, 11}, "pis": {9, 11},
 			"telefone": {8, 13}, "cep": {7, 8}, "doc": {5, 20}}[class]
-		if class == "cnpj" && let > 0 { // CNPJ novo, com letras
+		if class == "cnpj" && let > 0 { // new CNPJ, with letters
 			return class, dig+let == 14 && dig >= 2
 		}
 		return class, dig >= rng[0] && dig <= rng[1] && let <= 3
@@ -94,14 +93,14 @@ func fieldValue(class, v string) (string, bool) {
 	case "endereco":
 		return class, let >= 4 && len(v) >= 6
 	case "usuario":
-		// não vale variável de ambiente, parâmetro de consulta (":user_id") nem trecho de código;
-		// nem valor sem dono ("stub-user", "my_user", "XXXXXXXXX", ver vocab_dev.go)
+		// environment variables, query parameters (":user_id") and pieces of code do not count; nor
+		// do ownerless values ("stub-user", "my_user", "XXXXXXXXX", see vocab_dev.go)
 		return class, dig+let >= 2 && !commonUser[strings.ToLower(v)] && !strings.ContainsAny(v, " ()[]{}$<>:%") &&
 			!ownerless(v, nil)
 	case "sensivel":
 		return class, let+dig >= 1
 	case "nomecompleto":
-		// nome e sobrenome, cada um começando com maiúscula ("Maria Lopes", "MARIA LOPES")
+		// first and last name, each starting with a capital ("Maria Lopes", "MARIA LOPES")
 		ps := strings.Fields(v)
 		if len(ps) < 2 {
 			return "", false
@@ -113,7 +112,7 @@ func fieldValue(class, v string) (string, bool) {
 		}
 		return fieldValue("nome", v)
 	case "nome":
-		// nome de gente: letras, espaços e pouco mais (não "SVC_CARGA", "a.b:c", "x@y")
+		// a person's name: letters, spaces and little else (not "SVC_CARGA", "a.b:c", "x@y")
 		for _, c := range v {
 			if !unicode.IsLetter(c) && c != ' ' && c != '\'' && c != '-' && c != '.' {
 				return "", false
@@ -124,10 +123,10 @@ func fieldValue(class, v string) (string, bool) {
 	return "", false
 }
 
-// findFields procura "campo: valor", "campo=valor", "campo": "valor" (JSON) com campo
-// sensível. Não usa regex: anda só pelos ":" e "=" do texto, olha a palavra que vem antes
-// (o rótulo) e, se ela for de um campo sensível, pega o valor que vem depois. Em texto sem
-// campo sensível o custo é uma consulta por separador.
+// findFields looks for "field: value", "field=value", "field": "value" (JSON) with a sensitive
+// field. It does not use regex: it only walks through the ":" and "=" of the text, looks at the
+// word before it (the label) and, if it is a sensitive field, takes the value that comes after. In
+// text without a sensitive field the cost is one lookup per separator.
 func (m *Masker) findFields(s string, add func(ini, end int, typ string)) {
 	for i := 0; i < len(s); i++ {
 		c := s[i]
@@ -140,7 +139,7 @@ func (m *Masker) findFields(s string, add func(ini, end int, typ string)) {
 		}
 		class := m.classBefore(s, i)
 		if class == "nomesolto" {
-			class = m.nameInRegistry(s, i) // "nome" sozinho: de pessoa só com outro campo de pessoa ao lado
+			class = m.nameInRegistry(s, i) // "nome" alone: a person's only with another person field next to it
 		}
 		if class == "" {
 			continue
@@ -156,8 +155,8 @@ func (m *Masker) findFields(s string, add func(ini, end int, typ string)) {
 		if j >= len(s) {
 			break
 		}
-		// prefixo de literal de string (r'...', b"...", f'...', rb'...', u'...'): não é o
-		// valor, o valor é o que está entre as aspas
+		// string literal prefix (r'...', b"...", f'...', rb'...', u'...'): it is not the value, the
+		// value is what is between the quotes
 		j = afterLiteralPrefix(s, j)
 		ini, end := j, j
 		if q := s[j]; q == '"' || q == '\'' || q == '`' {
@@ -167,13 +166,15 @@ func (m *Masker) findFields(s string, add func(ini, end int, typ string)) {
 				end++
 			}
 		} else {
-			// a crase e o ">" fecham código e marcação em volta do valor ("`User ID=x`", "<b>x</b>")
+			// the backtick and the ">" close code and markup around the value ("`User ID=x`",
+			// "<b>x</b>")
 			for end < len(s) && end-ini < 120 && !strings.ContainsRune("\n\"'`,;|{}[]<>", rune(s[end])) {
 				end++
 			}
 			if c == '=' {
-				// "a=1 b=2" (log, .env): o valor acaba no espaço. Um nome de pessoa pode ter
-				// espaços; aí vai até a palavra que já é de outro "campo=valor".
+				// "a=1 b=2" (log, .env): the value ends at the space. A person's name can have
+				// spaces; then it goes up to the word that already belongs to another
+				// "field=value".
 				p := ini
 				for p < end && s[p] != ' ' && s[p] != '\t' {
 					p++
@@ -203,8 +204,8 @@ func (m *Masker) findFields(s string, add func(ini, end int, typ string)) {
 	}
 }
 
-// fieldSeparator: s[i] é o ":" ou "=" de um "campo: valor" ou "campo=valor". Não são: "::",
-// "==", "!=", "<=", ">=", ":=" (vale o "="), "://".
+// fieldSeparator: s[i] is the ":" or "=" of a "field: value" or "field=value". Not these: "::",
+// "==", "!=", "<=", ">=", ":=" (the "=" counts), "://".
 func fieldSeparator(s string, i int) bool {
 	c := s[i]
 	if c != ':' && c != '=' {
@@ -221,11 +222,11 @@ func fieldSeparator(s string, i int) bool {
 		!(c == '=' && (next == '=' || prev == '=' || prev == '!' || prev == '<' || prev == '>'))
 }
 
-// nameInRegistry: "nome" ou "name" sozinho é nome de pessoa, como numa tabela (ver
-// cabecalho), quando o MESMO registro tem outro campo sensível ({"nome": x, "cpf": y},
-// <nome>x</nome><cpf>y</cpf>, nome=x cpf=y). O nome de um produto ou de um recurso fica.
-// O registro termina em s[i] (o separador ou o "</" do campo): o "{...}" em volta; sem
-// chaves, as linhas vizinhas com o mesmo recuo (XML, YAML, .env) ou a própria linha (log).
+// nameInRegistry: "nome" or "name" alone is a person's name, as in a table (see header), when the
+// SAME record has another sensitive field ({"nome": x, "cpf": y}, <nome>x</nome><cpf>y</cpf>,
+// nome=x cpf=y). The name of a product or a resource stays. The record ends at s[i] (the separator
+// or the "</" of the field): the "{...}" around it; without braces, the neighboring lines with the
+// same indentation (XML, YAML, .env) or the line itself (log).
 func (m *Masker) nameInRegistry(s string, i int) string {
 	a, b := registryIn(s, i)
 	for k := a; k < b; k++ {
@@ -249,7 +250,7 @@ func (m *Masker) nameInRegistry(s string, i int) string {
 	return ""
 }
 
-// registryIn: o registro em volta de s[i] (ver nameInRegistry), com teto de tamanho.
+// registryIn: the record around s[i] (see nameInRegistry), with a size ceiling.
 func registryIn(s string, i int) (int, int) {
 	const ceiling = 8 << 10
 	depth := 0
@@ -277,14 +278,14 @@ func registryIn(s string, i int) (int, int) {
 			return a, min(len(s), a+2*ceiling)
 		case '\n':
 			if depth == 0 && a > 0 && s[a-1] == '\n' {
-				a = -1 // linha em branco antes de qualquer "{": não está entre chaves
+				a = -1 // a blank line before any "{": it is not between braces
 			}
 		}
 		if a < 0 {
 			break
 		}
 	}
-	// sem chaves: as linhas vizinhas não vazias com o mesmo recuo
+	// without braces: the non-empty neighboring lines with the same indentation
 	ini := strings.LastIndexByte(s[:i], '\n') + 1
 	indent := func(l int) int {
 		n := 0
@@ -320,8 +321,8 @@ func lineEndIn(s string, i int) int {
 	return len(s)
 }
 
-// afterLiteralPrefix: se s[j:] começa com um prefixo de literal de string do Python (r, b,
-// f, u, rb, br, fr, rf, em qualquer caixa) colado numa aspa, devolve a posição da aspa.
+// afterLiteralPrefix: if s[j:] starts with a Python string literal prefix (r, b, f, u, rb, br, fr,
+// rf, in any case) glued to a quote, returns the position of the quote.
 func afterLiteralPrefix(s string, j int) int {
 	for n := 1; n <= 2 && j+n < len(s); n++ {
 		if q := s[j+n]; q != '"' && q != '\'' {
@@ -338,9 +339,9 @@ func afterLiteralPrefix(s string, j int) int {
 	return j
 }
 
-// shortLettersOnly: 1 ou 2 letras e nada mais ("r", "pt", "M"): no "campo: valor" isso é sigla,
-// prefixo ou pedaço de código, não o dado. Os quase identificadores (sexo "F", UF "MG") são a
-// exceção: lá o valor é curto mesmo (e o detector é opcional).
+// shortLettersOnly: 1 or 2 letters and nothing else ("r", "pt", "M"): in "field: value" this is an
+// acronym, a prefix or a piece of code, not the data. The quasi-identifiers (sex "F", state "MG")
+// are the exception: there the value really is short (and the detector is optional).
 func shortLettersOnly(v string) bool {
 	if len(v) > 2 {
 		return false
@@ -353,8 +354,8 @@ func shortLettersOnly(v string) bool {
 	return true
 }
 
-// defaultOrModel: o valor é um padrão de regex ("(?!x)\\b...", "\\d+") ou um modelo de texto
-// ("{valor}", "%s", "%(nome)s"): é código, não o dado do campo.
+// defaultOrModel: the value is a regex pattern ("(?!x)\\b...", "\\d+") or a text template
+// ("{valor}", "%s", "%(nome)s"): it is code, not the field data.
 func defaultOrModel(v string) bool {
 	if strings.Contains(v, "(?") || len(v) >= 2 && v[0] == '{' && v[len(v)-1] == '}' || v == "%s" || strings.HasPrefix(v, "%(") {
 		return true
@@ -367,10 +368,10 @@ func defaultOrModel(v string) bool {
 	return false
 }
 
-// trimValue tira do fim do valor o que é da frase ou da marcação em volta, e não do valor:
-// espaço, ponto final, e ")", "]", "}" ou "*" sem a abertura correspondente dentro do valor
-// ("(User ID=x)", "**User ID=x**"). Sem isto, o fechamento ia junto para dentro do
-// pseudônimo: o modelo não o via, e um valor com ")" era descartado inteiro (e saía em claro).
+// trimValue removes from the end of the value what belongs to the sentence or the markup around it,
+// and not to the value: space, period, and ")", "]", "}" or "*" without the matching opening inside
+// the value ("(User ID=x)", "**User ID=x**"). Without this, the closing went into the pseudonym:
+// the model did not see it, and a value with ")" was discarded whole (and went out in the clear).
 func trimValue(s string, ini, end int) int {
 	for end > ini {
 		v := s[ini:end]
@@ -396,9 +397,9 @@ func trimValue(s string, ini, end int) int {
 	return end
 }
 
-// classBefore classifica o rótulo que termina logo antes de s[i] (o separador). Tenta com a
-// última palavra, depois com as duas últimas, depois com as três ("cpf", "cliente cpf",
-// "nome da mae"), e fica com a primeira que for um campo sensível.
+// classBefore classifies the label that ends right before s[i] (the separator). It tries with the
+// last word, then with the last two, then with the last three ("cpf", "cliente cpf", "nome da
+// mae"), and keeps the first one that is a sensitive field.
 func (m *Masker) classBefore(s string, i int) string {
 	end := i
 	for end > 0 && (s[end-1] == ' ' || s[end-1] == '\t') {
@@ -432,8 +433,8 @@ func (m *Masker) classBefore(s string, i int) string {
 	return ""
 }
 
-// findInsert: INSERT INTO t (col1, col2) VALUES (v1, v2), (...). As colunas dão o rótulo de
-// cada valor.
+// findInsert: INSERT INTO t (col1, col2) VALUES (v1, v2), (...). The columns give the label of each
+// value.
 func (m *Masker) findInsert(s, lower string, add func(ini, end int, typ string)) {
 	if len(s) != len(lower) {
 		return
@@ -470,7 +471,7 @@ func (m *Masker) findInsert(s, lower string, add func(ini, end int, typ string))
 			pos = p
 			continue
 		}
-		for { // cada "(v1, v2, ...)"
+		for { // each "(v1, v2, ...)"
 			p = skipBlank(s, p, true)
 			if p >= len(s) || s[p] != '(' {
 				break
@@ -484,7 +485,7 @@ func (m *Masker) findInsert(s, lower string, add func(ini, end int, typ string))
 					end = ini
 					for end < len(s) && !(s[end] == '\'' && (end+1 >= len(s) || s[end+1] != '\'')) {
 						if s[end] == '\'' {
-							end++ // aspa dobrada dentro do texto
+							end++ // doubled quote inside the text
 						}
 						end++
 					}
@@ -512,7 +513,7 @@ func (m *Masker) findInsert(s, lower string, add func(ini, end int, typ string))
 	}
 }
 
-// findXML: <campo>valor</campo>, com campo sensível.
+// findXML: <field>value</field>, with a sensitive field.
 func (m *Masker) findXML(s string, add func(ini, end int, typ string)) {
 	for pos := 0; ; {
 		i := strings.Index(s[pos:], "</")
@@ -533,7 +534,7 @@ func (m *Masker) findXML(s string, add func(ini, end int, typ string)) {
 		if class == "" {
 			continue
 		}
-		// o valor é o que está entre o ">" da abertura e o "</"
+		// the value is what is between the ">" of the opening and the "</"
 		a0 := max(0, closes-122)
 		ab := strings.LastIndexByte(s[a0:closes], '>')
 		if ab >= 0 {
@@ -546,13 +547,13 @@ func (m *Masker) findXML(s string, add func(ini, end int, typ string)) {
 	}
 }
 
-// Column descreve como um nome de campo foi entendido (para o comando "llm-dlp columns").
+// Column describes how a field name was understood (for the "llm-dlp columns" command).
 type Column struct {
 	Name, Class string
 }
 
-// DescribeFields acha os nomes de campo de um texto (o cabeçalho de uma tabela, ou as
-// chaves de "campo: valor"/JSON) e diz como cada um foi classificado.
+// DescribeFields finds the field names of a text (the header of a table, or the keys of "field:
+// value"/JSON) and says how each one was classified.
 func (m *Masker) DescribeFields(s string) []Column {
 	var out []Column
 	seen := map[string]bool{}
@@ -564,7 +565,7 @@ func (m *Masker) DescribeFields(s string) []Column {
 		seen[name] = true
 		out = append(out, Column{name, m.vocab.labelClass(name)})
 	}
-	// 1) primeira linha com cara de cabeçalho de tabela
+	// 1) first line that looks like a table header
 	for _, line := range strings.SplitN(s, "\n", 30) {
 		if isMarkdownSeparator(line) || strings.ContainsAny(line, "={}()") {
 			continue
@@ -594,7 +595,7 @@ func (m *Masker) DescribeFields(s string) []Column {
 			return out
 		}
 	}
-	// 2) chaves de "campo: valor" / JSON
+	// 2) "field: value" / JSON keys
 	for i := 0; i < len(s) && len(out) < 400; i++ {
 		if s[i] != ':' && s[i] != '=' {
 			continue
@@ -617,8 +618,8 @@ var reDateTime = regexp.MustCompile(`^(?:\d{4}[-/.]\d{1,2}[-/.]\d{1,2}|\d{1,2}[-
 
 func looksLikeDateTime(v string) bool { return reDateTime.MatchString(v) }
 
-// skipBlank avança espaços, quebras de linha (e vírgulas, se virgula) e o número de linha
-// que a ferramenta de leitura do Claude Code põe no começo de cada linha ("12<tab>").
+// skipBlank skips spaces, line breaks (and commas, if comma) and the line number Claude Code's read
+// tool puts at the start of each line ("12<tab>").
 func skipBlank(s string, p int, comma bool) int {
 	for p < len(s) {
 		switch c := s[p]; {

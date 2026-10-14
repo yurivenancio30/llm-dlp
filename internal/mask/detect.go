@@ -7,25 +7,24 @@ import (
 	"sync/atomic"
 )
 
-// Detect: junta os detectores. Text comum é examinado inteiro; texto grande, em pedaços
-// paralelos.
+// Detect: joins the detectors. Common text is examined whole; large text, in parallel pieces.
 
-// Detect: texto comum é examinado inteiro; texto grande, em pedaços paralelos.
+// Detect: common text is examined whole; large text, in parallel pieces.
 
-// Detect devolve os trechos sensíveis de s (sem sobreposição resolvida).
+// Detect returns the sensitive pieces of s (without resolving overlaps).
 func (m *Masker) Detect(s string) []Finding { return m.detect(s, true) }
 
-// detectar com aprende=false não lembra nada do que achar (conteúdo da internet): só
-// mascara onde aparece.
+// detect with learn=false remembers nothing of what it finds (internet content): it only masks
+// where it appears.
 func (m *Masker) detect(s string, learn bool) []Finding { return m.detectD(s, learn, nil) }
 
-// detectD: com a dica do comando que produziu o texto (nil = sem dica).
+// detectD: with the hint of the command that produced the text (nil = no hint).
 func (m *Masker) detectD(s string, learn bool, d *outputHint) []Finding {
 	out, _ := m.detectDE(s, learn, d, "")
 	return out
 }
 
-// detectDE: também com a extensão da dica (para os decisores); devolve os nomes decididos.
+// detectDE: also with the hint extension (for the deciders); returns the decided names.
 func (m *Masker) detectDE(s string, learn bool, d *outputHint, ext string) ([]Finding, []Decision) {
 	if len(s) > largeMin && !longBlock(s, largeMargin) {
 		return m.detectLargeE(s, learn, d, ext)
@@ -33,25 +32,25 @@ func (m *Masker) detectDE(s string, learn bool, d *outputHint, ext string) ([]Fi
 	return m.detectWholeE(s, learn, d, ext)
 }
 
-// Text grande é examinado em pedaços, em paralelo. Cada pedaço é examinado junto com uma
-// margem do texto vizinho dos dois lados, e só valem os achados que COMEÇAM dentro do
-// pedaço: assim, o que fica em cima de um corte (uma chave privada de várias linhas, um
-// número com a palavra-chave logo antes) é visto inteiro por um dos dois lados.
+// Large text is examined in pieces, in parallel. Each piece is examined together with a margin of
+// the neighboring text on both sides, and only the findings that START inside the piece count: this
+// way, what sits on top of a cut (a multi-line private key, a number with the keyword right before
+// it) is seen whole by one of the two sides.
 //
-// Os cortes e as bordas das janelas caem sempre num espaço em branco: uma "palavra" (uma
-// senha, um token, um bloco de base64, por maior que seja) nunca é dividida. Assim, só um
-// dado com espaços no meio E maior que a margem poderia ficar em cima de um corte; o único
-// desse tipo é o bloco "-----BEGIN ... -----END", e texto com um bloco maior que a margem é
-// examinado inteiro, de uma vez.
+// The cuts and the edges of the windows always fall on whitespace: a "word" (a password, a token, a
+// base64 block, however large) is never split. This way, only data with spaces in the middle AND
+// larger than the margin could sit on top of a cut; the only one of that kind is the "-----BEGIN
+// ... -----END" block, and text with a block larger than the margin is examined whole, at once.
 //
-// São variáveis só para os testes poderem usar tamanhos pequenos.
+// They are variables only so the tests can use small sizes.
 var (
-	largeMin    = 96 << 10 // acima disso, em pedaços
+	largeMin    = 96 << 10 // above this, in pieces
 	largePiece  = 48 << 10
-	largeMargin = 8 << 10 // maior que os dados sensíveis de várias linhas (chave RSA 4096 ≈ 3 KB)
+	largeMargin = 8 << 10 // larger than the multi-line sensitive data (RSA 4096 key ≈ 3 KB)
 )
 
-// longBlock: há um bloco "-----BEGIN" cujo "-----END" está a mais de limite bytes (ou falta)?
+// longBlock: is there a "-----BEGIN" block whose "-----END" is more than limit bytes away (or
+// missing)?
 func longBlock(s string, limitN int) bool {
 	for i := 0; ; {
 		j := strings.Index(s[i:], "-----BEGIN")
@@ -66,7 +65,7 @@ func longBlock(s string, limitN int) bool {
 	}
 }
 
-// detectWhole examina s de uma vez só.
+// detectWhole examines s at once.
 func (m *Masker) detectWhole(s string) []Finding { return m.detectWholeA(s, true) }
 
 func (m *Masker) detectWholeA(s string, learn bool) []Finding {
@@ -82,11 +81,11 @@ func (m *Masker) detectWholeE(s string, learn bool, d *outputHint, ext string) (
 	out := m.detectBase(s)
 	out = append(out, m.findStructure(s, learn, out, d)...)
 	newSet, dec := m.runDeciders(s, out, learn, ext)
-	dec = append(findingDecisions(out), dec...) // as dos leitores (antes dos achados dos decisores)
+	dec = append(findingDecisions(out), dec...) // the readers' ones (before the deciders' findings)
 	out = append(out, newSet...)
-	// Values que dependem de contexto são lembrados e reconhecidos depois em qualquer
-	// lugar (ver memory_known.go): sem isto, vazariam quando o modelo os repete sem a
-	// palavra-chave por perto e o histórico é reenviado.
+	// Values that depend on context are remembered and recognized later anywhere (see
+	// memory_known.go): without this, they would leak when the model repeats them without the
+	// keyword nearby and the history is resent.
 	for _, a := range out {
 		if learn {
 			m.learnIt(a.Type, a.Real)
@@ -102,7 +101,7 @@ func (m *Masker) detectWholeE(s string, learn bool, d *outputHint, ext string) (
 
 func blank(b byte) bool { return b == ' ' || b == '\n' || b == '\t' || b == '\r' }
 
-// detectLarge examina s em pedaços paralelos (ver o comentário acima).
+// detectLarge examines s in parallel pieces (see the comment above).
 func (m *Masker) detectLarge(s string, learn bool, d *outputHint) []Finding {
 	out, _ := m.detectLargeE(s, learn, d, "")
 	return out
@@ -110,14 +109,14 @@ func (m *Masker) detectLarge(s string, learn bool, d *outputHint) []Finding {
 
 func (m *Masker) detectLargeE(s string, learn bool, d *outputHint, ext string) ([]Finding, []Decision) {
 	type piece struct{ ini, end, jStart, jEnd int } // miolo [ini,fim) e janela [jStart,jEnd)
-	// depois: primeira posição >= i que vem logo depois de um espaço em branco (ou o fim)
+	// after: first position >= i that comes right after whitespace (or the end)
 	after := func(i int) int {
 		for i < len(s) && !(i > 0 && blank(s[i-1])) {
 			i++
 		}
 		return i
 	}
-	// antes: última posição <= i que vem logo depois de um espaço em branco (ou o começo)
+	// before: last position <= i that comes right after whitespace (or the start)
 	before := func(i int) int {
 		for i > 0 && !blank(s[i-1]) {
 			i--
@@ -130,9 +129,9 @@ func (m *Masker) detectLargeE(s string, learn bool, d *outputHint, ext string) (
 		if end >= len(s) {
 			end = len(s)
 		} else if k := strings.LastIndexByte(s[ini:end], '\n'); k > largePiece/2 {
-			end = ini + k + 1 // de preferência, numa quebra de linha
+			end = ini + k + 1 // preferably, at a line break
 		} else {
-			end = after(end) // senão, no próximo espaço: uma "palavra" nunca é cortada
+			end = after(end) // otherwise, at the next space: a "word" is never cut
 		}
 		ps = append(ps, piece{ini, end, before(max(0, ini-largeMargin)), after(min(len(s), end+largeMargin))})
 		ini = end
@@ -174,13 +173,13 @@ func (m *Masker) detectLargeE(s string, learn bool, d *outputHint, ext string) (
 			add(a.Start, a.End, a.Type)
 		}
 	})
-	// estrutura (objetos) e tabelas: no texto inteiro (uma estrutura pode passar de um pedaço)
+	// structure (objects) and tables: on the whole text (a structure may span more than one piece)
 	out = append(out, m.findStructure(s, learn, out, d)...)
 	newSet, dec := m.runDeciders(s, out, learn, ext)
-	dec = append(findingDecisions(out), dec...) // as dos leitores (antes dos achados dos decisores)
+	dec = append(findingDecisions(out), dec...) // the readers' ones (before the deciders' findings)
 	out = append(out, newSet...)
-	// primeiro aprende TUDO, depois procura os valores conhecidos no texto inteiro: um valor
-	// ensinado no fim do texto é reconhecido também no começo
+	// first it learns EVERYTHING, then looks for the known values in the whole text: a value taught
+	// at the end of the text is recognized at the start too
 	for _, a := range out {
 		if learn {
 			m.learnIt(a.Type, a.Real)
@@ -194,11 +193,12 @@ func (m *Masker) detectLargeE(s string, learn bool, d *outputHint, ext string) (
 	return out, dec
 }
 
-// findStructure: os leitores de estrutura e de tabela, no texto sem o transporte (ver
-// normalization.go), com os achados de volta nas posições do original, e no original quando a
-// normalização tirou algo que traz nome. base: os achados dos detectores (para namesInLine).
-// d: a dica do comando que produziu o texto (call_command.go), ou nil. Depois dos leitores, as
-// listas homogêneas (objects_lists.go) usam o que já se sabe para tipar os itens que faltam.
+// findStructure: the structure and table readers, on the text without the transport (see
+// normalization.go), with the findings back at the positions of the original, and on the original
+// when normalization removed something that carries a name. base: the detectors' findings (for
+// namesInLine). d: the hint of the command that produced the text (call_command.go), or nil. After
+// the readers, the homogeneous lists (objects_lists.go) use what is already known to type the
+// missing items.
 func (m *Masker) findStructure(s string, learn bool, base []Finding, d *outputHint) []Finding {
 	readIt := func(s string, base []Finding) []Finding {
 		var out []Finding
@@ -223,7 +223,7 @@ func (m *Masker) findStructure(s string, learn bool, base []Finding, d *outputHi
 	if n.alsoRaw {
 		out = readIt(s, base)
 	}
-	var bt []Finding // os achados dos detectores, nas posições do texto limpo
+	var bt []Finding // the detectors' findings, at positions of the clean text
 	for _, a := range base {
 		if la, lb, ok := n.cleaned(s, a.Start, a.End); ok {
 			bt = append(bt, Finding{la, lb, a.Type, a.Real})

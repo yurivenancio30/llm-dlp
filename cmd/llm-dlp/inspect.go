@@ -1,7 +1,7 @@
 package main
 
-// Commands para conferir o llm-dlp: "ultima" (o que a API recebeu na última mensagem) e
-// "simular" (reproduz uma sessão antiga do Claude Code pelo llm-dlp, sem falar com a API).
+// Commands to inspect llm-dlp: "last" (what the API received in the last message) and "simulate"
+// (replays an old Claude Code session through llm-dlp, without talking to the API).
 
 import (
 	"bufio"
@@ -28,8 +28,8 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/proxy"
 )
 
-// ultima mostra as últimas mensagens da última requisição, do jeito que foram para a API.
-// Serve para conferir, durante o uso, o que saiu mascarado.
+// last shows the last messages of the last request, as they went to the API. It is for checking,
+// during use, what went out masked.
 func lastConv(args []string) error {
 	n := 2
 	if len(args) > 0 {
@@ -41,7 +41,7 @@ func lastConv(args []string) error {
 	if err != nil {
 		return err
 	}
-	// a conversa, mesmo mascarada, só sai para quem lê a chave (proxy/local.go)
+	// the conversation, even masked, only goes out to whoever reads the key (proxy/local.go)
 	key, err := mask.Key(config.Path("chave"))
 	if err != nil {
 		return err
@@ -77,20 +77,20 @@ func lastConv(args []string) error {
 	return nil
 }
 
-// seenMessage: uma mensagem da última requisição, com os textos que "llm-dlp last" mostra.
+// seenMessage: one message of the last request, with the texts "llm-dlp last" shows.
 type seenMessage struct {
 	hostRole string
 	texts    []string
 }
 
-// lastMessages lê as mensagens da última requisição mascarada, no formato da Anthropic
-// (messages) ou do Gemini (contents).
+// lastMessages reads the messages of the last masked request, in the Anthropic format (messages) or
+// the Gemini one (contents).
 func lastMessages(body []byte) []seenMessage {
 	var req struct {
 		Messages []struct {
 			Role    string `json:"role"`
 			Content any    `json:"content"`
-			// formato da OpenAI: as chamadas de ferramenta ficam fora do conteúdo
+			// OpenAI format: tool calls are outside the content
 			ToolCalls []struct {
 				Function struct {
 					Name      string `json:"name"`
@@ -102,14 +102,14 @@ func lastMessages(body []byte) []seenMessage {
 			Role  string `json:"role"`
 			Parts []any  `json:"parts"`
 		} `json:"contents"`
-		// Gemini CLI com a conta Google: a conversa do Gemini vai dentro de "request"
+		// Gemini CLI with the Google account: the Gemini conversation goes inside "request"
 		Request struct {
 			Contents []struct {
 				Role  string `json:"role"`
 				Parts []any  `json:"parts"`
 			} `json:"contents"`
 		} `json:"request"`
-		// Responses (o Codex): instruções e itens
+		// Responses (Codex): instructions and items
 		Instructions string `json:"instructions"`
 		Input        any    `json:"input"`
 	}
@@ -133,7 +133,7 @@ func lastMessages(body []byte) []seenMessage {
 	return append(out, responsesItems(req.Input)...)
 }
 
-// responsesItems: as mensagens do "input" do Responses (texto, chamada e resultado de ferramenta).
+// responsesItems: the messages of the Responses "input" (text, tool call and tool result).
 func responsesItems(entry any) []seenMessage {
 	if s, ok := entry.(string); ok {
 		return []seenMessage{{"user", []string{s}}}
@@ -177,8 +177,7 @@ func responsesItems(entry any) []seenMessage {
 	return out
 }
 
-// partTexts devolve os textos de uma mensagem do Gemini (texto, chamada e resultado de
-// ferramenta).
+// partTexts returns the texts of a Gemini message (text, tool call and tool result).
 func partTexts(parts []any) []string {
 	var out []string
 	for _, p := range parts {
@@ -202,8 +201,8 @@ func partTexts(parts []any) []string {
 	return out
 }
 
-// responseText: o resultado de uma ferramenta do Gemini. Os textos saem como texto (um por
-// linha, com o nome do campo quando há mais de um); o resto, em JSON.
+// responseText: the result of a Gemini tool. Texts come out as text (one per line, with the field
+// name when there is more than one); the rest, as JSON.
 func responseText(r any) string {
 	m, _ := r.(map[string]any)
 	var names []string
@@ -229,7 +228,7 @@ func responseText(r any) string {
 	return strings.Join(lines, "\n")
 }
 
-// contentTexts devolve os textos de uma mensagem (texto, resultado e entrada de ferramenta).
+// contentTexts returns the texts of a message (text, tool result and tool input).
 func contentTexts(c any) []string {
 	switch x := c.(type) {
 	case string:
@@ -259,12 +258,12 @@ func contentTexts(c any) []string {
 	return nil
 }
 
-// simular reproduz uma sessão antiga do Claude Code: remonta as requisições que o Claude
-// Code teria feito, passa cada uma pelo llm-dlp e as entrega a uma API falsa local, que só
-// devolve o último texto que recebeu. Nada vai para a internet. Confere, a cada requisição:
-// o proxy aceitou; nenhum valor que ele mesmo detectou sobrou em outro ponto da requisição;
-// a resposta voltou igual ao texto original; e as mensagens antigas saíram idênticas às da
-// requisição anterior (o cache da API depende disso). Só imprime contagens.
+// simulate replays an old Claude Code session: it rebuilds the requests Claude Code would have
+// made, passes each one through llm-dlp and delivers them to a local fake API, which only returns
+// the last text it received. Nothing goes to the internet. It checks, on every request: the proxy
+// accepted it; no value it detected itself was left in another part of the request; the response
+// came back equal to the original text; and the old messages went out identical to those of the
+// previous request (the API cache depends on it). It only prints counts.
 func simulate(args []string) error {
 	fs := flag.NewFlagSet("simulate", flag.ContinueOnError)
 	max := fs.Int("max", 400, "número máximo de requisições por sessão")
@@ -281,7 +280,7 @@ func simulate(args []string) error {
 		return err
 	}
 	for _, file := range fs.Args() {
-		// cópia do registro de pessoas e nenhum arquivo de hashes: a simulação não muda nada
+		// a copy of the people registry and no hash file: the simulation changes nothing
 		tmp, err := os.MkdirTemp("", "llm-dlp-simular-")
 		if err != nil {
 			return err
@@ -305,7 +304,7 @@ func simulate(args []string) error {
 }
 
 func simulateSession(file string, cfg config.Config, m *mask.Masker, limitN, window int) error {
-	// a API falsa: guarda o corpo que recebeu e devolve, em pedaços, o último texto
+	// the fake API: keeps the body it received and returns, in pieces, the last text
 	var received []byte
 	cutEcho := false
 	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -342,8 +341,8 @@ func simulateSession(file string, cfg config.Config, m *mask.Masker, limitN, win
 				"delta": map[string]any{"type": "text_delta", "text": string(rs[i:min(i+9, len(rs))])}})
 		}
 		ev("content_block_stop", map[string]any{"type": "content_block_stop", "index": 0})
-		// a escrita: a última chamada de ferramenta da conversa volta como se o modelo a tivesse
-		// escrito agora, com os pseudônimos que recebeu, em pedaços (como a API manda)
+		// the writing: the conversation's last tool call comes back as if the model had written it
+		// now, with the pseudonyms it received, in pieces (as the API sends it)
 		var contentList []any
 		for _, m := range req.Messages {
 			contentList = append(contentList, m.Content)
@@ -383,7 +382,7 @@ func simulateSession(file string, cfg config.Config, m *mask.Masker, limitN, win
 	}
 	var conversation []msg
 	total, next := 0, 0
-	previousOnes := map[int][32]byte{} // id da mensagem -> como saiu mascarada da última vez
+	previousOnes := map[int][32]byte{} // message id -> how it went out masked the last time
 	var (
 		reqs, refused, errs, roundTripDiff, withLeftover, leftovers, cacheChanged, images int
 		timings                                                                           []time.Duration
@@ -395,9 +394,9 @@ func simulateSession(file string, cfg config.Config, m *mask.Masker, limitN, win
 		writes, maskedWrites, writesDiff, writesWithLeftover, webWrites int
 		diffByTool                                                      = map[string]int{}
 	)
-	// a conversa de um subagente: no arquivo da sessão, vem marcada como lateral (isSidechain) e é
-	// pulada; no arquivo do próprio subagente (subagents/agent-*.jsonl), é toda lateral e é ela
-	// que se repete. Quem decide é a primeira mensagem do arquivo.
+	// a subagent's conversation: in the session file, it is marked as a side chain (isSidechain)
+	// and is skipped; in the subagent's own file (subagents/agent-*.jsonl), all of it is a side
+	// chain and it is what repeats. The first message of the file decides.
 	lateral, firstOne := false, true
 	for sc.Scan() && reqs < limitN {
 		var e struct {
@@ -430,7 +429,7 @@ func simulateSession(file string, cfg config.Config, m *mask.Masker, limitN, win
 		if role != "user" {
 			continue
 		}
-		// monta e envia a requisição, como o Claude Code faria neste ponto
+		// builds and sends the request, as Claude Code would at this point
 		msgs := make([]any, len(conversation))
 		for i, c := range conversation {
 			msgs[i] = c.raw
@@ -467,13 +466,13 @@ func simulateSession(file string, cfg config.Config, m *mask.Masker, limitN, win
 			reasons[rsn]++
 			continue
 		}
-		// 1) ida e volta. O eco cortado (o texto mascarado passou de 4000 bytes, mesmo com o
-		// original abaixo disso: o pseudônimo pode ser maior que o valor) não dá para comparar.
+		// 1) round trip. The cut echo (the masked text went over 4000 bytes, even with the
+		// original below that: the pseudonym can be longer than the value) cannot be compared.
 		if expected != "" && !cutEcho && response != expected {
 			roundTripDiff++
 		}
-		// 1b) a escrita: a chamada de ferramenta que "o modelo escreveu" com pseudônimos voltou
-		// igual à original? É o que o Claude Code grava no arquivo ou roda no terminal.
+		// 1b) the writing: did the tool call that "the model wrote" with pseudonyms come back equal
+		// to the original? It is what Claude Code writes to the file or runs in the terminal.
 		var contentList []any
 		for _, c := range conversation {
 			contentList = append(contentList, c.raw["content"])
@@ -483,7 +482,7 @@ func simulateSession(file string, cfg config.Config, m *mask.Masker, limitN, win
 			cameBack, ok := responseEntry(respBody)
 			switch {
 			case cfg.NoUnmask(name):
-				webWrites++ // vai para a internet: fica com os pseudônimos, de propósito
+				webWrites++ // goes to the internet: keeps the pseudonyms, on purpose
 			case ok:
 				writes++
 				orig, _ := json.Marshal(usage["input"])
@@ -514,7 +513,7 @@ func simulateSession(file string, cfg config.Config, m *mask.Masker, limitN, win
 				}
 			}
 		}
-		// 2) algo que o próprio llm-dlp detectou sobrou em outro ponto do que foi enviado?
+		// 2) was something llm-dlp detected itself left in another part of what was sent?
 		var env struct {
 			Messages []json.RawMessage `json:"messages"`
 		}
@@ -581,7 +580,7 @@ func simulateSession(file string, cfg config.Config, m *mask.Masker, limitN, win
 		if foundIt {
 			withLeftover++
 		}
-		// 3) as mensagens antigas saíram iguais às da requisição anterior?
+		// 3) did the old messages go out equal to those of the previous request?
 		if len(env.Messages) == len(conversation) {
 			changed := false
 			for i, c := range conversation {
@@ -634,10 +633,10 @@ func simulateSession(file string, cfg config.Config, m *mask.Masker, limitN, win
 	return nil
 }
 
-// rePseudoShape: o que tem a forma de um pseudônimo do llm-dlp (para contar o que sobrou).
+// rePseudoShape: what has the shape of an llm-dlp pseudonym (to count what was left).
 var rePseudoShape = regexp.MustCompile(`p\.[a-z2-7]{8}@d[a-z2-7]{4}\.invalid|\bh[a-z2-7]{8}\.invalid|\b[a-z]{1,5}_[a-z2-7]{8}\b|\b(?:[A-Z]{2,12}|[a-z]{2,12}|[A-Z][a-z]{1,11})-[a-z2-7]{8}\b|[Pp]essoa [a-z2-7]{8}|PESSOA [A-Z2-7]{8}`)
 
-// lastUse: a última chamada de ferramenta (tool_use) dos conteúdos das mensagens.
+// lastUse: the last tool call (tool_use) in the message contents.
 func lastUse(contentList []any) map[string]any {
 	for i := len(contentList) - 1; i >= 0; i-- {
 		blocks, _ := contentList[i].([]any)
@@ -650,7 +649,7 @@ func lastUse(contentList []any) map[string]any {
 	return nil
 }
 
-// responseEntry junta a entrada da chamada de ferramenta de uma resposta em streaming.
+// responseEntry joins the input of the tool call of a streaming response.
 func responseEntry(b []byte) ([]byte, bool) {
 	var out bytes.Buffer
 	foundIt := false
@@ -674,7 +673,7 @@ func responseEntry(b []byte) ([]byte, bool) {
 	return out.Bytes(), foundIt
 }
 
-// readSSEText junta o texto de uma resposta em streaming (ou devolve o corpo, se for um erro).
+// readSSEText joins the text of a streaming response (or returns the body, if it is an error).
 func readSSEText(body io.Reader) string {
 	b, _ := io.ReadAll(body)
 	if !bytes.Contains(b, []byte("data: ")) {
@@ -696,8 +695,8 @@ func readSSEText(body io.Reader) string {
 	return out.String()
 }
 
-// noReasoning devolve as mensagens como texto, sem os blocos de raciocínio (que por regra
-// da API não podem ser alterados; numa sessão que já passou pelo llm-dlp eles só têm pseudônimos).
+// noReasoning returns the messages as text, without the reasoning blocks (which by API rule cannot
+// be changed; in a session that already went through llm-dlp they only have pseudonyms).
 func noReasoning(msgs []json.RawMessage) string {
 	var b strings.Builder
 	var strip func(v any) any
@@ -731,7 +730,7 @@ func noReasoning(msgs []json.RawMessage) string {
 	return b.String()
 }
 
-// allTexts junta os textos de todas as mensagens (menos raciocínio e imagens).
+// allTexts joins the texts of all messages (except reasoning and images).
 func allTexts(msgs []any) []string {
 	var out []string
 	var rec func(v any)

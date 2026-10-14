@@ -14,11 +14,11 @@ import (
 	"sync"
 )
 
-// A chave secreta e os identificadores derivados dela (HMAC).
+// The secret key and the identifiers derived from it (HMAC).
 
 var b32 = base32.StdEncoding.WithPadding(base32.NoPadding)
 
-// Key carrega a chave de 256 bits de path, criando uma nova (0600) se não existir.
+// Key loads the 256-bit key from path, creating a new one (0600) if it does not exist.
 func Key(path string) ([]byte, error) {
 	b, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
@@ -26,11 +26,11 @@ func Key(path string) ([]byte, error) {
 		if _, err := rand.Read(k); err != nil {
 			return nil, err
 		}
-		// Grava a chave COMPLETA num arquivo temporário e só então a publica com link(),
-		// que é atômico e falha se o arquivo final já existir. Assim, se dois processos
-		// criarem ao mesmo tempo, só um vence e o outro lê a chave dele — e ninguém nunca
-		// lê uma chave pela metade. Sem isso, um sobrescreveria o outro e os hashes já
-		// gravados (pessoas.json) deixariam de bater, sem aviso.
+		// Writes the COMPLETE key to a temporary file and only then publishes it with link(), which
+		// is atomic and fails if the final file already exists. So, if two processes create it at
+		// the same time, only one wins and the other reads its key — and nobody ever reads a
+		// half-written key. Without this, one would overwrite the other and the hashes already
+		// written (pessoas.json) would stop matching, without warning.
 		tmp, err := os.CreateTemp(filepath.Dir(path), ".chave-*")
 		if err != nil {
 			return nil, err
@@ -67,18 +67,18 @@ func Key(path string) ([]byte, error) {
 	return k, nil
 }
 
-// Pseudo gera identificadores curtos e estáveis a partir da chave.
+// Pseudo generates short, stable identifiers from the key.
 type Pseudo struct {
 	key []byte
 	mu  sync.RWMutex
-	ids map[string]string // IDs já calculados (só em RAM): as mesmas palavras se repetem muito
+	ids map[string]string // IDs already computed (RAM only): the same words repeat a lot
 }
 
-const idsMax = 100_000 // passou disso, recomeça (limita a RAM)
+const idsMax = 100_000 // past this, start over (limits RAM)
 
 func NewPseudo(key []byte) *Pseudo { return &Pseudo{key: key, ids: map[string]string{}} }
 
-// ID devolve 8 caracteres base32 (40 bits) de HMAC(chave, tipo || valor normalizado).
+// ID returns 8 base32 characters (40 bits) of HMAC(key, type || normalized value).
 func (p *Pseudo) ID(typ, normValue string) string {
 	k := typ + "\x00" + normValue
 	p.mu.RLock()
@@ -97,7 +97,7 @@ func (p *Pseudo) ID(typ, normValue string) string {
 	return id
 }
 
-// Bits devolve n bytes do HMAC, para derivar números (ex.: prefixo de IP falso).
+// Bits returns n bytes of the HMAC, to derive numbers (e.g. the fake IP prefix).
 func (p *Pseudo) Bits(typ, normValue string, n int) []byte {
 	m := hmac.New(sha256.New, p.key)
 	m.Write([]byte(typ))

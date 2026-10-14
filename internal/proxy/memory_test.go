@@ -16,21 +16,20 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/mask"
 )
 
-// Memória da conversa e quem escreveu, de ponta a ponta. Names inventados,
-// de palavra comum, montados por partes.
+// Conversation memory and who wrote it, end to end. Made-up common-word names, built from parts.
 
 var (
 	nsWord  = "pag" + "amentos"
 	rePseNS = regexp.MustCompile(`\bns_[a-z2-7]{8}\b`)
-	// o inventário: o leitor de linha de comando decide o namespace
+	// the inventory: the command-line reader decides the namespace
 	inventory = "kubectl logs -n " + nsWord + " deploy/web --tail 10"
 )
 
-// resposta da API falsa, montada a partir do corpo que ela recebeu
+// response of the fake API, built from the body it received
 type fakeResp func(body []byte, w http.ResponseWriter)
 
-// buildMem: proxy com vistos e enviados.log em dir (o mesmo dir = o mesmo disco depois de um
-// "reinício"). Cada corpo que chega à API vai para *corpos.
+// buildMem: proxy with vistos and enviados.log in dir (the same dir = the same disk after a
+// "restart"). Each body that reaches the API goes to *bodies.
 func buildMem(t *testing.T, dir string, bodies *[][]byte, resp fakeResp) *httptest.Server {
 	t.Helper()
 	cfg := config.Default()
@@ -57,8 +56,8 @@ func buildMem(t *testing.T, dir string, bodies *[][]byte, resp fakeResp) *httpte
 	return px
 }
 
-// respText: um bloco de texto (com o pseudônimo do namespace no lugar de %s), em streaming
-// picotado ou em JSON.
+// respText: a text block (with the namespace pseudonym in place of %s), in chopped streaming or in
+// JSON.
 func respText(stream bool, template string) fakeResp {
 	return func(body []byte, w http.ResponseWriter) {
 		text := strings.ReplaceAll(template, "%s", rePseNS.FindString(string(body)))
@@ -74,7 +73,7 @@ func respText(stream bool, template string) fakeResp {
 	}
 }
 
-// commandResp: uma chamada de ferramenta com o comando (o pseudônimo no lugar de %s).
+// commandResp: a tool call with the command (the pseudonym in place of %s).
 func commandResp(stream bool, template string) fakeResp {
 	return func(body []byte, w http.ResponseWriter) {
 		cmd := strings.ReplaceAll(template, "%s", rePseNS.FindString(string(body)))
@@ -91,8 +90,8 @@ func commandResp(stream bool, template string) fakeResp {
 	}
 }
 
-// sendRead: manda a conversa e devolve o que o Claude Code recebeu: o texto e a entrada da
-// ferramenta (desmascarados).
+// sendRead: sends the conversation and returns what Claude Code received: the text and the tool
+// input (unmasked).
 func sendRead(t *testing.T, px *httptest.Server, stream bool, msgs []any) (text, entry string) {
 	t.Helper()
 	b, _ := json.Marshal(map[string]any{"model": "x", "max_tokens": 10, "stream": stream, "messages": msgs})
@@ -149,9 +148,10 @@ func inputCommand(t *testing.T, entry string) string {
 	return in["command"]
 }
 
-// O modelo usa o pseudônimo num comando, o proxy traduz para o nome; quando a chamada
-// volta no histórico, ela sai com o pseudônimo, a palavra traduzida entra na memória e a saída
-// seguinte com a palavra sai mascarada (numa conversa sem o inventário: só a tradução ensina).
+// The model uses the pseudonym in a command, the proxy translates it to the name; when the call
+// comes back in the history, it goes out with the pseudonym, the translated word enters the memory
+// and the next output with the word goes out masked (in a conversation without the inventory: only
+// the translation teaches).
 func TestMemoryTranslatedInCommand(t *testing.T) {
 	for _, stream := range []bool{true, false} {
 		var bodies [][]byte
@@ -177,7 +177,7 @@ func TestMemoryTranslatedInCommand(t *testing.T) {
 			t.Errorf("stream=%v: a saída com a palavra traduzida saiu em claro: %s", stream, ms[2])
 		}
 
-		// sem registro (outro processo): comportamento atual, a palavra comum passa
+		// without a registry (another process): current behavior, the common word passes
 		var othersSet [][]byte
 		px2 := buildMem(t, t.TempDir(), &othersSet, respText(false, "ok"))
 		sendRead(t, px2, false, conversation)
@@ -187,13 +187,13 @@ func TestMemoryTranslatedInCommand(t *testing.T) {
 	}
 }
 
-// Resposta com um pseudônimo traduzido e a mesma palavra escrita pelo próprio modelo no
-// mesmo bloco. Ao voltar no histórico, só a traduzida vira pseudônimo; na mensagem nova do
-// usuário a palavra comum fica como palavra (o contágio não leva palavra comum para a prosa:
-// mask/vocab_words.go). Vale também depois de um reinício (o registro está no
-// enviados.log, só com HMAC e pseudônimos).
+// A response with a translated pseudonym and the same word written by the model itself in the same
+// block. When it comes back in the history, only the translated one becomes a pseudonym; in the new
+// user message the common word stays a word (contagion does not carry a common word into prose:
+// mask/vocab_words.go). It also holds after a restart (the record is in enviados.log, only with
+// HMAC and pseudonyms).
 func TestMemoryWhoWroteEndToEnd(t *testing.T) {
-	template := "o namespace %s tem logs; " + nsWord + " tambem e uma palavra comum" // ASCII: o picote de 3 bytes não parte um caractere
+	template := "o namespace %s tem logs; " + nsWord + " tambem e uma palavra comum" // ASCII: the 3-byte chop does not split a character
 	for _, stream := range []bool{true, false} {
 		for _, restartN := range []bool{false, true} {
 			dir := t.TempDir()
@@ -233,7 +233,7 @@ func TestMemoryWhoWroteEndToEnd(t *testing.T) {
 	}
 }
 
-// Outra conversa, sem o inventário, não mascara a palavra comum (no mesmo processo).
+// Another conversation, without the inventory, does not mask the common word (in the same process).
 func TestMemoryOtherConversation(t *testing.T) {
 	var bodies [][]byte
 	px := buildMem(t, t.TempDir(), &bodies, respText(false, "ok"))
@@ -249,8 +249,8 @@ func TestMemoryOtherConversation(t *testing.T) {
 	}
 }
 
-// O que já foi enviado continua idêntico, byte a byte, depois que a memória passa a
-// conhecer o nome; os textos novos do mesmo pedido usam a memória.
+// What was already sent stays identical, byte for byte, after the memory comes to know the name;
+// the new texts of the same request use the memory.
 func TestMemoryDoesNotRewritePastEndToEnd(t *testing.T) {
 	var bodies [][]byte
 	px := buildMem(t, t.TempDir(), &bodies, respText(false, "entendi"))
@@ -270,8 +270,8 @@ func TestMemoryDoesNotRewritePastEndToEnd(t *testing.T) {
 			t.Fatalf("reenvio mudou a mensagem %d:\n%s\n%s", j, r[1][j], r[2][j])
 		}
 	}
-	// o inventário colado no texto novo continua nome (o leitor decide ali); a palavra comum na
-	// prosa fica como palavra (mask/vocab_words.go)
+	// the inventory pasted in the new text stays a name (the reader decides there); the common word
+	// in prose stays a word (mask/vocab_words.go)
 	if strings.Contains(r[1][2], "-n "+nsWord) || !strings.Contains(r[2][4], nsWord) {
 		t.Fatalf("texto novo: %s | %s", r[1][2], r[2][4])
 	}

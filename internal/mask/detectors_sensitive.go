@@ -9,14 +9,14 @@ import (
 	"unicode/utf8"
 )
 
-// Dados pessoais sensíveis da LGPD (art. 5º, II) escritos no meio do texto: cor ou raça,
-// religião, orientação sexual e identidade de gênero, partido político, sindicato e biometria.
-// Com o nome do campo ("religiao: X") quem cuida é a detecção pelo campo (fields.go); aqui é a
-// frase ("o paciente é evangélico", "filiado ao PSOL", "mulher parda"). Mascara só o valor, e só
-// depois de uma expressão que liga o valor a alguém: a palavra sozinha ("tela preta", "igreja
-// católica do bairro") fica. Os valores vêm das listas oficiais citadas em cada uma.
+// LGPD sensitive personal data (art. 5, II) written in the middle of the text: color or race,
+// religion, sexual orientation and gender identity, political party, trade union and biometrics.
+// With the field name ("religiao: X") the detection by field takes care of it (fields.go); here it
+// is the sentence ("o paciente é evangélico", "filiado ao PSOL", "mulher parda"). It masks only the
+// value, and only after an expression that ties the value to someone: the word alone ("tela preta",
+// "igreja católica do bairro") stays. The values come from the official lists cited in each one.
 
-// unaccentedRE: o texto do valor como regex que aceita com e sem acento.
+// unaccentedRE: the value's text as a regex that accepts it with and without accents.
 func unaccentedRE(v string) string {
 	var b strings.Builder
 	for _, r := range strings.ToLower(v) {
@@ -42,7 +42,7 @@ func unaccentedRE(v string) string {
 	return b.String()
 }
 
-// alternativas: as formas como regex, as mais longas primeiro (na alternância vale a primeira).
+// alternatives: the forms as a regex, the longest first (in an alternation the first one wins).
 func alternatives(vs []string, fn func(string) string) string {
 	vs = append([]string(nil), vs...)
 	sort.SliceStable(vs, func(i, j int) bool { return len(vs[i]) > len(vs[j]) })
@@ -53,7 +53,7 @@ func alternatives(vs []string, fn func(string) string) string {
 	return strings.Join(ps, "|")
 }
 
-// flexoes: "católic" -> católico, católica, católicos, católicas.
+// inflections: "católic" -> católico, católica, católicos, católicas.
 func inflections(radicais ...string) []string {
 	var out []string
 	for _, r := range radicais {
@@ -62,12 +62,12 @@ func inflections(radicais ...string) []string {
 	return out
 }
 
-// cor ou raça: as cinco categorias do IBGE (branca, preta, parda, amarela, indígena) e "negra",
-// que o IBGE usa como a soma de pretos e pardos.
+// color or race: the five IBGE categories (branca, preta, parda, amarela, indígena) and "negra",
+// which IBGE uses as the sum of pretos and pardos.
 var raceColorValues = append(inflections("branc", "pret", "pard", "amarel", "negr"), "indígena", "indígenas")
 
-// religião: os grupos da classificação de religiões do Censo do IBGE (2010, anexo 7), como
-// adjetivo de quem segue e como nome; e as igrejas que a classificação nomeia.
+// religion: the groups of the IBGE Census religion classification (2010, annex 7), as an adjective
+// of the follower and as a noun; and the churches the classification names.
 var religionValues = append(append(inflections("católic", "evangélic", "luteran", "presbiterian", "anglican",
 	"agnóstic", "muçulman", "islâmic", "judaic"),
 	"protestante", "protestantes", "pentecostal", "pentecostais", "neopentecostal", "neopentecostais",
@@ -87,22 +87,22 @@ var churchesIBGE = []string{"assembleia de deus", "congregação cristã do bras
 	"santos dos últimos dias", "igreja messiânica mundial", "seicho-no-ie", "hare krishna", "soka gakkai",
 	"santo daime", "união do vegetal"}
 
-// orientação sexual: as opções da Pesquisa Nacional de Saúde (IBGE, 2019: heterossexual,
-// homossexual, bissexual) e da ficha de cadastro do e-SUS APS (Ministério da Saúde: gay, lésbica,
+// sexual orientation: the options of the National Health Survey (IBGE, 2019: heterossexual,
+// homossexual, bissexual) and of the e-SUS APS registration form (Ministry of Health: gay, lésbica,
 // pansexual).
 var orientationValues = []string{"heterossexual", "heterossexuais", "homossexual", "homossexuais", "bissexual",
 	"bissexuais", "pansexual", "pansexuais", "gay", "gays", "lésbica", "lésbicas"}
 
-// identidade de gênero: as opções do e-SUS APS (homem/mulher cisgênero e transgênero, travesti,
-// não-binário) e as formas curtas "homem trans", "mulher trans".
+// gender identity: the e-SUS APS options (cisgender and transgender man/woman, travesti,
+// non-binary) and the short forms "homem trans", "mulher trans".
 var genderValues = []string{"homem cisgênero", "mulher cisgênero", "homem transgênero", "mulher transgênero",
 	"homem trans", "mulher trans", "cisgênero", "cisgêneros", "transgênero", "transgêneros", "transexual",
 	"transexuais", "travesti", "travestis", "não-binário", "não-binária", "não-binários", "não-binárias",
 	"não binário", "não binária"}
 
-// partidos: siglas e nomes dos órgãos partidários nos dados abertos do TSE (inclusive os extintos,
-// para filiação antiga). Sigla só em maiúsculas (PT, PL, PP também são outras coisas); nome que
-// também é palavra comum ("New", "Rede", "Avante") só com a primeira maiúscula ou tudo em maiúsculas.
+// parties: acronyms and names of the party bodies in TSE open data (including extinct ones, for old
+// memberships). Acronym only in uppercase (PT, PL, PP are also other things); a name that is also a
+// common word ("New", "Rede", "Avante") only with an initial capital or all uppercase.
 var partyAcronyms = []string{"AGIR", "AVANTE", "CIDADANIA", "DC", "DEM", "DEMOCRATA", "MDB", "MISSÃO", "MISSAO",
 	"MOBILIZA", "NOVO", "PATRIOTA", "PCB", "PCdoB", "PCDOB", "PC do B", "PCO", "PDT", "PHS", "PL", "PODE", "PODEMOS",
 	"PP", "PPL", "PRD", "PROS", "PRP", "PRTB", "PSB", "PSC", "PSDB", "PSD", "PSL", "PSOL", "PSTU", "PTB", "PT", "PV",
@@ -120,28 +120,29 @@ var partyNames = []string{"democracia cristã", "movimento democrático brasilei
 	"partido trabalhista brasileiro", "partido dos trabalhadores", "partido verde", "rede sustentabilidade",
 	"unidade popular"}
 
-// whoDeclares: a expressão de quem declara de si ("se declara", "autodeclarado"): a única que
-// vale para cor ou raça, porque "é preta" também é a cor de uma tela.
+// whoDeclares: the expression of someone declaring about themselves ("se declara",
+// "autodeclarado"): the only one that counts for color or race, because "é preta" is also the color
+// of a screen.
 const whoDeclares = `(?:se\s+(?:auto)?(?:declara|declarou|declaram|considera|considerou|identifica|identificou)(?:\s+como)?|(?:auto)?declarad[oa]s?(?:\s+como)?)`
 
-// whoIs: a expressão que liga o valor a uma pessoa ("é", "se declara", "tornou-se"), para os
-// valores que não têm outro sentido ("católico", "bissexual", "travesti").
+// whoIs: the expression that ties the value to a person ("é", "se declara", "tornou-se"), for the
+// values that have no other meaning ("católico", "bissexual", "travesti").
 const whoIs = `(?:é|sou|somos|são|era|eram|foi|fui|seja|sejam|se\s+(?:auto)?(?:declara|declarou|declaram|considera|considerou|diz|disse|identifica|identificou|assume|assumiu|tornou|converteu)(?:\s+(?:como|ser|ao|à|a|para\s+[oa]))?|tornou-se|converteu-se(?:\s+(?:ao|à|a|para\s+[oa]))?|convertid[oa]s?\s+(?:ao|à|a)|(?:auto)?declarad[oa]s?(?:\s+como)?|assumidamente|assumid[oa]s?)`
 
-// pessoa: substantivos que descrevem alguém ("mulher parda", "paciente evangélico").
+// person: nouns that describe someone ("mulher parda", "paciente evangélico").
 const personRE = `(?:homem|homens|mulher|mulheres|pessoa|pessoas|paciente|pacientes|cidad[ãa]o|cidad[ãa]os|cidad[ãa]s?|jovem|jovens|crian[cç]as?|idos[oa]s?|menor|menores|indiv[ií]duos?|rapaz|rapazes|mo[cç]as?|senhora?s?|v[ií]timas?|suspeit[oa]s?|cliente|clientes|funcion[aá]ri[oa]s?|aluno|aluna|alunos|alunas|casal|casais|filh[oa]s?|m[ãa]e|pai|esposa|marido|candidat[oa]s?|eleitor[a]?|eleitores|colaborador[a]?|empregad[oa]s?|segurad[oa]s?|benefici[aá]ri[oa]s?)`
 
 type sensitiveRule struct {
 	re *regexp.Regexp
-	// pistas: pedaços (em minúsculas, sem acento) dos quais pelo menos um tem de estar no texto
+	// clues: pieces (lowercase, unaccented) of which at least one has to be in the text
 	clues []string
 }
 
 var sensitiveRules = func() []sensitiveRule {
 	fa := func(vs []string) string { return alternatives(vs, unaccentedRE) }
 	exactly := func(vs []string) string { return alternatives(vs, regexp.QuoteMeta) }
-	// o valor é o grupo 1; antes, a expressão; depois, o valor não pode continuar (a borda é
-	// conferida em findSensitive, porque \b do Go não conhece letra acentuada)
+	// the value is group 1; before it, the expression; after it, the value cannot continue (the
+	// edge is checked in findSensitive, because Go's \b does not know accented letters)
 	r := func(before, value string, clues ...string) sensitiveRule {
 		return sensitiveRule{regexp.MustCompile(`(?:^|[^\p{L}\p{N}_])(?:` + before + `)[\s:=]+(` + value + `)`), clues}
 	}
@@ -167,14 +168,14 @@ var sensitiveRules = func() []sensitiveRule {
 	}
 }()
 
-// sindicato: o nome do sindicato depois de quem é filiado a ele ("sindicalizado no Sindicato dos
-// Metalúrgicos do ABC"). Filiação a sindicato é dado sensível; o nome sozinho, não.
+// trade union: the name of the union after someone who is a member of it ("sindicalizado no
+// Sindicato dos Metalúrgicos do ABC"). Union membership is sensitive data; the name alone is not.
 var reUnion = regexp.MustCompile(`(?i:sindicalizad[oa]s?|filiad[oa]s?|associad[oa]s?|membros?|delegad[oa]s?\s+sindica(?:l|is)|dirigentes?|diretor[a]?|presidente)\s+(?:a|ao|à|no|na|do|da|de)\s+(Sindicato|SINDICATO)\s`)
 
 var nameConnectors = setOf("de", "da", "do", "das", "dos", "e", "em", "no", "na", "nos", "nas", "a", "o")
 
-// unionNameEnd: onde acaba "Sindicato dos Metalúrgicos do ABC": palavras com maiúscula,
-// siglas e os conectores entre elas.
+// unionNameEnd: where "Sindicato dos Metalúrgicos do ABC" ends: capitalized words, acronyms and the
+// connectors between them.
 func unionNameEnd(s string, p int) int {
 	end := p
 	for q := p; q < len(s); {
@@ -202,9 +203,9 @@ func unionNameEnd(s string, p int) int {
 	return end
 }
 
-// biometria: o template de impressão digital no formato de intercâmbio de minúcias (ISO/IEC
-// 19794-2 e ANSI/INCITS 378: o registro começa por "FMR\0"), que costuma ir em base64 num JSON
-// ou numa coluna. Em base64, "FMR\0" começa por "Rk1SA".
+// biometrics: the fingerprint template in the minutiae interchange format (ISO/IEC 19794-2 and
+// ANSI/INCITS 378: the record starts with "FMR\0"), which usually goes in base64 in a JSON or a
+// column. In base64, "FMR\0" starts with "Rk1SA".
 func findBiometricTemplate(s string, add func(ini, end int, typ string)) {
 	b64 := func(c byte) bool { return isAlnum(c) || c == '+' || c == '/' || c == '=' }
 	for i := 0; ; {
@@ -221,16 +222,16 @@ func findBiometricTemplate(s string, add func(ini, end int, typ string)) {
 		if ini > 0 && b64(s[ini-1]) || end-ini < 32 {
 			continue
 		}
-		// os 8 primeiros caracteres são os 6 primeiros bytes do registro
+		// the first 8 characters are the first 6 bytes of the record
 		if d, err := base64.StdEncoding.DecodeString(s[ini : ini+8]); err == nil && strings.HasPrefix(string(d), "FMR\x00") {
 			add(ini, end, "sensivel")
 		}
 	}
 }
 
-// findSensitive roda as regras deste arquivo. baixo: s em minúsculas.
+// findSensitive runs the rules of this file. lower: s in lowercase.
 func findSensitive(s, lower string, add func(ini, end int, typ string)) {
-	letter := func(i int) bool { // s[i] começa uma letra ou dígito (também acentuada)
+	letter := func(i int) bool { // s[i] starts a letter or digit (also accented)
 		return i < len(s) && (isAlnum(s[i]) || s[i] >= 0xC3 || s[i] == '_')
 	}
 	for _, rg := range sensitiveRules {

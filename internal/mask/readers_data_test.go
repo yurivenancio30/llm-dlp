@@ -6,11 +6,12 @@ import (
 	"testing"
 )
 
-// Leitores de SQL, mensagens de erro, conexões e tabelas. Names fictícios.
+// SQL, error message, connection and table readers. Made-up names.
 
 var reAnyPseudo = regexp.MustCompile(`\b(?i:host|db|sch|t|c|proc|idx|usr|ns|svc|bkt|top)_[a-z2-7]{8}\b`)
 
-// mascara confere que cada nome de deve sumiu, que cada nome de fica ficou, e devolve a saída.
+// check verifies that each name in gone disappeared, that each name in stays stayed, and returns
+// the output.
 func check(t *testing.T, m *Masker, s string, gone, stays []string) string {
 	t.Helper()
 	out, _ := m.Mask(s)
@@ -27,7 +28,7 @@ func check(t *testing.T, m *Masker, s string, gone, stays []string) string {
 	return out
 }
 
-// typeOf: o tipo do pseudônimo que substituiu real (pelas entradas).
+// typeOf: the type of the pseudonym that replaced real (by the entries).
 func typeOf(m *Masker, s, real string) string {
 	_, ents := m.Mask(s)
 	for _, e := range ents {
@@ -52,17 +53,17 @@ func TestReaderSQL(t *testing.T) {
 			t.Errorf("%s: tipo %q, esperado %q", real, got, typ)
 		}
 	}
-	// Snowflake, minúsculas, com várias cláusulas
+	// Snowflake, lowercase, with several clauses
 	check(t, m, "create or replace table ANALYTICS_X.STG.TB_PEDIDO_X9 as select * from RAW_X.SRC.PEDIDOS_X1 where 1=1;",
 		[]string{"ANALYTICS_X", "STG", "TB_PEDIDO_X9", "RAW_X", "SRC", "PEDIDOS_X1"}, []string{"create or replace table ", " as select * from "})
-	// BigQuery: o nome inteiro entre crases
+	// BigQuery: the whole name between backticks
 	check(t, m, "SELECT col_a FROM `projeto-demo.dataset_x.tb_y_01` WHERE col_b IS NULL",
 		[]string{"projeto-demo", "dataset_x", "tb_y_01", "col_a", "col_b"}, []string{"`", "IS NULL"})
-	// PostgreSQL / SQL dentro de string de código
+	// PostgreSQL / SQL inside a code string
 	check(t, m, "INSERT INTO financeiro.tb_pedido_x9 (id_x, vl_total) VALUES (1, 2)", []string{"financeiro", "tb_pedido_x9", "vl_total", "id_x"}, []string{"INSERT INTO ", "VALUES (1, 2)"})
 	check(t, m, `cur.execute("SELECT vl_total FROM tb_pedido_x9 WHERE id = %s", (x,))`+"\nresultado = cur.fetchall()",
 		[]string{"tb_pedido_x9", "vl_total"}, []string{"cur.execute(", "cur.fetchall()", "resultado"})
-	// funções e palavras-chave ficam
+	// functions and keywords stay
 	check(t, m, "SELECT COUNT(*), MAX(dt_ref_x) FROM tb_pedido_x9 GROUP BY cd_loja_x ORDER BY 1", []string{"dt_ref_x", "cd_loja_x"}, []string{"COUNT(*)", "MAX(", "GROUP BY", "ORDER BY"})
 	check(t, m, "EXEC financeiro.sp_fecha_mes_x 2026", []string{"financeiro", "sp_fecha_mes_x"}, []string{"EXEC "})
 	if typeOf(m, "EXEC financeiro.sp_fecha_mes_x 2026", "sp_fecha_mes_x") != "obj.procedure" {
@@ -114,7 +115,7 @@ func TestReaderConnection(t *testing.T) {
 	check(t, m, "urn:li:dataset:(urn:li:dataPlatform:mssql,vendas_demo.financeiro.tb_pedido_x9,PROD)", []string{"vendas_demo", "financeiro", "tb_pedido_x9"}, []string{"urn:li:dataPlatform:mssql,", ",PROD)"})
 	check(t, m, "select * from {{ ref('stg_pedidos_x9') }} join {{ source('erp_x', 'tb_cliente_x2') }}", []string{"stg_pedidos_x9", "erp_x", "tb_cliente_x2"}, []string{"{{ ref('", "{{ source('"})
 	check(t, m, `SQLExecuteQueryOperator(task_id="t1", conn_id="conn_vendas_demo")`, []string{"conn_vendas_demo"}, []string{"task_id=\"t1\""})
-	// não é string de conexão
+	// not a connection string
 	for _, s := range []string{
 		"user = request.user\ndb = get_db()",
 		"a=1;b=2;c=3",
@@ -138,9 +139,9 @@ func TestReaderTable(t *testing.T) {
 		[]string{"tb_pedido_x9", "vl_total"}, []string{"TABLE_NAME", "(1 rows affected)"})
 	check(t, m, "+-----------------------+\n| Tables_in_vendas_demo |\n+-----------------------+\n| tb_pedido_x9          |\n+-----------------------+\n1 row in set (0.00 sec)\n",
 		[]string{"vendas_demo", "tb_pedido_x9"}, []string{"Tables_in_", "1 row in set"})
-	// cabeçalho de dados: colunas com cara de identificador
+	// data header: columns that look like identifiers
 	check(t, m, "cd_cliente_x,vl_total,dt_ref\n1,2,3\n4,5,6\n", []string{"cd_cliente_x", "vl_total", "dt_ref"}, []string{"1,2,3"})
-	// não é tabela de objeto: palavras simples e tabelas de documentação ficam
+	// not an object table: plain words and documentation tables stay
 	for _, s := range []string{
 		"nome,idade,cidade\nAna,30,BH\n",
 		"| Option | Description |\n|---|---|\n| a | b |\n",
@@ -152,8 +153,8 @@ func TestReaderTable(t *testing.T) {
 	}
 }
 
-// Name aprendido num formato é mascarado em outro formato e em prosa, em qualquer caixa.
-// Column não propaga.
+// A name learned in one format is masked in another format and in prose, in any case. A column does
+// not propagate.
 func TestNameLearnedInOtherFormat(t *testing.T) {
 	m := newTest(t)
 	m.Mask("SELECT vl_total_x7 FROM financeiro_x.tb_pedido_x9 WHERE id > 0")
@@ -170,8 +171,8 @@ func TestNameLearnedInOtherFormat(t *testing.T) {
 	if out, _ := m.Mask("soma de vl_total_x7 no relatório"); !strings.Contains(out, "vl_total_x7") {
 		t.Errorf("coluna não deveria propagar: %q", out)
 	}
-	// um nome visto só numa instrução de uma cláusula sem forma inequívoca (evidência fraca)
-	// não ensina; "UPDATE tb_x SET a = 1" tem forma inequívoca e ensina, em qualquer caixa
+	// a name seen only in a one-clause statement without an unambiguous shape (weak evidence) does
+	// not teach; "UPDATE tb_x SET a = 1" has an unambiguous shape and teaches, in any case
 	m2 := newTest(t)
 	m2.Mask("SELECT nome total FROM tb_fraca_x1")
 	if out, _ := m2.Mask("depois: tb_fraca_x1"); !strings.Contains(out, "tb_fraca_x1") {
@@ -179,7 +180,7 @@ func TestNameLearnedInOtherFormat(t *testing.T) {
 	}
 }
 
-// O SQL mascarado continua SQL: a instrução é reconhecida de novo e só os nomes mudaram.
+// Masked SQL is still SQL: the statement is recognized again and only the names changed.
 func TestMaskedSQLStaysValid(t *testing.T) {
 	m := newTest(t)
 	orig := "SELECT p.vl_total, [cd cliente] FROM vendas_demo.financeiro.tb_pedido_x9 AS p WHERE p.id_x = 10;"
@@ -202,7 +203,7 @@ func TestMaskedSQLStaysValid(t *testing.T) {
 	}
 }
 
-// Minúsculas com uma cláusula, quando a forma não deixa dúvida; prosa fica.
+// Lowercase with one clause, when the shape leaves no doubt; prose stays.
 func TestLowercaseSQLOneClause(t *testing.T) {
 	m := newTest(t)
 	for _, c := range []struct{ s, name string }{
@@ -230,7 +231,7 @@ func TestLowercaseSQLOneClause(t *testing.T) {
 	}
 }
 
-// Colunas e views públicas do information_schema e dos catálogos ficam.
+// Public columns and views of information_schema and of the catalogs stay.
 func TestVocabularyCatalogStays(t *testing.T) {
 	m := newTest(t)
 	for _, s := range []string{
@@ -245,7 +246,7 @@ func TestVocabularyCatalogStays(t *testing.T) {
 	}
 }
 
-// DSN do driver MySQL do Go e DSN do PDO.
+// Go MySQL driver DSN and PDO DSN.
 func TestDSNGoAndPDO(t *testing.T) {
 	m := newTest(t)
 	check(t, m, `db, err := sql.Open("mysql", "svc_app_x1:pw@tcp(db-mysql-x1:3306)/vendas_x1?parseTime=true")`,
@@ -262,7 +263,7 @@ func TestDSNGoAndPDO(t *testing.T) {
 	}
 }
 
-// Ajuste final 3: só é catálogo a tabela cujo cabeçalho tem forma de identificador.
+// Final adjustment 3: only a table whose header is shaped like an identifier is a catalog.
 func TestTableHeaderShapedLikeIdentifier(t *testing.T) {
 	m := newTest(t)
 	for _, s := range []string{

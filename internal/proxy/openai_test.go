@@ -16,9 +16,9 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/mask"
 )
 
-// O formato da OpenAI (Chat Completions), o do Copilot com provedor próprio, da xAI e do
-// endereço compatível do Gemini: nada real chega à API, a resposta volta real (inteira e em
-// streaming) e o arquivo que o agente escreve sai com o valor real.
+// The OpenAI format (Chat Completions), Copilot's with its own provider, xAI's and Gemini's
+// compatible endpoint: nothing real reaches the API, the response comes back real (whole and in
+// streaming) and the file the agent writes comes out with the real value.
 
 const (
 	oaEmail = "joao.silva@empresa-ficticia.com.br"
@@ -32,7 +32,7 @@ type oaRequest struct {
 	body       []byte
 }
 
-// buildOpenAI: proxy com os provedores "xai" e "gemini" apontando para uma API falsa.
+// buildOpenAI: proxy with the "xai" and "gemini" providers pointing to a fake API.
 func buildOpenAI(t *testing.T, resp func(p oaRequest, w http.ResponseWriter)) (*httptest.Server, *[]oaRequest) {
 	t.Helper()
 	cfg := config.Default()
@@ -64,7 +64,7 @@ func oaResponse(w http.ResponseWriter, msg map[string]any) {
 		"choices": []any{map[string]any{"index": 0, "finish_reason": "stop", "message": msg}}})
 }
 
-// oaConversation: uma conversa de agente no formato da OpenAI, com dado sensível em cada lugar.
+// oaConversation: an agent conversation in the OpenAI format, with sensitive data in each place.
 func oaConversation() map[string]any {
 	call := func(id, args string) map[string]any {
 		return map[string]any{"id": id, "type": "function", "function": map[string]any{"name": "bash", "arguments": args}}
@@ -91,7 +91,7 @@ func TestOpenAIMaskedOutbound(t *testing.T) {
 		oaResponse(w, map[string]any{"role": "assistant", "content": "ok"})
 	})
 	body, _ := json.Marshal(oaConversation())
-	// pelo provedor de formato "openai" e pelo endereço compatível do provedor do Gemini
+	// through the "openai" format provider and through the Gemini provider's compatible endpoint
 	for _, path := range []string{"/xai/v1/chat/completions", "/gemini/v1beta/openai/chat/completions"} {
 		st, _ := ask(t, "POST", px.URL+path, body, func(r *http.Request) { r.Header.Set("authorization", "Bearer chave-de-teste") })
 		if st != 200 {
@@ -136,7 +136,7 @@ func TestOpenAIMaskedOutbound(t *testing.T) {
 		if err := json.Unmarshal([]byte(a.ToolCalls[0].Function.Arguments), &args); err != nil || !strings.HasPrefix(args.Command, "ping -c1 ") {
 			t.Errorf("%s: os argumentos mascarados deviam continuar um JSON: %q", path, a.ToolCalls[0].Function.Arguments)
 		}
-		// o que não tinha dado sensível sai exatamente como o cliente mandou (espaços e tudo)
+		// what had no sensitive data goes out exactly as the client sent it (spaces and all)
 		if a.ToolCalls[1].Function.Arguments != `{ "command" : "date" }` {
 			t.Errorf("%s: argumentos sem dado sensível mudaram: %q", path, a.ToolCalls[1].Function.Arguments)
 		}
@@ -147,15 +147,15 @@ func TestOpenAIMaskedOutbound(t *testing.T) {
 			t.Errorf("%s: conteúdo em partes devia continuar em partes: %+v", path, req.Messages[4])
 		}
 	}
-	// a mesma conversa, mandada de novo, sai idêntica (o cache da API depende disso)
+	// the same conversation, sent again, goes out identical (the API cache depends on it)
 	ask(t, "POST", px.URL+"/xai/v1/chat/completions", body, nil)
 	if n := len(*requests); !bytes.Equal((*requests)[0].body, (*requests)[n-1].body) {
 		t.Errorf("a mesma requisição saiu diferente na segunda vez")
 	}
 }
 
-// A resposta sem streaming volta real: o texto e os argumentos da chamada de ferramenta (o que o
-// cliente grava num arquivo ou roda no terminal).
+// The response without streaming comes back real: the text and the arguments of the tool call (what
+// the client writes to a file or runs in the terminal).
 func TestOpenAIReturnWithoutStreaming(t *testing.T) {
 	px, _ := buildOpenAI(t, func(p oaRequest, w http.ResponseWriter) {
 		pse := rePseEmail.FindString(string(p.body))
@@ -188,15 +188,15 @@ func TestOpenAIReturnWithoutStreaming(t *testing.T) {
 	if err := json.Unmarshal([]byte(m.ToolCalls[0].Function.Arguments), &args); err != nil || args.Content != "AVISAR "+oaEmail+" \"hoje\"" {
 		t.Errorf("argumentos da escrita: %q (%v)", m.ToolCalls[0].Function.Arguments, err)
 	}
-	// o que vai para a internet segue com o pseudônimo
+	// what goes to the internet keeps the pseudonym
 	if strings.Contains(m.ToolCalls[1].Function.Arguments, oaEmail) || !rePseEmail.MatchString(m.ToolCalls[1].Function.Arguments) {
 		t.Errorf("a busca na internet devia seguir mascarada: %q", m.ToolCalls[1].Function.Arguments)
 	}
 }
 
-// Em streaming, o pseudônimo chega cortado entre dois pedaços, no texto e nos argumentos (que
-// são pedaços de um JSON): o cliente nunca recebe um pedaço de pseudônimo, e o que ele junta é o
-// valor real. O "[DONE]" continua sendo a última linha.
+// In streaming, the pseudonym arrives cut between two pieces, in the text and in the arguments
+// (which are pieces of a JSON): the client never receives a piece of a pseudonym, and what it joins
+// is the real value. "[DONE]" is still the last line.
 func TestOpenAIReturnStreaming(t *testing.T) {
 	for _, withEnd := range []bool{true, false} {
 		px, _ := buildOpenAI(t, func(p oaRequest, w http.ResponseWriter) {
@@ -271,8 +271,8 @@ func TestOpenAIReturnStreaming(t *testing.T) {
 	}
 }
 
-// Arquivo anexado que não dá para verificar (áudio) não sai: vai uma nota no lugar. E um campo
-// que o llm-dlp não conhece é mascarado por precaução.
+// An attached file that cannot be checked (audio) does not go out: a note goes in its place. And a
+// field llm-dlp does not know is masked as a precaution.
 func TestOpenAIAttachmentAndUnknownField(t *testing.T) {
 	px, requests := buildOpenAI(t, func(p oaRequest, w http.ResponseWriter) {
 		oaResponse(w, map[string]any{"role": "assistant", "content": "ok"})

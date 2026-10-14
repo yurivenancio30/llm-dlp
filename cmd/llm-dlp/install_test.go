@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// A trava acrescenta só o que é dela, preserva o resto e é removida sem deixar rastro.
+// The lock adds only what is its own, keeps the rest and is removed without a trace.
 func TestLockRoundTrip(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "managed-settings.json")
 	orig := `{"permissions": {"deny": ["Bash(rm -rf *)"]}, "env": {"HTTPS_PROXY": "http://proxy:3128"}, "outra": true}`
@@ -16,7 +16,7 @@ func TestLockRoundTrip(t *testing.T) {
 	if _, err := applyLock(p, 8787, false); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := applyLock(p, 8787, false); err != nil { // de novo: não duplica
+	if _, err := applyLock(p, 8787, false); err != nil { // again: does not duplicate
 		t.Fatal(err)
 	}
 	var s map[string]any

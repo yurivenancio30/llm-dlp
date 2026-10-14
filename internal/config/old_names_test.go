@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// Um config.json da 0.8.0 (todos os campos com o nome antigo e valores fora do padrão).
+// A 0.8.0 config.json (all fields with the old name and non-default values).
 const oldConfig = `{
   "porta": 9999,
   "upstream": "https://api.anthropic.com",
@@ -34,7 +34,7 @@ const oldConfig = `{
 func expectedFromOld() Config {
 	c := Default()
 	c.Port = 9999
-	c.Providers["gemini"] = Provider{Upstream: "https://g.example", Format: "gemini"} // soma aos padrões
+	c.Providers["gemini"] = Provider{Upstream: "https://g.example", Format: "gemini"} // adds to the defaults
 	c.InternalDomains, c.EmailsLiberados, c.AllowedEmailDomains = []string{"acme"}, []string{"a@b.c"}, []string{"example.com"}
 	c.HostRoles = []string{"mysql"}
 	c.ExtraPatterns = []ExtraPattern{{Label: "CONTRATO", Regex: "CT-[0-9]+"}}
@@ -50,7 +50,7 @@ func expectedFromOld() Config {
 	return c
 }
 
-// Os nomes antigos continuam valendo: o arquivo da 0.8.0 é lido inteiro.
+// The old names still apply: the 0.8.0 file is read in full.
 func TestConfigWithOldNames(t *testing.T) {
 	c := Default()
 	if err := Read([]byte(oldConfig), &c); err != nil {
@@ -61,9 +61,9 @@ func TestConfigWithOldNames(t *testing.T) {
 	}
 }
 
-// update: o arquivo passa para os nomes novos (e é lido igual) e, ao voltar para uma versão
-// anterior, de volta para os antigos, que a 0.8.0 lia (um leitor só com os nomes antigos acha
-// tudo). Campo desconhecido fica.
+// update: the file moves to the new names (and is read the same) and, when going back to an earlier
+// version, back to the old ones, which 0.8.0 read (a reader with only the old names finds
+// everything). An unknown field stays.
 func TestMigrateFileRoundTrip(t *testing.T) {
 	t.Setenv("LLM_DLP_HOME", t.TempDir())
 	p := Path("config.json")

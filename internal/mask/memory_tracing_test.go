@@ -5,9 +5,9 @@ import (
 	"testing"
 )
 
-// O conhecimento acumulado (aprendido em textos anteriores, ou de antes de um reinício) segue
-// as regras do rastreamento: palavra comum aprendida não volta em todo texto, nome com cara de
-// identificador volta, vocabulário público nunca.
+// The accumulated knowledge (learned in previous texts, or from before a restart) follows the
+// tracing rules: a learned common word does not come back in every text, an identifier-shaped name
+// comes back, public vocabulary never.
 func TestAccumulatedKnowledgeFollowsRules(t *testing.T) {
 	m := newTest(t)
 	m.Mask("SELECT id FROM erro JOIN tb_pedido_cli ON 1=1 JOIN linhagem ON 1=1;")
@@ -22,9 +22,9 @@ func TestAccumulatedKnowledgeFollowsRules(t *testing.T) {
 	}
 }
 
-// SQL cortado sem ";" (saída de grep, head, log) seguido de outra coisa: a instrução acaba
-// onde a linha de antes está completa e a seguinte é uma palavra solta; nomes de arquivo de
-// uma listagem não viram tabela.coluna. SQL formatado em várias linhas continua sendo lido.
+// SQL cut without ";" (grep, head or log output) followed by something else: the statement ends
+// where the line before is complete and the next one is a loose word; file names of a listing do
+// not become table.column. SQL formatted over several lines is still read.
 func TestCutSQLDoesNotSwallowListing(t *testing.T) {
 	m := newTest(t)
 	out, _ := m.Mask("SELECT a FROM t WHERE x = 1\nlinhagem.sql\nconfere.py\nrelatorio-novo.html\n")

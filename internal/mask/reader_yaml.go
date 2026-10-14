@@ -5,19 +5,19 @@ import (
 	"strings"
 )
 
-// Reader de configuração estruturada (YAML e JSON): o motor que lê por caminho, o despachante
-// que decide a família (Kubernetes, compose, CloudFormation, ARM, Helm, Ansible, CI) e os
-// auxiliares comuns. As regras de cada família estão nos arquivos reader_kubernetes.go,
-// reader_iac.go, reader_ansible.go e reader_ci.go.
+// Structured configuration reader (YAML and JSON): the engine that reads by path, the dispatcher
+// that decides the family (Kubernetes, compose, CloudFormation, ARM, Helm, Ansible, CI) and the
+// common helpers. Each family's rules are in the files reader_kubernetes.go, reader_iac.go,
+// reader_ansible.go and reader_ci.go.
 
 type yEnt struct {
 	path   []string
-	ids    []int // id de cada elemento do caminho (o contêiner dos filhos dele)
-	root   int   // id da raiz do documento
-	ki, kf int   // a chave (-1: item de lista)
-	vi, vf int   // o valor escalar, sem aspas (-1: sem valor na linha / aninhado)
+	ids    []int // id of each element of the path (the container of its children)
+	root   int   // id of the document root
+	ki, kf int   // the key (-1: list item)
+	vi, vf int   // the scalar value, unquoted (-1: no value on the line / nested)
 	tag    string
-	tmpl   bool // valor com {{ }} (template Helm/Jinja): não é tocado
+	tmpl   bool // value with {{ }} (Helm/Jinja template): not touched
 }
 
 func (e *yEnt) key() string { return e.path[len(e.path)-1] }
@@ -31,7 +31,7 @@ func (e *yEnt) parent() int {
 	return e.ids[len(e.ids)-2]
 }
 
-// limites para entrada patológica (memória e tempo): profundidade e número de entradas
+// limits for pathological input (memory and time): depth and number of entries
 const (
 	maxYAMLDepth = 32
 	maxEntsYAML  = 50_000
@@ -58,9 +58,9 @@ type yEl struct {
 	item bool
 }
 
-// readYAML: linhas com indentação de espaços (linha com tab na indentação não é YAML), itens
-// "- ", chaves simples ou entre aspas, valores simples, entre aspas, com tag (!Ref), em fluxo
-// ({a: b}, [a, b]) e blocos | > (pulados). "---" separa documentos.
+// readYAML: lines indented with spaces (a line with a tab in the indentation is not YAML), "- "
+// items, plain or quoted keys, plain, quoted, tagged (!Ref) and flow ({a: b}, [a, b]) values, and |
+// > blocks (skipped). "---" separates documents.
 func (w *yCollector) readYAML(s string) {
 	root := w.newOne()
 	var st []yEl
@@ -147,7 +147,7 @@ func (w *yCollector) readYAML(s string) {
 	}
 }
 
-// yamlKey: a chave que começa em p (simples ou entre aspas) e onde começa o valor.
+// yamlKey: the key that starts at p (plain or quoted) and where the value starts.
 func yamlKey(s string, p, end int) (ki, kf, vp int, ok bool) {
 	c := s[p]
 	if c == '"' || c == '\'' {
@@ -185,7 +185,7 @@ func yamlKey(s string, p, end int) (ki, kf, vp int, ok bool) {
 	return
 }
 
-// closeQuotes: a aspa que fecha a que está em s[p], na mesma linha (” e \" são escapes).
+// closeQuotes: the quote that closes the one at s[p], on the same line (” and \" are escapes).
 func closeQuotes(s string, p, end int) int {
 	q := s[p]
 	for j := p + 1; j < end; j++ {
@@ -208,7 +208,7 @@ func (w *yCollector) yamlValue(s string, path []string, ids []int, root, ki, kf,
 		v++
 	}
 	tag := ""
-	for v < end && (s[v] == '&' || s[v] == '!') { // âncora, tag
+	for v < end && (s[v] == '&' || s[v] == '!') { // anchor, tag
 		j := v
 		for j < end && s[j] != ' ' {
 			j++
@@ -255,7 +255,7 @@ func (w *yCollector) yamlValue(s string, path []string, ids []int, root, ki, kf,
 	}
 }
 
-// fluxo: {a: b, c: [d, e]} numa linha só. Devolve onde parou.
+// flow: {a: b, c: [d, e]} on a single line. Returns where it stopped.
 func (w *yCollector) stream(s string, i, end int, path []string, ids []int, root, depth int) int {
 	if depth > 20 {
 		return end
@@ -360,8 +360,8 @@ func (w *yCollector) scaleStream(s string, i, end int, path []string, ids []int,
 	return e
 }
 
-// readJSON: objetos JSON no meio do texto (começam com { seguido de chave entre aspas). Em
-// qualquer coisa que não seja JSON, larga o objeto e segue procurando.
+// readJSON: JSON objects in the middle of the text (they start with { followed by a quoted key). On
+// anything that is not JSON, drops the object and keeps looking.
 func (w *yCollector) readJSON(s string) {
 	type ctx struct {
 		obj, hasKey bool
@@ -483,8 +483,8 @@ func (w *yCollector) readJSON(s string) {
 	}
 }
 
-// ---------------------------------------------------------------------------------------
-// Vocabulário público e validação de valor
+// --------------------------------------------------------------------------------------- Public
+// vocabulary and value validation
 
 var publicDevopsSet = func() map[string]bool {
 	m := map[string]bool{}
@@ -500,7 +500,8 @@ var publicDevopsSet = func() map[string]bool {
 	return m
 }()
 
-// regiões e zonas dos provedores (formas oficiais): us-east-1, sa-east-1, southamerica-east1, europe-west1-b
+// providers' regions and zones (official forms): us-east-1, sa-east-1, southamerica-east1,
+// europe-west1-b
 var reRegion = regexp.MustCompile(`^(?:(?:us|eu|ap|sa|ca|me|af|il|mx|cn)(?:-gov)?-(?:east|west|north|south|central|northeast|southeast|northwest|southwest)-\d[a-z]?|(?:us|europe|asia|australia|southamerica|northamerica|me|africa)-[a-z]+\d(?:-[a-z])?)$`)
 
 func publicDevops(v string) bool {
@@ -516,7 +517,7 @@ func publicDevops(v string) bool {
 	return publicConnection(v)
 }
 
-// nome de recurso: letras, dígitos, _ . -; sem espaço, aspas, expressão ou caminho
+// resource name: letters, digits, _ . -; no space, quotes, expression or path
 var reResourceName = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9_.\-]{0,252}$`)
 
 func allDigits(v string) bool {
@@ -551,7 +552,7 @@ func addName(s string, a, b int, ent, rule string, strong bool, add func(ObjFind
 	add(ObjFinding{a, b, ent, rule, strong})
 }
 
-// addSegments: valor com interpolação (${...}): só os pedaços literais, e fracos.
+// addSegments: value with interpolation (${...}): only the literal pieces, and weak.
 func addSegments(s string, a, b int, ent, rule string, add func(ObjFinding)) {
 	for a < b {
 		j := strings.Index(s[a:b], "${")
@@ -580,7 +581,7 @@ func addSegments(s string, a, b int, ent, rule string, add func(ObjFinding)) {
 	}
 }
 
-// addARNOrName: nome que pode vir como ARN (arn:aws:eks:região:conta:cluster/nome).
+// addARNOrName: a name that may come as an ARN (arn:aws:eks:region:account:cluster/name).
 func addARNOrName(s string, a, b int, ent, rule string, add func(ObjFinding)) {
 	v := s[a:b]
 	if !strings.HasPrefix(v, "arn:") {
@@ -599,13 +600,13 @@ func addARNOrName(s string, a, b int, ent, rule string, add func(ObjFinding)) {
 }
 
 // ---------------------------------------------------------------------------------------
-// Reader de YAML/JSON estruturado: Kubernetes, kubeconfig, Helm, compose, CloudFormation, ARM,
-// Ansible (YAML) e pipelines de CI.
+// Structured YAML/JSON reader: Kubernetes, kubeconfig, Helm, compose, CloudFormation, ARM, Ansible
+// (YAML) and CI pipelines.
 
-// composeServiceKeys: as chaves de um serviço na especificação do Compose
-// (https://github.com/compose-spec/compose-spec/blob/main/05-services.md), mais a fusão "<<"
-// (serviço que herda tudo de uma âncora, "<<: *comum"). Um filho de "services:" com uma delas
-// é serviço, tenha imagem própria ou não.
+// composeServiceKeys: the keys of a service in the Compose specification
+// (https://github.com/compose-spec/compose-spec/blob/main/05-services.md), plus the "<<" merge (a
+// service that inherits everything from an anchor, "<<: *common"). A child of "services:" with one
+// of them is a service, whether or not it has its own image.
 var composeServiceKeys = setOf("image", "build", "ports", "environment", "env_file", "command", "entrypoint",
 	"depends_on", "volumes", "networks", "restart", "healthcheck", "deploy", "container_name", "hostname",
 	"labels", "expose", "links", "extends", "profiles", "working_dir", "user", "logging", "ulimits",
@@ -636,7 +637,7 @@ func findStructuredDevops(s string, add func(ObjFinding)) {
 		return
 	}
 	w := &yCollector{}
-	w.readYAML(s) // o JSON indentado também é lido linha a linha
+	w.readYAML(s) // indented JSON is also read line by line
 	if j {
 		w.readJSON(s)
 	}
@@ -655,7 +656,7 @@ func findStructuredDevops(s string, add func(ObjFinding)) {
 
 var reAPIVersion = regexp.MustCompile(`^(?:[a-z0-9.-]+/)?v\d+(?:(?:alpha|beta)\d+)?$`)
 
-// propriedades de CloudFormation que guardam o nome real do recurso
+// CloudFormation properties that hold the real resource name
 var cfnProps = map[string]string{"BucketName": "bucket", "DBInstanceIdentifier": "database", "DBClusterIdentifier": "database",
 	"DBName": "database", "DatabaseName": "database", "TableName": "tabela", "ServerName": "servidor", "ClusterName": "servidor",
 	"QueueName": "fila", "TopicName": "fila", "StreamName": "fila", "FunctionName": "servico", "RepositoryName": "repositorio",
@@ -667,13 +668,13 @@ var playWords = []string{"tasks", "roles", "become", "gather_facts", "vars", "ha
 
 func structureRules(s string, ents []yEnt, add func(ObjFinding)) {
 	children := map[int][]int{}
-	keys := map[int]map[string]int{} // contêiner -> chave -> primeira entrada
+	keys := map[int]map[string]int{} // container -> key -> first entry
 	rootDir := map[int]map[string]int{}
 	type resource struct{ api, kind string }
 	res := map[int]*resource{}
 	compose := map[int]bool{}
 	composeSvc := map[int]bool{}
-	composeDecl := map[int]map[string]bool{} // redes e volumes declarados no topo
+	composeDecl := map[int]map[string]bool{} // networks and volumes declared at the top
 	ci := map[int]bool{}
 	val := func(e *yEnt) string {
 		if e.vi < 0 || e.tmpl {
@@ -745,7 +746,7 @@ func structureRules(s string, ents []yEnt, add func(ObjFinding)) {
 		}
 		return r.kind, true
 	}
-	// Helm Chart.yaml: apiVersion v1/v2 + name + version, sem kind
+	// Helm Chart.yaml: apiVersion v1/v2 + name + version, no kind
 	chart := map[int]bool{}
 	for root, ks := range rootDir {
 		_, n := ks["name"]
@@ -761,7 +762,7 @@ func structureRules(s string, ents []yEnt, add func(ObjFinding)) {
 		e := &ents[i]
 		k := e.key()
 		v := val(e)
-		// Kubernetes: o recurso mais próximo (objeto com apiVersion e kind)
+		// Kubernetes: the closest resource (object with apiVersion and kind)
 		inK8s := false
 		for j := len(e.path) - 1; j >= 0; j-- {
 			c := e.root
@@ -796,7 +797,8 @@ func structureRules(s string, ents []yEnt, add func(ObjFinding)) {
 			case (e.path[0] == "networks" || e.path[0] == "volumes") && len(e.path) == 2 && e.ki >= 0:
 				addName(s, e.ki, e.kf, "servico", "compose", false, add)
 			case e.path[0] == "services" && len(e.path) == 4 && (e.path[2] == "networks" || e.path[2] == "volumes"):
-				// referência a rede/volume declarado no topo: "- rede", "rede:", "- volume:/caminho"
+				// reference to a network/volume declared at the top: "- net", "net:", "-
+				// volume:/path"
 				a, b := e.ki, e.kf
 				if e.ki < 0 {
 					a, b = e.vi, e.vf
@@ -811,7 +813,7 @@ func structureRules(s string, ents []yEnt, add func(ObjFinding)) {
 				}
 			}
 		}
-		// CloudFormation: Resources.<lógico>.Properties.<XxxName>
+		// CloudFormation: Resources.<logical>.Properties.<XxxName>
 		if len(e.path) == 4 && e.path[0] == "Resources" && e.path[2] == "Properties" && v != "" {
 			if ent, ok := cfnProps[k]; ok {
 				switch e.tag {
@@ -822,7 +824,7 @@ func structureRules(s string, ents []yEnt, add func(ObjFinding)) {
 				}
 			}
 		}
-		// ARM: resources[].name, com o tipo Microsoft.X/y ao lado; "[...]" é expressão
+		// ARM: resources[].name, with the Microsoft.X/y type beside it; "[...]" is an expression
 		if k == "name" && v != "" && v[0] != '[' && len(e.path) >= 3 && e.path[len(e.path)-2] == "-" && e.path[len(e.path)-3] == "resources" {
 			if t := child(e.parent(), "type"); t != nil && strings.HasPrefix(strings.ToLower(val(t)), "microsoft.") {
 				addAzureName(s, e.vi, e.vf, val(t), "arm", add)
@@ -844,7 +846,7 @@ func structureRules(s string, ents []yEnt, add func(ObjFinding)) {
 					break
 				}
 			}
-			if play { // padrão de hosts: a,b:c:&d:!e
+			if play { // hosts pattern: a,b:c:&d:!e
 				for x := e.vi; x < e.vf; {
 					y := x
 					for y < e.vf && s[y] != ',' && s[y] != ':' {

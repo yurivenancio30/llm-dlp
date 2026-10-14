@@ -5,36 +5,37 @@ import (
 	"strings"
 )
 
-// Freios e âncora da memória da conversa (ver docs/pt-BR/structures.md, seção Conhecer o nome).
+// Brakes and anchor of the conversation memory (see docs/structures.md, section Knowing the name).
 //
-//   - Programa: na saída de um comando, a palavra que está no texto do programa (o comando ou o
-//     script que ele executa) não é trocada pela memória; a exceção é a palavra que o proxy
-//     traduziu de um pseudônimo nesse comando (essa é nome, não programa). Uma regex
-//     '.*cpf.*' que o script escreveu sai como o script a escreveu.
-//   - Comentário e texto corrido: a memória não troca palavra comum (sem cara de identificador)
-//     dentro de comentário (--, #, //, /* */ na linha, fora de aspas) na frase do usuário ou do
-//     modelo; num dado (saída de ferramenta, arquivo lido), só a coluna e o índice ficam de
-//     fora: o nome de recurso que a requisição provou continua nome (procedência). Em texto corrido (três ou mais palavras
-//     de prosa seguidas), não troca a palavra comum que é nome de coluna ou de índice: é o
-//     vocabulário do modelo de dados (a coluna "nome" de um catálogo não troca o "nome" de uma
-//     frase), o mesmo motivo por que o vistos não propaga coluna. Name de recurso (namespace,
-//     tabela, bucket...) decidido num inventário continua valendo na prosa.
-//   - Âncora por posição: numa saída de comando com registros paralelos (3 ou mais linhas com o
-//     mesmo número de palavras, ±1), uma posição em que dois ou mais valores distintos já são
-//     nomes de um mesmo tipo é uma coluna desse tipo: os outros valores dela que podem ser nome
-//     (decidableWord, fora do programa) ganham o tipo, e os que estavam com o tipo genérico
-//     são corrigidos. É o que pega as colunas do catálogo que o head não mostrou.
+//   - Program: in the output of a command, the word that is in the program text (the command
+//     or the script it runs) is not swapped by the memory; the exception is the word the proxy
+//     translated from a pseudonym in that command (that one is a name, not program). A regex
+//     '.*cpf.*' the script wrote goes out as the script wrote it.
+//   - Comment and running text: the memory does not swap a common word (without identifier
+//     shape) inside a comment (--, #, //, /* */ on the line, outside quotes) in the user's or
+//     the model's sentence; in data (tool output, file read), only column and index stay out:
+//     the resource name the request proved stays a name (provenance). In running text (three
+//     or more prose words in a row), it does not swap the common word that is a column or
+//     index name: it is the data model vocabulary (the "nome" column of a catalog does not
+//     swap the "nome" of a sentence), the same reason why vistos does not propagate columns.
+//     A resource name (namespace, table, bucket...) decided in an inventory still applies in
+//     prose.
+//   - Anchor by position: in a command output with parallel records (3 or more lines with the
+//     same number of words, ±1), a position in which two or more distinct values are already
+//     names of the same type is a column of that type: its other values that can be names
+//     (decidableWord, outside the program) get the type, and those with the generic type are
+//     corrected. It is what catches the catalog columns head did not show.
 
-// memFilter: o que a memória não pode trocar num texto.
+// memFilter: what the memory cannot swap in a text.
 type memFilter struct {
-	prog map[uint32]bool // palavras do programa (a dica da saída)
-	// saida: o texto é dado (saída de ferramenta, arquivo lido), não frase do usuário nem do
-	// modelo. Aí vale a procedência (ver pula).
+	prog map[uint32]bool // program words (the output hint)
+	// output: the text is data (tool output, file read), not a sentence of the user or the model.
+	// There provenance applies (see skips).
 	output bool
 }
 
-// columnOrIndex: o vocabulário do modelo de dados, que a memória não leva para a prosa nem
-// para outro arquivo (o mesmo motivo por que o vistos não propaga coluna).
+// columnOrIndex: the data model vocabulary, which the memory does not carry into prose nor into
+// another file (the same reason why vistos does not propagate columns).
 func columnOrIndex(ent string) bool { return ent == "coluna" || ent == "indice" }
 
 func filterOf(hint string) memFilter {
@@ -46,37 +47,36 @@ func filterOf(hint string) memFilter {
 	return memFilter{prog: e.prog}
 }
 
-// pula: a memória não troca s[a:b] (o nome nm) aqui.
+// skips: the memory does not swap s[a:b] (the name nm) here.
 func (f memFilter) skips(s string, a, b int, nm *memName) bool {
 	v := s[a:b]
 	if identifierShape(v) {
-		// nome do cliente que o programa cita (o modelo o copiou de um dado) sai mascarado
-		// também na saída dele; o que o modelo escreveu por conta própria já é público
-		// (anterioridade)
+		// a client name the program cites (the model copied it from data) also goes out masked in
+		// its output; what the model wrote on its own is already public (priority)
 		return false
 	}
 	if f.prog != nil && f.prog[hpal(v)] {
 		return true
 	}
-	// procedência: num dado (saída de ferramenta, arquivo), o nome de recurso que esta
-	// requisição já provou (é o que está na memória) continua nome dentro de um comentário; a
-	// palavra comum só vale como palavra na frase do usuário ou do modelo
+	// provenance: in data (tool output, file), the resource name this request already proved (it is
+	// what is in the memory) stays a name inside a comment; the common word only counts as a word
+	// in the user's or the model's sentence
 	if inComment(s, a) && !(f.output && !columnOrIndex(nm.ent)) {
 		return true
 	}
 	return columnOrIndex(nm.ent) && inProse(s, a, b)
 }
 
-// inComment: s[a] está depois de um marcador de comentário na mesma linha (--, #, //, /*),
-// que começa a linha ou vem depois de um espaço, fora de aspas. Não são comentário: "--x"
-// colado numa letra ou dígito (opção de comando: --schema=x) e "#" seguido de dígito (#3).
+// inComment: s[a] is after a comment marker on the same line (--, #, //, /*), which starts the line
+// or comes after a space, outside quotes. These are not comments: "--x" glued to a letter or digit
+// (command option: --schema=x) and "#" followed by a digit (#3).
 func inComment(s string, a int) bool {
 	ini := lineStartJ(s, a)
 	l := s[ini:a]
 	var quote byte
 	for i := 0; i < len(l); i++ {
 		c := l[i]
-		if quote != 0 { // dentro de uma string: o marcador é texto
+		if quote != 0 { // inside a string: the marker is text
 			if c == '\\' {
 				i++
 			} else if c == quote {
@@ -91,7 +91,7 @@ func inComment(s string, a int) bool {
 		if i > 0 && l[i-1] != ' ' && l[i-1] != '\t' {
 			continue
 		}
-		after := byte(' ') // o que vem depois do marcador (pode ser o próprio nome, em s[a])
+		after := byte(' ') // what comes after the marker (may be the name itself, at s[a])
 		switch {
 		case c == '#':
 			if ini+i+1 < len(s) {
@@ -114,8 +114,8 @@ func inComment(s string, a int) bool {
 	return false
 }
 
-// inProse: s[a:b] está numa sequência de 3 ou mais palavras de letras separadas por um espaço
-// (texto corrido), contando a própria.
+// inProse: s[a:b] is in a sequence of 3 or more words of letters separated by one space (running
+// text), counting itself.
 func inProse(s string, a, b int) bool {
 	letters := func(x, y int) bool {
 		if y-x < 1 {
@@ -129,7 +129,7 @@ func inProse(s string, a, b int) bool {
 		return true
 	}
 	n := 1
-	// para trás
+	// backwards
 	for i, k := a, 0; k < 2; k++ {
 		if i < 2 || s[i-1] != ' ' {
 			break
@@ -145,7 +145,7 @@ func inProse(s string, a, b int) bool {
 		n++
 		i = x
 	}
-	// para a frente (pontuação de frase depois da palavra ainda conta)
+	// forwards (sentence punctuation after the word still counts)
 	for i, k := b, 0; k < 2; k++ {
 		for i < len(s) && strings.IndexByte(",.;:!?", s[i]) >= 0 {
 			i++
@@ -167,13 +167,14 @@ func inProse(s string, a, b int) bool {
 	return n >= 3
 }
 
-// anchorPositions: a âncora por posição (ver acima), sobre os trechos já decididos de s (em
-// ordem). Devolve os trechos com os novos e os corrigidos (sem pseudônimo nos novos).
+// anchorPositions: the anchor by position (see above), over the already decided pieces of s (in
+// order). Returns the pieces with the new and the corrected ones (without pseudonyms in the new
+// ones).
 func (l *Batch) anchorPositions(s string, ts []snippet, f memFilter) []snippet {
 	if f.prog == nil || len(ts) < 2 || strings.Count(s, "\n") < 2 || len(s) > maxCallText {
 		return ts
 	}
-	// o trecho que cobre cada posição
+	// the piece that covers each position
 	covers := func(a, b int) int {
 		i, j := 0, len(ts)
 		for i < j {
@@ -228,8 +229,8 @@ func (l *Batch) anchorPositions(s string, ts []snippet, f memFilter) []snippet {
 		block = append(block, r)
 	}
 	closeIt()
-	// por campo: linhas seguidas com o mesmo separador na mesma quantidade (a contagem de
-	// palavras pode variar dentro de um campo: "NUMBER(12,2)", uma lista de regex no fim)
+	// by field: consecutive lines with the same separator the same number of times (the word count
+	// may vary inside a field: "NUMBER(12,2)", a list of regexes at the end)
 	for _, b := range blocksByField(s, ls) {
 		newSet = append(newSet, l.anchorBlock(s, b, ts, covers, f, redo)...)
 	}
@@ -255,7 +256,7 @@ func (l *Batch) anchorBlock(s string, block [][][2]int, ts []snippet, covers fun
 	for _, r := range block {
 		maxN = max(maxN, len(r))
 	}
-	used := map[int]bool{} // palavra (início) já decidida neste bloco
+	used := map[int]bool{} // word (start) already decided in this block
 	for side := 0; side < 2; side++ {
 		for pos := 0; pos < maxN; pos++ {
 			at := func(r [][2]int) ([2]int, bool) {
@@ -268,7 +269,7 @@ func (l *Batch) anchorBlock(s string, block [][][2]int, ts []snippet, covers fun
 				}
 				return r[k], true
 			}
-			// os tipos dos valores já decididos nesta posição (por valor distinto)
+			// the types of the values already decided in this position (per distinct value)
 			byType := map[string]map[string]bool{}
 			n := 0
 			for _, r := range block {
@@ -277,8 +278,9 @@ func (l *Batch) anchorBlock(s string, block [][][2]int, ts []snippet, covers fun
 					continue
 				}
 				n++
-				// semente: o valor inteiro do campo (num nome qualificado, a última parte), com
-				// prova direta na mesma fonte; dedução não é semente (ver memory_tracing.go)
+				// seed: the whole value of the field (in a qualified name, the last part), with
+				// direct proof in the same source; a deduction is not a seed (see
+				// memory_tracing.go)
 				if i := lastCovering(ts, p[0], p[1]); i >= 0 && ts[i].End == p[1] && isObject(ts[i].Type) && ts[i].Type != objTypePrefix+genericEnt &&
 					!l.deduced(s[ts[i].Start:ts[i].End]) && l.provenAtSource(s[ts[i].Start:ts[i].End]) {
 					if byType[ts[i].Type] == nil {
@@ -298,7 +300,7 @@ func (l *Batch) anchorBlock(s string, block [][][2]int, ts []snippet, covers fun
 				}
 			}
 			if maxV < 2 || maxV*3 < totV*2 {
-				continue // menos de dois valores conhecidos, ou tipos misturados
+				continue // fewer than two known values, or mixed types
 			}
 			for _, r := range block {
 				p, ok := at(r)
@@ -310,14 +312,14 @@ func (l *Batch) anchorBlock(s string, block [][][2]int, ts []snippet, covers fun
 						redo[i] = typ
 					}
 					if ts[i].Start <= p[0] && ts[i].End >= p[1] || !strings.Contains(s[p[0]:p[1]], ".") {
-						continue // coberto inteiro (de um nome qualificado, só as partes que faltam)
+						continue // covered whole (of a qualified name, only the missing parts)
 					}
 				}
 				v := s[p[0]:p[1]]
 				if f.prog[hpal(v)] {
 					continue
 				}
-				// nome qualificado (a.b): cada parte, com o tipo da posição no último pedaço
+				// qualified name (a.b): each part, with the position's type in the last piece
 				ps := strings.Split(v, ".")
 				ents := entQual(len(ps), strings.TrimPrefix(typ, objTypePrefix))
 				a := p[0]
@@ -334,14 +336,14 @@ func (l *Batch) anchorBlock(s string, block [][][2]int, ts []snippet, covers fun
 	return newSet
 }
 
-// sortSnippets: em ordem de início.
+// sortSnippets: in start order.
 func sortSnippets(ts []snippet) {
 	sort.SliceStable(ts, func(i, j int) bool { return ts[i].Start < ts[j].Start })
 }
 
-// blocksByField: os blocos de 3 ou mais linhas seguidas em que um separador (| TAB ; ,) aparece
-// o mesmo número de vezes (1 ou mais); cada registro são os campos de uma palavra só (o campo
-// com espaço no meio, ou vazio, fica como posição sem valor).
+// blocksByField: the blocks of 3 or more consecutive lines in which a separator (| TAB ; ,) appears
+// the same number of times (1 or more); each record is the single-word fields (a field with a space
+// inside, or empty, stays as a position without a value).
 func blocksByField(s string, ls [][2]int) [][][][2]int {
 	var out [][][][2]int
 	for _, sep := range []byte{'|', '\t', ';', ','} {
@@ -372,7 +374,7 @@ func blocksByField(s string, ls [][2]int) [][][][2]int {
 			for i := ln[0]; i <= ln[1]; i++ {
 				if i < ln[1] && (s[i] == '"' || s[i] == '\'') {
 					if f := strings.IndexByte(s[i+1:ln[1]], s[i]); f >= 0 {
-						i += f + 1 // separador dentro de aspas não conta
+						i += f + 1 // a separator inside quotes does not count
 						continue
 					}
 				}
@@ -386,7 +388,7 @@ func blocksByField(s string, ls [][2]int) [][][][2]int {
 				for y > x && (s[y-1] == ' ' || s[y-1] == '\t' || s[y-1] == '\r') {
 					y--
 				}
-				// o valor sem o que o embrulha: aspas, parênteses, colchetes
+				// the value without what wraps it: quotes, parentheses, brackets
 				for x < y && strings.IndexByte("'\"`([{", s[x]) >= 0 {
 					x++
 				}
@@ -394,7 +396,7 @@ func blocksByField(s string, ls [][2]int) [][][][2]int {
 					y--
 				}
 				if x == y || strings.ContainsAny(s[x:y], " \t") {
-					r = append(r, [2]int{x, x}) // campo vazio ou com frase: posição sem valor
+					r = append(r, [2]int{x, x}) // empty field or one with a sentence: a position without a value
 				} else {
 					r = append(r, [2]int{x, y})
 				}
@@ -407,7 +409,7 @@ func blocksByField(s string, ls [][2]int) [][][][2]int {
 	return out
 }
 
-// noOverlap: os trechos novos em ordem, sem repetir nem sobrepor (fica o primeiro).
+// noOverlap: the new pieces in order, without repeating or overlapping (the first one stays).
 func noOverlap(ts []snippet) []snippet {
 	sortSnippets(ts)
 	out := ts[:0]

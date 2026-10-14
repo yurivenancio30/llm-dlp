@@ -4,9 +4,9 @@ import (
 	"strings"
 )
 
-// Name e sigla da empresa (os termos cadastrados) embutidos em identificadores.
+// Company name and acronym (the registered terms) embedded in identifiers.
 
-// normTerm: minúsculas, sem separadores ("Acme_Corp" -> "acmecorp").
+// normTerm: lowercase, no separators ("Acme_Corp" -> "acmecorp").
 func normTerm(v string) string {
 	var b strings.Builder
 	for i := 0; i < len(v); i++ {
@@ -24,8 +24,8 @@ func normTerm(v string) string {
 
 func identDot(c byte) bool { return isAlnum(c) || c == '_' || c == '-' || c == '.' }
 
-// findTerms: identificador que CONTÉM um termo cadastrado como pedaço ("acme_pedidos",
-// "dbAcmeVendas"). O termo sozinho fica com o detector de termos.
+// findTerms: identifier that CONTAINS a registered term as a piece ("acme_pedidos",
+// "dbAcmeVendas"). The term alone is left to the terms detector.
 func findTerms(s string, ts []string, add func(ObjFinding)) {
 	for _, t := range ts {
 		c0 := t[0]
@@ -56,7 +56,7 @@ func findTerms(s string, ts []string, add func(ObjFinding)) {
 	}
 }
 
-// hasPiece: o termo t (normalizado) é uma sequência de pedaços inteiros de id.
+// hasPiece: the term t (normalized) is a sequence of whole pieces of id.
 func hasPiece(id, t string) bool {
 	var ps [16][2]int
 	n, ok := keyPieces(id, &ps)
@@ -79,8 +79,8 @@ func hasPiece(id, t string) bool {
 	return false
 }
 
-// entPosition: a entidade indicada pelo que vem antes de s[a] na linha (host de URL, valor de
-// chave conhecida, nome depois de FROM/JOIN/DATABASE...); sem posição, serviço.
+// entPosition: the entity indicated by what comes before s[a] on the line (URL host, value of a
+// known key, name after FROM/JOIN/DATABASE...); with no position, service.
 func entPosition(s string, a int) string {
 	k := a
 	for k > 0 && a-k < 8 && (s[k-1] == ' ' || s[k-1] == '\t' || s[k-1] == '"' || s[k-1] == '\'' || s[k-1] == '`') {

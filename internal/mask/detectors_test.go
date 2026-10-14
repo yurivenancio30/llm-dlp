@@ -57,15 +57,15 @@ func TestDoesNotDetect(t *testing.T) {
 		"versão 2.1.280, porta 8080 em 127.0.0.1, dns 8.8.8.8",
 		"oid 1.3.6.1.4.1.311 e build 10.0.19045.1",
 		"run_id 123e4567-e89b-42d3-a456-426614174000 terminou",
-		"o cargo de gerente e o rg da tabela", // "rg" sem número
+		"o cargo de gerente e o rg da tabela", // "rg" without a number
 		"contato pelo fulano@example.com",
 		"commit 9f8e7d6c5b4a39281706f5e4d3c2b1a0 em 2026-10-02",
 		"a Rua do Comércio é longa",
 		"timestamp 1727894400123 e pedido 98765432109",
 		"p.abc12345@dxyz9.invalid já mascarado",
 		"IP falso 240.1.2.3 já mascarado",
-		"evento (1727894400 epoch) registrado",                  // timestamp entre parênteses não é telefone
-		"exception no concept 20261003-153000-1abc do receptor", // "cep" dentro de outra palavra, e uma data
+		"evento (1727894400 epoch) registrado",                  // a timestamp in parentheses is not a telephone
+		"exception no concept 20261003-153000-1abc do receptor", // "cep" inside another word, and a date
 		"CEP de teste: 20261003",                                // data escrita junta
 	}
 	for _, s := range cleanedOnes {
@@ -86,7 +86,7 @@ func TestIdempotentAndDeterministic(t *testing.T) {
 	if c, ents := m.Mask(a); c != a || len(ents) > 0 {
 		t.Fatalf("mascarar de novo mudou o texto (pseudônimo re-detectado): %q -> %q", a, c)
 	}
-	// nome e e-mail da mesma pessoa ganham o mesmo identificador
+	// name and e-mail of the same person get the same identifier
 	if !strings.Contains(a, "Pessoa ") {
 		t.Fatalf("nome não mascarado: %q", a)
 	}
@@ -94,11 +94,11 @@ func TestIdempotentAndDeterministic(t *testing.T) {
 	if !strings.Contains(a, "Pessoa "+pid) {
 		t.Errorf("nome e e-mail sem o mesmo id: %q", a)
 	}
-	// mesma sub-rede /24 continua na mesma sub-rede falsa, com o mesmo host
+	// the same /24 subnet stays in the same fake subnet, with the same host
 	if !strings.Contains(a, ".15") || !strings.Contains(a, ".80") {
 		t.Errorf("octeto do host não preservado: %q", a)
 	}
-	// outra chave -> outros pseudônimos
+	// another key -> other pseudonyms
 	m2, _ := NewMasker(m.cfg, []byte("ffffffffffffffffffffffffffffffff"), nil, nil)
 	if c, _ := m2.Mask(s); c == a {
 		t.Error("chave diferente gerou os mesmos pseudônimos")
@@ -127,7 +127,7 @@ func TestPasswords(t *testing.T) {
 		"clientSecret: aB3~xY9.kL2-mN8qR5tU1wZ4":      "aB3~xY9.kL2-mN8qR5tU1wZ4",
 		"SECRET: -FraseLongaSemDigito":                "-FraseLongaSemDigito",
 		"segredo: Ficticia@2024":                      "Ficticia@2024",
-		// na dúvida, mascara: nomes e referências com cara de valor também saem
+		// when in doubt, mask: names and references that look like values also go out
 		"secretRef: db-credentials":                   "db-credentials",
 		"existingPasswordSecret: mysql8-secrets":      "mysql8-secrets",
 		"password_file: /run/secrets/db_pass1":        "/run/secrets/db_pass1",
@@ -205,7 +205,7 @@ func TestExtraDetectors(t *testing.T) {
 		"hash GB82WESTxyz e código BR15 em análise",
 		"o título do relatório tem 123456789012 caracteres",
 		"placa de vídeo RTX4090 instalada",
-		"sexo;idade;uf\nF;34;MG\n", // quase identificadores: desligados por padrão
+		"sexo;idade;uf\nF;34;MG\n", // quasi-identifiers: off by default
 		"card_type: visa",
 		"status_code: 200\ncontent-type: application/json",
 		"curl -H \"Authorization: Bearer ${TOKEN}\" https://x.test",
@@ -220,28 +220,28 @@ func TestExtraDetectors(t *testing.T) {
 	}
 }
 
-// Name importado em qualquer grafia.
+// Imported name in any spelling.
 func TestNameAnySpelling(t *testing.T) {
 	m := newTest(t)
 	for _, s := range []string{"falei com joão silva ontem", "o JOAO CARLOS SILVA saiu", "Joao Carlos Silva", "ana paula souza aprovou"} {
-		// o pseudônimo segue a caixa do nome: Pessoa, PESSOA ou pessoa
+		// the pseudonym follows the case of the name: Pessoa, PESSOA or pessoa
 		if out, _ := m.Mask(s); !strings.Contains(strings.ToLower(out), "pessoa ") {
 			t.Errorf("nome não mascarado em %q: %q", s, out)
 		}
 	}
-	// palavras comuns que não são nome importado continuam intactas
+	// common words that are not an imported name stay intact
 	if out, _ := m.Mask("a silva e souza são sobrenomes comuns"); strings.Contains(strings.ToLower(out), "pessoa ") {
 		t.Errorf("falso positivo: %q", out)
 	}
 }
 
-// Segredo dentro de base64 (Secret do Kubernetes), sem palavra-chave por perto.
+// A secret inside base64 (Kubernetes Secret), without a keyword nearby.
 func TestSecretInBase64(t *testing.T) {
 	m := newTest(t)
 	enc := base64.StdEncoding.EncodeToString([]byte("ghp_k3Jd9sLq2mXv8RtY7wPz4nBc6HfG1aE5uQiO"))
 	for _, s := range []string{
 		"apiVersion: v1\nkind: Secret\ndata:\n  conexao: " + enc + "\n  outro: abc\n",
-		enc + "\nlinha seguinte", // na primeira linha (coluna do gitleaks tem outro deslocamento)
+		enc + "\nlinha seguinte", // on the first line (the gitleaks column has another offset)
 	} {
 		out, _ := m.Mask(s)
 		if strings.Contains(out, enc) || strings.Contains(out, enc[:20]) {
@@ -250,8 +250,8 @@ func TestSecretInBase64(t *testing.T) {
 	}
 }
 
-// Text grande vai ao gitleaks em janelas. Um segredo em qualquer posição, inclusive em cima
-// do corte, tem que ser achado como no texto inteiro.
+// Large text goes to gitleaks in windows. A secret in any position, including on top of the cut,
+// has to be found as in the whole text.
 func TestSecretAtWindowBoundary(t *testing.T) {
 	tok := "ghp_k3Jd9sLq2mXv8RtY7wPz4nBc6HfG1aE5uQiO"
 	line := "linha de log comum sem nada sensivel, status=200\n"
@@ -261,16 +261,16 @@ func TestSecretAtWindowBoundary(t *testing.T) {
 			t.Errorf("token na posição %d (janela de %d) passou", pos, leaksWindow)
 		}
 	}
-	// sem nenhuma quebra de linha (um bloco só)
+	// without any line break (a single block)
 	block := strings.Repeat("a ", leaksWindow/2-10) + "token=" + tok + " " + strings.Repeat("b ", leaksWindow)
 	if out, _ := newTest(t).Mask(block); strings.Contains(out, tok) {
 		t.Error("token em cima do corte, sem quebra de linha, passou")
 	}
 }
 
-// Item 1 e 2 (revisão externa): CPF e CNPJ válidos, só com dígitos, sem a palavra "cpf" por
-// perto e sem nome de coluna reconhecido. Reproduz uma consulta com UNION em que a coluna
-// recebeu o alias "valor": os valores saíam em claro.
+// Items 1 and 2 (external review): valid CPF and CNPJ, digits only, without the word "cpf" nearby
+// and without a recognized column name. Reproduces a query with UNION in which the column got the
+// alias "valor": the values went out in the clear.
 func TestDigitsOnlyDocumentWithoutContext(t *testing.T) {
 	cpf1 := strings.NewReplacer(".", "", "-", "").Replace(genCPF("318452760"))
 	cpf2 := strings.NewReplacer(".", "", "-", "").Replace(genCPF("529982247"))
@@ -291,8 +291,8 @@ func TestDigitsOnlyDocumentWithoutContext(t *testing.T) {
 	}
 }
 
-// As exceções do CPF/CNPJ sem contexto: pedaço de hash, parte decimal, número com versão e
-// carimbo de data e hora (14 dígitos) não são documentos.
+// The exceptions of CPF/CNPJ without context: a piece of a hash, a decimal part, a number with a
+// version and a date-time stamp (14 digits) are not documents.
 func TestDigitsOnlyDocumentExceptions(t *testing.T) {
 	cpf := strings.NewReplacer(".", "", "-", "").Replace(genCPF("318452760"))
 	stays := []string{

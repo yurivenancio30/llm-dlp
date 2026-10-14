@@ -19,40 +19,41 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/config"
 )
 
-// O supervisor segura a porta; o proxy só a recebe emprestada.
+// The supervisor holds the port; the proxy only borrows it.
 //
-// O supervisor abre a porta uma vez e a passa a cada proxy que sobe (como o systemd faz com
-// socket activation). Se o proxy cai, a porta continua aberta: as conexões esperam na fila do
-// kernel até o proxy seguinte, em vez de "Connection refused". O Claude Code manda requisições
-// no meio de um turno (depois de uma ferramenta) sem passar pelo hook que sobe o llm-dlp, e uma
-// porta vazia nessa hora era um erro na tela.
+// The supervisor opens the port once and passes it to each proxy it starts (as systemd does with
+// socket activation). If the proxy goes down, the port stays open: connections wait in the kernel
+// queue until the next proxy, instead of "Connection refused". Claude Code sends requests in the
+// middle of a turn (after a tool) without going through the hook that starts llm-dlp, and an empty
+// port at that moment was an error on the screen.
 //
-// Swap de versão (atualizar, recarregar): SIGHUP no supervisor. Ele sobe um proxy com o
-// binário instalado, na mesma porta, e espera o aviso de que está pronto; aí manda o antigo
-// sair (SIGUSR2: para de aceitar conexões e termina o que está em andamento) e se reexecuta com
-// o binário instalado, herdando a porta, a trava e os dois proxies. Se o novo não ficar pronto,
-// é parado, e o antigo segue. O resultado vai para troca.estado, que o atualizar lê.
+// Version swap (update, reload): SIGHUP to the supervisor. It starts a proxy with the installed
+// binary, on the same port, and waits for the notice that it is ready; then it tells the old one to
+// exit (SIGUSR2: stops accepting connections and finishes what is in progress) and re-executes
+// itself with the installed binary, inheriting the port, the lock and both proxies. If the new one
+// does not become ready, it is stopped, and the old one goes on. The result goes to troca.estado,
+// which update reads.
 //
-// Uma versão anterior a esta (o supervisor dela não segura a porta nem conhece o SIGHUP) é
-// trocada de outro jeito: um supervisor novo com --assumir espera a porta, o antigo é parado, e
-// a porta fica vazia só os milissegundos entre um fechar e o outro abrir.
+// A version older than this one (its supervisor does not hold the port nor know SIGHUP) is swapped
+// another way: a new supervisor with --assumir waits for the port, the old one is stopped, and the
+// port is empty only for the milliseconds between one closing and the other opening.
 
 const (
-	envPort    = "LLM_DLP_PORTA_FD"  // o proxy recebe a porta do supervisor no fd 3
-	envReady   = "LLM_DLP_PRONTO_FD" // e avisa no fd 4 quando já atende
+	envPort    = "LLM_DLP_PORTA_FD"  // the proxy receives the port from the supervisor on fd 3
+	envReady   = "LLM_DLP_PRONTO_FD" // and notifies on fd 4 when it is already serving
 	envInherit = "LLM_DLP_HERANCA"   // supervisor reexecutado: "porta trava proxy drenando"
 
-	stopDeadline = 3 * time.Second  // parar: o que der para terminar em poucos segundos (o parar espera 5)
-	swapDeadline = 10 * time.Minute // troca: a versão nova já atende; as respostas longas terminam
-	// graceDeadline: na troca, quanto as conexões já abertas ainda são atendidas pelo antigo. Os
-	// clientes HTTP largam uma conexão parada antes disso (o do Node, em 4 s).
+	stopDeadline = 3 * time.Second  // stop: whatever can be finished in a few seconds (stop waits 5)
+	swapDeadline = 10 * time.Minute // swap: the new version is already serving; long responses finish
+	// graceDeadline: during a swap, how long the connections already open are still served by the
+	// old one. HTTP clients drop an idle connection before that (Node's, in 4 s).
 	graceDeadline = 6 * time.Second
-	// readyDeadline: quanto o proxy novo tem para carregar a configuração e os registros
+	// readyDeadline: how long the new proxy has to load the configuration and the records
 	readyDeadline = 20 * time.Second
 )
 
-// servicePort: a porta emprestada pelo supervisor ou, sem ele (llm-dlp serve à mão), uma
-// aberta aqui. emprestada diz qual.
+// servicePort: the port lent by the supervisor or, without it (llm-dlp serve by hand), one opened
+// here. borrowed says which.
 func servicePort(address string) (ln net.Listener, borrowed bool, err error) {
 	if os.Getenv(envPort) == "" {
 		ln, err = net.Listen("tcp", address)
@@ -64,7 +65,7 @@ func servicePort(address string) (ln net.Listener, borrowed bool, err error) {
 	return ln, true, err
 }
 
-// notifyReady: diz ao supervisor que o proxy já atende (a troca espera por isso).
+// notifyReady: tells the supervisor the proxy is already serving (the swap waits for it).
 func notifyReady() {
 	if os.Getenv(envReady) != "" {
 		f := os.NewFile(4, "pronto")
@@ -73,13 +74,14 @@ func notifyReady() {
 	}
 }
 
-// serveUntilSignal atende até cair ou até um sinal. SIGTERM/SIGINT (parar): para de aceitar e dá
-// alguns segundos às respostas em andamento. SIGUSR2 (troca): o proxy novo já atende, então sem
-// pressa: para de aceitar conexões, mas o que ainda chegar pelas conexões já abertas (o Claude
-// Code as reaproveita) é atendido com "Connection: close", e o cliente abre a próxima no novo;
-// as que ficarem paradas só são fechadas depois de graceDeadline (fechar uma conexão parada no
-// instante em que o cliente manda por ela faria a requisição falhar). No fim, fim() grava o que
-// estiver pendente. Close a porta aqui não a tira do ar: ela é do supervisor.
+// serveUntilSignal serves until it goes down or until a signal. SIGTERM/SIGINT (stop): stops
+// accepting and gives a few seconds to responses in progress. SIGUSR2 (swap): the new proxy is
+// already serving, so no hurry: it stops accepting connections, but what still arrives on
+// connections already open (Claude Code reuses them) is served with "Connection: close", and the
+// client opens the next one on the new proxy; idle ones are only closed after graceDeadline
+// (closing an idle connection at the instant the client sends on it would make the request fail).
+// At the end, end() writes what is pending. Closing the port here does not take it offline: it
+// belongs to the supervisor.
 func serveUntilSignal(srv *http.Server, ln net.Listener, lg *log.Logger, end func()) error {
 	var exiting atomic.Bool
 	h := srv.Handler
@@ -110,7 +112,7 @@ func serveUntilSignal(srv *http.Server, ln net.Listener, lg *log.Logger, end fun
 		lg.Printf("saindo (%v, pid %d): terminando as respostas em andamento (até %s)", s, os.Getpid(), deadline)
 		ctx, cancel := context.WithTimeout(context.Background(), deadline)
 		defer cancel()
-		// (a porta já fechada na troca não é erro)
+		// (the port already closed during a swap is not an error)
 		if err := srv.Shutdown(ctx); err != nil && !errors.Is(err, net.ErrClosed) {
 			lg.Printf("saindo (pid %d): %v (respostas cortadas)", os.Getpid(), err)
 		}
@@ -122,19 +124,19 @@ func serveUntilSignal(srv *http.Server, ln net.Listener, lg *log.Logger, end fun
 	}
 }
 
-// childProxy: um proxy que o supervisor subiu (ou herdou ao se reexecutar).
+// childProxy: a proxy the supervisor started (or inherited when re-executing).
 type childProxy struct {
 	p   *os.Process
 	end chan error
 }
 
-// startProxy sobe "servir" com a porta emprestada e devolve o lado de leitura do aviso de
-// pronto. O nome antigo ("servir", não "serve"; "supervisionar" na reexecução e no garantir) é
-// de propósito: o binário instalado pode ser de uma versão anterior aos nomes em inglês (quem
-// voltou de versão), e toda versão entende o antigo. A porta vai como número cru (syscall.ForkExec), nunca por um *os.File: passar um
-// *os.File a um processo (exec.Cmd.ExtraFiles) chama Fd(), que põe o socket em modo
-// bloqueante, e o modo vale para todos os processos que o dividem. O proxy no ar ficaria
-// preso no accept e não conseguiria mais sair.
+// startProxy starts "servir" with the borrowed port and returns the read side of the ready notice.
+// The old name ("servir", not "serve"; "supervisionar" on re-execution and in ensure) is on
+// purpose: the installed binary may be from a version older than the English names (someone who
+// went back a version), and every version understands the old one. The port goes as a raw number
+// (syscall.ForkExec), never through an *os.File: passing an *os.File to a process
+// (exec.Cmd.ExtraFiles) calls Fd(), which puts the socket in blocking mode, and the mode applies to
+// every process sharing it. The running proxy would get stuck in accept and could no longer exit.
 func startProxy(bin string, port int, lg *log.Logger) (*childProxy, *os.File, error) {
 	r, w, err := os.Pipe()
 	if err != nil {
@@ -149,7 +151,7 @@ func startProxy(bin string, port int, lg *log.Logger) (*childProxy, *os.File, er
 	defer devnull.Close()
 	output := devnull.Fd()
 	if f := logFile(lg); f != nil {
-		output = f.Fd() // o log (arquivo comum: Fd() não muda nada)
+		output = f.Fd() // the log (a regular file: Fd() changes nothing)
 	}
 	var env []string
 	for _, v := range os.Environ() {
@@ -170,8 +172,8 @@ func startProxy(bin string, port int, lg *log.Logger) (*childProxy, *os.File, er
 	return inheritProxy(pid), r, nil
 }
 
-// inheritProxy: espera por um proxy filho deste processo (subido aqui, ou pelo supervisor
-// anterior antes de se reexecutar: continua filho).
+// inheritProxy: waits for a child proxy of this process (started here, or by the previous
+// supervisor before re-executing: it is still a child).
 func inheritProxy(pid int) *childProxy {
 	p, _ := os.FindProcess(pid)
 	f := &childProxy{p, make(chan error, 1)}
@@ -185,7 +187,7 @@ func inheritProxy(pid int) *childProxy {
 	return f
 }
 
-// waitReady: o aviso do proxy novo, ou o motivo de não ter vindo.
+// waitReady: the new proxy's notice, or the reason it did not come.
 func waitReady(f *childProxy, ready *os.File) error {
 	defer ready.Close()
 	came := make(chan bool, 1)
@@ -199,7 +201,7 @@ func waitReady(f *childProxy, ready *os.File) error {
 		if ok {
 			return nil
 		}
-		err := <-f.end // fechou sem avisar: saiu
+		err := <-f.end // closed without notice: it exited
 		f.end <- err
 		return fmt.Errorf("o proxy novo saiu sem ficar pronto (%v)", err)
 	case <-time.After(readyDeadline):
@@ -217,10 +219,10 @@ func stopProxy(f *childProxy) {
 	}
 }
 
-// supervisionar segura a porta e mantém um proxy no ar: se ele cair, sobe de novo (espera 1s,
-// 2s, 4s... até 10s; enquanto isso as conexões esperam na fila). SIGHUP troca o proxy pelo
-// binário instalado (ver o começo do arquivo). Com --assumir (quem chama é o atualizar, para
-// trocar uma versão anterior), espera a porta e a trava do supervisor antigo.
+// supervise holds the port and keeps a proxy running: if it goes down, it starts it again (waits
+// 1s, 2s, 4s... up to 10s; meanwhile connections wait in the queue). SIGHUP swaps the proxy for the
+// installed binary (see the top of the file). With --assumir (the caller is update, to swap an
+// earlier version), it waits for the port and the lock of the old supervisor.
 func supervise(args []string) error {
 	assume := hasArg(args, "--assumir")
 	lg := openLog()
@@ -235,10 +237,11 @@ func supervise(args []string) error {
 	}
 
 	var lock *os.File
-	var port int // o socket, como número cru (ver startProxy)
+	var port int // the socket, as a raw number (see startProxy)
 	var current *childProxy
 	if h := os.Getenv(envInherit); h != "" {
-		// reexecutado depois de uma troca: a porta, a trava e os proxies vêm do processo anterior
+		// re-executed after a swap: the port, the lock and the proxies come from the previous
+		// process
 		os.Unsetenv(envInherit)
 		var tfd, proxyPid, draining int
 		if n, _ := fmt.Sscanf(h, "%d %d %d %d", &port, &tfd, &proxyPid, &draining); n != 4 {
@@ -249,9 +252,9 @@ func supervise(args []string) error {
 		lock = os.NewFile(uintptr(tfd), "trava")
 		current = inheritProxy(proxyPid)
 		if draining > 0 {
-			inheritProxy(draining) // só para recolher quando sair
+			inheritProxy(draining) // only to reap when it exits
 		}
-		os.WriteFile(pidFile, []byte(mine), 0o600) // (o mesmo pid; grava de novo caso tenha sumido)
+		os.WriteFile(pidFile, []byte(mine), 0o600) // (the same pid; writes it again in case it disappeared)
 		lg.Printf("supervisor: agora no binário instalado (pid %d); proxy %d", os.Getpid(), proxyPid)
 	} else {
 		var err error
@@ -261,7 +264,7 @@ func supervise(args []string) error {
 		if err := syscall.Flock(int(lock.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err == nil {
 			os.WriteFile(pidFile, []byte(mine), 0o600)
 		} else if !assume {
-			return nil // já existe um supervisor
+			return nil // a supervisor already exists
 		} else {
 			go func() {
 				if syscall.Flock(int(lock.Fd()), syscall.LOCK_EX) == nil {
@@ -271,7 +274,7 @@ func supervise(args []string) error {
 		}
 		cfg, err := config.Load()
 		if err != nil {
-			cfg = config.Default() // a config pode ser o que quebrou; o proxy decide (emergência)
+			cfg = config.Default() // the config may be what broke; the proxy decides (emergency)
 		}
 		if port, err = openPort(address(cfg), assume, signals, lg); err != nil {
 			stripPid()
@@ -306,7 +309,8 @@ func supervise(args []string) error {
 			case err := <-current.end:
 				current = nil
 				if err == nil {
-					// saída intencional (troca de modo normal <-> emergência): volta na hora
+					// intentional exit (switch between normal mode and emergency): comes back right
+					// away
 					lg.Printf("supervisor: troca de modo; reiniciando já")
 					wait = time.Second
 					continue
@@ -333,9 +337,9 @@ func supervise(args []string) error {
 	}
 }
 
-// swapProxy sobe um proxy com o binário instalado e, pronto, manda o antigo sair e reexecuta
-// o supervisor no binário instalado. Devolve o proxy que fica no ar. O resultado vai para
-// troca.estado.
+// swapProxy starts a proxy with the installed binary and, once it is ready, tells the old one to
+// exit and re-executes the supervisor with the installed binary. Returns the proxy that stays
+// running. The result goes to troca.estado.
 func swapProxy(me string, port int, lock *os.File, old *childProxy, lg *log.Logger) *childProxy {
 	state := config.Path("troca.estado")
 	newOne, ready, err := startProxy(me, port, lg)
@@ -353,15 +357,16 @@ func swapProxy(me string, port int, lock *os.File, old *childProxy, lg *log.Logg
 	if old != nil {
 		old.p.Signal(syscall.SIGUSR2)
 		draining = old.p.Pid
-		// "ok" só quando o antigo largou o socket: daí em diante, só o novo aceita conexões
+		// "ok" only when the old one released the socket: from then on, only the new one accepts
+		// connections
 		if !waitRelease(draining, port, 2*time.Second) {
 			lg.Printf("supervisor: o proxy %d ainda segura a porta", draining)
 		}
 		lg.Printf("supervisor: proxy %d no ar; o %d termina o que está em andamento e sai", newOne.p.Pid, draining)
 	}
 	os.WriteFile(state, []byte("ok "+strconv.Itoa(newOne.p.Pid)), 0o600)
-	// o supervisor também passa para o binário instalado, sem soltar a porta nem a trava
-	tfd := int(lock.Fd()) // arquivo comum: Fd() não muda nada
+	// the supervisor also moves to the installed binary, without releasing the port or the lock
+	tfd := int(lock.Fd()) // a regular file: Fd() changes nothing
 	if err := noCloseOnExec(port, tfd); err == nil {
 		env := append(os.Environ(), fmt.Sprintf("%s=%d %d %d %d", envInherit, port, tfd, newOne.p.Pid, draining))
 		err = syscall.Exec(me, []string{me, "supervisionar"}, env)
@@ -372,8 +377,8 @@ func swapProxy(me string, port int, lock *os.File, old *childProxy, lg *log.Logg
 	return newOne
 }
 
-// waitRelease espera o processo pid não ter mais o socket da porta entre os seus arquivos
-// abertos (/proc/PID/fd). Sem /proc (fora do Linux), espera um pouco.
+// waitRelease waits until process pid no longer has the port's socket among its open files
+// (/proc/PID/fd). Without /proc (outside Linux), it waits a little.
 func waitRelease(pid, port int, deadline time.Duration) bool {
 	var st syscall.Stat_t
 	if err := syscall.Fstat(port, &st); err != nil {
@@ -401,7 +406,7 @@ func waitRelease(pid, port int, deadline time.Duration) bool {
 	return false
 }
 
-// noCloseOnExec deixa os fds passarem para o processo reexecutado.
+// noCloseOnExec lets the fds pass to the re-executed process.
 func noCloseOnExec(fds ...int) error {
 	for _, fd := range fds {
 		if _, _, e := syscall.Syscall(syscall.SYS_FCNTL, uintptr(fd), syscall.F_SETFD, 0); e != 0 {
@@ -411,10 +416,10 @@ func noCloseOnExec(fds ...int) error {
 	return nil
 }
 
-// openPort abre a porta do serviço e devolve o socket como número cru (ver startProxy).
-// Ocupada: com assumir (troca de uma versão anterior), avisa em supervisor.esperando e tenta
-// de novo a cada 2 ms até ela sair; sem, tenta de novo com espera crescente (outro programa,
-// ou um proxy antigo sem supervisor).
+// openPort opens the service port and returns the socket as a raw number (see startProxy). Taken:
+// with assume (swap of an earlier version), it notes it in supervisor.esperando and tries again
+// every 2 ms until the port is released; without it, tries again with growing waits (another
+// program, or an old proxy without a supervisor).
 func openPort(address string, assume bool, signals <-chan os.Signal, lg *log.Logger) (int, error) {
 	mark := config.Path("supervisor.esperando")
 	defer os.Remove(mark)
@@ -423,13 +428,13 @@ func openPort(address string, assume bool, signals <-chan os.Signal, lg *log.Log
 	for {
 		ln, err := net.Listen("tcp", address)
 		if err == nil {
-			// uma cópia do socket fora do runtime do Go (que fecharia ou mudaria o modo dele)
+			// a copy of the socket outside the Go runtime (which would close it or change its mode)
 			rc, err := ln.(*net.TCPListener).SyscallConn()
 			fd := -1
 			if err == nil {
 				rc.Control(func(s uintptr) { fd, err = syscall.Dup(int(s)) })
 			}
-			ln.Close() // a cópia mantém a porta aberta
+			ln.Close() // the copy keeps the port open
 			if err != nil {
 				return -1, err
 			}
@@ -465,8 +470,7 @@ func openPort(address string, assume bool, signals <-chan os.Signal, lg *log.Log
 	}
 }
 
-// installedBinary: onde o instalar e o atualizar põem o llm-dlp (e para onde apontam os
-// hooks do Claude Code).
+// installedBinary: where install and update put llm-dlp (and where the Claude Code hooks point).
 func installedBinary() string {
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -475,9 +479,9 @@ func installedBinary() string {
 	return filepath.Join(home, ".local", "bin", "llm-dlp")
 }
 
-// serviceBinary: o programa que o supervisor e o proxy rodam: o instalado, se existir; senão,
-// este. Não o de quem chamou: o install.sh roda o instalar de uma pasta temporária que apaga
-// logo depois, e um supervisor preso a esse arquivo não conseguiria mais subir o proxy.
+// serviceBinary: the program the supervisor and the proxy run: the installed one, if it exists;
+// otherwise, this one. Not the caller's: install.sh runs install from a temporary folder it deletes
+// right after, and a supervisor tied to that file could no longer start the proxy.
 func serviceBinary() string {
 	if d := installedBinary(); d != "" {
 		if st, err := os.Stat(d); err == nil && st.Mode().IsRegular() && st.Mode()&0o111 != 0 {
@@ -488,12 +492,12 @@ func serviceBinary() string {
 	return me
 }
 
-// supervisorUp: o pid do supervisor, se supervisor.pid aponta para um supervisor do llm-dlp
-// vivo (o número pode ter sido reaproveitado pelo sistema); 0 se não. Sem o arquivo, procura
-// quem segura a trava do supervisor e grava o arquivo de novo: na passagem da 0.7.0 para a
-// 0.8.0, o supervisor antigo apagava ao sair o arquivo que o novo tinha acabado de gravar, e
-// sem ele o update não achava o supervisor (trocava o proxy cortando a resposta em andamento,
-// e o supervisor nunca era atualizado) e o stop dizia que não havia supervisor.
+// supervisorUp: the supervisor's pid, if supervisor.pid points to a live llm-dlp supervisor (the
+// number may have been reused by the system); 0 if not. Without the file, it looks for whoever
+// holds the supervisor lock and writes the file again: when going from 0.7.0 to 0.8.0, the old
+// supervisor deleted on exit the file the new one had just written, and without it update did not
+// find the supervisor (it swapped the proxy cutting the response in progress, and the supervisor
+// was never updated) and stop said there was no supervisor.
 func supervisorUp() int {
 	pidFile := config.Path("supervisor.pid")
 	b, _ := os.ReadFile(pidFile)
@@ -507,15 +511,15 @@ func supervisorUp() int {
 	return 0
 }
 
-// isSupervisor: pid é um supervisor do llm-dlp ("supervisionar", o que o llm-dlp sobe: ver
-// startProxy; ou "supervise").
+// isSupervisor: pid is an llm-dlp supervisor ("supervisionar", what llm-dlp starts: see startProxy;
+// or "supervise").
 func isSupervisor(pid int) bool {
 	cmdline := commandLine(pid)
 	return strings.Contains(cmdline, "supervis") && strings.Contains(cmdline, "llm-dlp")
 }
 
-// lockOwner: o processo que segura o flock do arquivo trava, por /proc/locks (só no Linux;
-// 0 se ninguém segura ou se não dá para saber).
+// lockOwner: the process that holds the flock of the lock file, by /proc/locks (Linux only; 0 if
+// nobody holds it or if it cannot be known).
 func lockOwner(lockPath string) int {
 	st, err := os.Stat(lockPath)
 	if err != nil {
@@ -526,8 +530,8 @@ func lockOwner(lockPath string) int {
 	if err != nil {
 		return 0
 	}
-	// "231: FLOCK  ADVISORY  WRITE 57709 08:30:1297200 0 EOF"; quem espera a trava aparece
-	// numa linha com "->"
+	// "231: FLOCK ADVISORY WRITE 57709 08:30:1297200 0 EOF"; whoever waits for the lock appears on
+	// a line with "->"
 	for _, l := range strings.Split(string(b), "\n") {
 		c := strings.Fields(l)
 		if len(c) < 6 || c[1] != "FLOCK" {
@@ -541,7 +545,7 @@ func lockOwner(lockPath string) int {
 	return 0
 }
 
-// waitExit espera o processo pid terminar (até prazo).
+// waitExit waits for process pid to end (until the deadline).
 func waitExit(pid int, deadline time.Duration) bool {
 	for limitN := time.Now().Add(deadline); time.Now().Before(limitN); time.Sleep(20 * time.Millisecond) {
 		if syscall.Kill(pid, 0) != nil {

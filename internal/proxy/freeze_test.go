@@ -16,8 +16,8 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/mask"
 )
 
-// Proxy com vistos.json e enviados.log num diretório temporário (nunca em ~/.config).
-// Cada corpo que chega à "API" vai para *corpos.
+// Proxy with vistos.json and enviados.log in a temporary directory (never in ~/.config). Each body
+// that reaches the "API" goes to *bodies.
 func buildDisk(t *testing.T, dir string, bodies *[][]byte) *httptest.Server {
 	t.Helper()
 	cfg := config.Default()
@@ -59,7 +59,7 @@ func send(t *testing.T, px *httptest.Server, msgs []any) {
 	}
 }
 
-// mensagens: cada mensagem exatamente como saiu (bytes do corpo enviado à API)
+// messages: each message exactly as it went out (bytes of the body sent to the API)
 func messages(t *testing.T, body []byte) []string {
 	t.Helper()
 	var v struct {
@@ -79,14 +79,14 @@ func msg(hostRole string, content any) map[string]any {
 	return map[string]any{"role": hostRole, "content": content}
 }
 
-// senha montada por partes (ver o comentário em mask/memory_sent_test.go)
+// password built from parts (see the comment in mask/memory_sent_test.go)
 var weakTest = "gira" + "ssol"
 
 func urlWith(s string) string { return "mysql://app:" + s + "@db1:3306/base" }
 
-// (c) e (d): duas requisições seguidas com o mesmo histórico, com um valor aprendido no
-// meio (num texto curto, no fim da conversa), saem com o histórico byte a byte idêntico;
-// e o mesmo depois de um reinício do proxy.
+// (c) and (d): two consecutive requests with the same history, with a value learned in the middle
+// (in a short text, at the end of the conversation), go out with the history byte for byte
+// identical; and the same after a proxy restart.
 func TestHistorySameWhenLearning(t *testing.T) {
 	dir := t.TempDir()
 	var bodies [][]byte
@@ -95,7 +95,7 @@ func TestHistorySameWhenLearning(t *testing.T) {
 	conversation := []any{msg("user", "tentei "+s+" no login e não entrou")}
 	send(t, px, conversation)
 	conversation = append(conversation, msg("assistant", "vou olhar a conexão"), msg("user", "a url é "+urlWith(s)))
-	send(t, px, conversation) // aprende s, num texto curto no fim
+	send(t, px, conversation) // learns s, in a short text at the end
 	conversation = append(conversation, msg("assistant", "entendi"), msg("user", "testa "+s+" de novo"))
 	send(t, px, conversation)
 
@@ -114,7 +114,7 @@ func TestHistorySameWhenLearning(t *testing.T) {
 		t.Errorf("texto novo não usou o valor aprendido: %s | %s", r[1][2], r[2][4])
 	}
 
-	// o MESMO texto da primeira mensagem, agora numa mensagem nova: sai mascarado
+	// the SAME text of the first message, now in a new message: goes out masked
 	firstOne := "tentei " + s + " no login e não entrou"
 	conversation = append(conversation, msg("assistant", "certo"), msg("user", firstOne))
 	send(t, px, conversation)
@@ -133,14 +133,14 @@ func TestHistorySameWhenLearning(t *testing.T) {
 	conversation = conversation[:5]
 	r[2] = messages(t, bodies[2])
 
-	// reinício: memo vazio, mesmo diretório
+	// restart: empty memo, same directory
 	var bodies2 [][]byte
 	px2 := buildDisk(t, dir, &bodies2)
 	send(t, px2, conversation)
 	if got := messages(t, bodies2[0]); strings.Join(got, "\n") != strings.Join(r[2], "\n") {
 		t.Fatalf("depois do reinício o histórico mudou:\nantes:  %v\ndepois: %v", r[2], got)
 	}
-	// e texto novo depois do reinício continua mascarado (valor lembrado em vistos.json)
+	// and new text after the restart stays masked (value remembered in vistos.json)
 	conversation = append(conversation, msg("assistant", "ok"), msg("user", "e agora "+s+"?"))
 	send(t, px2, conversation)
 	if got := messages(t, bodies2[1]); strings.Contains(got[6], s) {
@@ -148,8 +148,8 @@ func TestHistorySameWhenLearning(t *testing.T) {
 	}
 }
 
-// (b) A senha de exemplo numa URL dentro do resultado de um WebFetch é mascarada ali, mas não
-// é lembrada (nem em RAM nem em vistos.json).
+// (b) The example password in a URL inside a WebFetch result is masked there, but is not remembered
+// (neither in RAM nor in vistos.json).
 func TestWebFetchResultDoesNotTeach(t *testing.T) {
 	dir := t.TempDir()
 	var bodies [][]byte
@@ -174,15 +174,15 @@ func TestWebFetchResultDoesNotTeach(t *testing.T) {
 		t.Errorf("valor vindo da web foi lembrado: %s", r[4])
 	}
 	var bodies2 [][]byte
-	px2 := buildDisk(t, dir, &bodies2) // reinício: só o que está em disco
+	px2 := buildDisk(t, dir, &bodies2) // restart: only what is on disk
 	send(t, px2, []any{msg("user", "outra conversa: "+ex+" aparece aqui")})
 	if r := messages(t, bodies2[0]); !strings.Contains(r[0], ex) {
 		t.Errorf("valor vindo da web foi gravado em vistos.json: %s", r[0])
 	}
 }
 
-// (e) Ferramenta de conector do claude.ai (roda fora da máquina) recebe o pseudônimo, como
-// WebFetch; ferramenta local recebe o real.
+// (e) A claude.ai connector tool (runs outside the machine) receives the pseudonym, like WebFetch;
+// a local tool receives the real value.
 func TestConnectorDoesNotUnmask(t *testing.T) {
 	var pseudoEmail string
 	_, px := build(t, func(w http.ResponseWriter, r *http.Request) {
@@ -228,8 +228,8 @@ func TestConnectorDoesNotUnmask(t *testing.T) {
 	}
 }
 
-// O marcador de cache muda de lugar a cada mensagem: não pode mudar a posição dos textos
-// que vêm depois dele.
+// The cache marker moves with every message: it cannot change the position of the texts that come
+// after it.
 func TestCacheControlKeepsPosition(t *testing.T) {
 	var bodies [][]byte
 	px := buildDisk(t, t.TempDir(), &bodies)

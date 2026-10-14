@@ -21,7 +21,7 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/proxy"
 )
 
-// Commands de apoio: importar-pessoas, testar, testar-midia, medir, colunas.
+// Support commands: import-people, test, test-media, measure, columns.
 
 func importPeople(args []string) error {
 	fs := flag.NewFlagSet("import-people", flag.ExitOnError)
@@ -87,12 +87,12 @@ func importPeople(args []string) error {
 	if err := people.Save(); err != nil {
 		return err
 	}
-	// o que já saiu à API fica congelado (ver memory_sent.go); com nomes novos, o histórico
-	// passa a ser mascarado de novo, com eles
+	// what already went out to the API stays frozen (see memory_sent.go); with new names, the
+	// history is masked again, with them
 	os.Remove(config.Path("enviados.log"))
 	fmt.Printf("%d linhas lidas; variantes de nome conhecidas: %d (antes: %d). Nada em texto puro foi gravado.\n",
 		lines, people.Total(), before)
-	// o proxy lê o registro ao iniciar: reinicia para os nomes novos valerem já
+	// the proxy reads the registry on start: restart it so the new names apply right away
 	if cfg, err := config.Load(); err == nil && healthy(cfg) {
 		if err := stop(); err == nil {
 			if err := ensure(); err != nil {
@@ -129,7 +129,7 @@ func test() error {
 	return nil
 }
 
-// testMedia processa uma imagem/PDF como o proxy faria e grava o que sairia em DIR.
+// testMedia processes an image/PDF as the proxy would and writes what would go out into DIR.
 func testMedia(args []string) error {
 	if len(args) < 2 {
 		return errors.New("uso: llm-dlp test-media ARQUIVO DIR_SAIDA")
@@ -186,7 +186,7 @@ func testMedia(args []string) error {
 	return nil
 }
 
-// medir: aplica o mascarador ao que o Claude enviaria (seus prompts e saídas de ferramenta).
+// measure: applies the masker to what Claude would send (your prompts and tool outputs).
 func measure(args []string) error {
 	_, _, _, _, m, err := loadAll()
 	if err != nil {
@@ -205,7 +205,7 @@ func measure(args []string) error {
 		for sc.Scan() {
 			var e map[string]any
 			if json.Unmarshal(sc.Bytes(), &e) != nil {
-				bad++ // linha inválida no transcript: pula e segue (antes parava aqui)
+				bad++ // invalid line in the transcript: skip and go on (before, it stopped here)
 				continue
 			}
 			msg, _ := e["message"].(map[string]any)
@@ -263,9 +263,9 @@ func texts(c any) []string {
 	return nil
 }
 
-// colunas mostra como o llm-dlp entende os nomes de campo de um arquivo (o cabeçalho de um
-// CSV, as chaves de um JSON): o que será mascarado e o que ele não reconhece. Serve para
-// descobrir o que acrescentar em extra_fields no config.json.
+// columns shows how llm-dlp understands the field names of a file (the header of a CSV, the keys of
+// a JSON): what will be masked and what it does not recognize. It is for finding out what to add to
+// extra_fields in config.json.
 func columns(args []string) error {
 	if len(args) == 0 {
 		return fmt.Errorf("uso: llm-dlp columns ARQUIVO...")

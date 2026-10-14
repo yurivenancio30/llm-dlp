@@ -6,41 +6,41 @@ import (
 	"sync"
 )
 
-// Interface comum das regras que decidem nomes (ver docs/pt-BR/structures.md, seção Memória da
-// conversa). Três peças:
+// Common interface of the rules that decide names (see docs/structures.md, section Conversation
+// memory). Three pieces:
 //
-//   - Decision: um nome que uma regra decidiu num texto (nome, tipo, regra). Fica no resultado
-//     do memo (resultado.decididos), em RAM; nunca vai para o vistos.json. A memória da
-//     conversa (proxy, entre as duas passadas) junta as decisões de todos os textos do pedido.
-//   - Decider: uma regra que decide nomes olhando o texto inteiro e o que já foi achado nele
-//     (proveniência, identidade, eco, léxica). Cada decisor chama TextCtx.Decide, que
-//     mascara no lugar e registra a decisão. Os decisores se registram com registerDecider,
-//     cada um no init() do próprio arquivo.
-//   - Quem escreveu: o texto que a API mandou (só com pseudônimos), guardado pelo hash do
-//     texto desmascarado que o Claude Code vai reenviar (RecordResponse / OriginalOf /
-//     Translated).
+//   - Decision: a name a rule decided in a text (name, type, rule). It lives in the memo result
+//     (result.decidedSet), in RAM; it never goes to vistos.json. The conversation memory (proxy,
+//     between the two passes) joins the decisions of all the texts of the request.
+//   - Decider: a rule that decides names looking at the whole text and at what was already
+//     found in it (provenance, identity, echo, lexical). Each decider calls TextCtx.Decide,
+//     which masks in place and records the decision. Deciders register with registerDecider,
+//     each one in the init() of its own file.
+//   - Who wrote it: the text the API sent (only with pseudonyms), kept by the hash of the
+//     unmasked text Claude Code will resend (RecordResponse / OriginalOf / Translated).
 
-// Decision: um nome decidido num texto.
+// Decision: a name decided in a text.
 type Decision struct {
-	Name string // como aparece no texto (sem citação)
-	Ent  string // tipo (chave de ObjectPrefixes)
-	Rule string // quem decidiu
-	// Generic: palavra da referência pública derivada (isGeneric). É mascarada onde foi
-	// decidida, mas não entra na memória da conversa.
+	Name string // as it appears in the text (without quoting)
+	Ent  string // type (ObjectPrefixes key)
+	Rule string // who decided it
+	// Generic: a word of the derived public reference (isGeneric). It is masked where it was
+	// decided, but does not enter the conversation memory.
 	Generic bool
 }
 
-// Key: a forma que identifica o nome (a mesma regra de caixa do vistos: SQL e servidor
-// sem caixa, os outros tipos exatos).
+// Key: the form that identifies the name (the same case rule as vistos: SQL and server caseless,
+// the other types exact).
 func (d Decision) Key() string { return canonObj(d.Ent, d.Name) }
 
-// TextCtx: o que um decisor vê de um texto.
+// TextCtx: what a decider sees of a text.
 type TextCtx struct {
 	S        string
-	Findings []Finding // o que os detectores e leitores já acharam em S (posições de S)
-	Learn    bool      // false: conteúdo da internet (decide no lugar, sem lembrar)
-	// Ext: a parte da dica que não é a do leitor de tabela (call_command.go): o que o proxy sabe
-	// da chamada que produziu o texto. "" = nada. O formato é de quem a escreve.
+	Findings []Finding // what the detectors and readers already found in S (positions of S)
+	Learn    bool      // false: internet content (decides in place, without remembering)
+	// Ext: the part of the hint that is not the table reader's (call_command.go): what the proxy
+	// knows about the call that produced the text. "" = none. The format belongs to whoever writes
+	// it.
 	Ext string
 
 	m   *Masker
@@ -48,7 +48,7 @@ type TextCtx struct {
 	dec []Decision
 }
 
-// Decide: s[ini:fim] é um nome do tipo ent. Mascara no lugar e registra a decisão.
+// Decide: s[start:end] is a name of type ent. Masks in place and records the decision.
 func (c *TextCtx) Decide(ini, end int, ent, rule string) {
 	if ini < 0 || end > len(c.S) || end <= ini {
 		return
@@ -57,7 +57,7 @@ func (c *TextCtx) Decide(ini, end int, ent, rule string) {
 		return
 	}
 	if !wholeValue(c.S, ini, end) || publicSystem(unquoted(c.S[ini:end])) {
-		return // pedaço de uma expressão, ou vocabulário de sistema (ver memory_tracing.go)
+		return // a piece of an expression, or system vocabulary (see memory_tracing.go)
 	}
 	v := c.S[ini:end]
 	if isPseudoObj(v) {
@@ -67,7 +67,7 @@ func (c *TextCtx) Decide(ini, end int, ent, rule string) {
 	c.dec = append(c.dec, Decision{Name: unquoted(v), Ent: ent, Rule: rule, Generic: isGeneric(v)})
 }
 
-// Known: o tipo com que v já é nome (aprendido em RAM ou no vistos.json), se é.
+// Known: the type with which v is already a name (learned in RAM or in vistos.json), if it is.
 func (c *TextCtx) Known(v string) (string, bool) {
 	if c.m == nil {
 		return "", false
@@ -75,7 +75,7 @@ func (c *TextCtx) Known(v string) (string, bool) {
 	return c.m.learnedEnt(v)
 }
 
-// Decider: uma regra que decide nomes num texto.
+// Decider: a rule that decides names in a text.
 type Decider struct {
 	Name   string
 	Decide func(c *TextCtx)
@@ -86,15 +86,14 @@ var (
 	deciders   []Decider
 )
 
-// registerDecider: chamado no init() do arquivo de cada regra.
+// registerDecider: called in the init() of the file of each rule.
 func registerDecider(d Decider) {
 	decidersMu.Lock()
 	deciders = append(deciders, d)
 	decidersMu.Unlock()
 }
 
-// runDeciders: todos os decisores em s (depois dos leitores). Devolve os achados novos e
-// as decisões.
+// runDeciders: all deciders on s (after the readers). Returns the new findings and the decisions.
 func (m *Masker) runDeciders(s string, findings []Finding, learn bool, ext string) ([]Finding, []Decision) {
 	decidersMu.RLock()
 	ds := deciders
@@ -109,8 +108,8 @@ func (m *Masker) runDeciders(s string, findings []Finding, learn bool, ext strin
 	return c.out, c.dec
 }
 
-// findingDecisions: os nomes de objeto achados pelos leitores, como decisões (regra
-// "leitor"). Junto com as dos decisores, formam os nomes decididos do texto.
+// findingDecisions: the object names found by the readers, as decisions (rule "leitor"). Together
+// with those of the deciders, they make up the decided names of the text.
 func findingDecisions(as []Finding) []Decision {
 	var out []Decision
 	seen := map[string]bool{}
@@ -127,8 +126,8 @@ func findingDecisions(as []Finding) []Decision {
 	return out
 }
 
-// Decided: os nomes decididos no texto s (o resultado no memo). nil se s ainda não foi
-// mascarado com essa dica.
+// Decided: the names decided in text s (the result in the memo). nil if s was not masked with that
+// hint yet.
 func (m *Masker) Decided(s, hint string) []Decision {
 	k := memoKey(s, hint)
 	m.mu.Lock()
@@ -143,30 +142,30 @@ func (m *Masker) Decided(s, hint string) []Decision {
 	return r.decidedSet
 }
 
-// ---------------------------------------------------------------------------------------
-// Referência pública derivada: palavras muito frequentes como nome de recurso no
-// material público (default, public, api...). Preenchida por um arquivo gerado por medição.
+// --------------------------------------------------------------------------------------- Derived
+// public reference: words very frequent as resource names in public material (default, public,
+// api...). Filled by a file generated by measurement.
 
 var publicRef map[string]bool
 
-// isGeneric: v é genérico demais para entrar na memória da conversa.
+// isGeneric: v is too generic to enter the conversation memory.
 func isGeneric(v string) bool { return publicRef[strings.ToLower(unquoted(v))] }
 
-// ---------------------------------------------------------------------------------------
-// Quem escreveu: o texto original (com pseudônimos) de cada texto do assistente, pelo hash do
-// texto desmascarado. Em RAM, com teto, e no enviados.log (só o HMAC do texto desmascarado e,
-// para cada trecho traduzido, onde está, o tipo e o pseudônimo: nenhum valor real).
+// --------------------------------------------------------------------------------------- Who wrote
+// it: the original text (with pseudonyms) of each assistant text, by the hash of the unmasked text.
+// In RAM, with a ceiling, and in enviados.log (only the HMAC of the unmasked text and, for each
+// translated piece, where it is, the type and the pseudonym: no real value).
 
-// Translation: um trecho do texto desmascarado que veio de um pseudônimo.
+// Translation: a piece of the unmasked text that came from a pseudonym.
 type Translation struct {
 	Start, End int
 	Pseudo     string
-	Type       string // o tipo do pseudônimo ("obj.namespace", "email"...)
+	Type       string // the type of the pseudonym ("obj.namespace", "email"...)
 }
 
 type written struct {
 	original string
-	ts       []snippet // os trechos traduzidos, em posições do texto desmascarado
+	ts       []snippet // the translated pieces, in positions of the unmasked text
 }
 
 type writtenRegistry struct {
@@ -199,15 +198,15 @@ func (r *writtenRegistry) lookup(k [32]byte) (written, bool) {
 	return e, ok
 }
 
-// writtenID: como um texto do assistente é guardado em disco (HMAC do texto desmascarado).
+// writtenID: how an assistant text is kept on disk (HMAC of the unmasked text).
 func (m *Masker) writtenID(des string) string { return m.p.raw("escrito", des, 16) }
 
-// RecordResponse: o texto original que a API mandou e a tabela usada para desmascará-lo.
-// Devolve o texto desmascarado (o mesmo que tab.Unmask). Todo texto é registrado, mesmo
-// sem pseudônimo: o que o modelo escreveu sozinho é palavra comum (ele nunca viu o nome real).
+// RecordResponse: the original text the API sent and the table used to unmask it. Returns the
+// unmasked text (the same as tab.Unmask). Every text is recorded, even without pseudonyms: what the
+// model wrote by itself is a common word (it never saw the real name).
 func (m *Masker) RecordResponse(original string, tab *Table) string {
 	des := tab.Unmask(original, false)
-	if len(des) < 4 { // texto curto nunca é mascarado (ver Batch.MaskHint)
+	if len(des) < 4 { // a short text is never masked (see Batch.MaskHint)
 		return des
 	}
 	var ts []snippet
@@ -223,7 +222,7 @@ func (m *Masker) RecordResponse(original string, tab *Table) string {
 			lastPos = end
 		})
 		b.WriteString(original[lastPos:])
-		if b.String() != des { // a volta fez mais que trocar pseudônimos (sub-rede de IP): sem registro
+		if b.String() != des { // the return did more than swap pseudonyms (IP subnet): no record
 			return des
 		}
 	}
@@ -234,7 +233,7 @@ func (m *Masker) RecordResponse(original string, tab *Table) string {
 	return des
 }
 
-// writtenOf: o registro de des (da RAM, ou do enviados.log depois de um reinício).
+// writtenOf: the record of des (from RAM, or from enviados.log after a restart).
 func (m *Masker) writtenOf(des string) (written, bool) {
 	k := sha256.Sum256([]byte(des))
 	if e, ok := m.writtenSet.lookup(k); ok {
@@ -256,13 +255,13 @@ func (m *Masker) writtenOf(des string) (written, bool) {
 	return e, true
 }
 
-// OriginalOf: o texto que a API mandou, se des é um texto do assistente desmascarado aqui.
+// OriginalOf: the text the API sent, if des is an assistant text unmasked here.
 func (m *Masker) OriginalOf(des string) (string, bool) {
 	e, ok := m.writtenOf(des)
 	return e.original, ok
 }
 
-// Translated: os trechos de des que o proxy traduziu de um pseudônimo (ok=false: sem registro).
+// Translated: the pieces of des the proxy translated from a pseudonym (ok=false: no record).
 func (m *Masker) Translated(des string) ([]Translation, bool) {
 	e, ok := m.writtenOf(des)
 	if !ok {

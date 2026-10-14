@@ -8,27 +8,27 @@ import (
 	"unicode/utf8"
 )
 
-// Values já mascarados uma vez são reconhecidos depois em qualquer lugar (memória em RAM).
+// Values already masked once are recognized later anywhere (memory in RAM).
 
-// Values conhecidos: tudo que foi mascarado por um detector que depende de CONTEXTO
-// (a palavra "rg" por perto, "password:" antes da senha...) precisa ser reconhecido
-// depois em qualquer lugar. Senão acontece isto:
+// Known values: everything masked by a detector that depends on CONTEXT (the word "rg" nearby,
+// "password:" before the password...) needs to be recognized later anywhere. Otherwise this
+// happens:
 //
-//	você:    "RG: 12.345.678-9"            -> mascarado (tem a palavra RG)
-//	modelo:  "o documento RG-abc está ok"  -> você vê "o documento 12.345.678-9 está ok"
-//	próxima mensagem: o histórico volta com "o documento 12.345.678-9 está ok"
-//	                  -> sem a palavra RG por perto, o número passaria sem máscara
+//	you:     "RG: 12.345.678-9"            -> masked (it has the word RG)
+//	model:   "o documento RG-abc está ok"  -> you see "o documento 12.345.678-9 está ok"
+//	next message: the history comes back with "o documento 12.345.678-9 está ok"
+//	              -> without the word RG nearby, the number would pass unmasked
 //
-// Duas memórias:
-//   - em RAM, o valor exato (busca literal, pega qualquer formato já visto);
-//   - em disco, só o hash com a chave (para sobreviver a reinícios sem guardar o valor).
+// Two memories:
+//   - in RAM, the exact value (literal search, catches any format already seen);
+//   - on disk, only the hash with the key (to survive restarts without keeping the value).
 
 var contextual = map[string]bool{"segredo": true, "rg": true, "cnh": true, "pis": true, "cep": true, "conta": true,
 	"pix": true, "nascimento": true, "telefone": true, "cartao": true, "cpf": true, "cnpj": true,
 	"usuario": true, "doc": true}
 
-// forEachCode chama fn para cada "palavra" de s que pode ser um código de usuário ou de
-// documento: de 3 a 40 letras, dígitos, "_", "." ou "-", começando por letra ou dígito.
+// forEachCode calls fn for each "word" of s that can be a user or document code: from 3 to 40
+// letters, digits, "_", "." or "-", starting with a letter or digit.
 
 func forEachCode(s string, fn func(ini, end int)) {
 	for i := 0; i < len(s); {
@@ -42,7 +42,7 @@ func forEachCode(s string, fn func(ini, end int)) {
 		}
 		end := j
 		for end > i && !isAlnum(s[end-1]) {
-			end-- // pontuação do fim da frase não faz parte
+			end-- // end-of-sentence punctuation is not part of it
 		}
 		if n := end - i; n >= 3 && n <= 40 {
 			fn(i, end)
@@ -51,8 +51,8 @@ func forEachCode(s string, fn func(ini, end int)) {
 	}
 }
 
-// canonicalKey: forma do valor usada para comparar independentemente do tipo e da
-// pontuação ("12.345.678-9" e "123456789" são o mesmo número).
+// canonicalKey: form of the value used to compare regardless of type and punctuation
+// ("12.345.678-9" and "123456789" are the same number).
 func canonicalKey(typ, real string) string {
 	if isObject(typ) {
 		return canonObj(strings.TrimPrefix(typ, objTypePrefix), real)
@@ -78,28 +78,27 @@ func canonNum(v string) string {
 	return d
 }
 
-// conhecidos é a memória em RAM. A busca no texto não percorre a lista de valores: usa um
-// índice pelo começo de cada valor (os 4 primeiros bytes), como fazem os buscadores de
-// vários padrões (prefixo + conferência). O custo depende do tamanho do texto, não de
-// quantos valores há. Has teto: passou de maxKnown, a metade mais antiga sai da RAM
-// (o hash dela continua em disco).
+// knownSet is the memory in RAM. The search in the text does not walk the list of values: it uses
+// an index by the start of each value (the first 4 bytes), as multi-pattern search engines do
+// (prefix + confirmation). The cost depends on the size of the text, not on how many values there
+// are. It has a ceiling: past maxKnown, the oldest half leaves RAM (its hash stays on disk).
 type knownSet struct {
 	mu    sync.RWMutex
-	base  int               // quantos valores já saíram da RAM (mantém a "geração" crescente)
-	reals []string          // em ordem de chegada; geração do valor = base + índice
+	base  int               // how many values already left RAM (keeps the "generation" increasing)
+	reals []string          // in order of arrival; generation of the value = base + index
 	typ   map[string]string // valor exato -> tipo
-	seq   map[string]int    // valor exato -> geração em que foi aprendido
-	canon map[string]string // chave canônica -> tipo
-	// chave canônica -> geração em que foi aprendida. Serve para refazer um texto memorizado
-	// em que o valor apareceu em OUTRA grafia (RG sem pontos, código em minúsculas).
+	seq   map[string]int    // exact value -> generation in which it was learned
+	canon map[string]string // canonical key -> type
+	// canonical key -> generation in which it was learned. It serves to redo a memoized text in
+	// which the value appeared in ANOTHER spelling (RG without dots, code in lowercase).
 	canonSeq map[string]int
 	nTypes   map[string]int
-	nObj     int // quantos nomes de objeto (ver objects.go)
-	// 4 primeiros bytes -> TAMANHOS dos valores que começam assim. Com o começo e o tamanho,
-	// o trecho do texto é consultado direto em seq (uma busca em mapa). Guardar a lista de
-	// valores aqui ficaria lento quando milhares começam igual (RGs "12.3...", CPFs em sequência).
+	nObj     int // how many object names (see objects.go)
+	// first 4 bytes -> LENGTHS of the values that start like this. With the start and the length,
+	// the piece of text is looked up directly in seq (one map lookup). Keeping the list of values
+	// here would be slow when thousands start the same way (RGs "12.3...", CPFs in sequence).
 	pfx  map[uint32][]int32
-	pair [1 << 16 / 64]uint64 // filtro rápido: há algum valor começando com estes 2 bytes?
+	pair [1 << 16 / 64]uint64 // quick filter: is there any value starting with these 2 bytes?
 }
 
 const maxKnown = 50_000
@@ -153,7 +152,7 @@ func (c *knownSet) learnIt(typ, real string) bool {
 	if _, ok := c.typ[real]; ok {
 		return false
 	}
-	if len(c.reals) >= maxKnown { // teto: fica a metade mais recente, em mapas novos
+	if len(c.reals) >= maxKnown { // ceiling: the most recent half stays, in new maps
 		stayOnes := append([]string(nil), c.reals[len(c.reals)/2:]...)
 		types := make([]string, len(stayOnes))
 		for i, v := range stayOnes {
@@ -169,8 +168,8 @@ func (c *knownSet) learnIt(typ, real string) bool {
 	return true
 }
 
-// varrer chama fn para cada ocorrência, em s, de um valor aprendido a partir da geração
-// desde. fn devolve false para parar.
+// scan calls fn for each occurrence, in s, of a value learned from generation since. fn returns
+// false to stop.
 func (c *knownSet) scan(s string, since int, fn func(ini, end int, typ string) bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -193,13 +192,13 @@ func (c *knownSet) scan(s string, since int, fn func(ini, end int, typ string) b
 				continue
 			}
 			if isAlnum(v[0]) && i > 0 && isAlnum(s[i-1]) {
-				continue // pedaço de outra palavra/número
+				continue // piece of another word/number
 			}
 			if isAlnum(v[len(v)-1]) && end < len(s) && isAlnum(s[end]) {
 				continue
 			}
 			if tp := c.typ[v]; isObject(tp) && (i > 0 && (isIdent(s[i-1]) || utf8LetterBefore(s, i)) || end < len(s) && (isIdent(s[end]) || utf8Letter(s, end) > 0)) {
-				continue // nome de objeto só vale inteiro ("tb_x" não é pedaço de "tb_x_hist")
+				continue // an object name only counts whole ("tb_x" is not a piece of "tb_x_hist")
 			}
 			if !fn(i, end, c.typ[v]) {
 				return
@@ -208,8 +207,8 @@ func (c *knownSet) scan(s string, since int, fn func(ini, end int, typ string) b
 	}
 }
 
-// containsSince diz se s contém algum valor aprendido a partir da geração g (ou se já não dá
-// para saber, porque valores daquela época saíram da RAM).
+// containsSince says whether s contains some value learned from generation g (or whether it can no
+// longer be known, because values of that time left RAM).
 func (c *knownSet) containsSince(s string, g int) bool {
 	c.mu.RLock()
 	lost := g < c.base
@@ -222,7 +221,7 @@ func (c *knownSet) containsSince(s string, g int) bool {
 	if foundIt {
 		return true
 	}
-	// a mesma coisa em outra grafia: o número sem pontuação, o código em outra caixa
+	// the same thing in another spelling: the number without punctuation, the code in another case
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	newOne := func(key string) bool { gen, ok := c.canonSeq[key]; return ok && gen >= g }
@@ -243,7 +242,7 @@ func (c *knownSet) containsSince(s string, g int) bool {
 	})
 	if !foundIt && c.nObj > 0 {
 		objTokens(s, func(a, b int) {
-			for _, f := range dottedShapes(s, a, b) { // também com ponto ("top_x.eventos")
+			for _, f := range dottedShapes(s, a, b) { // also with a dot ("top_x.eventos")
 				if v := s[a:f]; !foundIt && (newOne("O:"+v) || newOne("o:"+strings.ToLower(v))) {
 					foundIt = true
 				}
@@ -265,11 +264,10 @@ func hasDigit(s string) bool {
 	return false
 }
 
-// isIdent: caractere que continua um identificador (letra, dígito, _ $ # -).
+// isIdent: a character that continues an identifier (letter, digit, _ $ # -).
 func isIdent(b byte) bool { return isAlnum(b) || b == '_' || b == '$' || b == '#' || b == '-' }
 
-// utf8Letter: se s[i] começa uma letra fora do ASCII (á, ç, ñ...), o tamanho dela em bytes;
-// senão 0.
+// utf8Letter: if s[i] starts a non-ASCII letter (á, ç, ñ...), its length in bytes; otherwise 0.
 func utf8Letter(s string, i int) int {
 	if s[i] < 0x80 {
 		return 0
@@ -281,7 +279,7 @@ func utf8Letter(s string, i int) int {
 	return n
 }
 
-// utf8LetterBefore: o caractere que termina em s[i-1] é uma letra fora do ASCII?
+// utf8LetterBefore: is the character that ends at s[i-1] a non-ASCII letter?
 func utf8LetterBefore(s string, i int) bool {
 	if i == 0 || s[i-1] < 0x80 {
 		return false
@@ -294,18 +292,18 @@ func isAlnum(b byte) bool {
 	return b >= '0' && b <= '9' || b >= 'a' && b <= 'z' || b >= 'A' && b <= 'Z'
 }
 
-// lineWindow limita a busca do começo/fim da linha em volta de uma ocorrência. Sem limite,
-// numa linha única longa (JSON minificado, resposta de API, HTML) cada ocorrência percorre a
-// linha inteira e o custo vira quadrático.
+// lineWindow limits the search for the start/end of the line around an occurrence. Without a limit,
+// on a single long line (minified JSON, API response, HTML) each occurrence walks the whole line
+// and the cost becomes quadratic.
 const lineWindow = 1000
 
-// lineStartJ: começo da linha de s[i], ou o começo da janela se a linha for mais longa.
+// lineStartJ: start of the line of s[i], or the start of the window if the line is longer.
 func lineStartJ(s string, i int) int {
 	a := max(0, i-lineWindow)
 	return a + strings.LastIndexByte(s[a:i], '\n') + 1
 }
 
-// lineEndJ: fim da linha de s[i] (o '\n' ou len(s)), ou o fim da janela.
+// lineEndJ: end of the line of s[i] (the '\n' or len(s)), or the end of the window.
 func lineEndJ(s string, i int) int {
 	z := min(len(s), i+lineWindow)
 	if k := strings.IndexByte(s[i:z], '\n'); k >= 0 {
@@ -314,7 +312,7 @@ func lineEndJ(s string, i int) int {
 	return z
 }
 
-// separadores em que uma senha costuma estar grudada; maxCuts limita o trabalho por palavra
+// separators a password is usually glued to; maxCuts limits the work per word
 const (
 	passwordSep = "=&:/?@|#+"
 	maxCuts     = 17
@@ -325,17 +323,17 @@ var (
 	reTokenSeg = regexp.MustCompile("[^\\s\"'`,;()\\[\\]{}<>]{8,}")
 )
 
-// conhecidos acrescenta a out as ocorrências, em s, de valores já conhecidos.
+// findKnown appends to out the occurrences, in s, of values already known.
 func (m *Masker) findKnown(s string, longNum bool, add0 func(ini, end int, typ string)) {
 	c := m.known
 	add := func(ini, end int, typ string) {
 		if isObject(typ) {
 			if !m.objPropagates(strings.TrimPrefix(typ, objTypePrefix)) {
-				return // tipo desligado depois de aprendido
+				return // type turned off after being learned
 			}
-			// o conhecimento acumulado (RAM, vistos.json) segue as regras do rastreamento:
-			// palavra comum não se espalha por ele e vocabulário público nunca é aplicado
-			// (um nome aprendido errado antes não volta em todo texto; ver memory_tracing.go)
+			// the accumulated knowledge (RAM, vistos.json) follows the tracing rules: a common word
+			// does not spread through it and public vocabulary is never applied (a name learned
+			// wrongly before does not come back in every text; see memory_tracing.go)
 			if v := s[ini:end]; !identifierShape(v) || publicGeneral(v) {
 				return
 			}
@@ -344,11 +342,11 @@ func (m *Masker) findKnown(s string, longNum bool, add0 func(ini, end int, typ s
 	}
 	m.findKnownObjects(s, add)
 
-	// 1) valores em RAM, pelo texto exato (pega qualquer formato já visto)
+	// 1) values in RAM, by the exact text (catches any format already seen)
 	c.scan(s, 0, func(ini, end int, typ string) bool { add(ini, end, typ); return true })
 
-	// Finding pelo hash: o valor real está aqui no texto, então volta para a memória. Assim
-	// a busca pelo texto exato (1) passa a pegá-lo também grudado em outra coisa.
+	// Finding by hash: the real value is here in the text, so it goes back to the memory. This way
+	// the search by exact text (1) starts catching it glued to something else too.
 	gotIt := func(ini, end int, tp string) {
 		add(ini, end, tp)
 		if end-ini >= 4 {
@@ -356,8 +354,8 @@ func (m *Masker) findKnown(s string, longNum bool, add0 func(ini, end int, typ s
 		}
 	}
 
-	// 2) candidatos pela forma canônica: mesmo número com outra pontuação, e valores
-	//    aprendidos antes de um reinício (em disco só há o hash)
+	// 2) candidates by the canonical form: the same number with other punctuation, and values
+	//    learned before a restart (on disk there is only the hash)
 	hasHash := m.seenSet != nil && !m.seenSet.IsEmpty()
 	c.mu.RLock()
 	hasCanon := len(c.canon) > 0
@@ -381,8 +379,8 @@ func (m *Masker) findKnown(s string, longNum bool, add0 func(ini, end int, typ s
 	if longNum || hasHash || hasCanon {
 		for _, ix := range reNumTok.FindAllStringIndex(s, -1) {
 			v := s[ix[0]:ix[1]]
-			// só números longos: um número curto aprendido (agência "4321-0") não pode fazer
-			// todo "43210" do texto virar dado sensível. Os curtos ficam com a busca literal.
+			// only long numbers: a short learned number (branch "4321-0") cannot make every "43210"
+			// of the text become sensitive data. Short ones stay with the literal search.
 			if !digitEdge(s, ix[0], ix[1]) || len(digitsOnly(v)) < 8 {
 				continue
 			}
@@ -390,7 +388,7 @@ func (m *Masker) findKnown(s string, longNum bool, add0 func(ini, end int, typ s
 				gotIt(ix[0], ix[1], tp)
 			}
 		}
-		for _, ix := range reTel.FindAllStringIndex(s, -1) { // telefones com espaço/parênteses
+		for _, ix := range reTel.FindAllStringIndex(s, -1) { // telephones with spaces/parentheses
 			if tp, ok := look("n:" + canonNum(s[ix[0]:ix[1]])); ok && digitEdge(s, ix[0], ix[1]) {
 				gotIt(ix[0], ix[1], tp)
 			}
@@ -403,7 +401,7 @@ func (m *Masker) findKnown(s string, longNum bool, add0 func(ini, end int, typ s
 			}
 		}
 	}
-	// códigos de usuário e documentos aprendidos (em qualquer caixa, e depois de um reinício)
+	// learned user codes and documents (in any case, and after a restart)
 	c.mu.RLock()
 	nCode := c.nTypes["usuario"] + c.nTypes["doc"]
 	c.mu.RUnlock()
@@ -418,7 +416,7 @@ func (m *Masker) findKnown(s string, longNum bool, add0 func(ini, end int, typ s
 			}
 		})
 	}
-	// segredos de antes de um reinício: só o hash existe, então testa cada "palavra" longa
+	// secrets from before a restart: only the hash exists, so it tests each long "word"
 	if hasHash && (m.seenSet.Has("segredo") || nSeg > 0) {
 		for _, ix := range reTokenSeg.FindAllStringIndex(s, -1) {
 			v := s[ix[0]:ix[1]]
@@ -434,14 +432,14 @@ func (m *Masker) findKnown(s string, longNum bool, add0 func(ini, end int, typ s
 					continue
 				}
 			}
-			// Senha grudada em outra coisa ("k=Senha@1&b=2", "user:Senha@1@host"): com o hash
-			// só dá para perguntar por um pedaço exato, então testa os pedaços entre
-			// separadores. A senha pode conter separadores, por isso todos os intervalos
-			// (de um corte a outro), e não só os pedaços mínimos.
+			// Password glued to something else ("k=Senha@1&b=2", "user:Senha@1@host"): with the
+			// hash one can only ask about an exact piece, so it tests the pieces between
+			// separators. The password can contain separators, so all intervals (from one cut to
+			// another), and not only the minimal pieces.
 			cuts := []int{0}
 			for i := 0; i < len(v) && len(cuts) < maxCuts; i++ {
 				if strings.IndexByte(passwordSep, v[i]) >= 0 {
-					cuts = append(cuts, i, i+1) // antes e depois do separador
+					cuts = append(cuts, i, i+1) // before and after the separator
 				}
 			}
 			if len(cuts) == 1 {
@@ -452,8 +450,8 @@ func (m *Masker) findKnown(s string, longNum bool, add0 func(ini, end int, typ s
 			for a := 0; a < len(cuts); a++ {
 				for b := len(cuts) - 1; b > a; b-- {
 					ini, end := cuts[a], cuts[b]
-					// só pedaços do tamanho de alguma senha conhecida: evita calcular o hash
-					// de quase todos (o cálculo do hash é a parte cara)
+					// only pieces of the length of some known password: avoids hashing almost all
+					// of them (computing the hash is the expensive part)
 					if end-ini < 8 || (ini == 0 && end == len(v)) || !m.seenSet.HasSize(end-ini) {
 						continue
 					}
@@ -467,22 +465,22 @@ func (m *Masker) findKnown(s string, longNum bool, add0 func(ini, end int, typ s
 	}
 }
 
-// aprender registra um valor contextual em RAM e (só o hash) em disco.
+// learnIt records a contextual value in RAM and (hash only) on disk.
 func (m *Masker) learnIt(typ, real string) {
 	if typ == "nome" {
-		// Name achado pelo rótulo do campo ("NOM_CLIENTE"): a pessoa entra no registro, como
-		// num importar-pessoas, e passa a ser reconhecida em qualquer lugar e grafia.
+		// A name found by the field label ("NOM_CLIENTE"): the person enters the registry, as in
+		// import-people, and starts being recognized anywhere and in any spelling.
 		if m.people != nil && len(strings.Fields(real)) >= 2 && len(real) <= 80 && m.people.PID(m.p, "nome", NormName(real)) == "" {
 			m.people.Import(m.p, real, "", "")
-			m.known.learnIt("nome", real) // faz os textos já memorizados com esse nome serem refeitos
+			m.known.learnIt("nome", real) // makes the texts already memoized with this name be redone
 		}
 		return
 	}
 	if !contextual[typ] || len(real) < 4 {
 		return
 	}
-	// código curto ou sem dígito ("jsilva", "ana") só é mascarado junto do rótulo: lembrá-lo
-	// faria toda palavra igual virar dado sensível
+	// a short code or one without a digit ("jsilva", "ana") is only masked together with the label:
+	// remembering it would make every equal word become sensitive data
 	if (typ == "usuario" || typ == "doc") && (len(real) < 5 || !hasDigit(real)) {
 		return
 	}

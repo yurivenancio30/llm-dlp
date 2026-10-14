@@ -14,11 +14,11 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/mask"
 )
 
-// A porta local: quem pode falar com ela, quem lê a última conversa e a prova de identidade.
+// The local port: who can talk to it, who reads the last conversation and the identity proof.
 
 var testKey = []byte("0123456789abcdef0123456789abcdef")
 
-// buildLocal: proxy com a chave ligada. Devolve também quantas requisições chegaram à API e o log.
+// buildLocal: proxy with the key on. Also returns how many requests reached the API and the log.
 func buildLocal(t *testing.T, withKey bool) (*httptest.Server, *int, *safeLog) {
 	t.Helper()
 	cfg := config.Default()
@@ -62,9 +62,9 @@ func ask(t *testing.T, method, url string, body []byte, f func(*http.Request)) (
 	return resp.StatusCode, b
 }
 
-// Uma página no navegador chega à porta local: pelo próprio domínio apontando para 127.0.0.1
-// (DNS rebinding; o Host é o domínio dela) ou mandando a requisição de outro site (a Origin é a
-// dela). Nenhuma das duas é atendida, e nada vai para a API.
+// A page in the browser reaches the local port: through its own domain pointing to 127.0.0.1 (DNS
+// rebinding; the Host is its domain) or by sending the request from another site (the Origin is its
+// own). Neither is served, and nothing goes to the API.
 func TestServesOnlyLocalProgram(t *testing.T) {
 	cases := []struct {
 		host, origin, site string
@@ -121,8 +121,9 @@ func TestServesOnlyLocalProgram(t *testing.T) {
 	}
 }
 
-// A última conversa (mascarada) só sai para quem lê a chave: o comando "llm-dlp last". Outro
-// usuário da máquina, sem a chave, não lê nem usa o proxy para conferir palpites.
+// The last conversation (masked) only goes out to whoever reads the key: the "llm-dlp last"
+// command. Another user of the machine, without the key, neither reads it nor uses the proxy to
+// check guesses.
 func TestLastOnlyWithProof(t *testing.T) {
 	px, _, _ := buildLocal(t, true)
 	body, _ := json.Marshal(map[string]any{"model": "x", "messages": []any{msg("user", strings.Repeat("texto da conversa ", 200))}})
@@ -141,15 +142,15 @@ func TestLastOnlyWithProof(t *testing.T) {
 		t.Errorf("com a prova: status %d, corpo %.80s", st, b)
 	}
 
-	// sem chave ligada, não há quem possa ler
+	// without the key on, nobody can read it
 	noKey, _, _ := buildLocal(t, false)
 	if st, _ := ask(t, "GET", noKey.URL+"/__llm-dlp/ultima", nil, func(r *http.Request) { r.Header.Set(ProofHeader, Proof(nil, "ultima")) }); st != http.StatusForbidden {
 		t.Errorf("sem chave: status %d, esperado 403", st)
 	}
 }
 
-// O llm-dlp prova que é ele respondendo a um desafio novo; só assina desafio em hexadecimal, e a
-// prova de um desafio não serve para ler a última conversa.
+// llm-dlp proves it is itself by answering a fresh challenge; it only signs hexadecimal challenges,
+// and the proof of a challenge does not serve to read the last conversation.
 func TestHealthProvesIdentity(t *testing.T) {
 	px, _, _ := buildLocal(t, true)
 	challenge := strings.Repeat("0f", 16)
@@ -173,8 +174,8 @@ func TestHealthProvesIdentity(t *testing.T) {
 	}
 }
 
-// O caminho da requisição vai para o log sem caracteres de controle: uma quebra de linha no
-// caminho não forja outra linha.
+// The request path goes to the log without control characters: a line break in the path does not
+// forge another line.
 func TestLogWithoutForgedLine(t *testing.T) {
 	px, _, lg := buildLocal(t, true)
 	ask(t, "GET", px.URL+"/v1/x%0aPOST%20/v1/messages%20-%3E%20200%20%7C%20linha%20forjada", nil, nil)

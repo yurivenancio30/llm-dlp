@@ -7,29 +7,29 @@ import (
 	"strings"
 )
 
-// O comando diz o que a saída é (ver docs/pt-BR/structures.md, seção Saídas soltas de script e de
-// shell). O proxy vê a chamada de ferramenta (tool_use) e o resultado (tool_result) do mesmo id:
-// o comando tipa as colunas do resultado. Nenhum leitor pode fazer isso, porque um leitor só vê
-// o próprio texto; a dica entra como evidência no leitor de tabela que já existe
-// (classifyTableD) e, para a saída sem cabeçalho (psql -At, cut, uniq -c), numa leitura por
-// linha com o mesmo número de células em todas as linhas.
+// The command says what the output is (see docs/structures.md, section Loose script and shell
+// outputs). The proxy sees the tool call (tool_use) and the result (tool_result) with the same id:
+// the command types the columns of the result. No reader can do this, because a reader only sees
+// its own text; the hint enters as evidence in the table reader that already exists
+// (classifyTableD) and, for output without a header (psql -At, cut, uniq -c), in a per-line reading
+// with the same number of cells on every line.
 //
-// Três formas, nenhuma por ferramenta:
-//   - SQL no comando: a lista do SELECT dá o tipo de cada coluna, em ordem e pelo nome (alias
-//     ou coluna); "name" vale pelo catálogo do FROM (sys.tables -> tabela); SHOW <tipos> dá o
-//     tipo da coluna name.
-//   - extração de coluna por posição (cut -fN, awk '{print $N}') sobre um arquivo cujo
-//     cabeçalho já passou pela conversa: a coluna N tem o tipo daquele cabeçalho.
-//   - listagem de recurso (<cli> get|list|ls <tipo>, <tipo> list, list-<tipo>, <cli> ps): o
-//     tipo pedido diz o tipo da coluna NAME. É evidência fraca: mascara no lugar e só ensina
-//     com uma segunda regra.
+// Three forms, none per tool:
+//   - SQL in the command: the SELECT list gives the type of each column, in order and by name
+//     (alias or column); "name" counts by the FROM catalog (sys.tables -> table); SHOW <types>
+//     gives the type of the name column.
+//   - column extraction by position (cut -fN, awk '{print $N}') over a file whose header
+//     already went through the conversation: column N has the type of that header.
+//   - resource listing (<cli> get|list|ls <type>, <type> list, list-<type>, <cli> ps): the
+//     requested type gives the type of the NAME column. It is weak evidence: it masks in place
+//     and only teaches with a second rule.
 
-// outputHint: o que o comando diz das colunas da saída.
+// outputHint: what the command says about the output columns.
 type outputHint struct {
-	cols   []string          // tipo de cada coluna, em ordem ("" = sem tipo); vazio = posição desconhecida
-	names  map[string]string // nome da coluna no cabeçalho (minúsculo) -> tipo
-	name   string            // tipo da coluna NAME/NAMES sem tipo próprio
-	strong bool              // posição inequívoca (SQL, cabeçalho de arquivo): ensina sozinho
+	cols   []string          // type of each column, in order ("" = no type); empty = unknown position
+	names  map[string]string // column name in the header (lowercase) -> type
+	name   string            // type of the NAME/NAMES column without a type of its own
+	strong bool              // unambiguous position (SQL, file header): teaches by itself
 }
 
 func (d *outputHint) empty() bool {
@@ -44,7 +44,7 @@ func (d *outputHint) empty() bool {
 	return len(d.names) == 0 && d.name == ""
 }
 
-// codificar: a dica como texto (vai junto do texto na chave da memória de resultados).
+// encode: the hint as text (it goes with the text in the key of the result memory).
 func (d *outputHint) encode() string {
 	if d.empty() {
 		return ""
@@ -71,18 +71,18 @@ func (d *outputHint) encode() string {
 	return b.String()
 }
 
-// sepExt separa, na dica, a parte do leitor de tabela (codificar) da extensão que os decisores
-// leem (TextCtx.Ext).
+// sepExt separates, in the hint, the table reader's part (encode) from the extension the deciders
+// read (TextCtx.Ext).
 const sepExt = "\x1e"
 
-// hintParts: a dica do leitor de tabela e a extensão.
+// hintParts: the table reader's hint and the extension.
 func hintParts(s string) (table, ext string) {
 	t, e, _ := strings.Cut(s, sepExt)
 	return t, e
 }
 
-// readHint: o inverso de codificar (nil se vazia ou inválida). A extensão (depois de sepExt) é
-// ignorada aqui.
+// readHint: the inverse of encode (nil if empty or invalid). The extension (after sepExt) is
+// ignored here.
 func readHint(s string) *outputHint {
 	s, _ = hintParts(s)
 	ps := strings.Split(s, "|")
@@ -106,7 +106,7 @@ func readHint(s string) *outputHint {
 	return d
 }
 
-// tipo: o tipo da coluna k (de n) cujo cabeçalho é h.
+// typ: the type of column k (of n) whose header is h.
 func (d *outputHint) typ(h string, k, n int) string {
 	l := strings.ToLower(h)
 	if t, ok := d.names[l]; ok {
@@ -121,18 +121,18 @@ func (d *outputHint) typ(h string, k, n int) string {
 	return ""
 }
 
-// Commands: os comandos de uma conversa, em ordem (o proxy cria um por requisição). Guarda o
-// cabeçalho dos arquivos lidos, para a extração de coluna por posição.
+// Commands: the commands of a conversation, in order (the proxy creates one per request). It keeps
+// the header of the files read, for column extraction by position.
 type Commands struct {
-	hdrs map[string][]string // caminho (e nome do arquivo) -> células do cabeçalho
-	cv   conversationCmd     // proveniência, eco e tipo pedido (call.go)
+	hdrs map[string][]string // path (and file name) -> header cells
+	cv   conversationCmd     // provenance, echo and requested type (call.go)
 }
 
 func NewCommands() *Commands { return &Commands{hdrs: map[string][]string{}} }
 
-// Hint: o que o comando diz da saída (texto vazio: nada). saida é o resultado do comando: se
-// ele mostra o começo de um arquivo com cabeçalho, o cabeçalho fica lembrado para os comandos
-// seguintes.
+// Hint: what the command says about the output (empty text: nothing). output is the command result:
+// if it shows the start of a file with a header, the header is remembered for the following
+// commands.
 func (c *Commands) Hint(cmd, output string) string {
 	if len(cmd) > 8<<10 {
 		cmd = cmd[:8<<10]
@@ -152,7 +152,7 @@ func (c *Commands) hint(cmd string) *outputHint {
 	return listingHint(cmd)
 }
 
-// ---- SQL no comando --------------------------------------------------------------------
+// ---- SQL in the command ------------------------------------------------------------------
 
 var (
 	reSelectFrom = regexp.MustCompile(`(?is)\bselect\s+(.+?)\s+from\s+((?:[\w$]+|"[^"\n]+"|\x60[^\x60\n]+\x60|\[[^\]\n]+\])(?:\.(?:[\w$]+|"[^"\n]+"|\x60[^\x60\n]+\x60|\[[^\]\n]+\]))*)`)
@@ -162,7 +162,7 @@ var (
 	reSimpleCol  = regexp.MustCompile(`^(?:[\w$]+|"[^"]+"|\x60[^\x60]+\x60|\[[^\]]+\])(?:\.(?:[\w$]+|"[^"]+"|\x60[^\x60]+\x60|\[[^\]]+\]))*$`)
 )
 
-// sqlHint: a dica de uma instrução SQL no comando (a última SELECT, ou SHOW/DESCRIBE).
+// sqlHint: the hint of an SQL statement in the command (the last SELECT, or SHOW/DESCRIBE).
 func sqlHint(cmd string) *outputHint {
 	if !hasAny(strings.ToLower(cmd), []string{"select", "show", "desc"}) {
 		return nil
@@ -175,7 +175,7 @@ func sqlHint(cmd string) *outputHint {
 		}
 	}
 	if systemTarget(cmd) {
-		return nil // descreve ou lista um catálogo de sistema: a estrutura listada é pública
+		return nil // describes or lists a system catalog: the listed structure is public
 	}
 	if m := reShow.FindStringSubmatch(cmd); m != nil {
 		if e, ok := pluralEnt(m[1]); ok {
@@ -188,7 +188,7 @@ func sqlHint(cmd string) *outputHint {
 	return nil
 }
 
-// pluralEnt: a entidade de uma palavra de tipo no plural ou no singular ("tables", "schemas").
+// pluralEnt: the entity of a type word in the plural or in the singular ("tables", "schemas").
 func pluralEnt(w string) (string, bool) {
 	l := strings.ToLower(w)
 	if !pluralType[l] && entPiece[l] == "" {
@@ -198,7 +198,7 @@ func pluralEnt(w string) (string, bool) {
 	return e, strong && e != ""
 }
 
-// selectHint: lista do SELECT e o objeto do FROM.
+// selectHint: SELECT list and the FROM object.
 func selectHint(list, from string) *outputHint {
 	items := splitList(list)
 	if len(items) == 0 || len(items) > 60 {
@@ -267,7 +267,7 @@ var (
 	reTop      = regexp.MustCompile(`(?i)^top\s+\(?\d+\)?\s+`)
 )
 
-// splitList: os itens de uma lista separada por vírgulas, fora de parênteses e aspas.
+// splitList: the items of a comma-separated list, outside parentheses and quotes.
 func splitList(s string) []string {
 	var out []string
 	depth, a := 0, 0
@@ -293,7 +293,7 @@ func splitList(s string) []string {
 	return append(out, s[a:])
 }
 
-// ---- extração de coluna por posição ----------------------------------------------------
+// ---- column extraction by position -------------------------------------------------------
 
 var (
 	reCut      = regexp.MustCompile(`\bcut\b(?:'[^'\n]*'|"[^"\n]*"|[^|;&\n'"])*`)
@@ -303,7 +303,7 @@ var (
 	rePath     = regexp.MustCompile(`[\w~./\-]*[\w\-]\.[A-Za-z][\w]{0,5}\b`)
 )
 
-// columnHint: cut -fN / awk '{print $N}' sobre um arquivo de cabeçalho conhecido.
+// columnHint: cut -fN / awk '{print $N}' over a file with a known header.
 func (c *Commands) columnHint(cmd string) *outputHint {
 	if len(c.hdrs) == 0 || !strings.Contains(cmd, "cut") && !strings.Contains(cmd, "awk") {
 		return nil
@@ -359,7 +359,7 @@ func (c *Commands) columnHint(cmd string) *outputHint {
 	return d
 }
 
-// quotedHeader: o cabeçalho de um arquivo conhecido citado no comando.
+// quotedHeader: the header of a known file cited in the command.
 func (c *Commands) quotedHeader(cmd string) []string {
 	for _, p := range rePath.FindAllString(cmd, 20) {
 		if hdr, ok := c.hdrs[p]; ok {
@@ -379,8 +379,8 @@ func fileNameOf(p string) string {
 	return p
 }
 
-// rememberHeader: a saída começa com o cabeçalho de um arquivo citado no comando ("a,b,c"
-// com cada célula um identificador)? Fica lembrado pelo caminho e pelo nome do arquivo.
+// rememberHeader: does the output start with the header of a file cited in the command ("a,b,c"
+// with each cell an identifier)? It is remembered by the path and by the file name.
 func (c *Commands) rememberHeader(cmd, output string) {
 	ps := rePath.FindAllString(cmd, 4)
 	if len(ps) == 0 || output == "" {
@@ -424,10 +424,10 @@ func (c *Commands) rememberHeader(cmd, output string) {
 	}
 }
 
-// ---- listagem de recurso ---------------------------------------------------------------
+// ---- resource listing --------------------------------------------------------------------
 
-// tipos de recurso de contêiner e de orquestrador (com as abreviações das próprias CLIs) que a
-// palavra de tipo genérica não cobre; o resto vem de pluralEnt (tables, topics, buckets...)
+// container and orchestrator resource types (with the CLIs' own abbreviations) that the generic
+// type word does not cover; the rest comes from pluralEnt (tables, topics, buckets...)
 var listingResource = map[string]string{
 	"pod": "servico", "pods": "servico", "po": "servico", "deployment": "servico", "deployments": "servico",
 	"deploy": "servico", "statefulset": "servico", "statefulsets": "servico", "sts": "servico",
@@ -442,7 +442,8 @@ var listingResource = map[string]string{
 	"apps": "servico", "functions": "servico", "groups": "servico", "repos": "repositorio",
 }
 
-// verbos de listagem (como subcomando, nunca o próprio programa: "ls" e "ps" sozinhos são do shell)
+// listing verbs (as a subcommand, never the program itself: "ls" and "ps" alone belong to the
+// shell)
 var listingVerbs = setOf("get", "list", "ls", "ps")
 
 // listingHint: <cli> get|list|ls <tipo>, <cli> <tipo> list|ls, <cli> list-<tipo>, <cli> ps.
@@ -468,8 +469,8 @@ func listingHint(cmd string) *outputHint {
 		}
 		return ""
 	}
-	// o tipo listado: o do vocabulário ou, para qualquer outro substantivo no plural ("dags",
-	// "projects", "pipelines"), objeto nomeado (servico)
+	// the listed type: the vocabulary one or, for any other plural noun ("dags", "projects",
+	// "pipelines"), a named object (service)
 	hintOf := func(w string) *outputHint {
 		if e := typeOf(w); e != "" {
 			return nameHint(e)
@@ -503,7 +504,7 @@ func listingHint(cmd string) *outputHint {
 			}
 		}
 		if v == "ps" || v == "list" && i == 1 {
-			return nameHint("servico") // docker ps, helm list: contêineres e releases
+			return nameHint("servico") // docker ps, helm list: containers and releases
 		}
 		return nil
 	}
@@ -514,10 +515,10 @@ func nameHint(e string) *outputHint {
 	return &outputHint{names: map[string]string{"name": e, "names": e}, name: e}
 }
 
-// identityHint: a listagem de um tipo fora do vocabulário tipa só a coluna de identidade
-// composta, o tipo no singular com _id ou _name (dags -> dag_id, projects -> project_id,
-// clusters -> cluster_name). NAME ou o tipo sozinho não: "UNIT" de systemctl list-units não diz
-// que o valor é nome de alguém.
+// identityHint: the listing of a type outside the vocabulary types only the compound identity
+// column, the singular type with _id or _name (dags -> dag_id, projects -> project_id, clusters ->
+// cluster_name). NAME or the type alone does not: "UNIT" of systemctl list-units does not say the
+// value is someone's name.
 func identityHint(e, typ string) *outputHint {
 	d := &outputHint{names: map[string]string{}}
 	t := strings.ToLower(strings.Trim(typ, `"'`))
@@ -537,7 +538,7 @@ func identityHint(e, typ string) *outputHint {
 	return d
 }
 
-// pluralNoun: uma palavra em minúsculas terminada em "s" (não "ss"): o tipo listado.
+// pluralNoun: a lowercase word ending in "s" (not "ss"): the listed type.
 func pluralNoun(w string) bool {
 	w = strings.Trim(w, `"'`)
 	if len(w) < 4 || w[len(w)-1] != 's' || w[len(w)-2] == 's' {
@@ -553,11 +554,11 @@ func pluralNoun(w string) bool {
 
 // ---- a dica aplicada -------------------------------------------------------------------
 
-// publicHint: o vocabulário dos formatos em que a dica aparece.
+// publicHint: the vocabulary of the formats in which the hint appears.
 func publicHint(v string) bool { return publicSQL(v) || publicDevops(v) }
 
-// findWithHint: as colunas tipadas pela dica, na tabela com cabeçalho (o leitor de tabela, em
-// modo dica) e na saída sem cabeçalho (uma linha por registro, o mesmo número de células).
+// findWithHint: the columns typed by the hint, in the table with a header (the table reader, in
+// hint mode) and in the output without a header (one line per record, the same number of cells).
 func findWithHint(s string, d *outputHint, add func(ObjFinding)) {
 	findTablesD(s, d, add)
 	if len(d.cols) > 0 {
@@ -570,8 +571,8 @@ var (
 	reFooter = regexp.MustCompile(`^\(\d+ (?:rows?|linhas?|registros?)(?: affected| afetad[oa]s?)?\)$`)
 )
 
-// hintLines: saída sem cabeçalho (psql -At, cut, awk, sort | uniq -c): toda linha tem o mesmo
-// número de células que a dica tem de colunas. Uma linha fora da forma desfaz tudo.
+// hintLines: output without a header (psql -At, cut, awk, sort | uniq -c): every line has the same
+// number of cells as the hint has columns. A line out of shape undoes everything.
 func hintLines(s string, d *outputHint, add func(ObjFinding)) {
 	n := len(d.cols)
 	type lineV struct{ a, b int }
@@ -640,7 +641,7 @@ func hintLines(s string, d *outputHint, add func(ObjFinding)) {
 		cells = append(cells, cs)
 	}
 	for _, cs := range cells {
-		hdr := true // a linha do cabeçalho (cut -f2 arquivo.csv imprime o cabeçalho)
+		hdr := true // the header line (cut -f2 file.csv prints the header)
 		for k, c := range cs {
 			if d.typ(s[c.a:c.b], k, 0) == "" || d.names[strings.ToLower(s[c.a:c.b])] == "" {
 				hdr = false
@@ -657,7 +658,7 @@ func hintLines(s string, d *outputHint, add func(ObjFinding)) {
 	}
 }
 
-// hintCell: o valor de uma coluna tipada pela dica (os freios da célula de catálogo).
+// hintCell: the value of a column typed by the hint (the brakes of the catalog cell).
 func hintCell(s string, c cell, e string, strong bool, add func(ObjFinding)) {
 	if c.a < 0 || c.b <= c.a {
 		return
@@ -678,18 +679,18 @@ func hintCell(s string, c cell, e string, strong bool, add func(ObjFinding)) {
 	}
 }
 
-// systemCatalogs: namespaces que são de sistema em toda instalação (os nomes de dentro deles
-// são documentação pública). public e dbo ficam de fora: guardam os objetos do cliente.
+// systemCatalogs: namespaces that are system ones in every installation (the names inside them are
+// public documentation). public and dbo stay out: they hold the client's objects.
 var systemCatalogs = setOf("information_schema", "pg_catalog", "pg_toast", "performance_schema", "sys",
 	"sysibm", "syscat", "sysstat", "snowflake", "account_usage", "organization_usage", "data_sharing_usage",
 	"readers_account_usage", "master", "msdb", "mysql")
 
 var reDescShowTarget = regexp.MustCompile(`(?i)\b(?:describe|desc)\s+(?:table\s+|view\s+)?([\w$."]+)|\bshow\b[^;\n]*?\bin\s+(?:account\s+|database\s+|schema\s+)?([\w$."]+)`)
 
-// systemTarget: o comando descreve (DESC) ou lista (SHOW ... IN) um objeto que está num
-// catálogo de sistema (SNOWFLAKE.ACCOUNT_USAGE.TAG_REFERENCES, information_schema.columns).
-// Só quando TODAS as instruções do comando são isso: um DESC de sistema junto com um SELECT (ou
-// um SHOW sem IN, um DESC de tabela do cliente) no mesmo comando traz dado do cliente na saída.
+// systemTarget: the command describes (DESC) or lists (SHOW ... IN) an object that is in a system
+// catalog (SNOWFLAKE.ACCOUNT_USAGE.TAG_REFERENCES, information_schema.columns). Only when ALL the
+// statements of the command are that: a system DESC together with a SELECT (or a SHOW without IN, a
+// DESC of a client table) in the same command brings client data in the output.
 func systemTarget(cmd string) bool {
 	sysName := false
 	for _, inst := range strings.Split(cmd, ";") {
@@ -709,14 +710,14 @@ func systemTarget(cmd string) bool {
 			rest = rest[:m[0]] + rest[m[1]:]
 		}
 		if reSQLStatement.MatchString(rest) {
-			return false // outra instrução no mesmo trecho (SELECT, SHOW sem IN...)
+			return false // another statement in the same piece (SELECT, SHOW without IN...)
 		}
 		sysName = sysName || len(ms) > 0
 	}
 	return sysName
 }
 
-// systemObject: alguma parte do nome qualificado é um catálogo de sistema.
+// systemObject: some part of the qualified name is a system catalog.
 func systemObject(target string) bool {
 	for _, p := range strings.Split(target, ".") {
 		if systemCatalogs[strings.ToLower(strings.Trim(p, `"`))] {
@@ -726,5 +727,5 @@ func systemObject(target string) bool {
 	return false
 }
 
-// reSQLStatement: palavra que começa uma instrução que lê ou muda dado.
+// reSQLStatement: a word that starts a statement that reads or changes data.
 var reSQLStatement = regexp.MustCompile(`(?i)\b(?:select|with|insert|update|delete|merge|copy|call|execute|show|desc|describe|list|get|put|values)\b`)

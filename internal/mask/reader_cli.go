@@ -5,20 +5,20 @@ import (
 	"strings"
 )
 
-// Reader de linha de comando: opções que levam o nome de um recurso,
-// iguais em qualquer ferramenta que siga a convenção.
+// Command-line reader: options that carry the name of a resource, the same in any tool that follows
+// the convention.
 //
-//	-h/--host, -S/--server        servidor
-//	-d/-D/--dbname/--database     banco
-//	-U/-u/--username/--user       usuário
+//	-h/--host, -S/--server        server
+//	-d/-D/--dbname/--database     database
+//	-U/-u/--username/--user       user
 //	-n/--namespace                namespace
-//	<tipo>/<nome>                 deploy/x, svc/x, sts/x, pod/x, cm/x, secret/x, ns/x, sa/x...
-//	host:/caminho, usuario@host:  cópia remota (scp, rsync)
+//	<type>/<name>                 deploy/x, svc/x, sts/x, pod/x, cm/x, secret/x, ns/x, sa/x...
+//	host:/path, user@host:        remote copy (scp, rsync)
 //
-// As opções longas já ficam com o leitor de chave-valor (--host x, --host=x). As curtas são
-// ambíguas (-h é ajuda, -d é "detach" ou "data" em muitas ferramentas): só valem quando o
-// mesmo comando tem pelo menos duas delas com valor (psql -h x -d y -U z), ou, para -n,
-// quando o comando também cita um recurso <tipo>/<nome> ou um subcomando de operação.
+// Long options already stay with the key-value reader (--host x, --host=x). Short ones are
+// ambiguous (-h is help, -d is "detach" or "data" in many tools): they only count when the same
+// command has at least two of them with a value (psql -h x -d y -U z), or, for -n, when the command
+// also cites a <type>/<name> resource or an operation subcommand.
 
 var shortOption = map[string]string{"-h": "servidor", "-S": "servidor", "-d": "database", "-D": "database",
 	"-U": "usuario", "-u": "usuario", "-n": "namespace"}
@@ -28,12 +28,12 @@ var reTypeName = regexp.MustCompile(`^(deploy|deployment|deployments|svc|service
 var entTypeName = map[string]string{"ns": "namespace", "namespace": "namespace", "namespaces": "namespace",
 	"sa": "usuario", "serviceaccount": "usuario", "node": "servidor", "nodes": "servidor"}
 
-// subcomandos de operação que acompanham -n (namespace)
+// operation subcommands that go with -n (namespace)
 var operationSubcommands = setOf("get", "describe", "logs", "exec", "rollout", "scale", "delete", "apply", "edit",
 	"patch", "port-forward", "top", "create", "expose", "attach", "cp", "install", "upgrade", "uninstall", "status")
 
-// afterCommand: o token k vem depois de um verbo de operação (get, logs, rollout restart...),
-// de uma opção (-n x, --all) ou de outro tipo/nome, na mesma linha de comando.
+// afterCommand: token k comes after an operation verb (get, logs, rollout restart...), an option
+// (-n x, --all) or another type/name, on the same command line.
 func afterCommand(s string, toks []cliToken, k int) bool {
 	for j := k - 1; j >= 0 && j >= k-4; j-- {
 		v := s[toks[j].a:toks[j].b]
@@ -47,7 +47,8 @@ func afterCommand(s string, toks []cliToken, k int) bool {
 	return false
 }
 
-// cliTypeName: "deploy/x" (a regex só roda em token com "/" que começa com letra minúscula)
+// cliTypeName: "deploy/x" (the regex only runs on a token with "/" that starts with a lowercase
+// letter)
 func cliTypeName(v string) []int {
 	i := strings.IndexByte(v, '/')
 	if i < 2 || i > 14 || v[0] < 'a' || v[0] > 'z' {
@@ -88,7 +89,7 @@ func findCLI(s string, add func(ObjFinding)) {
 	}
 }
 
-// cliLine trata uma linha, dividida em comandos por | && || ;
+// cliLine handles a line, split into commands by | && || ;
 func cliLine(s string, ini, end int, add func(ObjFinding)) {
 	var toks []cliToken
 	flush := func() {
@@ -117,12 +118,13 @@ func cliLine(s string, ini, end int, add func(ObjFinding)) {
 		}
 		a, b := i, j
 		b = noLooseClose(s, a, b)
-		// lista de argumentos (["kubectl", "-n", "x"]) e chamada (exec.Command("kubectl", ...),
-		// ProcessBuilder("kubectl", ...)): o token é a string, sem o que abre a lista ou a chamada
+		// argument list (["kubectl", "-n", "x"]) and call (exec.Command("kubectl", ...),
+		// ProcessBuilder("kubectl", ...)): the token is the string, without what opens the list or
+		// the call
 		if k := strings.LastIndexAny(s[a:b], "[("); k >= 0 && a+k+1 < b && (s[a+k+1] == '"' || s[a+k+1] == '\'') {
 			a += k + 1
 		}
-		if b-a >= 2 && (s[a] == '"' || s[a] == '\'') && s[b-1] == s[a] { // "valor" entre aspas
+		if b-a >= 2 && (s[a] == '"' || s[a] == '\'') && s[b-1] == s[a] { // "value" in quotes
 			a, b = a+1, b-1
 		}
 		toks = append(toks, cliToken{a, b})
@@ -131,8 +133,9 @@ func cliLine(s string, ini, end int, add func(ObjFinding)) {
 	flush()
 }
 
-// noLooseClose: tira do fim do token a pontuação colada que não abriu nele: o fecho da
-// string ou do objeto em volta (comando dentro de JSON: ...-U x"}), vírgula e ponto final.
+// noLooseClose: removes from the end of the token the glued punctuation that did not open in it:
+// the closing of the surrounding string or object (command inside JSON: ...-U x"}), comma and
+// period.
 func noLooseClose(s string, a, b int) int {
 	for b-a > 1 {
 		v := s[a : b-1]
@@ -164,8 +167,8 @@ func cliCommand(s string, toks []cliToken, add func(ObjFinding)) {
 	hasTypeName, hasOperation := false, false
 	for k, t := range toks {
 		v := s[t.a:t.b]
-		// "123 ns/op", "benchmark ns/op" (saída de benchmark) não é recurso: o tipo/nome vem
-		// depois de um verbo de operação, de uma opção ou de outro tipo/nome
+		// "123 ns/op", "benchmark ns/op" (benchmark output) is not a resource: the type/name comes
+		// after an operation verb, an option or another type/name
 		if m := cliTypeName(v); m != nil && k > 0 && afterCommand(s, toks, k) {
 			hasTypeName = true
 			ent := entTypeName[v[m[2]:m[3]]]
@@ -208,7 +211,7 @@ func cliCommand(s string, toks []cliToken, add func(ObjFinding)) {
 			add(ObjFinding{p.a, p.b, p.ent, "linha-de-comando", true})
 		}
 	}
-	// cópia remota: scp/rsync [usuario@]host:/caminho
+	// remote copy: scp/rsync [user@]host:/path
 	if len(toks) > 0 {
 		cmd := s[toks[0].a:toks[0].b]
 		if cmd == "scp" || cmd == "rsync" || strings.HasSuffix(cmd, "/scp") || strings.HasSuffix(cmd, "/rsync") {

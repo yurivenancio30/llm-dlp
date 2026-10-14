@@ -12,8 +12,8 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/mask"
 )
 
-// Trilha B (mask/call.go): o proxy liga a mensagem do usuário, o tool_use e o tool_result
-// em ordem, e a dica de cada um leva o que se sabe da chamada.
+// Track B (mask/call.go): the proxy links the user message, the tool_use and the tool_result in
+// order, and the hint of each one carries what is known about the call.
 
 func buildWithMasker(t *testing.T, bodies *[][]byte) (*httptest.Server, *mask.Masker) {
 	t.Helper()

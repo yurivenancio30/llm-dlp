@@ -15,22 +15,22 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/ocr"
 )
 
-// Imagens e PDFs: OCR, e cobre de preto o que for sensível.
+// Images and PDFs: OCR, and blacks out what is sensitive.
 
-// Media trata imagens e PDFs que vão para a API: lê o texto (OCR/pdftotext),
-// cobre o que é sensível e devolve blocos seguros. Resultados ficam memorizados
-// (o Claude Code reenvia as mesmas imagens a cada mensagem). O arquivo que não deu para
-// verificar nunca sai: é retirado, e no lugar vai um aviso (ver retirar).
+// Media handles images and PDFs that go to the API: reads the text (OCR/pdftotext), covers what is
+// sensitive and returns safe blocks. Results are memoized (Claude Code resends the same images with
+// every message). A file that could not be checked never goes out: it is removed, and a notice goes
+// in its place (see removeIt).
 type Media struct {
 	cfg   config.OCR
 	o     *ocr.OCR
 	m     *mask.Masker
-	lib   []string // domínios liberados (não cobrir em imagens)
-	dom   []string // domínios internos (cobrir mesmo com OCR imperfeito)
+	lib   []string // allowed domains (do not cover in images)
+	dom   []string // internal domains (cover even with imperfect OCR)
 	mu    sync.Mutex
 	memo  map[[32]byte]mediaRes
 	bytes int
-	// Warning recebe o motivo de cada arquivo retirado (o proxy grava no log)
+	// Warning receives the reason for each removed file (the proxy writes it to the log)
 	Warning func(msg string)
 	warned  map[[32]byte]bool
 }
@@ -38,12 +38,12 @@ type Media struct {
 type mediaRes struct {
 	blocks []any
 	ents   []mask.Entry
-	clean  bool // nada a cobrir: sai o bloco original (que não é guardado, para não segurar RAM)
+	clean  bool // nothing to cover: the original block goes out (which is not kept, to not hold RAM)
 	size   int
 }
 
-// saida monta os blocos desta requisição. O marcador de cache (cache_control) muda de lugar
-// a cada mensagem; por isso vem sempre do bloco atual e vai no último bloco que o substitui.
+// output builds the blocks of this request. The cache marker (cache_control) moves with every
+// message; so it always comes from the current block and goes on the last block that replaces it.
 func (r mediaRes) output(b map[string]any) []any {
 	if r.clean {
 		return []any{b}
@@ -59,7 +59,7 @@ func (r mediaRes) output(b map[string]any) []any {
 	return out
 }
 
-const mediaMemoMax = 128 << 20 // teto dos resultados memorizados; passou disso, recomeça
+const mediaMemoMax = 128 << 20 // ceiling of memoized results; past that, start over
 
 func NewMedia(cfg config.Config, m *mask.Masker) *Media {
 	var env []string
@@ -72,11 +72,11 @@ func NewMedia(cfg config.Config, m *mask.Masker) *Media {
 			Language: cfg.OCR.Language, Env: env})}
 }
 
-// Process recebe um bloco image/document em base64 e devolve os blocos que podem sair.
+// Process receives an image/document block in base64 and returns the blocks that may go out.
 func (md *Media) Process(b map[string]any) ([]any, []mask.Entry, error) {
 	src, _ := b["source"].(map[string]any)
 	if src == nil || src["type"] != "base64" {
-		return []any{b}, nil, nil // url/arquivo já hospedado: não há dado local aqui
+		return []any{b}, nil, nil // url/file already hosted: there is no local data here
 	}
 	typ, _ := src["media_type"].(string)
 	data, _ := src["data"].(string)
@@ -122,7 +122,7 @@ func (md *Media) Process(b map[string]any) ([]any, []mask.Entry, error) {
 	if r.clean {
 		r.blocks = nil
 	}
-	for _, bl := range r.blocks { // o cache_control é de cada requisição, não do resultado memorizado
+	for _, bl := range r.blocks { // cache_control belongs to each request, not to the memoized result
 		delete(bl.(map[string]any), "cache_control")
 	}
 	output, ents := r.output(b), r.ents
@@ -135,12 +135,12 @@ func (md *Media) Process(b map[string]any) ([]any, []mask.Entry, error) {
 	return output, ents, nil
 }
 
-// retirar: a imagem ou o PDF que não deu para verificar (ou que a configuração bloqueia) não
-// sai; no lugar vai um aviso, para o modelo contar ao usuário o que houve e como resolver.
-// Recusar a requisição inteira prendia a conversa: o arquivo fica no histórico, que o Claude
-// Code reenvia a cada mensagem. O aviso só tem texto fixo (o detalhe do erro, que pode citar um
-// caminho da máquina, fica no log) e o resultado não é memorizado: com o OCR instalado, a
-// próxima mensagem já leva o arquivo.
+// removeIt: the image or PDF that could not be checked (or that the configuration blocks) does not
+// go out; a notice goes in its place, for the model to tell the user what happened and how to fix
+// it. Refusing the whole request got the conversation stuck: the file stays in the history, which
+// Claude Code resends with every message. The notice only has fixed text (the error detail, which
+// may cite a path on the machine, stays in the log) and the result is not memoized: with OCR
+// installed, the next message already carries the file.
 func (md *Media) removeIt(b map[string]any, isPDF bool, reason string) []any {
 	t := "[llm-dlp] Uma imagem foi retirada daqui e não foi enviada: "
 	if isPDF {
@@ -149,7 +149,7 @@ func (md *Media) removeIt(b map[string]any, isPDF bool, reason string) []any {
 	return mediaRes{blocks: []any{map[string]any{"type": "text", "text": t + reason + "."}}}.output(b)
 }
 
-// avisar grava no log, uma vez por arquivo, por que ele foi retirado.
+// warn writes to the log, once per file, why it was removed.
 func (md *Media) warn(k [32]byte, msg string) {
 	md.mu.Lock()
 	already := md.warned[k]
@@ -177,7 +177,7 @@ func (md *Media) image(b map[string]any, bin []byte) (mediaRes, error) {
 	return mediaRes{blocks: []any{newOne, note(n, ents, "nesta imagem")}, ents: ents, size: len(data)}, nil
 }
 
-// cobrir: OCR + detecção; devolve a imagem (PNG) com os trechos cobertos.
+// cover: OCR + detection; returns the image (PNG) with the pieces covered.
 func (md *Media) cover(bin []byte) ([]byte, int, []mask.Entry, error) {
 	img, lines, err := md.o.Read(bin)
 	if err != nil {
@@ -213,8 +213,8 @@ var (
 	reIPOCR = regexp.MustCompile(`\d{1,3}[.,]\d{1,3}[.,]\d{1,3}[.,]\d{1,3}`)
 )
 
-// agressivo: regras extras para imagem, porque o OCR erra (ex.: lê "@" como "Q").
-// Imagem é rara; aqui vale cobrir a mais.
+// aggressive: extra rules for images, because OCR makes mistakes (e.g. reads "@" as "Q"). Images
+// are rare; here it is worth covering more.
 func (md *Media) aggressive(w string) bool {
 	w = strings.Trim(w, `()[]{}<>,;:'"`)
 	if strings.Contains(w, "@") {
@@ -231,7 +231,7 @@ func (md *Media) aggressive(w string) bool {
 	}
 	lower := strings.ToLower(w)
 	for _, d := range md.dom {
-		if len(d) >= 6 && strings.Contains(lower, strings.ToLower(d[:len(d)-1])) { // tolera 1 letra perdida no fim
+		if len(d) >= 6 && strings.Contains(lower, strings.ToLower(d[:len(d)-1])) { // tolerates 1 letter lost at the end
 			return true
 		}
 	}
@@ -267,7 +267,7 @@ func (md *Media) pdf(b map[string]any, bin []byte) (mediaRes, error) {
 		}
 		return mediaRes{blocks: []any{newOne}, ents: ents, size: len(masked)}, nil
 	}
-	// PDF escaneado: cada página vira imagem e passa pelo OCR
+	// scanned PDF: each page becomes an image and goes through OCR
 	pages, err := md.o.PDFPages(bin, md.cfg.MaxPages)
 	if err != nil {
 		return mediaRes{}, err

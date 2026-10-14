@@ -24,24 +24,24 @@ import (
 
 const lockFile = "/etc/claude-code/managed-settings.json"
 
-// regras que o llm-dlp acrescenta nas permissões do Claude Code
+// rules llm-dlp adds to Claude Code's permissions
 var denyLLMDLP = []string{
-	"Read(~/.config/llm-dlp/**)",    // a chave e os hashes nunca são lidos pelo agente
+	"Read(~/.config/llm-dlp/**)",    // the key and the hashes are never read by the agent
 	"Edit(~/.config/llm-dlp/**)",    // nem alterados
-	"Bash(*.config/llm-dlp*)",       // nem por um comando (a configuração decide o que é mascarado e para onde vai)
-	"Bash(*llm-dlp emergency*)",     // o agente não tenta ligar a emergência (a barreira real é o sudo)
-	"Bash(*llm-dlp emergencia*)",    // (o nome antigo do comando continua aceito)
-	"Bash(*managed-settings.json*)", // nem mexer na trava
+	"Bash(*.config/llm-dlp*)",       // nor by a command (the configuration decides what is masked and where it goes)
+	"Bash(*llm-dlp emergency*)",     // the agent does not try to turn on emergency (the real barrier is sudo)
+	"Bash(*llm-dlp emergencia*)",    // (the old command name is still accepted)
+	"Bash(*managed-settings.json*)", // nor touch the lock
 }
 
-// hooksLLMDLP: o comando de cada hook do Claude Code. oldHooks: os nomes de antes da 0.9.0,
-// que o install troca pelos novos e o uninstall também reconhece.
+// hooksLLMDLP: the command of each Claude Code hook. oldHooks: the names from before 0.9.0, which
+// install replaces with the new ones and uninstall also recognizes.
 var (
 	hooksLLMDLP = map[string]string{"SessionStart": "ensure", "UserPromptSubmit": "check"}
 	oldHooks    = map[string]string{"SessionStart": "garantir", "UserPromptSubmit": "verificar"}
 )
 
-// isLLMDLPHook: o grupo de hooks (em JSON) chama o llm-dlp, com o nome novo ou o antigo?
+// isLLMDLPHook: does the hook group (in JSON) call llm-dlp, with the new or the old name?
 func isLLMDLPHook(group []byte) bool {
 	for _, m := range []map[string]string{hooksLLMDLP, oldHooks} {
 		for _, action := range m {
@@ -55,7 +55,7 @@ func isLLMDLPHook(group []byte) bool {
 
 type entry struct {
 	r          *bufio.Reader
-	noQuestion bool // --yes: responde "sim" a tudo (para scripts)
+	noQuestion bool // --yes: answers "yes" to everything (for scripts)
 }
 
 func (e entry) askIt(msg string) string {
@@ -79,14 +79,14 @@ func step(n int, title, because string) {
 	fmt.Printf("\n[%d/5] %s\n      %s\n", n, title, because)
 }
 
-// withSudo roda um comando como administrador, ligado ao terminal (o sudo pede a senha).
+// withSudo runs a command as administrator, attached to the terminal (sudo asks for the password).
 func withSudo(args ...string) error {
 	c := exec.Command("sudo", args...)
 	c.Stdin, c.Stdout, c.Stderr = os.Stdin, os.Stdout, os.Stderr
 	return c.Run()
 }
 
-// instalar faz tudo, explicando cada passo. Pode ser rodado de novo sem estragar nada.
+// install does everything, explaining each step. It can be run again without breaking anything.
 func install(args []string) error {
 	in := entry{r: bufio.NewReader(os.Stdin)}
 	for _, a := range args {
@@ -117,7 +117,7 @@ Em dois passos (OCR e trava) ele usa sudo: a sua senha será pedida nessa hora.`
 		fmt.Printf("      ! %s não está no seu PATH. Acrescente ao ~/.bashrc:  export PATH=\"$HOME/.local/bin:$PATH\"\n", filepath.Dir(destination))
 	}
 
-	// 2. configuração e chave
+	// 2. configuration and key
 	step(2, "Configuração e chave", "cria "+config.Dir()+" com a configuração e a chave secreta que gera os pseudônimos.")
 	cfg, err := config.Load()
 	if err != nil {
@@ -203,7 +203,7 @@ Em dois passos (OCR e trava) ele usa sudo: a sua senha será pedida nessa hora.`
 		} else if err != nil {
 			return err
 		} else if info, _ := health(cfg); info.Commit != version.Commit || info.Version != version.Version {
-			// uma versão anterior no ar: troca por esta sem tirar o llm-dlp do ar
+			// an earlier version running: swap it for this one without taking llm-dlp offline
 			if err := swapService(cfg, info, version.Commit); err != nil {
 				fmt.Printf("      ! a versão anterior (%s) continua no ar: %v. Tente: llm-dlp update\n", info.Version, err)
 			} else {
@@ -291,7 +291,7 @@ func countTerms(cfg config.Config) int {
 	return n
 }
 
-// claudeEnabled: o settings.json do Claude Code aponta para o llm-dlp?
+// claudeEnabled: does Claude Code's settings.json point to llm-dlp?
 func claudeEnabled(home string, cfg config.Config) bool {
 	s, _, err := readSettings(filepath.Join(home, ".claude", "settings.json"))
 	if err != nil {
@@ -334,7 +334,7 @@ func uninstall(args []string) error {
 			perms["deny"] = stays
 		}
 	}
-	// não deixa restos vazios que não existiam antes da instalação
+	// leaves no empty leftovers that did not exist before the installation
 	for _, k := range []string{"env", "hooks"} {
 		if m, ok := s[k].(map[string]any); ok && len(m) == 0 {
 			delete(s, k)
@@ -344,9 +344,9 @@ func uninstall(args []string) error {
 	if err != nil {
 		return err
 	}
-	// O proxy NÃO é parado aqui: o Claude Code aplica o settings.json às sessões já abertas,
-	// mas uma sessão aberta continua apontando para o proxy até ser reiniciada. Parar agora
-	// deixaria essas sessões sem resposta (falha fechada).
+	// The proxy is NOT stopped here: Claude Code applies settings.json to sessions already open,
+	// but an open session keeps pointing to the proxy until it is restarted. Stopping now would
+	// leave those sessions without an answer (fail closed).
 	fmt.Println("✓ removido do Claude Code (backup em " + bak + ").")
 	fmt.Println("  O llm-dlp continua no ar para as sessões que já estão abertas. Feche e abra o Claude Code")
 	fmt.Println("  (ou o VS Code) e depois rode: llm-dlp stop")
@@ -359,16 +359,16 @@ func uninstall(args []string) error {
 	return nil
 }
 
-// installLock grava allowedProviders + ANTHROPIC_BASE_URL no managed-settings (root).
+// installLock writes allowedProviders + ANTHROPIC_BASE_URL into managed-settings (root).
 func installLock(remove bool) error {
 	if os.Geteuid() != 0 {
 		return errors.New("precisa de sudo (o arquivo da trava fica numa pasta do sistema)")
 	}
 	port := 8787
-	if u := os.Getenv("SUDO_USER"); u != "" { // usa a porta configurada pelo usuário
+	if u := os.Getenv("SUDO_USER"); u != "" { // uses the port configured by the user
 		if uu, err := user.Lookup(u); err == nil {
 			if b, err := os.ReadFile(filepath.Join(uu.HomeDir, ".config", "llm-dlp", "config.json")); err == nil {
-				var c config.Config // (com os nomes novos ou os antigos)
+				var c config.Config // (with the new or the old names)
 				if config.Read(b, &c) == nil && c.Port > 0 {
 					port = c.Port
 				}
@@ -393,7 +393,7 @@ func installLock(remove bool) error {
 	return nil
 }
 
-// applyLock acrescenta (ou remove) a trava num managed-settings.json, preservando o resto.
+// applyLock adds (or removes) the lock in a managed-settings.json, keeping the rest.
 func applyLock(path string, port int, remove bool) (string, error) {
 	s, orig, err := readSettings(path)
 	if err != nil {
@@ -468,8 +468,8 @@ func applyClaude(home, bin string, cfg config.Config) (string, error) {
 		return v
 	}
 	sub("env")["ANTHROPIC_BASE_URL"] = "http://" + address(cfg)
-	// os hooks do llm-dlp que já estiverem lá (com o nome novo ou o antigo) saem e entram de
-	// novo: nunca ficam dois
+	// the llm-dlp hooks already there (with the new or the old name) go out and come in again:
+	// there are never two
 	stripHooks(s)
 	byHooks(s, bin, hooksLLMDLP)
 	perms := sub("permissions")
@@ -487,7 +487,7 @@ func applyClaude(home, bin string, cfg config.Config) (string, error) {
 	return writeSettings(target, s, orig)
 }
 
-// stripHooks tira do settings.json os hooks do llm-dlp (com o nome novo ou o antigo).
+// stripHooks removes the llm-dlp hooks from settings.json (with the new or the old name).
 func stripHooks(s map[string]any) {
 	hooks, ok := s["hooks"].(map[string]any)
 	if !ok {
@@ -509,7 +509,7 @@ func stripHooks(s map[string]any) {
 	}
 }
 
-// byHooks acrescenta os hooks do llm-dlp, com os nomes de comando dados.
+// byHooks adds the llm-dlp hooks, with the given command names.
 func byHooks(s map[string]any, bin string, names map[string]string) {
 	hooks, ok := s["hooks"].(map[string]any)
 	if !ok {
@@ -518,17 +518,17 @@ func byHooks(s map[string]any, bin string, names map[string]string) {
 	}
 	for _, event := range []string{"SessionStart", "UserPromptSubmit"} {
 		list, _ := hooks[event].([]any)
-		// timeout explícito: hook que estoura o tempo é ignorado pelo Claude Code (falharia aberto)
+		// explicit timeout: a hook that runs out of time is ignored by Claude Code (it would fail
+		// open)
 		hooks[event] = append(list, map[string]any{"hooks": []any{
 			map[string]any{"type": "command", "command": bin + " " + names[event], "timeout": timeoutHook}}})
 	}
 }
 
-// hooksForVersion: depois de trocar o binário pela versão v, os hooks do Claude Code passam a
-// chamar os nomes de comando que ela conhece: os em inglês desde a 0.9.0, os antigos antes
-// (voltar para uma versão anterior com os nomes novos barraria cada mensagem com "comando
-// desconhecido"). Só mexe no settings.json se ele já chama o llm-dlp e os nomes mudam.
-// Devolve se mudou.
+// hooksForVersion: after swapping the binary for version v, the Claude Code hooks call the command
+// names it knows: the English ones since 0.9.0, the old ones before (going back to an earlier
+// version with the new names would block every message with "unknown command"). It only touches
+// settings.json if it already calls llm-dlp and the names change. Returns whether it changed.
 func hooksForVersion(home, bin, v string) (bool, error) {
 	target := filepath.Join(home, ".claude", "settings.json")
 	s, orig, err := readSettings(target)
@@ -570,7 +570,7 @@ func writeSettings(target string, s map[string]any, orig []byte) (string, error)
 func writeSettingsMode(target string, s map[string]any, orig []byte, mode os.FileMode) (string, error) {
 	bak := ""
 	if len(orig) > 0 {
-		// nome único: nunca sobrescreve um backup anterior (duas execuções no mesmo segundo)
+		// unique name: never overwrites an earlier backup (two runs in the same second)
 		base := target + ".bak-" + time.Now().Format("20060102-150405")
 		bak = base
 		for i := 2; ; i++ {
@@ -625,7 +625,7 @@ func copyFile(de, to string, mode os.FileMode) error {
 	if err := g.Close(); err != nil {
 		return err
 	}
-	return os.Rename(tmp, to) // troca atômica (funciona mesmo com o binário antigo rodando)
+	return os.Rename(tmp, to) // atomic swap (works even with the old binary running)
 }
 
 func missingOCR(cfg config.Config) string {
@@ -656,7 +656,7 @@ func lockInstalled(address string) bool {
 
 var reVersion = regexp.MustCompile(`\d+\.\d+\.\d+`)
 
-// claudeCodeVersion: a do CLI no PATH ou a maior entre as extensões do VS Code.
+// claudeCodeVersion: the one of the CLI in PATH or the highest among the VS Code extensions.
 func claudeCodeVersion() string {
 	if out, err := exec.Command("claude", "--version").Output(); err == nil {
 		return reVersion.FindString(string(out))

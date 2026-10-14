@@ -5,23 +5,22 @@ import (
 	"strings"
 )
 
-// Mais documentos brasileiros conferidos pelo próprio dado: boleto e conta de consumo, código de
-// rastreio, matrícula de certidão do registro civil e código da CID-10.
+// More Brazilian documents checked by the data itself: bank slip and utility bill, postal tracking
+// code, civil registry certificate number and ICD-10 code.
 
-// reBoleto: linha digitável do boleto de cobrança, 47 dígitos em 5 campos
-// (AAABC.CCCCX DDDDD.DDDDDY EEEEE.EEEEEZ K UUUUVVVVVVVVVV; Convenção da Cobrança da FEBRABAN,
-// Anexo V, 2.3.4).
+// reBoleto: typed line of the collection bank slip, 47 digits in 5 fields (AAABC.CCCCX DDDDD.DDDDDY
+// EEEEE.EEEEEZ K UUUUVVVVVVVVVV; FEBRABAN Collection Convention, Annex V, 2.3.4).
 var reBoleto = regexp.MustCompile(`\b\d{5}\.?\d{5}\s*\d{5}\.?\d{6}\s*\d{5}\.?\d{6}\s*\d\s*\d{14}\b`)
 
-// reBillPayment: linha digitável de arrecadação (conta de luz, água, telefone, tributo, GRU):
-// 4 blocos de 11 dígitos, cada um com o seu DV (48 dígitos; começa por 8, o produto).
+// reBillPayment: typed line of a bill payment (electricity, water, telephone, tax, GRU): 4 blocks
+// of 11 digits, each with its check digit (48 digits; starts with 8, the product).
 var reBillPayment = regexp.MustCompile(`\b8\d{10}[-\s]?\d\s*\d{11}[-\s]?\d\s*\d{11}[-\s]?\d\s*\d{11}[-\s]?\d\b`)
 
-// reBarcode: o código de barras dos dois, 44 dígitos.
+// reBarcode: the barcode of both, 44 digits.
 var reBarcode = regexp.MustCompile(`\b\d{44}\b`)
 
-// checkDigitMod10: módulo 10 da FEBRABAN: pesos 2 e 1 da direita para a esquerda, somando os algarismos
-// de cada produto; DV = 10 - resto (resto 0: DV 0).
+// checkDigitMod10: FEBRABAN modulo 10: weights 2 and 1 from right to left, adding the digits of
+// each product; check digit = 10 - remainder (remainder 0: check digit 0).
 func checkDigitMod10(s string) int {
 	sum, p := 0, 2
 	for i := len(s) - 1; i >= 0; i-- {
@@ -35,7 +34,7 @@ func checkDigitMod10(s string) int {
 	return 0
 }
 
-// sumMod11: pesos 2 a 9 da direita para a esquerda (cada caractere vale o código ASCII menos 48).
+// sumMod11: weights 2 to 9 from right to left (each character is worth its ASCII code minus 48).
 func sumMod11(s string) int {
 	sum, p := 0, 2
 	for i := len(s) - 1; i >= 0; i-- {
@@ -47,9 +46,9 @@ func sumMod11(s string) int {
 	return sum
 }
 
-// ValidBoletoBarcode: código de barras do boleto de cobrança (44 dígitos). Moeda 9 (real) ou 0
-// na posição 4; o DV geral, na posição 5, pelo módulo 11 sobre as outras 43 (11 - resto; 0 ou
-// maior que 9 vira 1: manual de código de barras da CAIXA, Anexo I, que segue a FEBRABAN).
+// ValidBoletoBarcode: barcode of the collection bank slip (44 digits). Currency 9 (real) or 0 at
+// position 4; the general check digit, at position 5, by modulo 11 over the other 43 (11 -
+// remainder; 0 or greater than 9 becomes 1: CAIXA barcode manual, Annex I, which follows FEBRABAN).
 func ValidBoletoBarcode(c string) bool {
 	if len(c) != 44 || c[3] != '9' && c[3] != '0' || digitsOnly(c) != c {
 		return false
@@ -61,8 +60,8 @@ func ValidBoletoBarcode(c string) bool {
 	return int(c[4]-'0') == dv
 }
 
-// ValidBoleto: a linha digitável de 47 dígitos. Os três primeiros campos com o DV do módulo 10,
-// e o código de barras remontado com o DV geral certo.
+// ValidBoleto: the 47-digit typed line. The first three fields with the modulo 10 check digit, and
+// the rebuilt barcode with the right general check digit.
 func ValidBoleto(s string) bool {
 	d := digitsOnly(s)
 	if len(d) != 47 {
@@ -76,9 +75,9 @@ func ValidBoleto(s string) bool {
 	return ValidBoletoBarcode(d[:4] + d[32:33] + d[33:47] + d[4:9] + d[10:20] + d[21:31])
 }
 
-// billPaymentCheckDigit: o 3º dígito diz o módulo (6 ou 7: 10; 8 ou 9: 11). No 11, resto 0 ou 1 dá DV 0 e
-// resto 10 dá DV 1 (FEBRABAN, Layout Padrão de Arrecadação/Recebimento com Utilização do Código
-// de Barras, cálculo do DAC).
+// billPaymentCheckDigit: the 3rd digit gives the modulus (6 or 7: 10; 8 or 9: 11). With 11,
+// remainder 0 or 1 gives check digit 0 and remainder 10 gives check digit 1 (FEBRABAN, Standard
+// Layout for Bill Payment/Receipt with Barcode, DAC calculation).
 func billPaymentCheckDigit(s string, mod11 bool) int {
 	if !mod11 {
 		return checkDigitMod10(s)
@@ -93,7 +92,8 @@ func billPaymentCheckDigit(s string, mod11 bool) int {
 	}
 }
 
-// ValidBillPaymentBarcode: produto 8, identificador de valor de 6 a 9 e o DV geral na posição 4.
+// ValidBillPaymentBarcode: product 8, value identifier from 6 to 9 and the general check digit at
+// position 4.
 func ValidBillPaymentBarcode(c string) bool {
 	if len(c) != 44 || c[0] != '8' || c[2] < '6' || digitsOnly(c) != c {
 		return false
@@ -101,8 +101,8 @@ func ValidBillPaymentBarcode(c string) bool {
 	return billPaymentCheckDigit(c[:3]+c[4:], c[2] >= '8') == int(c[3]-'0')
 }
 
-// ValidBillPayment: a linha de 48 dígitos; cada bloco de 11 com o seu DV, no mesmo módulo do DV
-// geral (Tesouro Nacional, código de barras da GRU).
+// ValidBillPayment: the 48-digit line; each block of 11 with its check digit, in the same modulus
+// as the general check digit (National Treasury, GRU barcode).
 func ValidBillPayment(s string) bool {
 	d := digitsOnly(s)
 	if len(d) != 48 || d[0] != '8' || d[2] < '6' {
@@ -137,12 +137,12 @@ func findBoletos(s string, add func(ini, end int, typ string)) {
 	}
 }
 
-// reTracking: identificador de objeto postal (norma S10 da UPU, usada pelos Correios): 2 letras
-// do serviço, 8 dígitos, o DV e as 2 letras do país; impresso também em grupos de 3.
+// reTracking: postal item identifier (UPU S10 standard, used by Correios): 2 service letters, 8
+// digits, the check digit and the 2 country letters; also printed in groups of 3.
 var reTracking = regexp.MustCompile(`\b[A-Z]{2} ?\d{3} ?\d{3} ?\d{3} ?[A-Z]{2}\b`)
 
-// ValidTracking: o DV pela S10 (5.4): pesos 8 6 4 2 3 5 9 7, 11 - resto do módulo 11; 10 vira 0
-// e 11 vira 5.
+// ValidTracking: the check digit by S10 (5.4): weights 8 6 4 2 3 5 9 7, 11 - remainder of modulo
+// 11; 10 becomes 0 and 11 becomes 5.
 func ValidTracking(s string) bool {
 	d := digitsOnly(s)
 	if len(d) != 9 {
@@ -170,14 +170,14 @@ func findTrackingCodes(s string, add func(ini, end int, typ string)) {
 	}
 }
 
-// reCertificate: matrícula das certidões do registro civil (nascimento, casamento, óbito), 32
-// dígitos: serventia(6) acervo(2) serviço(2) ano(4) tipo de livro(1) livro(5) folha(3) termo(7)
-// DV(2) (Provimento CNJ 149/2023, art. 473; guia do SIRC). Impressa em grupos, com espaço ou ponto.
+// reCertificate: number of the civil registry certificates (birth, marriage, death), 32 digits:
+// office(6) collection(2) service(2) year(4) book type(1) book(5) page(3) entry(7) check digits(2)
+// (CNJ Provision 149/2023, art. 473; SIRC guide). Printed in groups, with spaces or dots.
 var reCertificate = regexp.MustCompile(`\b\d{6}[ .]?\d{2}[ .]?\d{2}[ .]?\d{4}[ .]?\d[ .]?\d{5}[ .]?\d{3}[ .]?\d{7}[ .-]?\d{2}\b`)
 
-// ValidCertificateNumber: o serviço é sempre 55 (registro civil das pessoas naturais), o ano é
-// de quatro dígitos e o tipo de livro não é 0. O DV não é conferido: o cálculo é do sistema do CNJ
-// (SIRC) e não foi publicado.
+// ValidCertificateNumber: the service is always 55 (civil registry of natural persons), the year
+// has four digits and the book type is not 0. The check digit is not verified: the calculation
+// belongs to the CNJ system (SIRC) and was not published.
 func ValidCertificateNumber(s string) bool {
 	d := digitsOnly(s)
 	if len(d) != 32 || d[8:10] != "55" || d[14] == '0' {
@@ -194,12 +194,12 @@ func findCertificates(s string, add func(ini, end int, typ string)) {
 	}
 }
 
-// RG: cada estado define o número do seu registro geral (Lei 7.116/1983), e nenhum instituto de
-// identificação publica a regra do dígito verificador; a Carteira de Identidade Nacional usa o
-// CPF (Decreto 10.977/2022), que tem regra própria. Então o RG se reconhece pelo rótulo: depois
-// de "RG", "registro geral", "cédula de identidade" ou "carteira de identidade", o número de
-// qualquer estado, com ou sem pontuação, com a UF na frente ("MG-12.345.678") e o DV que for
-// (dígito ou X). O órgão emissor depois ("SSP/DF") fica.
+// RG: each state defines the number of its general registry (Law 7.116/1983), and no identification
+// institute publishes the check-digit rule; the National Identity Card uses the CPF (Decree
+// 10.977/2022), which has its own rule. So the RG is recognized by the label: after "RG", "registro
+// geral", "cédula de identidade" or "carteira de identidade", the number of any state, with or
+// without punctuation, with the state in front ("MG-12.345.678") and whatever check digit (digit or
+// X). The issuing body after it ("SSP/DF") stays.
 var reLabeledRG = regexp.MustCompile(`(?i)(?:^|[^\p{L}\p{N}])(?:rg|r\.g\.|registro\s+geral|c[eé]dula\s+de\s+identidade|carteira\s+de\s+identidade)(?:\s*(?:n[º°o]\.?|n[uú]mero))?\s*[:=]?\s*((?:(?-i:[A-Z]{2})[-\s]?)?\d[\d.\-]{3,14}[\dxX])`)
 
 func findLabeledRG(s string, add func(ini, end int, typ string)) {
@@ -211,9 +211,9 @@ func findLabeledRG(s string, add func(ini, end int, typ string)) {
 	}
 }
 
-// CID-10 (OMS; DATASUS): letra, 2 dígitos e a subcategoria (1 dígito, com ou sem ponto). Diagnóstico
-// é dado de saúde, sensível (LGPD, art. 5º, II). Só vale logo depois de "CID" ou "diagnóstico":
-// sozinho, "A10" é qualquer coisa. Pega a lista ("CID F32.1, F41.0 e Z73").
+// ICD-10 (WHO; DATASUS): a letter, 2 digits and the subcategory (1 digit, with or without a dot). A
+// diagnosis is health data, sensitive (LGPD, art. 5, II). It only counts right after "CID" or
+// "diagnóstico": alone, "A10" is anything. It takes the list ("CID F32.1, F41.0 e Z73").
 var (
 	reCIDGatilho = regexp.MustCompile(`(?i)(?:^|[^\p{L}\p{N}])(?:cids?(?:[- ]?10)?|diagn[oó]stico|diagnosis)["']?(?:\s*(?:[:=]|n[º°o]\.?))?\s*["']?`)
 	reCIDCodigo  = regexp.MustCompile(`^[A-Za-z]\d{2}(?:\.?\d)?`)
@@ -239,7 +239,7 @@ func findCID(s string, add func(ini, end int, typ string)) {
 	}
 }
 
-// hasCIDTrigger: pré-filtro de findCID.
+// hasCIDTrigger: prefilter of findCID.
 func hasCIDTrigger(lower string) bool {
 	return strings.Contains(lower, "cid") || strings.Contains(lower, "diagn")
 }

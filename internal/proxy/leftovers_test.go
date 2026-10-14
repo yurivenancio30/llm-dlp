@@ -14,10 +14,10 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/mask"
 )
 
-// A mesma pessoa escrita em caixas diferentes volta cada uma como estava: o relatório que o
-// modelo escreve com "MARIA DA SILVA" não grava "Maria da Silva" (e um Edit com old_string em
-// maiúsculas ainda casa com o arquivo). Caso tirado da forma de 7 escritas que voltavam
-// diferentes numa sessão real (os nomes aqui são inventados).
+// The same person written in different cases comes back each as it was: the report the model writes
+// with "MARIA DA SILVA" does not write "Maria da Silva" (and an Edit with old_string in uppercase
+// still matches the file). Case taken from the shape of 7 writes that came back different in a real
+// session (the names here are made up).
 func TestPersonReturnsEachSpellingCase(t *testing.T) {
 	const text = `[{"nome_cliente": "Maria da Silva", "cidade": "Recife"},` + "\n" +
 		` {"nome_cliente": "MARIA DA SILVA", "cidade": "Recife"},` + "\n" +
@@ -48,8 +48,8 @@ func TestPersonReturnsEachSpellingCase(t *testing.T) {
 	}
 }
 
-// buildCaseEcho: o proxy com um termo cadastrado ("sgp", a sigla de uma empresa inventada) e
-// uma API falsa que responde com a resposta que resp monta a partir do corpo que recebeu.
+// buildCaseEcho: the proxy with a registered term ("sgp", the acronym of a made-up company) and a
+// fake API that answers with the response resp builds from the body it received.
 func buildCaseEcho(t *testing.T, bodies *[][]byte, resp fakeResp) *httptest.Server {
 	t.Helper()
 	cfg := config.Default()
@@ -69,7 +69,7 @@ func buildCaseEcho(t *testing.T, bodies *[][]byte, resp fakeResp) *httptest.Serv
 	return px
 }
 
-// lastReceivedEntry: a entrada (já mascarada) da última chamada de ferramenta que a API recebeu.
+// lastReceivedEntry: the input (already masked) of the last tool call the API received.
 func lastReceivedEntry(body []byte) string {
 	var req struct {
 		Messages []struct {
@@ -91,16 +91,16 @@ func lastReceivedEntry(body []byte) string {
 	return string(in)
 }
 
-// O mesmo nome em grafias de caixa diferentes (a sigla da empresa "SgP", "sgp" e "SGP"; o login
-// "etl_carga" e "ETL_CARGA"; a tabela de SQL em maiúsculas num SELECT e em minúsculas noutro) volta
-// cada um como estava na escrita do modelo: o comando e o arquivo que ele escreve com os
-// pseudônimos que viu saem iguais ao original. Antes, o termo e o login tinham UM pseudônimo para
-// todas as grafias e a volta trazia sempre a primeira ("echo SgP sgp SGP" voltava "echo SgP SgP
-// SgP"). Caso tirado da forma de 21 escritas que voltavam diferentes, só pela caixa, numa
-// repetição de sessão real (os nomes aqui são inventados).
+// The same name in different case spellings (the company acronym "SgP", "sgp" and "SGP"; the login
+// "etl_carga" and "ETL_CARGA"; the SQL table in uppercase in one SELECT and in lowercase in
+// another) comes back each as it was in the model's writing: the command and the file it writes
+// with the pseudonyms it saw come out equal to the original. Before, the term and the login had ONE
+// pseudonym for all spellings and the return always brought the first one ("echo SgP sgp SGP" came
+// back as "echo SgP SgP SgP"). Case taken from the shape of 21 writes that came back different,
+// only by case, in a replay of a real session (the names here are made up).
 func TestWritingReturnsEachSpellingCase(t *testing.T) {
 	var bodies [][]byte
-	// o modelo repete a última chamada de ferramenta com os pseudônimos que viu
+	// the model repeats the last tool call with the pseudonyms it saw
 	px := buildCaseEcho(t, &bodies, func(body []byte, w http.ResponseWriter) {
 		w.Header().Set("content-type", "text/event-stream")
 		sse(w, "", lastReceivedEntry(body), "", 5)
@@ -139,10 +139,11 @@ func TestWritingReturnsEachSpellingCase(t *testing.T) {
 	}
 }
 
-// O modelo reescreve a caixa do pseudônimo da sigla, que só apareceu em maiúsculas ("SGP"): em
-// minúsculas num caminho, com a inicial maiúscula numa frase, toda em maiúsculas. Nenhuma dessas
-// formas sobra como pseudônimo, e todas voltam à sigla como ela entrou (o modelo que troca a caixa
-// do pseudônimo não inventa uma pasta "/dados/sgp" que não existe), como os nomes de objeto.
+// The model rewrites the case of the acronym's pseudonym, which only appeared in uppercase ("SGP"):
+// in lowercase in a path, with an initial capital in a sentence, all in uppercase. None of these
+// forms is left as a pseudonym, and all go back to the acronym as it entered (a model that changes
+// the case of a pseudonym does not invent a "/dados/sgp" folder that does not exist), like object
+// names.
 func TestWritingWithOtherPseudonymCase(t *testing.T) {
 	var bodies [][]byte
 	reCompany := regexp.MustCompile(`\bEMPRESA-[a-z2-7]{8}\b`)
@@ -163,8 +164,8 @@ func TestWritingWithOtherPseudonymCase(t *testing.T) {
 	}
 }
 
-// O lado de lá: uma coluna que é palavra comum ("status", "valor") não mascara a palavra maior
-// que a contém ("user_status" no código): só nome com cara de identificador vale por pedaço.
+// The other side: a column that is a common word ("status", "valor") does not mask the larger word
+// that contains it ("user_status" in code): only an identifier-shaped name counts by piece.
 func TestCommonWordDoesNotMaskLargerWord(t *testing.T) {
 	var bodies [][]byte
 	px := buildMem(t, t.TempDir(), &bodies, func(body []byte, w http.ResponseWriter) {
@@ -186,11 +187,11 @@ func TestCommonWordDoesNotMaskLargerWord(t *testing.T) {
 	}
 }
 
-// Um nome que a conversa já conhece não sai em claro numa saída de comando nova, mesmo dentro de
-// uma palavra maior (o lakehouse com o nome da tabela, o arquivo com prefixo); um GUID que é o
-// valor de um campo de id (workspace_id, "id") também não. E a volta traz o valor real: o modelo
-// que repete o pseudônimo devolve ao disco o nome que estava lá. Casos tirados da forma do que
-// sobrava numa sessão real do Microsoft Fabric (os dados aqui são inventados).
+// A name the conversation already knows does not go out in the clear in a new command output, even
+// inside a larger word (the lakehouse with the table name, the file with a prefix); neither does a
+// GUID that is the value of an id field (workspace_id, "id"). And the return brings the real value:
+// the model that repeats the pseudonym returns to disk the name that was there. Cases taken from
+// the shape of what was left in a real Microsoft Fabric session (the data here is made up).
 func TestKnownNameNotLeftOver(t *testing.T) {
 	const sql = "SELECT v.id, v.valor FROM dw.VENDA2024 v JOIN dw.CLIENTES_PF c ON c.id = v.cli WHERE v.ano = 2024"
 	const guid = "3fa85f64-5717-4562-b3fc-2c963f66afa6"
@@ -206,7 +207,7 @@ func TestKnownNameNotLeftOver(t *testing.T) {
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			var bodies [][]byte
-			// a API repete, como texto, o resultado de ferramenta que recebeu (com os pseudônimos)
+			// the API repeats, as text, the tool result it received (with the pseudonyms)
 			px := buildMem(t, t.TempDir(), &bodies, func(body []byte, w http.ResponseWriter) {
 				var req struct {
 					Messages []struct {

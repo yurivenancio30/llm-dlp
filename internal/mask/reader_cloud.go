@@ -4,9 +4,9 @@ import (
 	"strings"
 )
 
-// Recursos de nuvem: ARN da AWS, IDs do Azure Resource Manager e nomes de recurso do Google
-// Cloud (ver docs/pt-BR/structures.md, seção Recursos de nuvem e usuários de rede). Os hosts de
-// serviço gerenciado ficam em reader_cloud_hosts.go.
+// Cloud resources: AWS ARN, Azure Resource Manager IDs and Google Cloud resource names (see
+// docs/structures.md, section Cloud resources and network users). The managed service hosts are in
+// reader_cloud_hosts.go.
 
 func findCloud(s string, add func(ObjFinding)) {
 	if strings.Contains(s, "arn:") {
@@ -23,15 +23,16 @@ func findCloud(s string, add func(ObjFinding)) {
 	}
 }
 
-// awsPrefixes: IDs de recurso da AWS (EC2 e VPC), prefixo-hexadecimal com 8 ou 17 caracteres (o
-// formato longo, desde 2018: aws.amazon.com/blogs/compute/longer-resource-ids-in-2018-for-amazon-ec2-amazon-ebs-and-amazon-vpc).
-// Os prefixos são os dos exemplos da documentação da AWS CLI (docs.aws.amazon.com/code-library,
-// cli_2_ec2_code_examples). Ficam de fora ami- e pl-: há imagens e listas de prefixos públicas,
-// da própria AWS.
+// awsPrefixes: AWS resource IDs (EC2 and VPC), prefix-hexadecimal with 8 or 17 characters (the long
+// format, since 2018:
+// aws.amazon.com/blogs/compute/longer-resource-ids-in-2018-for-amazon-ec2-amazon-ebs-and-amazon-vpc).
+// The prefixes are those of the AWS CLI documentation examples (docs.aws.amazon.com/code-library,
+// cli_2_ec2_code_examples). ami- and pl- stay out: there are public images and prefix lists, AWS's
+// own.
 var awsPrefixes = setOf("i", "vpc", "subnet", "sg", "eni", "vol", "snap", "rtb", "igw", "eigw", "nat", "acl",
 	"vpce", "pcx", "tgw", "tgw-attach", "vgw", "cgw", "vpn", "dopt", "eipalloc", "eipassoc", "lt", "fl")
 
-// findAWSIDs: o ID solto (vpc-0a1b2c3d4e5f67890), com o mesmo pseudônimo que tem dentro do ARN.
+// findAWSIDs: the loose ID (vpc-0a1b2c3d4e5f67890), with the same pseudonym it has inside the ARN.
 func findAWSIDs(s string, add func(ObjFinding)) {
 	looseOne := func(c byte) bool { return !(isAlnum(c) || c == '_' || c == '-') }
 	for i := strings.IndexByte(s, '-'); i >= 0; {
@@ -64,7 +65,8 @@ func resourceEnd(c byte) bool {
 	return urlEnd(c) || c == '*' || c == '$' || c == '{' || c == '?' || c == '#'
 }
 
-// arn:partição:serviço:região:conta:recurso (https://docs.aws.amazon.com/IAM/latest/UserGuide/reference-arns.html)
+// arn:partition:service:region:account:resource
+// (https://docs.aws.amazon.com/IAM/latest/UserGuide/reference-arns.html)
 func findARN(s string, add func(ObjFinding)) {
 	for i := strings.Index(s, "arn:"); i >= 0; {
 		if i == 0 || !(isAlnum(s[i-1]) || s[i-1] == '_' || s[i-1] == '-' || s[i-1] == ':') {
@@ -79,12 +81,12 @@ func findARN(s string, add func(ObjFinding)) {
 }
 
 func arnEm(s string, i int, add func(ObjFinding)) {
-	var cs [5]int // posições dos ":" (depois de arn, partição, serviço, região e conta)
+	var cs [5]int // positions of the ":" (after arn, partition, service, region and account)
 	p := i + 3
 	cs[0] = p
 	for k := 1; k < 5; k++ {
 		q := p + 1
-		// região e conta podem ser curinga em policy (arn:aws:glue:*:123456789012:...)
+		// region and account can be a wildcard in a policy (arn:aws:glue:*:123456789012:...)
 		for q < len(s) && q-p < 40 && s[q] != ':' && (!resourceEnd(s[q]) || s[q] == '*') {
 			q++
 		}
@@ -104,7 +106,7 @@ func arnEm(s string, i int, add func(ObjFinding)) {
 		add(ObjFinding{cs[3] + 1, cs[4], "conta_nuvem", "arn", true})
 	}
 	if account == "aws" {
-		return // recurso gerenciado pela AWS (arn:aws:iam::aws:policy/...): público
+		return // AWS-managed resource (arn:aws:iam::aws:policy/...): public
 	}
 	ra := cs[4] + 1
 	rb := ra
@@ -124,7 +126,7 @@ func arnEm(s string, i int, add func(ObjFinding)) {
 			add(ObjFinding{a, b, ent, "arn", true})
 		}
 	}
-	cut := func(v string) int { // fim do primeiro pedaço
+	cut := func(v string) int { // end of the first piece
 		if k := strings.IndexAny(v, "/:"); k >= 0 {
 			return k
 		}
@@ -141,7 +143,7 @@ func arnEm(s string, i int, add func(ObjFinding)) {
 			piece(a, a+cut(s[a:rb]), "tabela")
 		}
 	default:
-		// tipo/nome ou tipo:nome (o último pedaço é o nome; "role/caminho/nome")
+		// type/name or type:name (the last piece is the name; "role/path/name")
 		k := cut(rec)
 		if k == len(rec) {
 			piece(ra, rb, "servico")
@@ -164,7 +166,7 @@ func arnEm(s string, i int, add func(ObjFinding)) {
 	}
 }
 
-// /subscriptions/<guid>/resourceGroups/<rg>/providers/<Ns>/<tipo>/<nome>[/<subtipo>/<subnome>]...
+// /subscriptions/<guid>/resourceGroups/<rg>/providers/<Ns>/<type>/<name>[/<subtype>/<subname>]...
 // (https://learn.microsoft.com/azure/azure-resource-manager/management/resource-name-rules)
 func findAzure(s string, add func(ObjFinding)) {
 	for i := strings.Index(s, "/subscriptions/"); i >= 0; {
@@ -192,13 +194,13 @@ func findAzure(s string, add func(ObjFinding)) {
 		k := 2
 		if len(ps) >= 4 && strings.EqualFold(sgm(2), "resourceGroups") {
 			if v := sgm(3); simpleName(v) && !publicDev(v) {
-				// grupo de recursos: agrupa recursos dentro da assinatura (como um namespace)
+				// resource group: groups resources inside the subscription (like a namespace)
 				add(ObjFinding{ps[3][0], ps[3][1], "namespace", "azure", true})
 			}
 			k = 4
 		}
 		if len(ps) >= k+4 && strings.EqualFold(sgm(k), "providers") {
-			// Ns, depois pares tipo/nome
+			// Ns, then type/name pairs
 			for t := k + 2; t+1 < len(ps); t += 2 {
 				if v := sgm(t + 1); simpleName(v) && !publicDev(v) {
 					ent := entAzureType[strings.ToLower(sgm(t))]
@@ -217,7 +219,7 @@ func findAzure(s string, add func(ObjFinding)) {
 	}
 }
 
-// tipo de recurso do Azure (o segmento antes do nome) -> entidade
+// Azure resource type (the segment before the name) -> entity
 var entAzureType = map[string]string{"servers": "servidor", "flexibleservers": "servidor", "managedinstances": "servidor",
 	"databases": "database", "storageaccounts": "conta_nuvem", "containers": "bucket", "shares": "bucket",
 	"filesystems": "bucket", "queues": "fila", "topics": "fila", "subscriptions": "fila", "eventhubs": "fila",
@@ -225,11 +227,11 @@ var entAzureType = map[string]string{"servers": "servidor", "flexibleservers": "
 	"registries": "servidor", "redis": "servidor", "sites": "servico", "vaults": "servico", "workspaces": "servico",
 	"factories": "servico", "accounts": "conta_nuvem", "tables": "tabela", "schemas": "schema"}
 
-// URLs de nuvem com estrutura fixa:
+// Cloud URLs with a fixed structure:
 //
-//	https://<conta>.(blob|dfs|file|queue|table).core.windows.net/<contêiner>/...   Azure Storage
-//	sb://<namespace>.servicebus.windows.net/ ... EntityPath=<fila>                Service Bus/Event Hubs
-//	https://sqs.<região>.amazonaws.com/<conta>/<fila>                              SQS
+//	https://<account>.(blob|dfs|file|queue|table).core.windows.net/<container>/...   Azure Storage
+//	sb://<namespace>.servicebus.windows.net/ ... EntityPath=<queue>                Service Bus/Event Hubs
+//	https://sqs.<region>.amazonaws.com/<account>/<queue>                           SQS
 //
 // (https://learn.microsoft.com/azure/storage/common/storage-account-overview#storage-account-endpoints,
 // https://learn.microsoft.com/azure/service-bus-messaging/service-bus-dotnet-get-started-with-queues,
@@ -243,7 +245,7 @@ func findCloudURLs(s string, add func(ObjFinding)) {
 	}
 	if strings.Contains(s, ".core.windows.net") {
 		for i := strings.Index(s, ".core.windows.net"); i >= 0; {
-			// <conta>.<serviço>.core.windows.net
+			// <account>.<service>.core.windows.net
 			d := strings.LastIndexByte(s[max(0, i-40):i], '.')
 			if d >= 0 {
 				d += max(0, i-40)
@@ -306,7 +308,7 @@ func findCloudURLs(s string, add func(ObjFinding)) {
 	}
 	if strings.Contains(s, "amazonaws.com/") {
 		for i := strings.Index(s, "amazonaws.com/"); i >= 0; {
-			// só SQS: sqs.<região>.amazonaws.com ou queue.amazonaws.com
+			// SQS only: sqs.<region>.amazonaws.com or queue.amazonaws.com
 			h := s[max(0, i-40):i]
 			if strings.Contains(h, "sqs.") || strings.HasSuffix(h, "queue.") {
 				a := i + len("amazonaws.com/")
@@ -334,19 +336,19 @@ func findCloudURLs(s string, add func(ObjFinding)) {
 	}
 }
 
-// Snowflake: <conta>.snowflakecomputing.com (a conta pode vir como org-conta ou com a região
-// depois: xy12345.us-east-1), app.<org>-<conta>.snowflakecomputing.com (Snowsight) e
-// app.snowflake.com/<org>/<conta>/.
+// Snowflake: <account>.snowflakecomputing.com (the account may come as org-account or with the
+// region after it: xy12345.us-east-1), app.<org>-<account>.snowflakecomputing.com (Snowsight) and
+// app.snowflake.com/<org>/<account>/.
 func findSnowflake(s string, add func(ObjFinding)) {
 	for i := strings.Index(s, ".snowflakecomputing.com"); i >= 0; {
 		a := i
 		for a > 0 && (isAlnum(s[a-1]) || s[a-1] == '-' || s[a-1] == '_' || s[a-1] == '.') {
 			a--
 		}
-		if strings.HasPrefix(strings.ToLower(s[a:i]), "app.") { // Snowsight: a conta vem depois de "app."
+		if strings.HasPrefix(strings.ToLower(s[a:i]), "app.") { // Snowsight: the account comes after "app."
 			a += 4
 		}
-		if d := strings.IndexByte(s[a:i], '.'); d >= 0 { // conta.região
+		if d := strings.IndexByte(s[a:i], '.'); d >= 0 { // account.region
 			i2 := a + d
 			if i2 > a {
 				add(ObjFinding{a, i2, "conta_nuvem", "snowflake", true})
@@ -388,8 +390,8 @@ func urlPathEnd(s string, a int) int {
 	return a
 }
 
-// projects/<p>/(topics|subscriptions|datasets|buckets|instances|...)/<nome> e
-// projects/<p>/locations/<l>/<tipo>/<nome> (https://cloud.google.com/apis/design/resource_names)
+// projects/<p>/(topics|subscriptions|datasets|buckets|instances|...)/<name> and
+// projects/<p>/locations/<l>/<type>/<name> (https://cloud.google.com/apis/design/resource_names)
 var entGCPType = map[string]string{"topics": "fila", "subscriptions": "fila", "datasets": "schema", "buckets": "bucket",
 	"tables": "tabela", "queues": "fila"}
 

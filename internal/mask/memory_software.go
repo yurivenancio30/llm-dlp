@@ -6,35 +6,34 @@ import (
 	"unicode"
 )
 
-// Proof de software (ver docs/pt-BR/structures.md, seção Público só com prova): o banco do DataHub se
-// chama "datahub", o do Airflow "airflow". O nome padrão de um software público não diz nada do
-// cliente, mas decidido como nome (a DSN .../datahub) a memória da conversa o espalhava por toda
-// a conversa, inclusive onde é a ferramenta ("o datahub ingere metadados").
+// Software proof (see docs/structures.md, section Public only with proof): DataHub's database is
+// called "datahub", Airflow's "airflow". The default name of a public software says nothing about
+// the client, but once decided as a name (the DSN .../datahub) the conversation memory spread it
+// through the whole conversation, including where it is the tool ("o datahub ingere metadados").
 //
-// A prova vem da própria conversa, como o compilador resolve um nome: a palavra está ligada a
-// um pacote externo quando é instalada (pip/npm/brew/helm/go get... install), importada (import
-// datahub, from datahub.x import, require('x'), import "github.com/org/x"), rodada como imagem
-// pública (as duas chaves de publicPath) ou executada como programa (RecordCommand). Com a
-// prova, a memória não espalha a palavra; onde um leitor a decide (a própria DSN), ela continua
-// mascarada.
+// The proof comes from the conversation itself, the way a compiler resolves a name: the word is
+// tied to an external package when it is installed (pip/npm/brew/helm/go get... install), imported
+// (import datahub, from datahub.x import, require('x'), import "github.com/org/x"), run as a public
+// image (the two keys of publicPath) or executed as a program (RecordCommand). With the proof, the
+// memory does not spread the word; where a reader decides it (the DSN itself), it stays masked.
 //
-// Duas chaves, falha fechada: além da prova estrutural, a palavra tem de ser nome de software
-// público (public_software.txt ou Imagem Oficial do Docker). Word real do dicionário
-// (common_words.txt e dictionary_words.txt: atlas, apollo, polaris, kraken, nexus) nunca
-// recebe a prova: é o que um codinome de cliente costuma ser, e um pacote interno com esse nome
-// é importado do mesmo jeito. Medido: dos nomes de repositório populares que são codinome
-// típico, nenhum passa; datahub, airflow, superset, minio, trino, grafana passam.
+// Two keys, fail closed: besides the structural proof, the word has to be the name of a public
+// software (public_software.txt or a Docker Official Image). A real dictionary word
+// (common_words.txt and dictionary_words.txt: atlas, apollo, polaris, kraken, nexus) never gets the
+// proof: it is what a client codename usually is, and an internal package with that name is
+// imported the same way. Measured: of the popular repository names that are a typical codename,
+// none passes; datahub, airflow, superset, minio, trino, grafana pass.
 //
-// Sombreamento (como num compilador, a definição local esconde a global): se a conversa mostra
-// o nome definido no projeto (name = "x" num manifesto, "name": "x" no package.json, module .../x
-// no go.mod, uma pasta x/__init__.py fora de site-packages), ele é do dono e a prova não vale.
-// O sombreamento só bloqueia: casar a mais nunca libera nada.
+// Shadowing (as in a compiler, the local definition hides the global one): if the conversation
+// shows the name defined in the project (name = "x" in a manifest, "name": "x" in package.json,
+// module .../x in go.mod, a folder x/__init__.py outside site-packages), it belongs to the owner
+// and the proof does not count. Shadowing only blocks: matching too much never releases anything.
 //
-// Term cadastrado sempre vence. Lista desatualizada só deixa de provar (a palavra continua
-// mascarada), nunca libera.
+// A registered term always wins. An outdated list only stops proving (the word stays masked), it
+// never releases.
 //
-// Custo: uma passada por linha; só a linha com a forma certa no começo (from, import, aspas,
-// image, FROM, name, module) ou com a palavra de instalação passa por regex.
+// Cost: one pass per line; only a line with the right shape at the start (from, import, quotes,
+// image, FROM, name, module) or with the install word goes through a regex.
 
 var (
 	reInstall = regexp.MustCompile(`\b(?:pip3?|pipx|uv(?:\s+pip)?|poetry|conda|mamba|npm|pnpm|yarn|bun|brew|apt(?:-get)?|apk|dnf|yum|gem|cargo|go|helm|choco|winget|snap)` +
@@ -47,7 +46,7 @@ var (
 	rePackageDef  = regexp.MustCompile(`(?:^|[\s/"'(])([\w.-]+)/__init__\.py`)
 )
 
-// linhas: chama f com cada linha de s (sem a quebra), sem alocar.
+// lines: calls f with each line of s (without the line break), without allocating.
 func lines(s string, f func(l string)) {
 	for len(s) > 0 {
 		i := strings.IndexByte(s, '\n')
@@ -60,7 +59,7 @@ func lines(s string, f func(l string)) {
 	}
 }
 
-// softwareProofs: as palavras que s liga a um pacote externo (ainda sem a segunda chave).
+// softwareProofs: the words s ties to an external package (still without the second key).
 func softwareProofs(s string) []string {
 	var out []string
 	add := func(vs ...string) {
@@ -75,8 +74,8 @@ func softwareProofs(s string) []string {
 		if t == "" {
 			return
 		}
-		// pacote instalado: o nome sem versão, extras, escopo e registro; pedaços só com o nome
-		// inteiro público (apache-airflow; acme-airflow não prova "airflow")
+		// installed package: the name without version, extras, scope and registry; pieces only with
+		// the whole public name (apache-airflow; acme-airflow does not prove "airflow")
 		if strings.Contains(t, "install") || strings.Contains(t, " add ") || strings.Contains(t, " get ") || strings.Contains(t, " i ") {
 			for _, m := range reInstall.FindAllStringSubmatch(t, -1) {
 				for _, x := range strings.Fields(m[1]) {
@@ -107,7 +106,7 @@ func softwareProofs(s string) []string {
 				}
 			}
 		}
-		// Go: import "host/org/nome", com ou sem apelido, dentro ou fora do bloco
+		// Go: import "host/org/name", with or without an alias, inside or outside the block
 		if q := strings.IndexByte(t, '"'); q >= 0 && strings.Count(t, "/") >= 2 && (q == 0 || strings.HasPrefix(t, "import ") || aliasShape(t[:q])) {
 			for _, m := range reImportGo.FindAllStringSubmatch(t, -1) {
 				add(m[1], m[2])
@@ -120,7 +119,7 @@ func softwareProofs(s string) []string {
 				}
 			}
 		}
-		// imagem pública com as duas chaves (redis, bitnami/redis, acryldata/datahub-gms)
+		// public image with both keys (redis, bitnami/redis, acryldata/datahub-gms)
 		if strings.Contains(t, "image") || strings.HasPrefix(t, "FROM") {
 			for _, m := range reAnyImage.FindAllStringSubmatch(t, -1) {
 				ref, _, _ := strings.Cut(m[1], "@")
@@ -143,7 +142,7 @@ func softwareProofs(s string) []string {
 	return out
 }
 
-// aliasShape: o que vem antes da aspa num import de Go com apelido ("es ", "_ ", ". ").
+// aliasShape: what comes before the quote in a Go import with an alias ("es ", "_ ", ". ").
 func aliasShape(p string) bool {
 	p = strings.TrimSpace(p)
 	if p == "_" || p == "." {
@@ -157,7 +156,7 @@ func aliasShape(p string) bool {
 	return p != ""
 }
 
-// localDefinitions: os nomes que s define no próprio projeto (ver Sombreamento acima).
+// localDefinitions: the names s defines in the project itself (see Shadowing above).
 func localDefinitions(s string) []string {
 	var out []string
 	lines(s, func(l string) {
@@ -179,19 +178,19 @@ func localDefinitions(s string) []string {
 	return out
 }
 
-// dictionaryWord: v é palavra real de um dos idiomas (as 50000 mais frequentes).
+// dictionaryWord: v is a real word of one of the languages (the 50000 most frequent).
 func dictionaryWord(v string) bool {
 	return commonWord(v) || dictionaryWords[strings.ToLower(v)]
 }
 
-// recordSoftware: as provas de s que passam na segunda chave entram no conjunto do Masker, e
-// as definições locais de s, no conjunto que as anula (fato sobre o mundo e sobre o projeto:
-// vale para qualquer conversa, só em RAM).
+// recordSoftware: the proofs of s that pass the second key enter the Masker's set, and the local
+// definitions of s, the set that cancels them (a fact about the world and about the project: it
+// applies to any conversation, RAM only).
 //
-// Os dois conjuntos são limitados pela lista de software (só entra nome que poderia ser provado
-// ou passar por dependência pública: uma definição local de outro nome não muda nada) e nunca
-// guardam nome do cliente. O sombreamento é guardado sem - _ . (normSoftware): o manifesto
-// escreve "vendas-core" e a pasta do pacote é vendas_core.
+// Both sets are limited by the software list (only a name that could be proven or pass as a public
+// dependency enters: a local definition of another name changes nothing) and never keep a client
+// name. Shadowing is stored without - _ . (normSoftware): the manifest writes "vendas-core" and the
+// package folder is vendas_core.
 func (m *Masker) recordSoftware(s string) {
 	for _, v := range localDefinitions(s) {
 		if likely(v) || dependencyPackage(v) {
@@ -203,22 +202,22 @@ func (m *Masker) recordSoftware(s string) {
 	}
 }
 
-// provavel: v pode receber a prova (segunda chave e não é palavra real). Número puro não é nome
-// de software, mesmo havendo repositório com esse nome (2048, 12306).
+// likely: v can get the proof (second key and not a real word). A pure number is not a software
+// name, even if there is a repository with that name (2048, 12306).
 func likely(v string) bool {
 	return len(v) >= 3 && strings.IndexFunc(v, unicode.IsLetter) >= 0 && !dictionaryWord(v) &&
 		(publicSoftware[normSoftware(v)] || officialImages[v])
 }
 
-// provar: v entra como software provado se pode receber a prova.
+// prove: v enters as proven software if it can get the proof.
 func (m *Masker) prove(v string) {
 	if likely(v) {
 		m.soft.Store(v, true)
 	}
 }
 
-// provenSoftware: v (palavra inteira, qualquer caixa) é software público com prova estrutural,
-// não é definido no projeto (sombreamento) e não contém termo cadastrado.
+// provenSoftware: v (whole word, any case) is public software with structural proof, is not defined
+// in the project (shadowing) and does not contain a registered term.
 func (m *Masker) provenSoftware(v string) bool {
 	l := strings.ToLower(v)
 	if _, ok := m.soft.Load(l); !ok {
@@ -230,14 +229,14 @@ func (m *Masker) provenSoftware(v string) bool {
 
 var reCommandSnippet = regexp.MustCompile(`\|\||&&|[|;\n&()]`)
 
-// programas que embrulham outro (o programa de verdade vem depois): sudo airflow ..., python -m
+// programs that wrap another one (the real program comes after): sudo airflow ..., python -m
 // datahub ..., npx superset ...
 var wrappers = setOf("sudo", "time", "nohup", "env", "exec", "nice", "timeout", "xargs", "watch", "npx", "uvx", "bunx", "pipx", "run", "poetry", "pdm", "uv", "command")
 
-// RecordCommand: o programa que um comando de shell executa (o primeiro nome de cada trecho
-// do pipeline, "airflow dags list", "datahub check ...", "python -m dagster ...") é prova de
-// software, com as mesmas duas chaves de recordSoftware. O proxy chama com a entrada de cada
-// chamada da ferramenta de shell (só ele sabe que o texto é um comando).
+// RecordCommand: the program a shell command runs (the first name of each pipeline piece, "airflow
+// dags list", "datahub check ...", "python -m dagster ...") is a software proof, with the same two
+// keys as recordSoftware. The proxy calls it with the input of each call of the shell tool (only it
+// knows the text is a command).
 func (m *Masker) RecordCommand(cmd string) {
 	for _, sgm := range reCommandSnippet.Split(cmd, -1) {
 		ts := strings.Fields(sgm)
@@ -245,7 +244,7 @@ func (m *Masker) RecordCommand(cmd string) {
 			t := ts[i]
 			switch {
 			case strings.Contains(t, "=") && !strings.HasPrefix(t, "-"), strings.HasPrefix(t, "-"), wrappers[t], len(t) > 0 && t[0] >= '0' && t[0] <= '9':
-				continue // VAR=x, opção, embrulho, número (timeout 30)
+				continue // VAR=x, option, wrapper, number (timeout 30)
 			case (t == "python" || t == "python3") && i+2 < len(ts) && ts[i+1] == "-m":
 				t = ts[i+2]
 			}

@@ -6,31 +6,30 @@ import (
 	"strings"
 )
 
-// Decider das saídas de comando e das entradas de tool_use (ver call.go e docs/pt-BR/structures.md):
+// Decider of command outputs and tool_use inputs (see call.go and docs/structures.md):
 //
-//   - B1 proveniência: palavra da saída que está no programa (o comando ou o script) não veio
-//     dos dados e nunca é decidida aqui;
-//   - B2 identidade: nos blocos de 3 ou mais registros paralelos (linhas com o mesmo número de
-//     palavras, ±1), a posição em que todos os valores são distintos, ao lado de posições com
-//     valores repetidos, é a identidade do registro; uma lista (uma palavra por linha, todas
-//     distintas) também é;
-//   - B3: a palavra de identidade que veio dos dados é nome quando a saída é um inventário (o
-//     pedido tem verbo de enumeração e substantivo, no comando ou na mensagem do usuário) ou
-//     quando outra posição do bloco já é de nomes conhecidos (âncora);
-//   - B4 eco: a palavra do tool_use que ecoa uma saída anterior em posição de argumento é nome;
-//     e a palavra que é segmento de um nome já mascarado no mesmo texto também;
-//   - B1 exceção: a palavra que o proxy traduziu de um pseudônimo é nome (no tool_use e na saída
-//     dele).
+//   - B1 provenance: a word of the output that is in the program (the command or the script) did
+//     not come from the data and is never decided here;
+//   - B2 identity: in blocks of 3 or more parallel records (lines with the same number of
+//     words, ±1), the position where all values are distinct, next to positions with repeated
+//     values, is the identity of the record; a list (one word per line, all distinct) also is;
+//   - B3: the identity word that came from the data is a name when the output is an inventory
+//     (the request has an enumeration verb and a noun, in the command or in the user message) or
+//     when another position of the block already holds known names (anchor);
+//   - B4 echo: a tool_use word that echoes a previous output in argument position is a name;
+//     and so is a word that is a segment of a name already masked in the same text;
+//   - B1 exception: a word the proxy translated from a pseudonym is a name (in the tool_use and
+//     in its output).
 //
-// Freios: formas numéricas, datas, durações (e a unidade depois de um número: "2 days"),
-// versões, hashes, tipos de dado, os vocabulários públicos que já existem e a palavra comum com
-// menos de 4 letras. Tudo em uma passada por linha e consulta em tabela hash.
+// Brakes: numeric forms, dates, durations (and the unit after a number: "2 days"), versions,
+// hashes, data types, the public vocabularies that already exist and common words with fewer than 4
+// letters. Everything in one pass per line and lookups in a hash table.
 
 func init() {
 	registerDecider(Decider{Name: "chamada", Decide: decideCall})
 }
 
-// callExt: a extensão da dica lida (call.go).
+// callExt: the extension of the hint read (call.go).
 type callExt struct {
 	output bool
 	typ    string
@@ -74,8 +73,8 @@ func readCallExt(s string) (callExt, bool) {
 	return e, true
 }
 
-// maxCallText: acima disso, as regras desta seção não rodam (a saída inteira de um
-// comando raramente passa disso; o resto das regras continua valendo).
+// maxCallText: above this, the rules of this section do not run (the whole output of a command
+// rarely goes past it; the rest of the rules still apply).
 const maxCallText = 8 << 20
 
 func decideCall(c *TextCtx) {
@@ -85,7 +84,7 @@ func decideCall(c *TextCtx) {
 	}
 	s := c.S
 	cov := coverage(c.Findings)
-	// B1 exceção e B4 eco: as palavras de nome da chamada, onde aparecem inteiras
+	// B1 exception and B4 echo: the name words of the call, where they appear whole
 	if len(e.names) > 0 {
 		scanWords(s, func(a, b int) {
 			if ent, ok := e.names[hpal(s[a:b])]; ok && !cov.covers(a, b) {
@@ -99,7 +98,7 @@ func decideCall(c *TextCtx) {
 	}
 }
 
-// knownEnt: o tipo com que v já é nome, se é; senão ent.
+// knownEnt: the type with which v is already a name, if it is; otherwise ent.
 func knownEnt(c *TextCtx, v, ent string) string {
 	if k, ok := c.Known(v); ok {
 		return k
@@ -107,7 +106,7 @@ func knownEnt(c *TextCtx, v, ent string) string {
 	return ent
 }
 
-// ---- cobertura: os trechos já achados ----------------------------------------------------
+// ---- coverage: the pieces already found -------------------------------------------------
 
 type ranges [][2]int
 
@@ -134,7 +133,7 @@ func coverage(as []Finding) ranges {
 	return out
 }
 
-// cobre: [a, b) cruza algum trecho já achado?
+// covers: does [a, b) cross some piece already found?
 func (fs ranges) covers(a, b int) bool {
 	i := sort.Search(len(fs), func(i int) bool { return fs[i][1] > a })
 	return i < len(fs) && fs[i][0] < b
@@ -142,10 +141,10 @@ func (fs ranges) covers(a, b int) bool {
 
 // ---- freios ------------------------------------------------------------------------------
 
-// decidableWord: v pode ser um nome (os freios comuns a eco, identidade e segmento).
+// decidableWord: v can be a name (the brakes common to echo, identity and segment).
 func decidableWord(v string) bool {
 	if len(v) < 3 || len(v) > 128 || v[0] >= '0' && v[0] <= '9' {
-		return false // número, data, hora, duração (12d, 3h4m), tamanho (10Mi)
+		return false // number, date, time, duration (12d, 3h4m), size (10Mi)
 	}
 	letter := false
 	for i := 0; i < len(v); i++ {
@@ -176,9 +175,9 @@ func decidableWord(v string) bool {
 
 func numeric(v string) bool { return v != "" && v[0] >= '0' && v[0] <= '9' }
 
-// fieldLabel: a palavra que termina em s[b] é o rótulo de um "campo: valor" ou
-// "campo=valor" (JSON, YAML, .env, log, dict do Python): o nome do campo, nunca o nome do
-// registro. Não são rótulo "x::y", "x://", "x==y" nem "host:5432" e "12:30" (porta e hora).
+// fieldLabel: the word that ends at s[b] is the label of a "field: value" or "field=value" (JSON,
+// YAML, .env, log, Python dict): the name of the field, never the name of the record. Not labels:
+// "x::y", "x://", "x==y" nor "host:5432" and "12:30" (port and time).
 func fieldLabel(s string, b int) bool {
 	if b < len(s) && (s[b] == '"' || s[b] == '\'') {
 		b++
@@ -202,12 +201,12 @@ func fieldLabel(s string, b int) bool {
 	return false
 }
 
-// ---- segmentos de um nome já mascarado (B4) ---------------------------------------------
+// ---- segments of an already masked name (B4) ---------------------------------------------
 
-// segmentos: a palavra que é segmento de um nome de objeto já achado no texto ("payments" em
-// payments-api-7d9f, registry/acme/payments:1.2) e que aparece também solta no mesmo texto é
-// nome, do tipo do nome em que está. Fora de comentário e de texto corrido, e nunca a partir de
-// um nome de coluna.
+// segments: a word that is a segment of an object name already found in the text ("payments" in
+// payments-api-7d9f, registry/acme/payments:1.2) and that also appears loose in the same text is a
+// name, of the type of the name it is in. Outside comments and running text, and never from a
+// column name.
 func segments(c *TextCtx, cov ranges) {
 	var sgms map[string]string
 	for _, a := range c.Findings {
@@ -216,7 +215,7 @@ func segments(c *TextCtx, cov ranges) {
 		}
 		ent := strings.TrimPrefix(a.Type, objTypePrefix)
 		if ent == "coluna" || ent == "indice" {
-			continue // os pedaços de um nome de coluna (cd_cliente) são vocabulário do modelo de dados, não recurso
+			continue // the pieces of a column name (cd_cliente) are data model vocabulary, not a resource
 		}
 		for _, p := range strings.FieldsFunc(a.Real, func(r rune) bool { return r < 0x80 && !letterD(byte(r)) }) {
 			if len(p) >= 4 && p != a.Real && decidableWord(p) {
@@ -244,10 +243,10 @@ func segments(c *TextCtx, cov ranges) {
 
 type regWord struct{ a, b int }
 
-// registro: as palavras de uma linha.
+// record: the words of a line.
 type record struct {
 	ps  []regWord
-	hdr bool // vem antes de uma linha de traços (cabeçalho)
+	hdr bool // comes before a dash line (header)
 }
 
 const (
@@ -282,7 +281,7 @@ func identity(c *TextCtx, e callExt, cov ranges) {
 			}
 		})
 		if len(r.ps) == 0 {
-			continue // linha de traços, vazia: não interrompe
+			continue // dash line, empty: does not interrupt
 		}
 		if len(r.ps) > maxRegWords {
 			closeIt()
@@ -300,7 +299,7 @@ func identity(c *TextCtx, e callExt, cov ranges) {
 	closeIt()
 }
 
-// dashLine: a linha k só tem traços, "=", "+", "|" e espaços (e pelo menos 3 traços).
+// dashLine: line k only has dashes, "=", "+", "|" and spaces (and at least 3 dashes).
 func dashLine(s string, ls [][2]int, k int) bool {
 	if k >= len(ls) {
 		return false
@@ -318,7 +317,7 @@ func dashLine(s string, ls [][2]int, k int) bool {
 	return n >= 3
 }
 
-// maiusculas: todas as palavras só com maiúsculas (NAME STATUS AGE).
+// uppercase: all words uppercase only (NAME STATUS AGE).
 func uppercase(s string, ps []regWord) bool {
 	for _, p := range ps {
 		for i := p.a; i < p.b; i++ {
@@ -330,19 +329,19 @@ func uppercase(s string, ps []regWord) bool {
 	return true
 }
 
-// blockIdentity: as posições de identidade de um bloco e a decisão.
+// blockIdentity: the identity positions of a block and the decision.
 func blockIdentity(c *TextCtx, e callExt, cov ranges, block []record) {
 	s := c.S
-	// o cabeçalho (a primeira linha, antes de traços ou só em maiúsculas quando o resto não é)
-	// não é registro
+	// the header (the first line, before dashes or uppercase only when the rest is not) is not a
+	// record
 	if b0 := block[0]; b0.hdr || uppercase(s, b0.ps) && !uppercase(s, block[1].ps) {
 		block = block[1:]
 	}
 	if len(block) < minList {
 		return
 	}
-	anc := e.typ == "" // a âncora só importa sem tipo pedido
-	// decidivel[r][k]: a palavra k do registro r pode ser nome (freios + proveniência)
+	anc := e.typ == "" // the anchor only matters without a requested type
+	// decidable[r][k]: word k of record r can be a name (brakes + provenance)
 	dec := make([][]bool, len(block))
 	maxN := 0
 	for i, r := range block {
@@ -353,18 +352,18 @@ func blockIdentity(c *TextCtx, e callExt, cov ranges, block []record) {
 			if !decidableWord(v) || e.prog[hpal(v)] || fieldLabel(s, p.b) {
 				continue
 			}
-			// unidade: a palavra logo depois de um número, separada por um espaço só ("2 days")
+			// unit: the word right after a number, separated by a single space ("2 days")
 			if k > 0 && numeric(s[r.ps[k-1].a:r.ps[k-1].b]) && p.a == r.ps[k-1].b+1 && s[p.a-1] == ' ' {
 				continue
 			}
 			dec[i][k] = true
 		}
 	}
-	// duas leituras das posições: da esquerda (k) e da direita (n-1-k); com o mesmo número de
-	// palavras em todas as linhas, são a mesma
+	// two readings of the positions: from the left (k) and from the right (n-1-k); with the same
+	// number of words on all lines, they are the same
 	ident := [2][]bool{make([]bool, maxN), make([]bool, maxN)}
-	// anchorPos: posição com valores repetidos em que metade ou mais já são nomes (coluna de um
-	// catálogo: o mesmo nome se repete entre tabelas)
+	// anchorPos: a position with repeated values in which half or more are already names (a catalog
+	// column: the same name repeats across tables)
 	anchorPos := [2][]bool{make([]bool, maxN), make([]bool, maxN)}
 	nIdent, nRepeat, anchor := [2]int{}, [2]int{}, [2]bool{}
 	vals := map[string]int{}
@@ -418,8 +417,8 @@ func blockIdentity(c *TextCtx, e callExt, cov ranges, block []record) {
 			}
 		}
 	}
-	// cara de identificador vinda dos dados, numa posição ancorada: duas pistas concordando,
-	// sem exigir que os valores sejam únicos
+	// identifier shape coming from the data, in an anchored position: two clues agreeing, without
+	// requiring the values to be unique
 	if anc {
 		for side := 0; side < 2; side++ {
 			for i, r := range block {
@@ -439,8 +438,8 @@ func blockIdentity(c *TextCtx, e callExt, cov ranges, block []record) {
 		}
 	}
 	for side := 0; side < 2; side++ {
-		// identidade de verdade: poucas posições distintas (uma tabela de registros tem uma ou
-		// duas chaves; uma frase solta tem todas as palavras distintas)
+		// real identity: few distinct positions (a table of records has one or two keys; a loose
+		// sentence has all words distinct)
 		if nIdent[side] == 0 || nIdent[side] > max(1, nRepeat[side]) {
 			continue
 		}
@@ -460,15 +459,15 @@ func blockIdentity(c *TextCtx, e callExt, cov ranges, block []record) {
 				if !ident[side][pos] || !dec[i][k] || cov.covers(p.a, p.b) {
 					continue
 				}
-				dec[i][k] = false // uma vez só
+				dec[i][k] = false // only once
 				c.Decide(p.a, p.b, knownEnt(c, s[p.a:p.b], typ), "identidade")
 			}
 		}
 	}
 }
 
-// entOfPosition: o tipo mais comum entre os valores já conhecidos de uma posição do bloco (genérico
-// se nenhum).
+// entOfPosition: the most common type among the already known values of a block position (generic
+// if none).
 func entOfPosition(c *TextCtx, block []record, side, pos int) string {
 	n := map[string]int{}
 	for _, r := range block {

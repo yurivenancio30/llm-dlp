@@ -6,8 +6,8 @@ import (
 	"testing"
 )
 
-// A versão é escrita em dois lugares que uma pessoa lê (version.go e CHANGELOG.md): têm de dizer
-// o mesmo, e a versão tem de ter uma seção no CHANGELOG antes de ser lançada.
+// The version is written in two places a person reads (version.go and CHANGELOG.md): they must say
+// the same, and the version must have a section in the CHANGELOG before it is released.
 func TestVersionMatchesChangelog(t *testing.T) {
 	if !regexp.MustCompile(`^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$`).MatchString(Version) {
 		t.Fatalf("Versao = %q: o formato é MAIOR.MENOR.CORREÇÃO", Version)

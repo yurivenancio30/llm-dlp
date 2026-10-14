@@ -10,20 +10,20 @@ import (
 	"testing"
 )
 
-// O texto do próprio Claude Code (system e ferramentas) quando a conversa aprende, como nome de
-// tabela, palavras que ele usa. Names de palavra comum, montados por partes.
+// The text of Claude Code itself (system and tools) when the conversation learns, as a table name,
+// words it uses. Common-word names, built from parts.
 
 var (
-	tabCommon  = "bil" + "ling" // palavra comum do inglês, e nome de tabela na conversa
+	tabCommon  = "bil" + "ling" // common English word, and a table name in the conversation
 	tabCommon2 = "res" + "ume"
-	tabAcronym = "c" + "li"          // não é palavra comum: só a identidade do cliente a protege
-	tabName    = "ped" + "idos_acme" // nome com cara de identificador: continua mascarado em todo lugar
+	tabAcronym = "c" + "li"          // not a common word: only the client identity protects it
+	tabName    = "ped" + "idos_acme" // identifier-shaped name: stays masked everywhere
 )
 
-// O cabeçalho com que o Claude Code se identifica à API, a frase de identidade, as instruções e
-// as descrições das ferramentas não mudam quando a conversa aprende como nome de tabela uma
-// palavra que eles usam. Com o cabeçalho trocado, a API deixa de reconhecer o Claude Code e
-// responde 429 a toda mensagem daquela conversa.
+// The header Claude Code identifies itself to the API with, the identity sentence, the instructions
+// and the tool descriptions do not change when the conversation learns, as a table name, a word
+// they use. With the header changed, the API stops recognizing Claude Code and answers 429 to every
+// message of that conversation.
 func TestClientTextUnchanged(t *testing.T) {
 	var bodies [][]byte
 	px := buildDisk(t, t.TempDir(), &bodies)
@@ -68,13 +68,13 @@ func TestClientTextUnchanged(t *testing.T) {
 	if err := json.Unmarshal(bodies[0], &wentOut); err != nil {
 		t.Fatal(err)
 	}
-	// premissa: a conversa aprendeu os nomes (no DDL eles saem mascarados)
+	// premise: the conversation learned the names (in the DDL they go out masked)
 	for _, n := range []string{tabCommon, tabCommon2, tabAcronym, tabName} {
 		if strings.Contains(string(wentOut.Messages[2]), "TABLE "+n+" ") {
 			t.Fatalf("premissa: a tabela %q devia sair mascarada no DDL: %s", n, wentOut.Messages[2])
 		}
 	}
-	// o nome do cliente que não é palavra comum continua mascarado no texto do system
+	// the client name that is not a common word stays masked in the system text
 	if strings.Contains(wentOut.System[3].Text, tabName) {
 		t.Errorf("nome aprendido na conversa vazou no system: %s", wentOut.System[3].Text)
 	}
@@ -95,8 +95,8 @@ func TestClientTextUnchanged(t *testing.T) {
 	}
 }
 
-// O cabeçalho só passa intacto com a forma exata dele (nome=valor curtos, sem texto livre) e no
-// system; o mesmo texto com um dado dentro, ou na mensagem do usuário, é mascarado como os outros.
+// The header only passes intact with its exact shape (short name=value pairs, no free text) and in
+// the system; the same text with data inside, or in the user message, is masked like the others.
 func TestClientHeaderShapeOnly(t *testing.T) {
 	for _, s := range []string{
 		"x-anthropic-billing-header: cc_version=2.1.296.c17; cc_entrypoint=claude-vscode;",

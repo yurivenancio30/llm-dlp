@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// Ansible: inventário INI (o YAML fica com o leitor de configuração estruturada).
+// Ansible: INI inventory (YAML stays with the structured configuration reader).
 
 var (
 	reINISection = regexp.MustCompile(`^\[([A-Za-z0-9_.\-]+)(:(?:vars|children))?\][ \t]*$`)
@@ -20,7 +20,7 @@ func findAnsibleINI(s string, add func(ObjFinding)) {
 	if !strong && !strings.Contains(s, "]\n") {
 		return
 	}
-	section := "" // "" = fora de seção; "h" = hosts; "v" = vars/children
+	section := "" // "" = outside a section; "h" = hosts; "v" = vars/children
 	for _, ln := range wrapLines(s) {
 		a, b := ln[0], ln[1]
 		if a >= b {
@@ -41,7 +41,7 @@ func findAnsibleINI(s string, add func(ObjFinding)) {
 		}
 		if l[0] == '#' || l[0] == ';' || l[0] == ' ' || l[0] == '\t' {
 			if l[0] == ' ' || l[0] == '\t' {
-				section = "" // linha indentada: não é inventário
+				section = "" // indented line: not inventory
 			}
 			continue
 		}
@@ -96,7 +96,7 @@ func findAnsibleINI(s string, add func(ObjFinding)) {
 	}
 }
 
-// addINIHostName: host do inventário; a faixa www[01:50].x é mascarada como unidade.
+// addINIHostName: inventory host; the www[01:50].x range is masked as a unit.
 func addINIHostName(s string, a, b int, strong bool, add func(ObjFinding)) {
 	v := s[a:b]
 	if strings.ContainsAny(v, "[]") {

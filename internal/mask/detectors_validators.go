@@ -7,7 +7,7 @@ import (
 	"golang.org/x/text/unicode/norm"
 )
 
-// Validadores de dígito verificador (CPF, CNPJ, PIS, CNH, cartão, título, CNS, RENAVAM, IBAN).
+// Check-digit validators (CPF, CNPJ, PIS, CNH, card, voter ID, CNS, RENAVAM, IBAN).
 
 func digitsOnly(s string) string {
 	var b strings.Builder
@@ -55,7 +55,7 @@ func ValidCPF(s string) bool {
 
 func ValidCNPJ(s string) bool {
 	d := digits(digitsOnly(s))
-	// o número de ordem (posições 9 a 12) começa em 0001, a matriz: 0000 não é um CNPJ real
+	// the order number (positions 9 to 12) starts at 0001, the head office: 0000 is not a real CNPJ
 	if len(d) != 14 || allEqual(d) || (d[8] == 0 && d[9] == 0 && d[10] == 0 && d[11] == 0) {
 		return false
 	}
@@ -77,7 +77,7 @@ func ValidCNPJ(s string) bool {
 	return true
 }
 
-// ValidPIS valida PIS/PASEP/NIS (11 dígitos).
+// ValidPIS validates PIS/PASEP/NIS (11 digits).
 func ValidPIS(s string) bool {
 	d := digits(digitsOnly(s))
 	if len(d) != 11 || allEqual(d) {
@@ -95,7 +95,7 @@ func ValidPIS(s string) bool {
 	return r == d[10]
 }
 
-// ValidCNH valida o número de registro da CNH (11 dígitos).
+// ValidCNH validates the CNH registration number (11 digits).
 func ValidCNH(s string) bool {
 	d := digits(digitsOnly(s))
 	if len(d) != 11 || allEqual(d) {
@@ -113,7 +113,7 @@ func ValidCNH(s string) bool {
 	for k := 0; k < 9; k++ {
 		sum += d[k] * (1 + k)
 	}
-	// mesmo algoritmo da validate-docbr: resto menos o desconto, corrigido para 0..10
+	// same algorithm as validate-docbr: remainder minus the discount, corrected to 0..10
 	dv2 := sum%11 - desc
 	if dv2 < 0 {
 		dv2 += 11
@@ -124,7 +124,7 @@ func ValidCNH(s string) bool {
 	return dv1 == d[9] && dv2 == d[10]
 }
 
-// ValidLuhn valida números de cartão (13 a 19 dígitos).
+// ValidLuhn validates card numbers (13 to 19 digits).
 func ValidLuhn(s string) bool {
 	d := digits(digitsOnly(s))
 	if len(d) < 13 || len(d) > 19 || allEqual(d) {
@@ -144,7 +144,7 @@ func ValidLuhn(s string) bool {
 	return sum%10 == 0
 }
 
-// NormName: maiúsculas, sem acento, espaços colapsados ("João  da Silva" -> "JOAO DA SILVA").
+// NormName: uppercase, unaccented, collapsed spaces ("João da Silva" -> "JOAO DA SILVA").
 func NormName(s string) string {
 	t := norm.NFD.String(s)
 	var b strings.Builder
@@ -166,12 +166,12 @@ func NormName(s string) string {
 	return b.String()
 }
 
-// Documentos e identificadores além dos básicos. As regras de validação seguem as mesmas
-// fontes dos demais (validate-docbr para os documentos brasileiros; ISO 13616 para IBAN;
-// Luhn para IMEI). A lista de tipos veio do que as ferramentas de mercado cobrem (Amazon
-// Macie, Microsoft Presidio, Google Cloud DLP) e nós não cobríamos.
+// Documents and identifiers beyond the basic ones. The validation rules follow the same sources as
+// the others (validate-docbr for the Brazilian documents; ISO 13616 for IBAN; Luhn for IMEI). The
+// list of types came from what market tools cover (Amazon Macie, Microsoft Presidio, Google Cloud
+// DLP) and we did not.
 
-// ValidVoterID: título de eleitor (12 dígitos, os dois últimos verificadores).
+// ValidVoterID: voter ID (12 digits, the last two are check digits).
 func ValidVoterID(s string) bool {
 	d := digits(digitsOnly(s))
 	if len(d) != 12 || allEqual(d) {
@@ -200,7 +200,7 @@ func ValidVoterID(s string) bool {
 	return d[10] == dv1 && d[11] == dv2
 }
 
-// ValidCNS: Cartão Nacional de Saúde (15 dígitos; soma ponderada múltipla de 11).
+// ValidCNS: National Health Card (15 digits; weighted sum multiple of 11).
 func ValidCNS(s string) bool {
 	d := digits(digitsOnly(s))
 	if len(d) != 15 || allEqual(d) || !(d[0] == 1 || d[0] == 2 || d[0] >= 7) {
@@ -213,11 +213,11 @@ func ValidCNS(s string) bool {
 	return sum%11 == 0
 }
 
-// ValidRenavam: 11 dígitos, o último verificador.
+// ValidRenavam: 11 digits, the last one is the check digit.
 func ValidRenavam(s string) bool {
 	t := digitsOnly(s)
 	for len(t) < 11 && len(t) >= 9 {
-		t = "0" + t // registros antigos têm 9 ou 10 dígitos
+		t = "0" + t // old records have 9 or 10 digits
 	}
 	d := digits(t)
 	if len(d) != 11 || allEqual(d) {
@@ -235,9 +235,9 @@ func ValidRenavam(s string) bool {
 	return dv == d[10]
 }
 
-// ValidAlphaCNPJ: CNPJ no formato novo, com letras nas 12 primeiras posições (vigente a
-// partir de julho de 2026). A conta é a mesma do CNPJ numérico, com cada caractere valendo
-// o seu código ASCII menos 48.
+// ValidAlphaCNPJ: CNPJ in the new format, with letters in the first 12 positions (in force from
+// July 2026). The calculation is the same as the numeric CNPJ, with each character worth its ASCII
+// code minus 48.
 func ValidAlphaCNPJ(s string) bool {
 	var v []int
 	letters := false
@@ -273,8 +273,8 @@ func ValidAlphaCNPJ(s string) bool {
 	return true
 }
 
-// ValidIBAN: conta bancária internacional (2 letras do país, 2 verificadores, até 30
-// letras ou dígitos; mod 97 = 1).
+// ValidIBAN: international bank account (2 country letters, 2 check digits, up to 30 letters or
+// digits; mod 97 = 1).
 func ValidIBAN(s string) bool {
 	s = strings.ToUpper(strings.ReplaceAll(s, " ", ""))
 	if len(s) < 15 || len(s) > 34 {

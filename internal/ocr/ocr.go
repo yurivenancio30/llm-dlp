@@ -1,5 +1,5 @@
-// Package ocr lê o texto de imagens e PDFs (tesseract/poppler) e cobre, na imagem,
-// os trechos que o mascarador considera sensíveis.
+// Package ocr reads the text of images and PDFs (tesseract/poppler) and covers, in the image, the
+// pieces the masker considers sensitive.
 package ocr
 
 import (
@@ -29,7 +29,7 @@ type Config struct {
 	PDFToText string
 	PDFToPPM  string
 	Language  string
-	Env       []string // ex.: LD_LIBRARY_PATH, TESSDATA_PREFIX quando instalado fora do padrão
+	Env       []string // e.g. LD_LIBRARY_PATH, TESSDATA_PREFIX when installed outside the default
 	Timeout   time.Duration
 }
 
@@ -45,7 +45,7 @@ func New(c Config) *OCR {
 	return &OCR{c: c}
 }
 
-// Available confere se o tesseract roda (para falhar fechado com mensagem clara se não).
+// Available checks whether tesseract runs (to fail closed with a clear message if not).
 func (o *OCR) Available() error {
 	_, err := o.runIt(context.Background(), nil, o.c.Tesseract, "--version")
 	if err != nil {
@@ -60,17 +60,17 @@ type Word struct {
 	Block, Pair, LineNo int
 }
 
-// Line é uma linha de texto montada a partir das palavras, com a posição de cada uma.
+// Line is a line of text built from the words, with the position of each one.
 type Line struct {
 	Text  string
 	Words []Word
-	Start []int // início de cada palavra dentro de Text
+	Start []int // start of each word inside Text
 }
 
-// Read devolve a imagem decodificada e as linhas de texto encontradas nela.
+// Read returns the decoded image and the lines of text found in it.
 func (o *OCR) Read(data []byte) (image.Image, []Line, error) {
-	// o tamanho declarado no cabeçalho, antes de decodificar: um arquivo de poucos KB pode
-	// declarar uma imagem de gigabytes e derrubar o processo por falta de memória
+	// the size declared in the header, before decoding: a file of a few KB can declare an image of
+	// gigabytes and bring the process down for lack of memory
 	if c, _, err := image.DecodeConfig(bytes.NewReader(data)); err != nil {
 		return nil, nil, fmt.Errorf("imagem ilegível: %w", err)
 	} else if c.Width <= 0 || c.Height <= 0 || c.Width > sideMax || c.Height > sideMax || c.Width*c.Height > maxDots {
@@ -80,7 +80,7 @@ func (o *OCR) Read(data []byte) (image.Image, []Line, error) {
 	if err != nil {
 		return nil, nil, fmt.Errorf("imagem ilegível: %w", err)
 	}
-	// tela escura (tema escuro, terminal): inverte antes do OCR, que lê melhor preto no branco
+	// dark screen (dark theme, terminal): invert before OCR, which reads black on white better
 	entry := img
 	if dark(img) {
 		entry = reverse(img)
@@ -142,7 +142,7 @@ func lines(ps []Word) []Line {
 	return out
 }
 
-// Cover pinta retângulos pretos (com folga) sobre as caixas e devolve PNG.
+// Cover paints black rectangles (with a margin) over the boxes and returns a PNG.
 func Cover(img image.Image, caseForms []image.Rectangle) ([]byte, error) {
 	b := img.Bounds()
 	rgba := image.NewRGBA(b)
@@ -156,7 +156,7 @@ func Cover(img image.Image, caseForms []image.Rectangle) ([]byte, error) {
 	return buf.Bytes(), err
 }
 
-// PDFText extrai o texto de um PDF (vazio para PDF escaneado).
+// PDFText extracts the text of a PDF (empty for a scanned PDF).
 func (o *OCR) PDFText(pdf []byte) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), o.c.Timeout)
 	defer cancel()
@@ -167,7 +167,7 @@ func (o *OCR) PDFText(pdf []byte) (string, error) {
 	return string(out), nil
 }
 
-// PDFPages renderiza as páginas do PDF como PNG (para OCR de PDF escaneado).
+// PDFPages renders the PDF pages as PNG (for OCR of a scanned PDF).
 func (o *OCR) PDFPages(pdf []byte, maxPages int) ([][]byte, error) {
 	dir, err := os.MkdirTemp("", "llm-dlp-pdf-")
 	if err != nil {
@@ -216,16 +216,16 @@ func (o *OCR) runIt(ctx context.Context, entry []byte, bin string, args ...strin
 	return out.b.Bytes(), nil
 }
 
-// Limites contra arquivo montado para estourar a memória. A API não aceita imagem com lado maior
-// que 8000 pontos; o texto de um PDF de verdade não chega perto de maxOutput.
+// Limits against a file built to blow up memory. The API does not accept an image with a side
+// larger than 8000 pixels; the text of a real PDF does not come close to maxOutput.
 const (
 	sideMax   = 16000
 	maxDots   = 64 << 20
 	maxOutput = 64 << 20
 )
 
-// limitado guarda até max bytes. Passou disso: com descarta, o resto é jogado fora (as mensagens
-// de erro do programa); sem, a escrita falha e o programa é encerrado (a saída).
+// limited keeps up to max bytes. Past that: with discards, the rest is thrown away (the program's
+// error messages); without it, the write fails and the program is stopped (the output).
 type limited struct {
 	b          bytes.Buffer
 	max        int
@@ -244,12 +244,12 @@ func (l *limited) Write(p []byte) (int, error) {
 	return l.b.Write(p)
 }
 
-// Missing: o erro é de programa não instalado (tesseract ou poppler fora do PATH).
+// Missing: the error is a program that is not installed (tesseract or poppler not in PATH).
 func Missing(err error) bool {
 	return errors.Is(err, exec.ErrNotFound) || errors.Is(err, os.ErrNotExist)
 }
 
-// escura: luminância média baixa (amostrada, para ser barato).
+// dark: low average luminance (sampled, to be cheap).
 func dark(img image.Image) bool {
 	b := img.Bounds()
 	var sum, n uint64

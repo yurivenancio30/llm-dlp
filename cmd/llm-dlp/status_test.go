@@ -7,7 +7,7 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/version"
 )
 
-// O status avisa quando o processo no ar não é o binário instalado.
+// status warns when the running process is not the installed binary.
 func TestStatusWarnsNewBinary(t *testing.T) {
 	if newBinary("outro", os.Getpid()) == "" {
 		t.Error("commit diferente deveria avisar")

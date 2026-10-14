@@ -10,8 +10,8 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/config"
 )
 
-// Os nomes em português de antes da 0.9.0 levam a um comando que existe (na ajuda, ou entre os
-// internos), e a ajuda não mostra nenhum deles.
+// The Portuguese names from before 0.9.0 lead to a command that exists (in the help, or among the
+// internal ones), and the help shows none of them.
 func TestOldCommandNames(t *testing.T) {
 	help := helpText()
 	for stale, newOne := range oldNames {
@@ -36,11 +36,11 @@ func readHooks(t *testing.T, target string) string {
 	return string(h)
 }
 
-// install troca os hooks antigos pelos novos (sem duplicar e sem mexer nos de outros
-// programas); update para uma versão anterior põe os antigos de volta; uninstall tira os dois.
+// install replaces the old hooks with the new ones (without duplicating and without touching other
+// programs' hooks); update to an earlier version puts the old ones back; uninstall removes both.
 func TestHooksNewAndOldNames(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home) // uninstall usa a home do usuário: nunca o ~/.claude de verdade
+	t.Setenv("HOME", home) // uninstall uses the user's home: never the real ~/.claude
 	t.Setenv("LLM_DLP_HOME", filepath.Join(home, "cfg"))
 	bin := filepath.Join(home, ".local", "bin", "llm-dlp")
 	target := filepath.Join(home, ".claude", "settings.json")

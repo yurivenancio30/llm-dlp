@@ -12,7 +12,7 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/version"
 )
 
-// llm-dlp: ponto de entrada e lista de comandos.
+// llm-dlp: entry point and command list.
 
 const help = `llm-dlp %s — mascara dado sensível entre você e a LLM (Claude Code)
 
@@ -63,10 +63,10 @@ func helpText() string {
 	return fmt.Sprintf(help, version.Version, config.Path("config.json"), config.Path("llm-dlp.log"))
 }
 
-// oldNames: os nomes em português de antes da 0.9.0. Continuam aceitos (os hooks já
-// instalados no Claude Code chamam "garantir" e "verificar", e o supervisor sobe "servir" e
-// "supervisionar", que toda versão entende: ver startProxy), mas não aparecem na ajuda nem
-// nas docs.
+// oldNames: the Portuguese names from before 0.9.0. They are still accepted (hooks already
+// installed in Claude Code call "garantir" and "verificar", and the supervisor starts "servir" and
+// "supervisionar", which every version understands: see startProxy), but they do not appear in the
+// help nor in the docs.
 var oldNames = map[string]string{
 	"ajuda": "help", "servir": "serve", "supervisionar": "supervise", "garantir": "ensure",
 	"verificar": "check", "atualizar": "update", "recarregar": "reload", "emergencia": "emergency",
@@ -176,13 +176,14 @@ func openLog() *log.Logger {
 	return log.New(l, "", log.LstdFlags)
 }
 
-// maxLog: o tamanho em que o llm-dlp.log gira. Fica um só antigo (llm-dlp.log.1): no disco,
-// no máximo uns 20 MB.
+// maxLog: the size at which llm-dlp.log rotates. Only one old file stays (llm-dlp.log.1): on disk,
+// about 20 MB at most.
 var maxLog int64 = 10 << 20
 
-// rotatingLog: o llm-dlp.log, que gira ao passar de maxLog a qualquer momento (antes só girava
-// quando o llm-dlp subia, e um proxy no ar por semanas fazia o arquivo crescer sem limite). Mais
-// de um processo escreve nele (supervisor e proxy): quem percebe que o outro girou reabre.
+// rotatingLog: llm-dlp.log, which rotates when it passes maxLog at any time (before, it only
+// rotated when llm-dlp started, and a proxy running for weeks made the file grow without limit).
+// More than one process writes to it (supervisor and proxy): whoever notices the other one rotated
+// reopens it.
 type rotatingLog struct {
 	mu sync.Mutex
 	p  string
@@ -204,7 +205,7 @@ func (l *rotatingLog) Write(b []byte) (int, error) {
 		os.Rename(l.p, l.p+".1")
 		l.reopen()
 	} else if fst, e := statOf(l.f); err != nil || e != nil || !os.SameFile(st, fst) {
-		l.reopen() // outro processo girou (ou apagaram o arquivo)
+		l.reopen() // another process rotated it (or the file was deleted)
 	}
 	if l.f == nil {
 		return os.Stderr.Write(b)
@@ -219,8 +220,8 @@ func statOf(f *os.File) (os.FileInfo, error) {
 	return f.Stat()
 }
 
-// logFile: o arquivo em que o log escreve agora (o supervisor o passa como saída de erro
-// do proxy, para um panic ficar registrado), ou nil.
+// logFile: the file the log writes to now (the supervisor passes it as the proxy's error output, so
+// a panic is recorded), or nil.
 func logFile(lg *log.Logger) *os.File {
 	switch w := lg.Writer().(type) {
 	case *os.File:

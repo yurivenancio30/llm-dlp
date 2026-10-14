@@ -5,28 +5,28 @@ import (
 	"strings"
 )
 
-// Caminhos fora da pasta pessoal. A pasta pessoal (/home/u, /Users/u,
-// C:\Users\u) fica com o leitor de caminhos de usuário. Aqui:
+// Paths outside the home folder. The home folder (/home/u, /Users/u, C:\Users\u) is left to the
+// user paths reader. Here:
 //
-//	/srv/x, /opt/x, /data/x, /mnt/x, /media/x, /var/www/x   cada pasta que não é pública
-//	/var/lib/x, /var/log/x, /var/opt/x, /etc/x               só pastas com cara de identificador
-//	                                                         (aqui vivem os programas instalados:
+//	/srv/x, /opt/x, /data/x, /mnt/x, /media/x, /var/www/x   each folder that is not public
+//	/var/lib/x, /var/log/x, /var/opt/x, /etc/x               only folders that look like an identifier
+//	                                                         (installed programs live here:
 //	                                                         /var/lib/postgresql, /etc/nginx)
-//	D:\x ... Z:\x (outras unidades)                          cada pasta que não é pública
-//	\\servidor\compartilhamento\x (UNC)                      servidor; compartilhamento e pastas
+//	D:\x ... Z:\x (other drives)                             each folder that is not public
+//	\\server\share\x (UNC)                                   server; share and folders
 //
-// O último pedaço com extensão é nome de arquivo e fica. Diretórios públicos do sistema
-// (bin, lib, share, log, conf...) ficam.
+// The last piece with an extension is a file name and stays. Public system directories (bin, lib,
+// share, log, conf...) stay.
 
 var pathRoots = []struct {
 	pfx    string
-	strict bool // só pastas com cara de identificador
+	strict bool // only folders that look like an identifier
 }{
 	{"/srv/", false}, {"/opt/", false}, {"/data/", false}, {"/mnt/", false}, {"/media/", false}, {"/var/www/", false},
 	{"/var/lib/", true}, {"/var/log/", true}, {"/var/opt/", true}, {"/etc/", true},
 }
 
-// pastas públicas comuns dentro dessas raízes
+// common public folders inside those roots
 var systemFolders = setOf("bin", "sbin", "lib", "lib64", "share", "include", "local", "log", "logs", "conf", "config",
 	"etc", "tmp", "temp", "cache", "run", "data", "html", "www", "public", "static", "assets", "backup", "backups",
 	"current", "releases", "shared", "src", "build", "dist", "out", "docs", "doc", "man", "lost+found", "default",
@@ -35,8 +35,8 @@ var systemFolders = setOf("bin", "sbin", "lib", "lib64", "share", "include", "lo
 	"homebrew", "anaconda3", "miniconda3", "conda", "venv", "env", "python", "java", "node", "go", "dotnet",
 	"windows", "program files", "program files (x86)", "programdata", "users", "temp")
 
-// pathPieceEnd: onde termina o pedaço de caminho que começa em s[a]: letras (também
-// acentuadas), dígitos, . _ - + e, no meio, $ e # ("ped$hist", "c#"). "$" no começo é variável.
+// pathPieceEnd: where the path piece starting at s[a] ends: letters (accented too), digits, . _ - +
+// and, in the middle, $ and # ("ped$hist", "c#"). "$" at the start is a variable.
 func pathPieceEnd(s string, a int) int {
 	b := a
 	for b < len(s) {
@@ -57,7 +57,7 @@ func pathPieceEnd(s string, a int) int {
 	return b
 }
 
-// folderName: um pedaço de caminho que pode ser nome (ver pathPieceEnd).
+// folderName: a path piece that may be a name (see pathPieceEnd).
 func folderName(v string) bool {
 	return v != "" && (isAlnum(v[0]) || utf8Letter(v, 0) > 0) && pathPieceEnd(v, 0) == len(v)
 }
@@ -73,7 +73,7 @@ func folderOutside(v string, strict bool) bool {
 	return !strict || identifierShape(v)
 }
 
-// pathPieces marca as pastas de s[a:] separadas por sep, até o fim do caminho.
+// pathPieces marks the folders of s[a:] separated by sep, up to the end of the path.
 func pathPieces(s string, a int, sep byte, strict bool, add func(ObjFinding)) {
 	prev := ""
 	for n := 0; n < 10 && a < len(s); n++ {
@@ -86,7 +86,7 @@ func pathPieces(s string, a int, sep byte, strict bool, add func(ObjFinding)) {
 		}
 		v := s[a:b]
 		if publicDependency(prev, v, s[b:]) {
-			return // código de terceiro: site-packages/pandas/..., node_modules/express/...
+			return // third-party code: site-packages/pandas/..., node_modules/express/...
 		}
 		prev = v
 		dir := b < len(s) && s[b] == sep
@@ -103,7 +103,7 @@ func pathPieces(s string, a int, sep byte, strict bool, add func(ObjFinding)) {
 	}
 }
 
-// pathStart: a raiz começa um caminho (não é pedaço de URL nem de outro caminho).
+// pathStart: the root starts a path (it is not a piece of a URL or of another path).
 func pathStart(s string, i int) bool {
 	if i == 0 {
 		return true
@@ -117,7 +117,8 @@ func findPathsOutside(s string, add func(ObjFinding)) {
 	if strings.IndexByte(s, '/') >= 0 {
 		for _, r := range pathRoots {
 			for i := strings.Index(s, r.pfx); i >= 0; {
-				// ":/srv/" só vale depois de um host (scp "host:/srv/x") ou de "=" e ":" de config
+				// ":/srv/" only counts after a host (scp "host:/srv/x") or after a config "=" and
+				// ":"
 				if pathStart(s, i) && !(i >= 2 && s[i-1] == ':' && s[i-2] == '/') {
 					pathPieces(s, i+len(r.pfx), '/', r.strict, add)
 				}
@@ -135,7 +136,7 @@ func findPathsOutside(s string, add func(ObjFinding)) {
 	if strings.IndexByte(s, '\\') < 0 {
 		return
 	}
-	// outras unidades: D:\ ... Z:\ (também escapado em JSON: D:\\)
+	// other drives: D:\ ... Z:\ (also escaped in JSON: D:\\)
 	for i := 1; i+2 < len(s); i++ {
 		if s[i] != ':' || s[i+1] != '\\' {
 			continue
@@ -150,7 +151,7 @@ func findPathsOutside(s string, add func(ObjFinding)) {
 		}
 		slashPathPieces(s, a, add)
 	}
-	// UNC: \\servidor\compartilhamento\... (ou \\\\servidor\\... escapado)
+	// UNC: \\server\share\... (or \\\\server\\... escaped)
 	for i := 0; i+3 < len(s); i++ {
 		if s[i] != '\\' || s[i+1] != '\\' || i > 0 && (s[i-1] == '\\' || isAlnum(s[i-1])) {
 			continue
@@ -176,10 +177,10 @@ func findPathsOutside(s string, add func(ObjFinding)) {
 	}
 }
 
-// escape de string escapado ("\\uD801", "\\U000003B4", "\\x0a", "\\012"): não é servidor nem pasta
+// escaped string escape ("\\uD801", "\\U000003B4", "\\x0a", "\\012"): neither a server nor a folder
 var reTextEscape = regexp.MustCompile(`^(?:u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8}|x[0-9A-Fa-f]{2}|[0-7]{3})`)
 
-// slashPathPieces: como pathPieces, com "\" (ou "\\" escapado) como separador.
+// slashPathPieces: like pathPieces, with "\" (or escaped "\\") as the separator.
 func slashPathPieces(s string, a int, add func(ObjFinding)) {
 	for n := 0; n < 10 && a < len(s); n++ {
 		for a < len(s) && s[a] == '\\' {
@@ -194,7 +195,7 @@ func slashPathPieces(s string, a int, add func(ObjFinding)) {
 		}
 		v := strings.TrimSuffix(s[a:b], "$") // compartilhamento administrativo: C$
 		if reTextEscape.MatchString(v) {
-			return // "\\u00e9", "\\x0a": escape de string, não pasta
+			return // "\\u00e9", "\\x0a": string escape, not a folder
 		}
 		dir := b < len(s) && s[b] == '\\'
 		if !dir && strings.IndexByte(v, '.') > 0 {
@@ -210,8 +211,8 @@ func slashPathPieces(s string, a int, add func(ObjFinding)) {
 	}
 }
 
-// primeiro nível público: diretórios do sistema (FHS, macOS), as raízes já tratadas acima e
-// as rotas web comuns (/api/v1/..., /static/...), que têm a mesma forma de um caminho
+// public first level: system directories (FHS, macOS), the roots already handled above and common
+// web routes (/api/v1/..., /static/...), which have the same shape as a path
 var publicRoots = setOf("bin", "boot", "dev", "etc", "home", "lib", "lib32", "lib64", "libx32", "media", "mnt", "opt",
 	"proc", "root", "run", "sbin", "snap", "srv", "sys", "tmp", "usr", "var", "data", "users", "library",
 	"applications", "system", "volumes", "private", "cores", "nix", "gnu", "network", "afs", "net", "cdrom",
@@ -220,11 +221,11 @@ var publicRoots = setOf("bin", "boot", "dev", "etc", "home", "lib", "lib32", "li
 	"health", "healthz", "readyz", "livez", "metrics", "graphql", "swagger", "openapi", "ws", "css", "js", "img",
 	"images", "fonts", "icons", "favicon.ico", ".well-known", "admin", "user", "users", "search", "en", "pt", "pt-br",
 	"blob", "tree", "raw", "wiki", "issues", "pull", "releases", "download", "downloads", "proxy", "callback",
-	// ID de recurso de nuvem (fica com o leitor de nuvem)
+	// cloud resource ID (left to the cloud reader)
 	"subscriptions", "providers", "resourcegroups", "projects", "organizations", "folders", "locations", "apis")
 
-// findRootPaths: caminho absoluto com 2 ou mais níveis cujo primeiro nível não é público
-// (/dados/Relatorios/..., /backup_x/...). Cada pasta que não é pública é mascarada (fraco).
+// findRootPaths: absolute path with 2 or more levels whose first level is not public
+// (/dados/Relatorios/..., /backup_x/...). Each folder that is not public is masked (weak).
 func findRootPaths(s string, add func(ObjFinding)) {
 	for i := strings.IndexByte(s, '/'); i >= 0 && i+1 < len(s); {
 		if pathStart(s, i) && letterD(s[i+1]) {
@@ -233,10 +234,10 @@ func findRootPaths(s string, add func(ObjFinding)) {
 			for b < len(s) && (isAlnum(s[b]) || s[b] == '.' || s[b] == '_' || s[b] == '-') {
 				b++
 			}
-			// primeiro nível com pelo menos 4 caracteres: raiz curta (/gc, /cpu, /x) é nome de
-			// métrica ou rota; as raízes reais de 3 letras (/srv, /opt, /mnt) têm regra própria
+			// first level with at least 4 characters: a short root (/gc, /cpu, /x) is a metric name
+			// or route; the real 3-letter roots (/srv, /opt, /mnt) have their own rule
 			if b-a >= 4 && b+1 < len(s) && s[b] == '/' && (isAlnum(s[b+1]) || s[b+1] == '_') && !publicRoots[strings.ToLower(s[a:b])] {
-				// fim do caminho; "/gc/heap/allocs:bytes" (nome de métrica com unidade) não é arquivo
+				// end of the path; "/gc/heap/allocs:bytes" (metric name with a unit) is not a file
 				e := b
 				for e < len(s) && (isAlnum(s[e]) || strings.IndexByte("._-/+", s[e]) >= 0) {
 					e++

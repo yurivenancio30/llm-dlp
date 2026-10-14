@@ -12,7 +12,7 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/mask"
 )
 
-// Volta: desmascara a resposta, em streaming (SSE) ou inteira (JSON).
+// Return: unmasks the response, in streaming (SSE) or whole (JSON).
 
 // ---- SSE (streaming) -------------------------------------------------------
 
@@ -21,9 +21,9 @@ func (p *Proxy) unmaskSSE(w http.ResponseWriter, body io.Reader, tab *mask.Table
 	rd := bufio.NewReaderSize(body, 64<<10)
 	streams := map[int]*mask.Stream{}
 	types := map[int]string{}
-	raws := map[int]bool{} // blocos que passam sem desmascarar (ferramentas que vão para a internet)
-	// quem escreveu: o texto original de cada bloco (como a API mandou), registrado no fim do
-	// bloco pelo hash do desmascarado (ver mask/memory_conversation.go)
+	raws := map[int]bool{} // blocks that pass without unmasking (tools that go to the internet)
+	// who wrote it: the original text of each block (as the API sent it), recorded at the end of
+	// the block by the hash of the unmasked one (see mask/memory_conversation.go)
 	orig := map[int]*strings.Builder{}
 	reg := func(s string) string { return p.m.RecordResponse(s, tab) }
 	var event []string
@@ -52,7 +52,7 @@ func (p *Proxy) unmaskSSE(w http.ResponseWriter, body io.Reader, tab *mask.Table
 			return
 		}
 		idx := intOf(ev["index"])
-		changed := false // evento que não mudou sai byte a byte como veio (thinking, ping, uso...)
+		changed := false // an event that did not change goes out byte for byte as it came (thinking, ping, usage...)
 		switch ev["type"] {
 		case "content_block_start":
 			cb, _ := ev["content_block"].(map[string]any)
@@ -69,11 +69,11 @@ func (p *Proxy) unmaskSSE(w http.ResponseWriter, body io.Reader, tab *mask.Table
 			}
 			if tp == "tool_use" {
 				if nameF, _ := cb["name"].(string); p.cfg.NoUnmask(nameF) {
-					raws[idx] = true // WebFetch/WebSearch: a entrada segue com pseudônimos
+					raws[idx] = true // WebFetch/WebSearch: the input keeps pseudonyms
 					delete(orig, idx)
 					break
 				}
-				// entrada que já chega completa no início do bloco (sem deltas)
+				// an input that arrives complete at the start of the block (without deltas)
 				if in, ok := cb["input"].(map[string]any); ok && len(in) > 0 {
 					cb["input"], changed = recordAll(in, reg), true
 				}
@@ -85,7 +85,7 @@ func (p *Proxy) unmaskSSE(w http.ResponseWriter, body io.Reader, tab *mask.Table
 			}
 			d, _ := ev["delta"].(map[string]any)
 			field := map[any]string{"text_delta": "text", "input_json_delta": "partial_json"}[d["type"]]
-			if field == "" { // thinking, assinatura, citações: passa intacto
+			if field == "" { // thinking, signature, citations: pass intact
 				break
 			}
 			f := streams[idx]
@@ -99,7 +99,7 @@ func (p *Proxy) unmaskSSE(w http.ResponseWriter, body io.Reader, tab *mask.Table
 			}
 			out := f.Push(s)
 			if out == "" {
-				return // segurando um possível pseudônimo cortado
+				return // holding a possible cut pseudonym
 			}
 			if out != s {
 				d[field], changed = out, true
@@ -167,9 +167,8 @@ func intOf(v any) int {
 	return -1
 }
 
-// recordBlock: o fim de um bloco da resposta. Text: registra o bloco inteiro. Entry de
-// ferramenta: registra cada string dela (o Claude Code a reenvia como objeto, e o walker
-// mascara string por string).
+// recordBlock: the end of a response block. Text: records the whole block. Tool input: records each
+// of its strings (Claude Code resends it as an object, and the walker masks string by string).
 func recordBlock(typ, original string, reg func(string) string) {
 	switch typ {
 	case "text":
@@ -187,7 +186,7 @@ func recordBlock(typ, original string, reg func(string) string) {
 	}
 }
 
-// recordAll: como unmaskAll, registrando cada string (quem escreveu).
+// recordAll: like unmaskAll, recording each string (who wrote it).
 func recordAll(v any, reg func(string) string) any {
 	switch x := v.(type) {
 	case string:
@@ -204,7 +203,7 @@ func recordAll(v any, reg func(string) string) any {
 	return v
 }
 
-// unmaskAll troca pseudônimos em todas as strings de um valor JSON já decodificado.
+// unmaskAll swaps pseudonyms in all strings of an already decoded JSON value.
 func unmaskAll(v any, tab *mask.Table) any {
 	switch x := v.(type) {
 	case string:
@@ -221,10 +220,9 @@ func unmaskAll(v any, tab *mask.Table) any {
 	return v
 }
 
-// unmaskJSONResponse: respostas sem streaming (texto e entradas de ferramenta).
-// Entradas de ferramentas em noUnmask (WebFetch, WebSearch) seguem com pseudônimos. reg
-// (opcional) desmascara registrando quem escreveu: o texto de cada bloco de texto e cada
-// string da entrada de cada ferramenta.
+// unmaskJSONResponse: responses without streaming (text and tool inputs). Inputs of tools in
+// noUnmask (WebFetch, WebSearch) keep pseudonyms. reg (optional) unmasks recording who wrote it:
+// the text of each text block and each string of the input of each tool.
 func unmaskJSONResponse(b []byte, tab *mask.Table, noUnmask func(string) bool, reg func(string) string) []byte {
 	dec := json.NewDecoder(bytes.NewReader(b))
 	dec.UseNumber()

@@ -9,7 +9,7 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/config"
 )
 
-// Funções de apoio usadas por vários testes.
+// Helper functions used by several tests.
 
 var testKey = []byte("0123456789abcdef0123456789abcdef")
 
@@ -31,7 +31,7 @@ func newTest(t testing.TB) *Masker {
 	return m
 }
 
-// gera documentos válidos a partir dos dígitos-base, calculando os verificadores
+// generates valid documents from the base digits, computing the check digits
 func genCPF(base string) string {
 	for dv := 0; dv < 100; dv++ {
 		c := fmt.Sprintf("%s%02d", base, dv)
@@ -56,7 +56,7 @@ func genEleven(base string, ok func(string) bool) string {
 	return ""
 }
 
-// gera um número válido completando os dígitos verificadores por tentativa
+// generates a valid number by completing the check digits by trial
 func genValid(base string, n int, ok func(string) bool) string {
 	for dv := 0; dv < 100; dv++ {
 		for _, c := range []string{fmt.Sprintf("%s%02d", base, dv), fmt.Sprintf("%s%d", base, dv%10)} {
@@ -70,8 +70,8 @@ func genValid(base string, n int, ok func(string) bool) string {
 
 func sha(s string) [32]byte { return sha256.Sum256([]byte(s)) }
 
-// asPandas imprime uma tabela como o pandas faz em print(df): índice à esquerda, cada
-// coluna com a largura do maior valor, tudo alinhado à direita, dois espaços entre colunas.
+// asPandas prints a table as pandas does in print(df): index on the left, each column as wide as
+// its largest value, all right-aligned, two spaces between columns.
 func asPandas(cols []string, lines [][]string) string {
 	wid := make([]int, len(cols))
 	for j, c := range cols {
@@ -98,7 +98,7 @@ func asPandas(cols []string, lines [][]string) string {
 	return b.String()
 }
 
-// numerar põe o número da linha antes de cada linha, como a ferramenta de leitura do Claude Code.
+// numberLines puts the line number before each line, like Claude Code's read tool.
 func numberLines(text string) string {
 	var b strings.Builder
 	for i, l := range strings.Split(strings.TrimRight(text, "\n"), "\n") {

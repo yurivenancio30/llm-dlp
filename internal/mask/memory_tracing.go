@@ -6,22 +6,23 @@ import (
 	"strings"
 )
 
-// Rastreamento (ver docs/pt-BR/structures.md): cada nome do cliente é decidido onde ENTRA na conversa
-// e, a partir daí, é mascarado em todo lugar. Três regras:
+// Tracing (see docs/structures.md): each client name is decided where it ENTERS the conversation
+// and, from then on, is masked everywhere. Three rules:
 //
-//  1. Entry: só os dados (saída de comando, arquivo lido) e o texto do usuário trazem nome do
-//     cliente. O texto que o assistente escreveu não é fonte: o modelo só conhece o cliente pelo
-//     que o proxy deixou passar; palavra nova dele é conhecimento público (MaskContagion).
-//  2. Contágio: o valor decidido vale em todas as ocorrências, em qualquer texto e formato.
-//  3. Limpeza: vocabulário público nunca é marcado (publicSystem, publicGeneral).
+//  1. Entry: only data (command output, file read) and the user text bring client names. The
+//     text the assistant wrote is not a source: the model only knows the client through what
+//     the proxy let through; a new word of its own is public knowledge (MaskContagion).
+//  2. Contagion: the decided value applies to all occurrences, in any text and format.
+//  3. Cleanup: public vocabulary is never marked (publicSystem, publicGeneral).
 //
-// Cada marca leva a origem: decidida com prova direta (leitor, decisor) ou deduzida (âncora por
-// posição). Dedução não gera dedução (sem cascata), e só vale com sementes provadas na mesma
-// fonte (o arquivo ou recurso que o comando leu): quatro nomes de tabela que coincidem com
-// pacotes de um constraints.txt não fazem a lista inteira virar tabela. Word comum provada numa
-// fonte não contamina outro arquivo lido; na conversa e nas saídas sem arquivo ela é o nome.
+// Each mark carries its origin: decided with direct proof (reader, decider) or deduced (anchor by
+// position). A deduction does not generate a deduction (no cascade), and only applies with seeds
+// proven in the same source (the file or resource the command read): four table names that coincide
+// with packages of a constraints.txt do not make the whole list become tables. A common word proven
+// in one source does not contaminate another file read; in the conversation and in outputs without
+// a file it is the name.
 
-// adicionar: põe d na memória (sem repetir). Devolve se entrou.
+// addEntry: puts d into the memory (without repeating). Returns whether it entered.
 func (mm *memory) addEntry(m *Masker, d Decision) bool {
 	if d.Generic || len(d.Name) < memMin || publicGeneral(d.Name) || m.provenSoftware(d.Name) || !m.objMask(d.Ent) || isPseudoObj(d.Name) {
 		return false
@@ -60,8 +61,8 @@ func (mm *memory) addEntry(m *Masker, d Decision) bool {
 	return true
 }
 
-// learnAnchor: os trechos novos de ts2 (fora de antes) são decisões de valor (regra 2):
-// entram na memória e ficam marcados como deduzidos. Devolve as que entraram.
+// learnAnchor: the new pieces of ts2 (outside before) are value decisions (rule 2): they enter the
+// memory and are marked as deduced. Returns those that entered.
 func (l *Batch) learnAnchor(s string, before, ts2 []snippet) []Decision {
 	already := map[[2]int]bool{}
 	for _, t := range before {
@@ -94,10 +95,10 @@ func (l *Batch) markDeduced(v string) {
 
 func (l *Batch) deduced(v string) bool { return l.deducedSet[strings.ToLower(v)] }
 
-// MaskContagion (regra 1): texto que o assistente escreveu e que não bate com o registro do
-// que o proxy traduziu. Só recebe o contágio: os detectores de formato (CPF, chave, e-mail:
-// valem por si), os valores já marcados e a memória da conversa. Nenhum leitor de estrutura nem
-// decisor roda aqui, e nada é aprendido.
+// MaskContagion (rule 1): a text the assistant wrote that does not match the record of what the
+// proxy translated. It only receives the contagion: the format detectors (CPF, key, e-mail: they
+// count by themselves), the values already marked and the conversation memory. No structure reader
+// or decider runs here, and nothing is learned.
 func (l *Batch) MaskContagion(s string, fromWeb bool, pos Position) (string, []Entry) {
 	if len(s) < 4 {
 		return s, nil
@@ -121,20 +122,20 @@ func (l *Batch) MaskContagion(s string, fromWeb bool, pos Position) (string, []E
 	return r.text, r.entries
 }
 
-// publicSystem (regra 3): vocabulário de sistema (SQL, desenvolvimento, devops, bancos); nunca
-// é mascarado, nem no lugar.
+// publicSystem (rule 3): system vocabulary (SQL, development, devops, databases); never masked, not
+// even in place.
 func publicSystem(v string) bool {
 	return publicSQL(v) || publicDev(v) || publicDevops(v) || databaseSchemes[strings.ToLower(v)]
 }
 
-// publicGeneral: o de sistema e a referência medida (publicRef). A referência, com prova, é
-// mascarada no lugar, mas não se espalha.
+// publicGeneral: the system one and the measured reference (publicRef). The reference, with proof,
+// is masked in place, but does not spread.
 func publicGeneral(v string) bool { return publicSystem(v) || publicRef[strings.ToLower(v)] }
 
-// wholeValue (só o valor inteiro é candidato): s[a:b] é o valor inteiro do seu token, e não um
-// pedaço de uma expressão. Um literal entre aspas é um valor; fora disso, o token vai até espaço
-// ou separador de campo (, ; | / : =), sem as aspas e os parênteses que o embrulham.
-// "pagamentos" numa coluna é; "CPF" em '.*CPF.*' ou em (CPF|CNPJ) não é.
+// wholeValue (only the whole value is a candidate): s[a:b] is the whole value of its token, and not
+// a piece of an expression. A quoted literal is a value; outside that, the token goes up to a space
+// or a field separator (, ; | / : =), without the quotes and parentheses that wrap it. "pagamentos"
+// in a column is; "CPF" in '.*CPF.*' or in (CPF|CNPJ) is not.
 func wholeValue(s string, a, b int) bool {
 	if a > 0 && b < len(s) && s[a-1] == s[b] && strings.IndexByte("'\"`", s[b]) >= 0 {
 		return true
@@ -156,7 +157,8 @@ func wholeValue(s string, a, b int) bool {
 	return i == a && j == b
 }
 
-// countOutsideQuotes: quantos c há em l fora de aspas simples ou duplas (fechadas na linha).
+// countOutsideQuotes: how many c there are in l outside single or double quotes (closed on the
+// line).
 func countOutsideQuotes(l string, c byte) int {
 	n := 0
 	var q byte
@@ -177,8 +179,8 @@ func countOutsideQuotes(l string, c byte) int {
 	return n
 }
 
-// noOverlapLong: os trechos em ordem, sem sobreposição; no conflito fica o que cobre mais
-// (nunca se descarta o resultado inteiro por causa de um conflito).
+// noOverlapLong: the pieces in order, without overlap; in a conflict, the one that covers more
+// stays (the whole result is never discarded because of a conflict).
 func noOverlapLong(ts []snippet) []snippet {
 	sortSnippets(ts)
 	out := make([]snippet, 0, len(ts))
@@ -194,7 +196,7 @@ func noOverlapLong(ts []snippet) []snippet {
 	return out
 }
 
-// lastCovering: o último trecho (em ordem) que se sobrepõe a [a, b), ou -1.
+// lastCovering: the last piece (in order) that overlaps [a, b), or -1.
 func lastCovering(ts []snippet, a, b int) int {
 	i := sort.Search(len(ts), func(k int) bool { return ts[k].Start >= b })
 	if k := i - 1; k >= 0 && ts[k].End > a {
@@ -205,10 +207,11 @@ func lastCovering(ts []snippet, a, b int) int {
 
 // ---- fonte -------------------------------------------------------------------------------
 
-// sourceSep: a fonte vai na frente da dica do resultado (WithSource); o Batch a separa na entrada.
+// sourceSep: the source goes in front of the result hint (WithSource); the Batch splits it off on
+// input.
 const sourceSep = "\x1d"
 
-// WithSource: a dica com a fonte (os arquivos ou o recurso do comando) na frente.
+// WithSource: the hint with the source (the files or the resource of the command) in front.
 func WithSource(source, hint string) string {
 	if source == "" {
 		return hint
@@ -216,7 +219,7 @@ func WithSource(source, hint string) string {
 	return sourceSep + source + sourceSep + hint
 }
 
-// SplitSource: o inverso de WithSource.
+// SplitSource: the inverse of WithSource.
 func SplitSource(d string) (source, hint string) {
 	if !strings.HasPrefix(d, sourceSep) {
 		return "", d
@@ -234,7 +237,7 @@ func noSources(items []BatchItem) []BatchItem {
 	return out
 }
 
-// recordSources: as decisões com prova direta de cada texto ficam ligadas à fonte dele.
+// recordSources: the decisions with direct proof of each text are tied to its source.
 func (l *Batch) recordSources(items []BatchItem, sources []string) {
 	if l.sources == nil {
 		l.sources = map[string]map[string]bool{}
@@ -259,7 +262,7 @@ func (l *Batch) recordSources(items []BatchItem, sources []string) {
 	}
 }
 
-// provenAtSource: v foi decidido com prova no próprio texto ou numa fonte do texto atual.
+// provenAtSource: v was decided with proof in the text itself or in a source of the current text.
 func (l *Batch) provenAtSource(v string) bool {
 	k := strings.ToLower(v)
 	if l.currentProv[k] {
@@ -278,8 +281,8 @@ func (l *Batch) provenAtSource(v string) bool {
 
 var reFileSource = regexp.MustCompile(`[\w~./\-]*[\w\-]\.[A-Za-z][\w]{0,5}\b`)
 
-// CommandSource: os arquivos que o comando cita (nome base, minúsculas); sem arquivo, o
-// programa e o primeiro argumento que não é opção ("kubectl get").
+// CommandSource: the files the command cites (base name, lowercase); without a file, the program
+// and the first argument that is not an option ("kubectl get").
 func CommandSource(cmd string) string {
 	vis := map[string]bool{}
 	var fs []string
@@ -308,7 +311,7 @@ func CommandSource(cmd string) string {
 	return strings.Join(fs, ",")
 }
 
-// fileSource: a fonte cita arquivo (e não só um comando sem arquivo, nem nada).
+// fileSource: the source cites a file (and not only a command without a file, or nothing).
 func fileSource(f string) bool {
 	for _, x := range strings.Split(f, ",") {
 		if x != "" && !strings.HasPrefix(x, "cmd:") {
@@ -318,11 +321,11 @@ func fileSource(f string) bool {
 	return false
 }
 
-// documentExt: arquivos de documentação em texto (o conteúdo é prosa, menos os blocos de código).
+// documentExt: text documentation files (the content is prose, except the code blocks).
 var documentExt = map[string]bool{"md": true, "markdown": true, "mdx": true, "txt": true, "rst": true, "adoc": true, "asciidoc": true}
 
-// documentSource: todo arquivo da fonte é documentação (com um arquivo de código junto, vale a
-// regra do código, que protege mais).
+// documentSource: every file of the source is documentation (with a code file along, the code rule
+// applies, which protects more).
 func documentSource(f string) bool {
 	n := 0
 	for _, x := range strings.Split(f, ",") {
@@ -338,21 +341,21 @@ func documentSource(f string) bool {
 	return n > 0
 }
 
-// SystemSource: a fonte de uma saída que descreve ou lista um catálogo de sistema (DESC/SHOW em
-// SNOWFLAKE.ACCOUNT_USAGE, information_schema...). A estrutura listada é documentação pública:
-// a saída não é fonte de decisão (como o texto do assistente) e só recebe o contágio dos nomes
-// do cliente já conhecidos.
+// SystemSource: the source of an output that describes or lists a system catalog (DESC/SHOW in
+// SNOWFLAKE.ACCOUNT_USAGE, information_schema...). The listed structure is public documentation:
+// the output is not a source of decisions (like the assistant text) and only receives the contagion
+// of the client names already known.
 const SystemSource = "sistema"
 
-// SystemTarget: o comando descreve ou lista um objeto de catálogo de sistema.
+// SystemTarget: the command describes or lists a system catalog object.
 func SystemTarget(cmd string) bool { return systemTarget(cmd) }
 
-// UsePublic: as palavras (minúsculas) que o modelo escreveu antes de um dado trazê-las nesta
-// conversa (anterioridade, no proxy). São conhecimento dele: nenhum caminho as marca aqui.
+// UsePublic: the words (lowercase) the model wrote before data brought them in this conversation
+// (priority, in the proxy). They are its knowledge: no path marks them here.
 func (l *Batch) UsePublic(p map[string]bool) { l.publicSet = p }
 
-// fromModel: v é conhecimento do modelo nesta conversa (e não contém termo cadastrado: o
-// cadastro sempre vence).
+// fromModel: v is model knowledge in this conversation (and does not contain a registered term: the
+// registry always wins).
 func (l *Batch) fromModel(v string) bool {
 	if len(l.publicSet) == 0 {
 		return false
@@ -360,8 +363,8 @@ func (l *Batch) fromModel(v string) bool {
 	return l.publicSet[strings.ToLower(v)] && !l.m.hasTerm(v)
 }
 
-// noPublics: os trechos de objeto cujo valor é conhecimento do modelo saem (os de formato,
-// como CPF e chave, ficam: valem por si).
+// noPublics: the object pieces whose value is model knowledge come out (the format ones, like CPF
+// and key, stay: they count by themselves).
 func (l *Batch) noPublics(s string, ts []snippet) []snippet {
 	out := ts[:0:0]
 	for _, t := range ts {

@@ -2,8 +2,8 @@ package mask
 
 import "testing"
 
-// O leitor de tabela em qualquer desenho. Os nomes de ferramenta são só de onde a forma
-// foi copiada; a regra lê a forma.
+// The table reader in any layout. The tool names are only where the shape was copied from; the rule
+// reads the shape.
 
 var tableNames = []string{"fin_contab", "lanc_diario", "plano_contas", "vl_lancto", "cd_conta"}
 
@@ -131,7 +131,8 @@ ns-financeiro    svc-conciliacao-6c8d7b9f4-k8j2m     1/1     Running   3        
 `},
 		{"aws text", "BUCKETS\t2024-01-01T00:00:00.000Z\tbkt-relat-fin\nBUCKETS\t2024-02-01T00:00:00.000Z\tbkt-notas-fisc\n"},
 	}
-	// a coluna NAME sem tipo no cabeçalho fica para o tipo dado pelo comando (call_command.go)
+	// the NAME column with no type in the header is left to the type given by the command
+	// (call_command.go)
 	names := []string{"ns-financeiro", "bkt-relat-fin", "bkt-notas-fisc"}
 	for _, c := range cases {
 		m := newTest(t)

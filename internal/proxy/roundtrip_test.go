@@ -12,14 +12,14 @@ import (
 	"testing"
 )
 
-// Um valor mascarado seguido de pontuação ou marcação ("`User ID=x`", "(User ID=x)",
-// "**User ID=x**"): a pontuação fica fora do pseudônimo, para o modelo vê-la, e o que ele
-// escreve de volta numa ferramenta (Write) chega ao disco igual ao original, com e sem
-// streaming, com o pseudônimo partido em qualquer ponto entre dois pedaços. Antes, a crase e
-// o ")" entravam no valor: a crase sumia da vista do modelo (e voltava em dobro quando ele a
-// fechava) e um valor com ")" era descartado e ia em claro para a API.
+// A masked value followed by punctuation or markup ("`User ID=x`", "(User ID=x)", "**User ID=x**"):
+// the punctuation stays outside the pseudonym, so the model sees it, and what it writes back in a
+// tool (Write) reaches the disk equal to the original, with and without streaming, with the
+// pseudonym split at any point between two pieces. Before, the backtick and the ")" went into the
+// value: the backtick disappeared from the model's view (and came back doubled when it closed it)
+// and a value with ")" was discarded and went to the API in the clear.
 func TestRoundTripValueFollowedByPunctuation(t *testing.T) {
-	u := "svc_" + "relatorio" // valor fictício, montado por partes
+	u := "svc_" + "relatorio" // fictitious value, built from parts
 	for _, after := range []string{"`", "\"", "'", ")", "]", "}", ">", "**", "`;", "`\n", ""} {
 		original := "Initial Catalog=vendas_x9;User ID=" + u + after + " fim"
 		if after == "" {
@@ -38,7 +38,7 @@ func TestRoundTripValueFollowedByPunctuation(t *testing.T) {
 					}
 					json.Unmarshal(b, &v)
 					seen = v.Messages[0].Content
-					// o modelo escreve no arquivo exatamente o que viu
+					// the model writes to the file exactly what it saw
 					arg, _ := json.Marshal(map[string]string{"file_path": "/tmp/x.md", "content": seen})
 					if !stream {
 						w.Header().Set("content-type", "application/json")
@@ -103,8 +103,8 @@ func TestRoundTripValueFollowedByPunctuation(t *testing.T) {
 	}
 }
 
-// Name de tabela mascarado na ida: o comando que o modelo escreve com o pseudônimo (em
-// qualquer caixa do prefixo) chega à ferramenta local com o nome real.
+// A table name masked on the way out: the command the model writes with the pseudonym (in any case
+// of the prefix) reaches the local tool with the real name.
 func TestRoundTripTableName(t *testing.T) {
 	re := regexp.MustCompile(`\b[Tt]_[a-z2-7]{8}\b`)
 	for _, letterCase := range []string{"igual", "outra"} {
@@ -153,8 +153,8 @@ func TestRoundTripTableName(t *testing.T) {
 	}
 }
 
-// A volta aceita o pseudônimo de objeto em qualquer caixa (inclusive todo em
-// maiúsculas), e uma pasta volta com a grafia exata dela.
+// The return path accepts the object pseudonym in any case (including all uppercase), and a folder
+// comes back with its exact spelling.
 func TestRoundTripObjectAnyCase(t *testing.T) {
 	re := regexp.MustCompile(`\b(?i:t|bkt)_[a-zA-Z2-7]{8}\b`)
 	for _, c := range []struct{ msg, real, command string }{
@@ -168,7 +168,7 @@ func TestRoundTripObjectAnyCase(t *testing.T) {
 				pseudos = re.FindAllString(string(b), -1)
 				p := ""
 				for _, x := range pseudos {
-					p = x // o último é o do nome procurado
+					p = x // the last one is the one of the name looked for
 				}
 				switch letterCase {
 				case "maiusc":

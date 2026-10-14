@@ -2,23 +2,23 @@ package mask
 
 import "strings"
 
-// Hosts de serviço gerenciado de nuvem: o domínio é do provedor (público) e o rótulo da
-// esquerda é o nome que o cliente deu ao recurso. A forma de cada host é a documentada pelo
-// provedor; o leitor mascara só o rótulo do cliente e deixa o domínio:
+// Managed cloud service hosts: the domain belongs to the provider (public) and the leftmost label
+// is the name the client gave to the resource. The shape of each host is the one documented by the
+// provider; the reader masks only the client label and leaves the domain:
 //
-//	bd-pedidos.c9akciq32.us-east-1.rds.amazonaws.com        instância do RDS
-//	dw-vendas.abc123.sa-east-1.redshift.amazonaws.com       cluster do Redshift
-//	<bucket>.s3[.<região>|-<região>].amazonaws.com          bucket do S3 (endereço virtual)
-//	<conta>.dkr.ecr.<região>.amazonaws.com                  conta da AWS no registro do ECR
-//	<nome>.database.windows.net, <nome>.vault.azure.net ... recurso do Azure
-//	dbc-xxxx.cloud.databricks.com, adb-N.N.azuredatabricks.net  workspace do Databricks
-//	<bucket>.storage.googleapis.com, <projeto>.appspot.com  Google Cloud
+//	bd-pedidos.c9akciq32.us-east-1.rds.amazonaws.com        RDS instance
+//	dw-vendas.abc123.sa-east-1.redshift.amazonaws.com       Redshift cluster
+//	<bucket>.s3[.<region>|-<region>].amazonaws.com          S3 bucket (virtual address)
+//	<account>.dkr.ecr.<region>.amazonaws.com                AWS account in the ECR registry
+//	<name>.database.windows.net, <name>.vault.azure.net ... Azure resource
+//	dbc-xxxx.cloud.databricks.com, adb-N.N.azuredatabricks.net  Databricks workspace
+//	<bucket>.storage.googleapis.com, <project>.appspot.com  Google Cloud
 //
 // (https://docs.aws.amazon.com/general/latest/gr/rande.html,
 // https://learn.microsoft.com/azure/azure-resource-manager/management/azure-services-resource-providers,
 // https://docs.databricks.com/workspace/workspace-details.html)
 
-// sufixo do host -> tipo do rótulo do cliente (o primeiro rótulo do host)
+// host suffix -> type of the client label (the first label of the host)
 var cloudHosts = []struct{ suf, ent string }{
 	{".rds.amazonaws.com", "servidor"},
 	{".redshift.amazonaws.com", "servidor"},
@@ -26,9 +26,9 @@ var cloudHosts = []struct{ suf, ent string }{
 	{".cache.amazonaws.com", "servidor"},
 	{".es.amazonaws.com", "servidor"},
 	{".elb.amazonaws.com", "servidor"},
-	{".execute-api.", "servico"}, // <id>.execute-api.<região>.amazonaws.com
+	{".execute-api.", "servico"}, // <id>.execute-api.<region>.amazonaws.com
 	{".database.windows.net", "servidor"},
-	{".database.azure.com", "servidor"}, // <nome>.postgres|mysql.database.azure.com
+	{".database.azure.com", "servidor"}, // <name>.postgres|mysql.database.azure.com
 	{".documents.azure.com", "servidor"},
 	{".redis.cache.windows.net", "servidor"},
 	{".vault.azure.net", "servico"},
@@ -43,7 +43,7 @@ var cloudHosts = []struct{ suf, ent string }{
 	{".appspot.com", "conta_nuvem"},
 }
 
-// rótulos que fazem parte da forma do host, não do nome do cliente
+// labels that are part of the host's shape, not of the client name
 var providerLabels = map[string]bool{"s3": true, "s3-website": true, "dkr": true, "ecr": true, "www": true,
 	"postgres": true, "mysql": true, "mariadb": true, "privatelink": true}
 
@@ -64,7 +64,7 @@ func findCloudHosts(s string, add func(ObjFinding)) {
 	findECRHost(s, add)
 }
 
-// clientLabel: o primeiro rótulo do host que termina em s[i] (o começo do sufixo).
+// clientLabel: the first label of the host that ends at s[i] (the start of the suffix).
 func clientLabel(s string, i int) (int, int, bool) {
 	a := i
 	for a > 0 && i-a < 253 && (isAlnum(s[a-1]) || s[a-1] == '-' || s[a-1] == '.') {
@@ -84,14 +84,14 @@ func clientLabel(s string, i int) (int, int, bool) {
 	return a, b, true
 }
 
-// S3 com endereço virtual: <bucket>.s3.amazonaws.com, <bucket>.s3.<região>.amazonaws.com,
-// <bucket>.s3-<região>.amazonaws.com, <bucket>.s3-website[.-]<região>.amazonaws.com. O bucket
-// pode ter pontos: é tudo antes de ".s3".
+// S3 with a virtual address: <bucket>.s3.amazonaws.com, <bucket>.s3.<region>.amazonaws.com,
+// <bucket>.s3-<region>.amazonaws.com, <bucket>.s3-website[.-]<region>.amazonaws.com. The bucket may
+// have dots: it is everything before ".s3".
 func findS3Virtual(s string, add func(ObjFinding)) {
 	for i := strings.Index(s, ".s3"); i >= 0; {
 		rest := s[i+3 : min(len(s), i+64)]
 		if (strings.HasPrefix(rest, ".") || strings.HasPrefix(rest, "-")) && strings.Contains(rest, "amazonaws.com") {
-			// o host vai até amazonaws.com sem espaço nem barra
+			// the host goes up to amazonaws.com without spaces or slashes
 			if k := strings.Index(rest, "amazonaws.com"); k >= 0 && strings.IndexAny(rest[:k], " /\n\t\"'") < 0 {
 				a := i
 				for a > 0 && (isAlnum(s[a-1]) || s[a-1] == '-' || s[a-1] == '.') {
@@ -110,7 +110,7 @@ func findS3Virtual(s string, add func(ObjFinding)) {
 	}
 }
 
-// <conta>.dkr.ecr.<região>.amazonaws.com: a conta da AWS (12 dígitos).
+// <account>.dkr.ecr.<region>.amazonaws.com: the AWS account (12 digits).
 func findECRHost(s string, add func(ObjFinding)) {
 	for i := strings.Index(s, ".dkr.ecr."); i >= 0; {
 		if i >= 12 && allDigits(s[i-12:i]) && (i == 12 || !isAlnum(s[i-13])) {

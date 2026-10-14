@@ -16,21 +16,21 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/mask"
 )
 
-// Rastreamento (mask/memory_tracing.go) de ponta a ponta, com nomes inventados.
+// Tracing (mask/memory_tracing.go) end to end, with made-up names.
 
 var rePsRT = regexp.MustCompile(`(?i)\b(host|db|sch|t|c|proc|idx|usr|ns|svc|bkt|top|repo|org|pkg|dir|acc|obj)_[a-z2-7]{8}\b`)
 
-// desescapar: no JSON, a quebra de linha é "\n" (a palavra do começo de uma linha ficaria colada
-// no "n" e não seria contada).
+// unescape: in JSON, the line break is "\n" (the word at the start of a line would be glued to the
+// "n" and would not be counted).
 var unescape = strings.NewReplacer(`\n`, "\n", `\t`, "\t", `\"`, `"`, `\\`, `\`)
 
-// rtTok: ocorrências de w como palavra inteira ("_" conta como letra), no texto desescapado.
+// rtTok: occurrences of w as a whole word ("_" counts as a letter), in the unescaped text.
 func rtTok(s, w string) int {
 	s = unescape.Replace(s)
 	return len(regexp.MustCompile(`(?i)(?:^|[^A-Za-z0-9_])`+regexp.QuoteMeta(w)+`(?:$|[^A-Za-z0-9_])`).FindAllStringIndex(s, -1))
 }
 
-// rtProxy: proxy com estado em dir (reabrir o mesmo dir é um reinício) e upstream falso.
+// rtProxy: proxy with state in dir (reopening the same dir is a restart) and a fake upstream.
 func rtProxy(t *testing.T, dir string, bodies *[][]byte, resp func([]byte, http.ResponseWriter)) *httptest.Server {
 	cfg := config.Default()
 	vs, _ := mask.LoadSeen(dir + "/vistos.json")
@@ -59,12 +59,12 @@ func rtText(text string, w http.ResponseWriter) {
 
 var rtSeq int
 
-// rtTurns: user, depois pares (comando Bash, saída).
+// rtTurns: user, then pairs (Bash command, output).
 func rtTurns(request string, pairs ...[2]string) []any {
 	msgs := []any{map[string]any{"role": "user", "content": request}}
 	for i, p := range pairs {
 		rtSeq++
-		id := fmt.Sprintf("c%d", rtSeq) // único entre chamadas (o proxy liga resultado a comando pelo id)
+		id := fmt.Sprintf("c%d", rtSeq) // unique among calls (the proxy links result to command by the id)
 		_ = i
 		msgs = append(msgs,
 			map[string]any{"role": "assistant", "content": []any{map[string]any{"type": "tool_use", "id": id, "name": "Bash", "input": map[string]any{"command": p[0]}}}},
@@ -90,10 +90,10 @@ func rtSend(t *testing.T, px *httptest.Server, msgs []any) string {
 	return r.Content[0].Text
 }
 
-// O modelo cita os códigos que recebeu (um em minúsculas) e escreve SQL de sistema; o cliente
-// guarda a resposta traduzida e reenvia; 3 turnos, cada um com o proxy reiniciado, e por fim o
-// texto do modelo alterado (não bate com o registro). Nunca nome real para a API, nunca código
-// para o cliente, nunca público trocado.
+// The model cites the codes it received (one in lowercase) and writes system SQL; the client keeps
+// the translated response and resends it; 3 turns, each with the proxy restarted, and finally the
+// model text changed (does not match the record). Never a real name to the API, never a code to the
+// client, never a public name swapped.
 func TestTracingRoundTrip(t *testing.T) {
 	secrets := []string{"pagto-core-prd", "billing-v2", "NUM_CPF_TITULAR", "DES_ENDERECO_RES", "tb_pedido_cli"}
 	publicSet := []string{"OBJECT_DEPENDENCIES", "REFERENCED_OBJECT_NAME", "NIVEL", "kube-system"}
@@ -155,9 +155,9 @@ func TestTracingRoundTrip(t *testing.T) {
 	verify("texto do modelo alterado", alt)
 }
 
-// O arquivo já foi visto com cabeçalho; depois o mesmo arquivo aparece em comandos compostos
-// (uniq -c, grep com prefixo), em linhas com pipe e num dicionário Python de uma linha, com
-// nomes que o head não mostrou. A decisão é do valor, a dedução vale na mesma fonte.
+// The file was already seen with a header; then the same file appears in compound commands (uniq
+// -c, grep with a prefix), in lines with a pipe and in a one-line Python dictionary, with names
+// head did not show. The decision is about the value; the deduction applies within the same source.
 func TestTracingFormats(t *testing.T) {
 	seenOnes := []string{"NUM_CPF_TITULAR", "DES_ENDERECO_RES", "cod_raca_cor", "QTD_TENT_LOGIN"}
 	newOnes := []string{"NUM_CEL_CLI", "eml_cli_princ", "DTA_NSC_CLI", "NOM_MAE", "VLR_RENDA_MENSAL", "END_RES_CLI", "NR_CNPJ_EMPRESA", "COD_CGC_EMP"}
@@ -202,8 +202,8 @@ func TestTracingFormats(t *testing.T) {
 	}
 }
 
-// A dedução só vale com sementes provadas na mesma fonte: uma lista de pacotes de outro arquivo,
-// em que alguns nomes coincidem com tabelas já vistas, não vira lista de tabelas.
+// Deduction only applies with seeds proven in the same source: a package list from another file,
+// where some names coincide with tables already seen, does not become a table list.
 func TestTracingDeductionSameSource(t *testing.T) {
 	sql := "CREATE TABLE celery (id INT);\nCREATE TABLE redis_jobs (id INT);\nSELECT * FROM celery JOIN kombu ON 1=1;\n"
 	packages := "apache-airflow==2.9.1\ncelery==5.3.6\nkombu==5.3.4\nflask-appbuilder==4.4.1\nmarshmallow-sqlalchemy==0.28.2\nsqlalchemy-utils==0.41.2\n"
@@ -222,9 +222,9 @@ func TestTracingDeductionSameSource(t *testing.T) {
 	}
 }
 
-// O modelo escreve SQL sobre as visões de sistema; os nomes do cliente que ele cita vieram de
-// uma saída anterior. Na ida seguinte, o vocabulário público chega intacto e os nomes do cliente
-// continuam mascarados.
+// The model writes SQL over the system views; the client names it cites came from a previous
+// output. On the next request, the public vocabulary arrives intact and the client names stay
+// masked.
 func TestTracingAssistantSQL(t *testing.T) {
 	sqlLine := "WITH RECURSIVE deps AS (\n  SELECT 1 AS NIVEL, REFERENCED_DATABASE AS OBJECT_DATABASE, REFERENCED_OBJECT_NAME AS OBJECT_NAME\n  FROM SNOWFLAKE.ACCOUNT_USAGE.OBJECT_DEPENDENCIES\n  WHERE REFERENCING_DATABASE = 'DW_COMERCIAL_PRD' AND REFERENCING_SCHEMA = 'MART_VENDAS' AND REFERENCING_OBJECT_NAME = 'VW_FATURAMENTO_DIA'\n)\nSELECT NIVEL, OBJECT_NAME, t.TAG_NAME, t.TAG_VALUE FROM deps c LEFT JOIN SNOWFLAKE.ACCOUNT_USAGE.TAG_REFERENCES t ON t.OBJECT_NAME = c.OBJECT_NAME;\n"
 	msgs := rtTurns("De onde a view VW_FATURAMENTO_DIA herda a tag de owner?",
@@ -247,9 +247,9 @@ func TestTracingAssistantSQL(t *testing.T) {
 	}
 }
 
-// DESC/SHOW de um objeto de catálogo de sistema lista estrutura pública (as colunas de
-// SNOWFLAKE.ACCOUNT_USAGE.TAG_REFERENCES são documentação); o DESC de uma tabela do cliente
-// continua mascarando as colunas.
+// DESC/SHOW of a system catalog object lists public structure (the columns of
+// SNOWFLAKE.ACCOUNT_USAGE.TAG_REFERENCES are documentation); the DESC of a client table still masks
+// the columns.
 func TestTracingSystemCatalog(t *testing.T) {
 	var bodies [][]byte
 	px := rtProxy(t, t.TempDir(), &bodies, func(b []byte, w http.ResponseWriter) { rtText("ok", w) })
@@ -269,8 +269,8 @@ func TestTracingSystemCatalog(t *testing.T) {
 	}
 }
 
-// Um DESC de sistema no mesmo comando que um SELECT do cliente não torna a saída toda de
-// sistema: os nomes que o SELECT trouxe continuam mascarados.
+// A system DESC in the same command as a client SELECT does not make the whole output system: the
+// names the SELECT brought stay masked.
 func TestTracingMixedSystemCatalog(t *testing.T) {
 	output := "name             type    kind\nTABLE_NAME       VARCHAR COLUMN\nTABLE_SCHEMA     VARCHAR COLUMN\n\n" +
 		"TABLE_SCHEMA     | TABLE_NAME\ncomercial_sul_x  | clientes_vip_x\ncomercial_norte_x| metas_regionais_x\n"

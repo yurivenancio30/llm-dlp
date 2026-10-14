@@ -5,29 +5,29 @@ import (
 	"strings"
 )
 
-// Table de saída de ferramenta de linha de comando (kubectl get, oc get, docker ps, helm list,
-// crictl ps...): cabeçalho em MAIÚSCULAS com colunas separadas por 2+ espaços ou tab, e as
-// linhas alinhadas no começo de cada coluna. A coluna diz o que o valor é: NAME/NAMES é o nome
-// do objeto, NAMESPACE o namespace, IMAGE a imagem, EXTERNAL-IP o IP público da infraestrutura.
-// Nada de ferramenta específica: só a forma do cabeçalho.
+// Command-line tool output table (kubectl get, oc get, docker ps, helm list, crictl ps...): a
+// header in UPPERCASE with columns separated by 2+ spaces or a tab, and the lines aligned at the
+// start of each column. The column says what the value is: NAME/NAMES is the object name, NAMESPACE
+// the namespace, IMAGE the image, EXTERNAL-IP the public IP of the infrastructure. Nothing
+// tool-specific: only the shape of the header.
 
 var reCLIHeader = regexp.MustCompile(`^[A-Z][A-Z0-9()/_.-]*(?: [A-Z][A-Z0-9()/_.-]*)?$`)
 
-// colunas que interessam -> tipo
+// columns of interest -> type
 var cliColumns = map[string]string{"NAME": "servico", "NAMES": "servico", "NAMESPACE": "namespace", "IMAGE": "imagem",
 	"EXTERNAL-IP": "ip", "EXTERNAL IP": "ip", "PUBLIC-IP": "ip", "PUBLIC IP": "ip", "CONTAINER": "servico"}
 
 type cliColumn struct {
-	ini int // posição na linha (alinhado) ou índice (tab)
+	ini int // position in the line (aligned) or index (tab)
 	ent string
 }
 
-// a linha de comando que gerou a tabela, logo acima dela no mesmo texto (terminal colado,
-// README, doc). Sem ela a tabela não é tipada aqui: a saída de ferramenta sem o comando à vista
-// fica com a dica do comando (ver call_command.go), e "NAME STATUS AGE" solto pode ser qualquer coisa.
+// the command line that generated the table, right above it in the same text (pasted terminal,
+// README, doc). Without it the table is not typed here: tool output without the command in view
+// stays with the command hint (see call_command.go), and a loose "NAME STATUS AGE" can be anything.
 var reCLICommand = regexp.MustCompile(`\b(?:kubectl|oc|docker|podman|nerdctl|crictl|helm|minikube|kind|k3s|microk8s|eksctl|az|gcloud|aws)[ \t]+[a-z]`)
 
-// get ns: a coluna NAME é o namespace
+// get ns: the NAME column is the namespace
 var reNSCommand = regexp.MustCompile(`\bget[ \t]+(?:ns|namespaces?)\b`)
 
 func findCLITable(s string, add func(ObjFinding)) {
@@ -67,7 +67,7 @@ func findCLITable(s string, add func(ObjFinding)) {
 	}
 }
 
-// cliHeader: as colunas de interesse, se a linha é um cabeçalho de tabela de saída.
+// cliHeader: the columns of interest, if the line is the header of an output table.
 func cliHeader(l string) ([]cliColumn, bool) {
 	tab := strings.Contains(l, "\t")
 	var names []string
@@ -117,7 +117,7 @@ func cliHeader(l string) ([]cliColumn, bool) {
 }
 
 func cliLine2(s string, base int, l string, cols []cliColumn, tab bool, add func(ObjFinding)) {
-	var fields [][2]int // início e fim de cada campo na linha
+	var fields [][2]int // start and end of each field in the line
 	if tab {
 		k := 0
 		for _, p := range strings.Split(l, "\t") {
@@ -138,7 +138,7 @@ func cliLine2(s string, base int, l string, cols []cliColumn, tab bool, add func
 		} else {
 			i = c.ini
 			if i >= len(l) || l[i] == ' ' || i > 0 && l[i-1] != ' ' {
-				continue // linha fora do alinhamento: não é linha da tabela
+				continue // a line out of alignment: not a table line
 			}
 			j = i
 			for j < len(l) && l[j] != ' ' {
@@ -161,7 +161,7 @@ func cliLine2(s string, base int, l string, cols []cliColumn, tab bool, add func
 				a += len(p) + 1
 			}
 		default:
-			// pod/nome, deployment.apps/nome: o nome é depois da barra; NAMES do docker: a,b
+			// pod/name, deployment.apps/name: the name is after the slash; docker NAMES: a,b
 			for _, p0 := range strings.Split(v, ",") {
 				x, p := a, p0
 				if k := strings.LastIndexByte(p0, '/'); k >= 0 {
@@ -174,9 +174,9 @@ func cliLine2(s string, base int, l string, cols []cliColumn, tab bool, add func
 	}
 }
 
-// IP público que o contexto diz ser da infraestrutura: o endereço do balanceador de um
-// Service (status.loadBalancer.ingress[].ip) e o endereço de um nó ({"type": "ExternalIP",
-// "address": ...}). Fora desse contexto o IP público fica (opção ip_publico).
+// A public IP the context says belongs to the infrastructure: the address of a Service's load
+// balancer (status.loadBalancer.ingress[].ip) and the address of a node ({"type": "ExternalIP",
+// "address": ...}). Outside that context the public IP stays (public_ip option).
 var (
 	reIPIngress  = regexp.MustCompile(`(?s)loadBalancer:\s*\n\s*ingress:\s*\n((?:[ \t]*-?[ \t]*(?:ip|hostname):[ \t]*\S+[ \t]*\n?)+)`)
 	reIPItem     = regexp.MustCompile(`\bip:[ \t]*(\d{1,3}(?:\.\d{1,3}){3})\b`)

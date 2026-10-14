@@ -17,9 +17,9 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/mask"
 )
 
-// Imagem e PDF que não dá para verificar: não saem, e a conversa continua.
+// Image and PDF that cannot be checked: they do not go out, and the conversation goes on.
 
-// PNG de 1x1 ponto
+// 1x1 PNG
 const minimalPNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
 
 type safeLog struct {
@@ -39,8 +39,8 @@ func (l *safeLog) String() string {
 	return l.b.String()
 }
 
-// buildMedia: proxy com a configuração de OCR ajustada por f. Devolve os corpos que chegam à
-// API e o log.
+// buildMedia: proxy with the OCR configuration adjusted by f. Returns the bodies that reach the API
+// and the log.
 func buildMedia(t *testing.T, f func(*config.Config)) (*httptest.Server, *[][]byte, *safeLog) {
 	t.Helper()
 	cfg := config.Default()
@@ -63,7 +63,7 @@ func buildMedia(t *testing.T, f func(*config.Config)) (*httptest.Server, *[][]by
 	return px, bodies, lg
 }
 
-// conversationWithFile: uma leitura de arquivo cujo resultado é o bloco dado (imagem ou PDF).
+// conversationWithFile: a file read whose result is the given block (image or PDF).
 func conversationWithFile(block map[string]any) []byte {
 	b, _ := json.Marshal(map[string]any{"model": "x", "max_tokens": 10, "messages": []any{
 		msg("user", "veja o arquivo"),
@@ -78,7 +78,7 @@ func imageBlock(data string) map[string]any {
 		"source": map[string]any{"type": "base64", "media_type": "image/png", "data": data}}
 }
 
-// whatWentOut: o conteúdo do resultado da ferramenta, como a API o recebeu.
+// whatWentOut: the content of the tool result, as the API received it.
 func whatWentOut(t *testing.T, body []byte) []map[string]any {
 	t.Helper()
 	var v struct {
@@ -109,8 +109,9 @@ func post(t *testing.T, px *httptest.Server, body []byte) int {
 	return resp.StatusCode
 }
 
-// Sem o OCR instalado, a imagem não sai e a requisição não é recusada: no lugar vai um aviso com
-// o motivo e como instalar. Recusada, a conversa ficava presa (a imagem fica no histórico).
+// Without OCR installed, the image does not go out and the request is not refused: a notice with
+// the reason and how to install goes in its place. When it was refused, the conversation got stuck
+// (the image stays in the history).
 func TestImageWithoutOCRDoesNotBlockConversation(t *testing.T) {
 	px, bodies, lg := buildMedia(t, func(c *config.Config) {
 		c.OCR.Tesseract = filepath.Join(t.TempDir(), "tesseract-que-nao-existe")
@@ -147,8 +148,8 @@ func TestImageWithoutOCRDoesNotBlockConversation(t *testing.T) {
 	}
 }
 
-// Arquivo ilegível: também é retirado, e o aviso não manda instalar o que já está instalado nem
-// leva o detalhe do erro (que fica no log).
+// Unreadable file: also removed, and the notice neither says to install what is already installed
+// nor carries the error detail (which stays in the log).
 func TestUnreadableImageIsRemoved(t *testing.T) {
 	px, bodies, lg := buildMedia(t, func(c *config.Config) {})
 	junk := base64.StdEncoding.EncodeToString([]byte("isto não é uma imagem"))
@@ -167,7 +168,7 @@ func TestUnreadableImageIsRemoved(t *testing.T) {
 	}
 }
 
-// ocr.mode = block: imagem e PDF não saem, e a conversa continua.
+// ocr.mode = block: image and PDF do not go out, and the conversation goes on.
 func TestMediaBlockedByConfig(t *testing.T) {
 	px, bodies, _ := buildMedia(t, func(c *config.Config) { c.OCR.Mode = "block" })
 	pdf := map[string]any{"type": "document", "source": map[string]any{"type": "base64", "media_type": "application/pdf", "data": minimalPNG}}
@@ -183,7 +184,8 @@ func TestMediaBlockedByConfig(t *testing.T) {
 	}
 }
 
-// O erro da API vai para o log com o tipo e a mensagem (é o que distingue um 429 de outro).
+// The API error goes to the log with the type and the message (that is what tells one 429 from
+// another).
 func TestAPIErrorInLog(t *testing.T) {
 	lg := &safeLog{}
 	cfg := config.Default()

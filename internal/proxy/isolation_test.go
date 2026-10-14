@@ -15,11 +15,13 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/mask"
 )
 
-// O suporte a outras APIs (Gemini, OpenAI) não muda nada no caminho do Claude Code: a mesma
-// requisição sai byte a byte igual com ou sem os provedores, o que é só desses formatos não vale
-// para a Anthropic, e nenhuma requisição ou resposta malformada desses formatos derruba o proxy.
+// Support for other APIs (Gemini, OpenAI) changes nothing in the Claude Code path: the same request
+// goes out byte for byte equal with or without the providers, what belongs only to those formats
+// does not apply to Anthropic, and no malformed request or response of those formats brings the
+// proxy down.
 
-// buildClaude: proxy com a API da Anthropic falsa (resp escreve a resposta) e os provedores dados.
+// buildClaude: proxy with the fake Anthropic API (resp writes the response) and the given
+// providers.
 func buildClaude(t *testing.T, provs map[string]config.Provider, resp func(body []byte, w http.ResponseWriter)) (*httptest.Server, *[][]byte) {
 	t.Helper()
 	cfg := config.Default()
@@ -46,9 +48,9 @@ func claudeResponse(w http.ResponseWriter, content ...any) {
 	json.NewEncoder(w).Encode(map[string]any{"type": "message", "role": "assistant", "content": content})
 }
 
-// claudeConversation: uma conversa do Claude Code com dado sensível nos lugares em que o código dos
-// outros formatos poderia encostar: um campo "format" na entrada de uma ferramenta, uma
-// ferramenta chamada web_fetch (nome de ferramenta de internet no Gemini CLI) e um schema.
+// claudeConversation: a Claude Code conversation with sensitive data in the places where the code
+// of the other formats could touch it: a "format" field in a tool input, a tool called web_fetch
+// (an internet tool name in Gemini CLI) and a schema.
 func claudeConversation() []byte {
 	b, _ := json.Marshal(map[string]any{"model": "claude", "max_tokens": 100,
 		"system": []any{map[string]any{"type": "text", "text": "You are Claude Code, Anthropic's official CLI for Claude."}},
@@ -76,14 +78,14 @@ func TestClaudeSameWithOrWithoutOtherAPIs(t *testing.T) {
 	if !bytes.Equal(a, b) {
 		t.Errorf("a requisição do Claude mudou com os provedores ligados:\n sem: %s\n com: %s", a, b)
 	}
-	// campos e ferramentas que só os outros formatos deixam intactos continuam mascarados no Claude
+	// fields and tools that only the other formats leave intact stay masked in Claude
 	if bytes.Contains(a, []byte(oaEmail)) || bytes.Contains(a, []byte(oaIP)) {
 		t.Errorf("valor real chegou à API da Anthropic: %s", a)
 	}
 }
 
-// Na volta do Claude, web_fetch é uma ferramenta como outra qualquer (a entrada volta real); só
-// WebFetch, a do Claude Code, segue com os pseudônimos.
+// On Claude's return path, web_fetch is a tool like any other (the input comes back real); only
+// WebFetch, Claude Code's own, keeps the pseudonyms.
 func TestClaudeReturnsWithoutOthersTools(t *testing.T) {
 	px, _ := buildClaude(t, config.DefaultProviders(), func(body []byte, w http.ResponseWriter) {
 		pse := rePseEmail.FindString(string(body))
@@ -109,7 +111,7 @@ func TestClaudeReturnsWithoutOthersTools(t *testing.T) {
 	}
 }
 
-// variacoes: cópias de v com um nó trocado por um valor estranho, um nó e um valor de cada vez.
+// variations: copies of v with one node replaced by an odd value, one node and one value at a time.
 func variations(t *testing.T, v any) [][]byte {
 	t.Helper()
 	orig, _ := json.Marshal(v)
@@ -156,8 +158,8 @@ func variations(t *testing.T, v any) [][]byte {
 	return out
 }
 
-// Requisições e respostas do Gemini e da OpenAI com qualquer nó trocado por um valor estranho:
-// o proxy nunca cai (responde sempre), e o Claude continua funcionando depois.
+// Gemini and OpenAI requests and responses with any node replaced by an odd value: the proxy never
+// goes down (it always answers), and Claude keeps working afterwards.
 func TestMalformedOtherAPIsDoNotBreakClaude(t *testing.T) {
 	cfg := config.Default()
 	m, err := mask.NewMasker(cfg, testKey, nil, nil)
@@ -244,8 +246,8 @@ func TestMalformedOtherAPIsDoNotBreakClaude(t *testing.T) {
 	t.Logf("%d requisições e respostas malformadas, nenhuma derrubou o proxy", n)
 }
 
-// O streaming malformado (pedaços que não são JSON, campos com o tipo errado, corte no meio)
-// também nunca derruba o proxy.
+// Malformed streaming (pieces that are not JSON, fields with the wrong type, a cut in the middle)
+// also never brings the proxy down.
 func TestOtherAPIsMalformedStreaming(t *testing.T) {
 	cfg := config.Default()
 	m, err := mask.NewMasker(cfg, testKey, nil, nil)

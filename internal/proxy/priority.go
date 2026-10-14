@@ -7,28 +7,28 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/mask"
 )
 
-// Anterioridade (ver mask/memory_tracing.go): o modelo só conhece o cliente pelo que o proxy deixa
-// passar. Uma palavra que o modelo escreveu (resposta, entrada de ferramenta) antes de qualquer
-// dado trazê-la é conhecimento dele: vocabulário público (as colunas de
-// SNOWFLAKE.ACCOUNT_USAGE.TAG_REFERENCES que ele usou numa query, os pacotes de um pip install).
-// O que o usuário escreve, o system e as ferramentas trazem a palavra só de mencioná-la (o nome
-// que o usuário digitou e o modelo repete é do cliente). A saída de uma ferramenta (arquivo,
-// comando) só a traz se a decidiu como nome: um changelog público que cita tag_name não torna
-// tag_name do cliente. O que a saída mostrou sem decidir já foi em claro para a API quando saiu
-// (e o que saiu não é reescrito: enviados.log); o modelo que repete a palavra depois não
-// revela nada novo. Word que o proxy traduziu de um pseudônimo nunca conta (veio do
-// cliente). Saída sem decisões calculadas (da internet) vale por inteiro.
+// Priority (see mask/memory_tracing.go): the model only knows the client through what the proxy
+// lets through. A word the model wrote (response, tool input) before any data brought it is its own
+// knowledge: public vocabulary (the columns of SNOWFLAKE.ACCOUNT_USAGE.TAG_REFERENCES it used in a
+// query, the packages of a pip install). What the user writes, the system and the tools bring the
+// word just by mentioning it (the name the user typed and the model repeats belongs to the client).
+// A tool output (file, command) only brings it if it decided it as a name: a public changelog that
+// cites tag_name does not make tag_name the client's. What the output showed without deciding
+// already went to the API in the clear when it went out (and what went out is not rewritten:
+// enviados.log); the model that repeats the word later reveals nothing new. A word the proxy
+// translated from a pseudonym never counts (it came from the client). Output without computed
+// decisions (from the internet) counts in full.
 
 var rePrevWord = regexp.MustCompile(`[A-Za-z_][A-Za-z0-9_$]*(?:-[A-Za-z0-9_]+)*`)
 
 type priority struct {
 	m          *mask.Masker
-	decid      map[string][]string // os nomes que cada saída de ferramenta decidiu por si
-	data       map[string]bool     // já apareceu num dado
-	model      map[string]bool     // apareceu primeiro num texto do modelo
-	translates map[string]bool     // o proxy traduziu (nunca é do modelo)
+	decid      map[string][]string // the names each tool output decided by itself
+	data       map[string]bool     // already appeared in data
+	model      map[string]bool     // appeared first in a model text
+	translates map[string]bool     // the proxy translated it (never the model's)
 	inData     bool
-	output     bool // dentro de um resultado de ferramenta (arquivo, comando)
+	output     bool // inside a tool result (file, command)
 }
 
 func (a *priority) text(s string) {
@@ -61,7 +61,7 @@ func (a *priority) text(s string) {
 	}
 }
 
-// tudo: as strings de v (nunca as chaves, nem os blocos assinados de raciocínio).
+// all: the strings of v (never the keys, nor the signed reasoning blocks).
 func (a *priority) all(v any) {
 	switch x := v.(type) {
 	case string:
@@ -80,8 +80,8 @@ func (a *priority) all(v any) {
 			a.output = true
 			defer func() { a.output = before }()
 		}
-		// resultado de ferramenta que vem dentro da mensagem do modelo (busca na web, execução de
-		// código, MCP do lado da API): o conteúdo é dado, não escrita do modelo
+		// a tool result that comes inside the model message (web search, code execution, API-side
+		// MCP): the content is data, not model writing
 		if strings.HasSuffix(t, "_tool_result") || t == "container_upload" {
 			before := a.inData
 			a.inData = true
@@ -96,8 +96,8 @@ func (a *priority) all(v any) {
 	}
 }
 
-// modelPublics: as palavras que o modelo escreveu antes de um dado trazê-las, nesta conversa
-// (decid: os nomes que cada saída de ferramenta decidiu; nil = toda saída vale por inteiro).
+// modelPublics: the words the model wrote before data brought them, in this conversation (decid:
+// the names each tool output decided; nil = every output counts in full).
 func modelPublics(req any, m *mask.Masker, decid map[string][]string) map[string]bool {
 	r, _ := req.(map[string]any)
 	if r == nil || m == nil {

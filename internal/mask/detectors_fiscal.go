@@ -6,24 +6,24 @@ import (
 	"strings"
 )
 
-// Key de acesso de documento fiscal eletrônico e Pix copia e cola: os dois levam um
-// documento ou uma chave de alguém dentro, e os dois se conferem pelo próprio dado.
+// Electronic fiscal document access key and Pix copy-and-paste: both carry someone's document or
+// key inside, and both are checked by the data itself.
 
-// reDFeKey: chave de acesso (NF-e, NFC-e, CT-e, MDF-e), 44 posições seguidas ou em 11 grupos
-// de 4 (a forma impressa no DANFE); no XML, o atributo Id é "NFe" + a chave (MOC, campo A03).
-// Com o CNPJ alfanumérico, as posições dele podem ter letras.
+// reDFeKey: access key (NF-e, NFC-e, CT-e, MDF-e), 44 positions in a row or in 11 groups of 4 (the
+// form printed on the DANFE); in the XML, the Id attribute is "NFe" + the key (MOC, field A03).
+// With the alphanumeric CNPJ, its positions may have letters.
 var reDFeKey = regexp.MustCompile(`(?:\bNFe|\b)([0-9A-Z]{4}(?: ?[0-9A-Z]{4}){10})\b`)
 
-// códigos de UF do IBGE (servicodados.ibge.gov.br/api/v1/localidades/estados)
+// IBGE state codes (servicodados.ibge.gov.br/api/v1/localidades/estados)
 var ufIBGE = setOf("11", "12", "13", "14", "15", "16", "17", "21", "22", "23", "24", "25", "26", "27",
 	"28", "29", "31", "32", "33", "35", "41", "42", "43", "50", "51", "52", "53")
 
-// ValidDFeKey confere a chave de acesso pelo Manual de Orientação do Contribuinte da NF-e
-// (MOC 7.0, Anexo I, e as regras de validação da chave referenciada): cUF(2) AAMM(4)
-// CNPJ/CPF(14) modelo(2) série(3) número(9) tpEmis(1) código(8) DV(1). UF do IBGE, mês de 01 a
-// 12, ano desde 06 (início da NF-e), CNPJ ou CPF do emitente válido, e o DV pelo módulo 11 (pesos
-// 2 a 9 da direita para a esquerda; resto 0 ou 1, DV 0). Cada caractere vale o código ASCII
-// menos 48, como no CNPJ alfanumérico (Nota Técnica Conjunta 2025.001): para dígitos, o próprio.
+// ValidDFeKey checks the access key by the NF-e Taxpayer Guidance Manual (MOC 7.0, Annex I, and the
+// validation rules of the referenced key): cUF(2) AAMM(4) CNPJ/CPF(14) model(2) series(3) number(9)
+// tpEmis(1) code(8) check digit(1). IBGE state, month from 01 to 12, year since 06 (start of NF-e),
+// valid issuer CNPJ or CPF, and the check digit by modulo 11 (weights 2 to 9 from right to left;
+// remainder 0 or 1, check digit 0). Each character is worth its ASCII code minus 48, as in the
+// alphanumeric CNPJ (Joint Technical Note 2025.001): for digits, the digit itself.
 func ValidDFeKey(s string) bool {
 	s = strings.ReplaceAll(s, " ", "")
 	if len(s) != 44 || digitsOnly(s[:6]) != s[:6] || digitsOnly(s[20:]) != s[20:] {
@@ -58,10 +58,10 @@ func findDFeKey(s string, add func(ini, end int, typ string)) {
 	}
 }
 
-// findBRCode: o Pix copia e cola (BR Code). Campos ID(2) + tamanho(2) + valor, começando por
-// "000201" e terminando no CRC16 (ID 63, 4 hexadecimais), com o GUI "br.gov.bcb.pix" num dos
-// campos 26 a 51 (Manual de Padrões para Iniciação do Pix, BCB). Leva a chave Pix, o nome e a
-// cidade de quem recebe: o código inteiro vira um pseudônimo.
+// findBRCode: Pix copy-and-paste (BR Code). Fields ID(2) + length(2) + value, starting with
+// "000201" and ending with the CRC16 (ID 63, 4 hexadecimal digits), with the GUI "br.gov.bcb.pix"
+// in one of the fields 26 to 51 (Pix Initiation Standards Manual, BCB). It carries the Pix key, the
+// name and the city of the receiver: the whole code becomes one pseudonym.
 func findBRCode(s string, add func(ini, end int, typ string)) {
 	for i := 0; ; {
 		j := strings.Index(s[i:], "000201")
@@ -104,7 +104,7 @@ func brCodeIn(s string, i int) (int, bool) {
 	return 0, false
 }
 
-// crc16CCITT: polinômio 0x1021, valor inicial 0xFFFF (o CRC do BR Code).
+// crc16CCITT: polynomial 0x1021, initial value 0xFFFF (the BR Code CRC).
 func crc16CCITT(s string) uint16 {
 	crc := uint16(0xFFFF)
 	for i := 0; i < len(s); i++ {

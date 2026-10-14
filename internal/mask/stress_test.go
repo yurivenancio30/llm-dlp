@@ -12,11 +12,11 @@ import (
 	"time"
 )
 
-// Testes de carga (só com LLM_DLP_ESTRESSE=1).
+// Load tests (only with LLM_DLP_STRESS=1).
 
-// Testes de estresse: pesados, rodam só com LLM_DLP_ESTRESSE=1.
+// Stress tests: heavy, they only run with LLM_DLP_STRESS=1.
 //
-//	LLM_DLP_ESTRESSE=1 go test ./internal/mask -run Estresse -v -timeout 60m
+//	LLM_DLP_STRESS=1 go test ./internal/mask -run Stress -v -timeout 60m
 func stressOnly(t *testing.T) {
 	if os.Getenv("LLM_DLP_ESTRESSE") == "" {
 		t.Skip("defina LLM_DLP_ESTRESSE=1 para rodar")
@@ -30,7 +30,7 @@ func heapMB() float64 {
 	return float64(ms.HeapAlloc) / (1 << 20)
 }
 
-// texto variado: log denso, código, caminhos/URLs e prosa com dados, sempre distinto
+// varied text: dense log, code, paths/URLs and prose with data, always distinct
 func variedText(i int) string {
 	switch i % 4 {
 	case 0:
@@ -49,7 +49,7 @@ func variedText(i int) string {
 	return b.String()
 }
 
-// 1) Memória: 1,2 GB de texto distinto, em paralelo. O heap tem que estabilizar.
+// 1) Memory: 1.2 GB of distinct text, in parallel. The heap has to stabilize.
 func TestStressMemoryText(t *testing.T) {
 	stressOnly(t)
 	vs, _ := LoadSeen(t.TempDir() + "/v.json")
@@ -110,7 +110,7 @@ func TestStressMemoryText(t *testing.T) {
 	}
 }
 
-// 2) Muitos valores aprendidos: o tempo por trecho novo não pode crescer com a quantidade.
+// 2) Many learned values: the time per new snippet cannot grow with the amount.
 func TestStressLearnedValues(t *testing.T) {
 	stressOnly(t)
 	dir := t.TempDir()
@@ -119,7 +119,7 @@ func TestStressLearnedValues(t *testing.T) {
 	measure := func() time.Duration {
 		var ts []time.Duration
 		for i := 0; i < 60; i++ {
-			s := variedText(1_000_000 + rand.Intn(1_000_000)*4 + 1) // código comum, sempre novo
+			s := variedText(1_000_000 + rand.Intn(1_000_000)*4 + 1) // common code, always new
 			t0 := time.Now()
 			m.Mask(s)
 			ts = append(ts, time.Since(t0))
@@ -154,7 +154,7 @@ func TestStressLearnedValues(t *testing.T) {
 	}
 }
 
-// 3) Entradas patológicas: 2 MB de cada. Nenhuma pode travar.
+// 3) Pathological inputs: 2 MB of each. None may hang.
 func TestStressPathological(t *testing.T) {
 	stressOnly(t)
 	rep := func(s string) string { return strings.Repeat(s, (2<<20)/len(s)+1)[:2<<20] }
@@ -189,7 +189,7 @@ func TestStressPathological(t *testing.T) {
 		vs, _ := LoadSeen(t.TempDir() + "/v.json")
 		base := newTest(t)
 		m, _ := NewMasker(base.cfg, testKey, base.people, vs)
-		m.Mask("DB_PASSWORD=Ficticia@2024 e RG: 12.345.678-9") // com valores já aprendidos
+		m.Mask("DB_PASSWORD=Ficticia@2024 e RG: 12.345.678-9") // with values already learned
 		t0 := time.Now()
 		out, ents := m.Mask(c.text)
 		d := time.Since(t0)
@@ -202,7 +202,7 @@ func TestStressPathological(t *testing.T) {
 	}
 }
 
-// 4) Concorrência com aprendizado e teto ao mesmo tempo: sem corrida, sem travar, resultado estável.
+// 4) Concurrency with learning and cap at the same time: no race, no hang, stable result.
 func TestStressConcurrency(t *testing.T) {
 	stressOnly(t)
 	vs, _ := LoadSeen(t.TempDir() + "/v.json")

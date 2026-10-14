@@ -9,25 +9,24 @@ import (
 	"unicode"
 )
 
-// Gerador de variações aplicado aos casos de cada leitor. Cada caso é um
-// modelo com lugares para nomes («1» «2» «3» = nome simples, «Q» = nome qualificado) e para
-// comentário («c»). O gerador muda UMA dimensão de cada vez a partir do caso base: caixa,
-// espaços/tabs/quebras entre tokens, citação do nome, comentário no meio, pontuação colada no
-// fim, nome com 2, 3 e 4 partes, nome com $ # - . e acento, e vários itens na mesma linha.
-// Confere as duas coisas: todo nome mascarado, e nenhuma palavra do modelo mascarada a mais.
-// Todos os nomes são fictícios.
+// Variation generator applied to each reader's cases. Each case is a template with slots for names
+// («1» «2» «3» = simple name, «Q» = qualified name) and for a comment («c»). The generator changes
+// ONE dimension at a time from the base case: case, spaces/tabs/breaks between tokens, name
+// quoting, comment in the middle, punctuation glued at the end, name with 2, 3 and 4 parts, name
+// with $ # - . and accents, and several items on the same line. It checks both things: every name
+// masked, and no extra template word masked. All names are made up.
 
 type varCase struct {
 	reader, model string
-	spc           []string // separadores alternativos para os espaços do modelo
-	quoted        []string // citações do nome: `"` `'` "`" "[]"
-	with          []string // comentários no lugar de «c»
-	punct         bool     // pontuação colada no fim
-	parts         bool     // «Q» com 2, 3 e 4 partes
-	chars         []string // variantes de nome (no lugar de «1»)
-	several       string   // separador para repetir o item na mesma linha ("" = não)
-	caseless      bool     // a caixa do modelo não pode mudar (formato sensível à caixa)
-	base          []string // nomes base próprios (nome DNS não tem "_")
+	spc           []string // alternative separators for the template's spaces
+	quoted        []string // name quoting: `"` `'` "`" "[]"
+	with          []string // comments in place of «c»
+	punct         bool     // punctuation glued at the end
+	parts         bool     // «Q» with 2, 3 and 4 parts
+	chars         []string // name variants (in place of «1»)
+	several       string   // separator to repeat the item on the same line ("" = no)
+	caseless      bool     // the template's case cannot change (case-sensitive format)
+	base          []string // own base names (a DNS name has no "_")
 }
 
 var (
@@ -50,45 +49,45 @@ var varCases = []varCase{
 	{reader: "sql", model: "TRUNCATE TABLE «Q»", spc: varSQLSpace, quoted: varQuotedSQL, punct: true, parts: true, chars: varSQLNames, several: "; "},
 	{reader: "sql", model: "MERGE INTO «1» USING «2» ON «1».id = «2».id", spc: varSQLSpace, quoted: varQuotedSQL, chars: varSQLNames},
 	{reader: "sql", model: "EXEC «Q» @a = 1", spc: varLineSpace, quoted: []string{"[]"}, parts: true, chars: varSQLNames, several: "; "},
-	// mensagens de erro
+	// error messages
 	{reader: "erro", model: `ERROR: relation "«Q»" does not exist`, punct: true, parts: true, chars: varSQLNames},
 	{reader: "erro", model: `Invalid object name '«Q»'`, punct: true, parts: true, chars: varSQLNames},
 	{reader: "erro", model: `Table '«Q»' doesn't exist`, punct: true, parts: true, chars: varSQLNames},
-	// strings de conexão e URIs
+	// connection strings and URIs
 	{reader: "conexão", model: "Server=«1»;Database=«2»;User Id=«3»;", spc: []string{" "}, chars: []string{"srv-ped-01", "srv_ped01"}, several: " "},
 	{reader: "conexão", model: `String url = "jdbc:sqlserver://«1»:1433;databaseName=«2»;encrypt=true";`, spc: varLineSpace, punct: true, chars: []string{"srv-ped-01"}},
 	{reader: "conexão", model: `props.put("url", "jdbc:sqlserver://«1»;databaseName=«2»");`, spc: varLineSpace, chars: []string{"srv-ped-01"}},
 	{reader: "conexão", model: "postgresql://«3»@«1»:5432/«2»", punct: true, chars: []string{"srv-ped-01"}, several: " "},
 	{reader: "conexão", model: "urn:li:dataset:(urn:li:dataPlatform:mssql,«Q»,PROD)", parts: true, caseless: true, punct: true, several: " "},
-	// tabela (resultado de consulta)
+	// table (query result)
 	{reader: "tabela", model: "table_schema,table_name\n«1»,«2»\n«1»,«3»\n", spc: []string{"\t", ";", "|", " , "}, quoted: []string{`"`}, chars: varSQLNames},
 	// chave-valor
 	{reader: "chave-valor", model: "database: «1»«c»\nschema: «2»\ntable: «3»\n", spc: varLineSpace, quoted: []string{`"`, "'"}, with: []string{"  # obs", " # obs: x"}, chars: varNames},
 	{reader: "chave-valor", model: "[banco]\nhost = «1»«c»\ndatabase = «2»\n", spc: varLineSpace, with: []string{" ; obs", " # obs"}, chars: []string{"srv-ped-01"}},
 	{reader: "chave-valor", model: "database=«1» schema=«2» table=«3»", quoted: []string{`"`, "'"}, chars: varNames},
 	{reader: "chave-valor", model: `{"database": "«1»", "schema": "«2»", "table": "«3»"}`, spc: varLineSpace, chars: varNames},
-	// endereços e caminhos
+	// addresses and paths
 	{reader: "endereço", model: "veja http://«1»:8080/api/v1", punct: true, chars: []string{"srv-ped-01"}, several: " e "},
 	{reader: "caminho", model: "lendo /srv/«1»/«2»/saida.csv", caseless: true, punct: true, chars: []string{"ped-hist-01", "ped$hist01"}, several: " e "},
-	// código
+	// code
 	{reader: "código-chamada", model: `df = spark.table("«Q»")«c»`, with: []string{"  # obs", " // obs", " /* obs */"}, caseless: true, spc: varLineSpace, quoted: []string{"'"}, parts: true, chars: varSQLNames, several: "; "},
 	{reader: "código-chamada", model: `df = pd.read_sql_table("«1»", con, schema="«2»")`, caseless: true, spc: varLineSpace, chars: varSQLNames},
-	// esquema (nome + tipo de dado)
+	// schema (name + data type)
 	{reader: "esquema", model: "root\n |-- «1»: string (nullable = true)\n |-- «2»: integer (nullable = true)\n", caseless: true, chars: varSQLNames},
 	{reader: "esquema", model: "«1»    object\n«2»     int64\n«3»    float64\ndtype: object\n", caseless: true, chars: varSQLNames},
-	// devops: manifesto, terraform, nuvem, DSN, DNS do Kubernetes, git
+	// devops: manifest, terraform, cloud, DSN, Kubernetes DNS, git
 	{reader: "devops-yaml", model: "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: «1»\n  namespace: «2»\n", spc: []string{"   "}, caseless: true, quoted: []string{`"`, "'"}, chars: []string{"svc-ped-01"}},
 	{reader: "terraform", model: "resource \"aws_s3_bucket\" \"dados\" {\n  bucket = \"«1»\"\n}\n", spc: []string{"\t"}, caseless: true, chars: []string{"bkt-ped-01"}},
 	{reader: "url-nuvem", model: "copiando para s3://«1»/«2»/arquivo.parquet", caseless: true, punct: true, chars: []string{"bkt-ped-01"}, several: " e "},
 	{reader: "dsn", model: `dsn := "«3»:senha@tcp(«1»:3306)/«2»"`, caseless: true, spc: varLineSpace, chars: []string{"srv-ped-01"}},
 	{reader: "k8s-dns", model: "curl http://«1».«2».svc.cluster.local:8080/saude", caseless: true, punct: true, chars: []string{"svc-ped-01"}, several: " && ", base: []string{"xq-pedidos01", "xq-clientes02"}},
 	{reader: "git", model: "git clone git@«1»:«2»/«3».git", caseless: true, punct: true, chars: []string{"srv-ped-01"}, several: " && ", base: []string{"xq-git01", "xq-org02", "xq-repo03"}},
-	// linha de comando
+	// command line
 	{reader: "linha-de-comando", model: "psql -h «1» -d «2» -U «3»", caseless: true, spc: varLineSpace, quoted: []string{`"`, "'"}, chars: []string{"srv-ped-01"}, several: " && "},
 	{reader: "linha-de-comando", model: "kubectl -n «1» get pods", spc: varLineSpace, caseless: true, chars: []string{"ns-ped-01"}, several: " && "},
 }
 
-// nomes base de cada lugar (fictícios)
+// base names for each slot (made up)
 var varBase = map[string]string{"1": "xq_pedidos01", "2": "xq_clientes02", "3": "xq_itens03"}
 
 var varParts = []string{"xq_srv01", "xq_banco01", "xq_esq01", "xq_tab01"}
@@ -99,7 +98,7 @@ type varText struct {
 	stays     []string
 }
 
-// citar põe o nome entre a citação (cada parte, num nome qualificado, se byPart).
+// cite puts the name inside the quoting (each part, in a qualified name, if byPart).
 func cite(n, quoted string, byPart bool) string {
 	if quoted == "" {
 		return n
@@ -134,7 +133,7 @@ func varLetterCase(s string, mode int) string {
 			}
 		}
 		return string(r)
-	case 4: // cada palavra com inicial maiúscula: Select, Database
+	case 4: // each word with an uppercase initial: Select, Database
 		r := []rune(strings.ToLower(s))
 		for i := range r {
 			if i == 0 || !unicode.IsLetter(r[i-1]) {
@@ -151,8 +150,8 @@ var (
 	reQuotedPlace = regexp.MustCompile(`"(«[123Q]»)"`)
 )
 
-// montar: o texto do caso com as escolhas dadas. Devolve também os nomes e as palavras do
-// modelo que têm que ficar.
+// build: the case text with the given choices. Also returns the names and the template words that
+// have to stay.
 func build(c varCase, letterCase int, spc, quoted, with string, parts int, n1 string, several bool) varText {
 	mod := c.model
 	if strings.Contains(mod, "«c»") {
@@ -162,7 +161,7 @@ func build(c varCase, letterCase int, spc, quoted, with string, parts int, n1 st
 		mod = strings.ReplaceAll(mod, "«c»", with)
 	}
 	if !c.caseless {
-		// muda a caixa só fora dos lugares
+		// changes the case only outside the slots
 		var b strings.Builder
 		last := 0
 		for _, ix := range rePlace.FindAllStringIndex(mod, -1) {
@@ -175,7 +174,7 @@ func build(c varCase, letterCase int, spc, quoted, with string, parts int, n1 st
 	}
 	if spc != " " && spc != "" {
 		mod = strings.ReplaceAll(mod, " ", spc)
-		if c.reader == "tabela" { // na tabela, o separador de colunas
+		if c.reader == "tabela" { // in the table, the column separator
 			mod = strings.ReplaceAll(c.model, ",", spc)
 		}
 	}
@@ -194,7 +193,8 @@ func build(c varCase, letterCase int, spc, quoted, with string, parts int, n1 st
 	if parts > 1 {
 		q = strings.Join(append(append([]string{}, varParts[4-parts:3]...), q), ".")
 	}
-	// o modelo já tem aspas em volta do lugar (código, JSON): a citação troca essas aspas
+	// the template already has quotes around the slot (code, JSON): the quoting replaces those
+	// quotes
 	if quoted != "" {
 		mod = reQuotedPlace.ReplaceAllString(mod, "$1")
 	}
@@ -219,8 +219,8 @@ func build(c varCase, letterCase int, spc, quoted, with string, parts int, n1 st
 	return varText{text: text, names: list, stays: stays}
 }
 
-// modelWords: as palavras de 4 ou mais letras do modelo (fora dos lugares): não podem
-// ser mascaradas.
+// modelWords: the template's words with 4 or more letters (outside the slots): they cannot be
+// masked.
 func modelWords(mod string) []string {
 	var out []string
 	for _, w := range regexp.MustCompile(`[A-Za-z]{4,}`).FindAllString(rePlace.ReplaceAllString(mod, " "), -1) {
@@ -229,7 +229,7 @@ func modelWords(mod string) []string {
 	return out
 }
 
-// variacoes: o caso base e uma dimensão mudada de cada vez.
+// variations: the base case and one dimension changed at a time.
 func variations(c varCase) []varText {
 	var out []varText
 	add := func(lbl string, v varText) { v.lbl = c.reader + " | " + c.model + " | " + lbl; out = append(out, v) }
@@ -237,7 +237,7 @@ func variations(c varCase) []varText {
 	if !c.caseless {
 		for k, name := range []string{"MAIÚSCULAS", "minúsculas", "aLtErNaDa", "Inicial"} {
 			if k == 2 && c.reader != "sql" && c.reader != "erro" {
-				continue // caixa alternada só onde a linguagem não diferencia caixa
+				continue // alternating case only where the language is case-insensitive
 			}
 			add("caixa "+name, build(c, k+1, " ", "", "", 1, "", false))
 		}
@@ -272,7 +272,7 @@ func variations(c varCase) []varText {
 	if c.several != "" {
 		add("vários na linha", build(c, 0, " ", "", "", 1, "", true))
 	}
-	// aspas escapadas: o texto inteiro dentro de uma string JSON (resultado de ferramenta)
+	// escaped quotes: the whole text inside a JSON string (tool result)
 	v := build(c, 0, " ", "", "", 1, "", false)
 	j, _ := json.Marshal(map[string]string{"stdout": v.text})
 	v.text = string(j)
@@ -280,7 +280,7 @@ func variations(c varCase) []varText {
 	return out
 }
 
-// reiniciar: o masker volta a não saber nada (sem refazer o NewMasker, que é caro).
+// restart: the masker goes back to knowing nothing (without redoing NewMasker, which is expensive).
 func restart(m *Masker) {
 	m.known = newKnown()
 	m.weakSet = weakSet{}
@@ -322,8 +322,8 @@ func TestReaderVariations(t *testing.T) {
 	t.Logf("%d variações, %d falhas", total, failures)
 }
 
-// Prosa em português com trechos de SQL entre crases (e palavras-chave soltas em maiúsculas):
-// o nome da tabela é mascarado, as palavras da frase não.
+// Portuguese prose with SQL snippets between backticks (and loose uppercase keywords): the table
+// name is masked, the words of the sentence are not.
 func TestProseWithSQLInBackticks(t *testing.T) {
 	cases := []struct {
 		text  string

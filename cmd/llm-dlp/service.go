@@ -23,9 +23,10 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/version"
 )
 
-// Commands do serviço: servir, supervisionar, garantir, verificar, status, parar.
+// Service commands: serve, supervise, ensure, check, status, stop.
 
-// servir: o proxy. Sob o supervisor, atende na porta que ele abriu e emprestou (ver swap.go).
+// serve: the proxy. Under the supervisor, it serves on the port the supervisor opened and lent (see
+// swap.go).
 func serve(args []string) error {
 	if until, ok := emergencyActive(); ok {
 		return serveEmergency(until)
@@ -40,13 +41,13 @@ func serve(args []string) error {
 		return err
 	}
 	lg.Printf("no ar em %s (pid %d, versão %s)", address(cfg), os.Getpid(), version.Complete())
-	// o que já saiu à API sai igual nos reenvios, também depois deste reinício (cache).
-	// Se a configuração ou a versão mudou, o registro recomeça.
+	// what already went out to the API goes out the same on resends, also after this restart
+	// (cache). If the configuration or the version changed, the record starts over.
 	imp, _ := json.Marshal(cfg)
 	if err := m.UseSent(config.Path("enviados.log"), version.Complete()+"\x00"+string(imp)); err != nil {
 		lg.Printf("AVISO enviados.log: %v (o histórico pode ser regravado no cache uma vez)", err)
 	}
-	go watchEmergency(false) // se o administrador ligar a emergência, sai e o supervisor troca de modo
+	go watchEmergency(false) // if the administrator turns on emergency, it exits and the supervisor switches mode
 	px := proxy.New(cfg, m, seenSet, lg).WithKey(key).WithSwap(borrowed)
 	srv := &http.Server{Handler: px, ReadHeaderTimeout: 30 * time.Second}
 	return serveUntilSignal(srv, ln, lg, func() {
@@ -64,18 +65,19 @@ type healthInfo struct {
 	Version string `json:"versao"`
 	Commit  string `json:"commit"`
 	PID     int    `json:"pid"`
-	// Swap: o proxy está num supervisor que segura a porta e o troca com SIGHUP (swap.go);
-	// versões anteriores não dizem
+	// Swap: the proxy is under a supervisor that holds the port and swaps it with SIGHUP (swap.go);
+	// earlier versions do not say
 	Swap bool `json:"troca"`
-	// WithoutProof: algo responde na porta dizendo ser o llm-dlp, mas não provou
+	// WithoutProof: something answers on the port saying it is llm-dlp, but did not prove it
 	WithoutProof bool `json:"-"`
 }
 
-// saude pergunta a quem está na porta se é o llm-dlp, e exige a prova: a resposta a um desafio
-// novo, que só quem lê a chave calcula (proxy.Proof). Dizer "sou o llm-dlp" não basta: outro
-// programa que pegue a porta enquanto o llm-dlp está fora do ar receberia a conversa sem máscara
-// e a credencial da API. No modo emergência não há prova (o repasse não carrega a chave, que
-// pode ser justamente o que quebrou): vale o arquivo que só o administrador grava.
+// health asks whoever is on the port whether it is llm-dlp, and requires the proof: the answer to a
+// fresh challenge, which only whoever reads the key computes (proxy.Proof). Saying "I am llm-dlp"
+// is not enough: another program that takes the port while llm-dlp is offline would receive the
+// conversation without masking and the API credential. In emergency mode there is no proof (the
+// pass-through does not load the key, which may be exactly what broke): the file only the
+// administrator writes is what counts.
 func health(cfg config.Config) (healthInfo, bool) {
 	var s healthInfo
 	b := make([]byte, 16)
@@ -83,8 +85,8 @@ func health(cfg config.Config) (healthInfo, bool) {
 		return s, false
 	}
 	challenge := hex.EncodeToString(b)
-	// conexão nova a cada pergunta: na troca de versão, reaproveitar a conexão perguntaria
-	// sempre ao mesmo proxy (o antigo), e o novo nunca seria visto
+	// a new connection for each question: during a version swap, reusing the connection would
+	// always ask the same proxy (the old one), and the new one would never be seen
 	c := http.Client{Timeout: 700 * time.Millisecond, Transport: &http.Transport{DisableKeepAlives: true}}
 	r, err := c.Get("http://" + address(cfg) + "/__llm-dlp/saude?desafio=" + challenge)
 	if err != nil {
@@ -109,8 +111,8 @@ func health(cfg config.Config) (healthInfo, bool) {
 	return s, true
 }
 
-// errNoProof: o que responde na porta não é este llm-dlp (uma versão anterior ainda no ar, ou
-// outro programa).
+// errNoProof: what answers on the port is not this llm-dlp (an earlier version still running, or
+// another program).
 var errNoProof = errors.New("o programa que responde na porta do llm-dlp não provou ser o seu llm-dlp. " +
 	"Se você acabou de atualizar: feche o Claude Code, rode \"llm-dlp stop\" e abra de novo. " +
 	"Se não: outro programa está usando a porta")
@@ -120,8 +122,8 @@ func healthy(cfg config.Config) bool {
 	return ok
 }
 
-// garantir é chamado pelo hook SessionStart: não imprime nada quando dá certo
-// (saída de hook vira contexto e gastaria tokens).
+// ensure is called by the SessionStart hook: it prints nothing when it works (hook output becomes
+// context and would spend tokens).
 func ensure() error {
 	cfg, err := config.Load()
 	if err != nil {
@@ -132,7 +134,7 @@ func ensure() error {
 		return nil
 	}
 	if info.WithoutProof {
-		return errNoProof // subir outro não adianta: a porta está ocupada
+		return errNoProof // starting another one does not help: the port is taken
 	}
 	sup := exec.Command(serviceBinary(), "supervisionar")
 	sup.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
@@ -142,8 +144,8 @@ func ensure() error {
 		return err
 	}
 	sup.Process.Release()
-	// prazo TOTAL (não número de tentativas): o hook precisa terminar bem antes do
-	// timeout dele, senão o Claude Code ignora o hook e segue em frente
+	// TOTAL deadline (not a number of attempts): the hook must finish well before its timeout,
+	// otherwise Claude Code ignores the hook and moves on
 	limitN := time.Now().Add(ensureDeadline)
 	for time.Now().Before(limitN) {
 		if healthy(cfg) {
@@ -154,20 +156,19 @@ func ensure() error {
 	return fmt.Errorf("o proxy não subiu em %s; veja %s", ensureDeadline, config.Path("llm-dlp.log"))
 }
 
-// ensureDeadline + o teste de saúde ficam bem abaixo de timeoutHook.
+// ensureDeadline + the health check stay well below timeoutHook.
 const (
 	ensureDeadline = 6 * time.Second
-	timeoutHook    = 20 // segundos, gravado no settings.json pelo instalar-claude
+	timeoutHook    = 20 // seconds, written in settings.json by install
 )
 
-// verificar é o hook UserPromptSubmit: barra a mensagem (exit 2) se o Claude Code não
-// estiver apontando para o llm-dlp ou se o llm-dlp não estiver saudável. Silencioso se
-// estiver tudo certo (não gasta tokens). É a segunda camada; a primeira é o
-// allowedProviders no managed-settings.json.
+// check is the UserPromptSubmit hook: it blocks the message (exit 2) if Claude Code is not pointing
+// to llm-dlp or if llm-dlp is not healthy. Silent if everything is fine (spends no tokens). It is
+// the second layer; the first is allowedProviders in managed-settings.json.
 func verifyIt() error {
 	cfg, err := config.Load()
 	if err != nil {
-		cfg = config.Default() // config quebrada: segue com o padrão (o modo emergência pode estar ligado)
+		cfg = config.Default() // broken config: goes on with the default (emergency mode may be on)
 	}
 	expected := "http://" + address(cfg)
 	if current := strings.TrimRight(os.Getenv("ANTHROPIC_BASE_URL"), "/"); current != expected {
@@ -185,7 +186,7 @@ func verifyIt() error {
 		return blockRequest("o llm-dlp está fora do ar e não consegui subi-lo; veja " + config.Path("llm-dlp.log") +
 			". Para usar o Claude sem máscara enquanto conserta: rode, no seu terminal, sudo llm-dlp emergency")
 	}
-	// avisos só para você (systemMessage não vai para a API: zero tokens)
+	// warnings only for you (systemMessage does not go to the API: zero tokens)
 	warning := ""
 	if info.Mode == "emergencia" {
 		until := info.Until
@@ -203,11 +204,11 @@ func verifyIt() error {
 	return nil
 }
 
-// reducedProtection: o que, na configuração em disco, tira proteção ou manda as mensagens para
-// outro lugar. A configuração é do usuário, e um agente induzido por uma página maliciosa
-// consegue mudá-la com um comando (o que só o administrador muda é a emergência). Enquanto esses
-// campos não forem travados pelo administrador, o que protege é o aviso a cada mensagem; quem
-// mudou de propósito só vê o lembrete.
+// reducedProtection: what, in the configuration on disk, removes protection or sends the messages
+// elsewhere. The configuration belongs to the user, and an agent induced by a malicious page can
+// change it with a command (what only the administrator changes is emergency). While these fields
+// are not locked by the administrator, what protects is the warning on every message; whoever
+// changed it on purpose only sees the reminder.
 func reducedProtection(cfg config.Config) []string {
 	var out []string
 	if u, err := url.Parse(cfg.Upstream); err != nil || u.Scheme != "https" || u.Hostname() != "api.anthropic.com" {
@@ -281,8 +282,8 @@ func status() error {
 	return nil
 }
 
-// newBinary diz se o processo no ar não é o binário instalado: outro commit, ou o
-// arquivo do executável dele foi trocado depois que ele subiu.
+// newBinary says whether the running process is not the installed binary: another commit, or its
+// executable file was replaced after it started.
 func newBinary(commit string, pid int) string {
 	if commit != version.Commit {
 		if commit == "" {
@@ -299,9 +300,9 @@ func newBinary(commit string, pid int) string {
 }
 
 func stop() error {
-	// o número do processo pode ter sido reaproveitado pelo sistema: supervisorUp confere
-	// que é mesmo o supervisor do llm-dlp antes de mandar o sinal (e o acha pela trava, se o
-	// arquivo de pid sumiu)
+	// the process number may have been reused by the system: supervisorUp checks it really is the
+	// llm-dlp supervisor before sending the signal (and finds it by the lock, if the pid file
+	// disappeared)
 	pid := supervisorUp()
 	if pid == 0 {
 		os.Remove(config.Path("supervisor.pid"))
@@ -310,14 +311,14 @@ func stop() error {
 	if err := syscall.Kill(pid, syscall.SIGTERM); err != nil {
 		return err
 	}
-	// espera ele sair (e soltar a trava), para um "garantir" logo em seguida não colidir
+	// waits for it to exit (and release the lock), so an "ensure" right after does not collide
 	if !waitExit(pid, 5*time.Second) {
 		return errors.New("o supervisor não encerrou em 5s")
 	}
 	return nil
 }
 
-// commandLine do processo: /proc no Linux; ps no macOS (que não tem /proc).
+// commandLine of the process: /proc on Linux; ps on macOS (which has no /proc).
 func commandLine(pid int) string {
 	if b, err := os.ReadFile(fmt.Sprintf("/proc/%d/cmdline", pid)); err == nil {
 		return string(b)

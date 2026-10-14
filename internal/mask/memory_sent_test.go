@@ -6,15 +6,15 @@ import (
 	"testing"
 )
 
-// Senhas e rótulos montados por partes: o texto do teste não deve ensinar nada a um
-// llm-dlp que esteja no caminho de quem edita o código.
+// Passwords and labels built from parts: the test text must not teach anything to an llm-dlp that
+// is in the path of whoever edits the code.
 var weakOnes = []string{"change" + "me", "ad" + "min", "gira" + "ssol"}
 
-// ensina: a senha numa URL de conexão (onde até a só de letras é detectada)
-// testCPF: CPF fictício válido
+// teaches: the password in a connection URL (where even a letters-only one is detected) testCPF: a
+// valid fictitious CPF
 var testCPF = "529.982" + ".247-25"
 
-// posições de teste (no proxy, vêm do hash da conversa até o texto)
+// test positions (in the proxy, they come from the hash of the conversation up to the text)
 var posA, posB = Position{1}, Position{2}
 
 func teaches(s string) string { return "mysql://app:" + s + "@db1:3306/base" }
@@ -35,8 +35,8 @@ func diskMasker(t *testing.T, dir string) (*Masker, *Seen) {
 	return m, vs
 }
 
-// (a) Senha fraca, só de letras ou com cara de exemplo, dita pelo usuário ou lida de um
-// arquivo local, é lembrada: aparece depois sem rótulo e é mascarada.
+// (a) A weak password, letters only or looking like an example, said by the user or read from a
+// local file, is remembered: it appears later without a label and is masked.
 func TestWeakPasswordIsRemembered(t *testing.T) {
 	for _, originV := range []string{"o usuário digitou: " + teaches("%s"), "# .env lido do disco\nDATABASE_URL=" + teaches("%s") + "\n"} {
 		m := newTest(t)
@@ -49,8 +49,8 @@ func TestWeakPasswordIsRemembered(t *testing.T) {
 	}
 }
 
-// (b) A mesma palavra, como senha de exemplo numa URL de um resultado de WebFetch: é mascarada
-// ali, mas não é lembrada nem gravada em vistos.json.
+// (b) The same word, as an example password in a URL of a WebFetch result: it is masked there, but
+// is neither remembered nor written to vistos.json.
 func TestWebContentDoesNotTeach(t *testing.T) {
 	dir := t.TempDir()
 	m, vs := diskMasker(t, dir)
@@ -72,15 +72,15 @@ func TestWebContentDoesNotTeach(t *testing.T) {
 	if out, _ := m2.Mask(loose); out != loose {
 		t.Errorf("após reinício, valor vindo da web é mascarado: %q", out)
 	}
-	// o mesmo texto vindo de fonte local ensina normalmente
+	// the same text coming from a local source teaches normally
 	m.Mask(page)
 	if out, _ := m.Mask(loose); out == loose {
 		t.Errorf("o mesmo texto, de fonte local, deveria ensinar")
 	}
 }
 
-// (c) Text que já saiu sai igual depois, mesmo que um valor dele seja aprendido mais
-// tarde, e também depois de um reinício (memo vazio). Text novo usa o valor aprendido.
+// (c) A text that already went out goes out the same later, even if one of its values is learned
+// afterwards, and also after a restart (empty memo). A new text uses the learned value.
 func TestSentTextStaysFrozen(t *testing.T) {
 	dir := t.TempDir()
 	m, vs := diskMasker(t, dir)
@@ -93,21 +93,22 @@ func TestSentTextStaysFrozen(t *testing.T) {
 	}
 	l.Freeze()
 
-	m.Mask(teaches(s)) // aprende depois
+	m.Mask(teaches(s)) // learns later
 	if out, _ := m.NewBatch().Mask(old, false, posA); out != sent {
 		t.Fatalf("texto já enviado mudou depois de aprender um valor:\nantes:  %q\ndepois: %q", sent, out)
 	}
 	if out, _ := m.Mask("de novo: " + s); strings.Contains(out, s) {
 		t.Fatalf("texto novo não usou o valor aprendido: %q", out)
 	}
-	// o MESMO texto, noutra posição (outra conversa, mensagem nova): não herda a máscara antiga
+	// the SAME text, at another position (another conversation, new message): does not inherit the
+	// old mask
 	if out, _ := m.NewBatch().Mask(old, false, posB); strings.Contains(out, s) {
 		t.Fatalf("o mesmo texto noutra posição saiu com a máscara antiga: %q", out)
 	}
 
 	m.Persist()
 	vs.SaveIfDirty()
-	m2, _ := diskMasker(t, dir) // reinício
+	m2, _ := diskMasker(t, dir) // restart
 	out, ents := m2.NewBatch().Mask(old, false, posA)
 	if out != sent {
 		t.Fatalf("após reinício, o texto enviado mudou:\nantes:  %q\ndepois: %q", sent, out)
@@ -123,8 +124,8 @@ func TestSentTextStaysFrozen(t *testing.T) {
 	}
 }
 
-// Configuração ou versão diferente: os registros antigos não valem (o texto é mascarado
-// com as regras atuais).
+// Different configuration or version: the old records are not valid (the text is masked with the
+// current rules).
 func TestSentFromOtherConfigInvalid(t *testing.T) {
 	dir := t.TempDir()
 	m, _ := diskMasker(t, dir)
@@ -145,7 +146,7 @@ func TestSentFromOtherConfigInvalid(t *testing.T) {
 	}
 }
 
-// Line corrompida ou trecho fora do texto: não remonta, mascara de novo.
+// Corrupted line or a piece outside the text: does not rebuild, masks again.
 func TestSentCorrupted(t *testing.T) {
 	dir := t.TempDir()
 	m, _ := diskMasker(t, dir)
@@ -163,8 +164,8 @@ func TestSentCorrupted(t *testing.T) {
 	}
 }
 
-// O congelamento é por posição: o mesmo texto noutra posição, depois de um reinício, também
-// é mascarado com o que se sabe agora.
+// Freezing is per position: the same text at another position, after a restart, is also masked with
+// what is known now.
 func TestFrozenOnlySamePositionAfterRestart(t *testing.T) {
 	dir := t.TempDir()
 	m, vs := diskMasker(t, dir)

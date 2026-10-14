@@ -66,7 +66,7 @@ func requestBody(stream bool) []byte {
 	return b
 }
 
-// sse monta eventos com o texto picotado em pedaços de n bytes.
+// sse builds events with the text chopped into pieces of n bytes.
 func sse(w io.Writer, text, toolJSON, thinking string, n int) {
 	ev := func(name string, v any) {
 		b, _ := json.Marshal(v)
@@ -108,7 +108,7 @@ func TestStreamingEndToEnd(t *testing.T) {
 	_, px := build(t, func(w http.ResponseWriter, r *http.Request) {
 		received, _ = io.ReadAll(r.Body)
 		pseudos = rePseudo.FindAllString(string(received), -1)
-		// "modelo": repete os pseudônimos que viu
+		// "model": repeats the pseudonyms it saw
 		u := map[string]string{}
 		for _, p := range pseudos {
 			switch {
@@ -135,17 +135,17 @@ func TestStreamingEndToEnd(t *testing.T) {
 	}
 	defer resp.Body.Close()
 
-	// 1) a API não viu nada real
+	// 1) the API saw nothing real
 	for _, r := range reals {
 		if bytes.Contains(received, []byte(r)) {
 			t.Errorf("valor real chegou à API: %q", r)
 		}
 	}
-	// 2) o raciocínio assinado foi enviado intacto
+	// 2) the signed reasoning was sent intact
 	if !bytes.Contains(received, []byte(thinkingReq)) || !bytes.Contains(received, []byte("SIG123")) {
 		t.Error("bloco thinking foi alterado")
 	}
-	// 3) o cliente recebe tudo real; o raciocínio novo, intacto
+	// 3) the client receives everything real; the new reasoning, intact
 	var text, tool, think strings.Builder
 	sc := bufio.NewScanner(resp.Body)
 	for sc.Scan() {
@@ -231,8 +231,8 @@ func TestHealth(t *testing.T) {
 	}
 }
 
-// WebFetch/WebSearch: a entrada volta com pseudônimo (nunca o real), tanto em streaming
-// quanto sem streaming; já o Bash recebe o real.
+// WebFetch/WebSearch: the input comes back with the pseudonym (never the real value), both in
+// streaming and without streaming; Bash, on the other hand, receives the real value.
 func TestWebFetchDoesNotUnmask(t *testing.T) {
 	var pseudoEmail string
 	_, px := build(t, func(w http.ResponseWriter, r *http.Request) {
@@ -278,7 +278,7 @@ func TestWebFetchDoesNotUnmask(t *testing.T) {
 	}
 }
 
-// Entry de ferramenta que chega completa no content_block_start também é desmascarada.
+// A tool input that arrives complete in content_block_start is also unmasked.
 func TestCompleteEntryAtStart(t *testing.T) {
 	_, px := build(t, func(w http.ResponseWriter, r *http.Request) {
 		b, _ := io.ReadAll(r.Body)
@@ -295,7 +295,7 @@ func TestCompleteEntryAtStart(t *testing.T) {
 	}
 }
 
-// Campo desconhecido no topo da requisição é mascarado; nome de ferramenta não muda.
+// An unknown field at the top of the request is masked; a tool name does not change.
 func TestUnknownFieldAndTools(t *testing.T) {
 	var received map[string]any
 	_, px := build(t, func(w http.ResponseWriter, r *http.Request) {
@@ -325,9 +325,9 @@ func TestUnknownFieldAndTools(t *testing.T) {
 	}
 }
 
-// O marcador de cache muda de bloco a cada mensagem. O resultado memorizado de uma imagem/PDF
-// não pode carregar o marcador da primeira vez (senão o cache da API quebra ou a API recusa
-// por excesso de marcadores).
+// The cache marker moves to another block with every message. The memoized result of an image/PDF
+// cannot carry the marker of the first time (otherwise the API cache breaks or the API refuses for
+// too many markers).
 func TestMediaMemoWithoutCacheControl(t *testing.T) {
 	with := map[string]any{"type": "image", "cache_control": map[string]any{"type": "ephemeral"}}
 	without := map[string]any{"type": "image"}
@@ -352,9 +352,9 @@ func TestMediaMemoWithoutCacheControl(t *testing.T) {
 	}
 }
 
-// O rótulo de um campo ("email": ...) não é o nome do registro: numa saída em JSON de um comando
-// que lista um substantivo no plural (o inventário do decisor), as chaves continuam chaves e o
-// "nome" do registro com CPF é de pessoa.
+// The label of a field ("email": ...) is not the name of the record: in a JSON output of a command
+// that lists a plural noun (the decider's inventory), the keys stay keys and the "nome" of the
+// record with a CPF belongs to a person.
 func TestJSONKeysStayKeys(t *testing.T) {
 	var received []byte
 	_, px := build(t, func(w http.ResponseWriter, r *http.Request) {

@@ -6,10 +6,10 @@ import (
 	"testing"
 )
 
-// Proof de software (mask/memory_software.go): o nome padrão de um software público, decidido
-// como banco numa DSN, só deixa de ser espalhado pela conversa quando a própria conversa prova
-// que é o software (instalado, importado, rodado). Sem prova, ou com nome que é palavra real,
-// nome inventado do cliente ou definido no projeto, continua mascarado em todo lugar.
+// Software proof (mask/memory_software.go): the default name of a public software, decided as a
+// database in a DSN, only stops being spread through the conversation when the conversation itself
+// proves it is the software (installed, imported, run). Without proof, or with a name that is a
+// real word, a made-up client name or one defined in the project, it stays masked everywhere.
 func TestSoftwareProof(t *testing.T) {
 	dsn := func(database string) [2]string {
 		return [2]string{"grep DB_URL .env", "DB_URL=postgresql://svc:x@pg-hx-prd:5432/" + database + "\n"}
@@ -19,7 +19,7 @@ func TestSoftwareProof(t *testing.T) {
 		word     string
 		pairs    [][2]string
 		sentence string
-		plain    bool // a palavra fica em claro na frase final do usuário
+		plain    bool // the word stays in the clear in the user's final sentence
 	}{
 		{"datahub sem prova", "datahub", [][2]string{dsn("datahub")}, "e a doc do datahub fala o que?", false},
 		{"datahub importado", "datahub", [][2]string{dsn("datahub"), {"head -1 emit.py", "from datahub.emitter.rest_emitter import DatahubRestEmitter\n"}},
@@ -43,14 +43,14 @@ func TestSoftwareProof(t *testing.T) {
 		if rtTok(sent, "pg-hx-prd") != 0 {
 			t.Errorf("%s: o host do cliente vazou", c.name)
 		}
-		// a DSN sempre mascara o banco; a frase final só fica em claro com prova
+		// the DSN always masks the database; the final sentence only stays in the clear with proof
 		if plain := rtTok(lastMessage(t, bodies[len(bodies)-1]), c.word) > 0; plain != c.plain {
 			t.Errorf("%s: %q em claro na frase final = %v, queria %v", c.name, c.word, plain, c.plain)
 		}
 	}
 }
 
-// lastMessage: o conteúdo da última mensagem do corpo enviado à API.
+// lastMessage: the content of the last message of the body sent to the API.
 func lastMessage(t *testing.T, body []byte) string {
 	t.Helper()
 	var r struct{ Messages []struct{ Content any } }
@@ -61,8 +61,8 @@ func lastMessage(t *testing.T, body []byte) string {
 	return string(b)
 }
 
-// Origem por caminho: o arquivo lido de uma dependência pública é código do fornecedor; os nomes
-// dele são mascarados ali, mas não ensinam a memória da conversa. O arquivo do projeto ensina.
+// Origin by path: a file read from a public dependency is vendor code; its names are masked there,
+// but do not teach the conversation memory. A project file teaches.
 func TestOriginByPath(t *testing.T) {
 	for _, c := range []struct {
 		name, path, table string

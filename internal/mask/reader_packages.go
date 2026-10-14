@@ -4,8 +4,8 @@ import (
 	"strings"
 )
 
-// Pacotes internos: módulo do go.mod, groupId do Maven/Gradle e escopo do npm (ver
-// docs/pt-BR/structures.md, seção Repositórios, pacotes e caminhos).
+// Internal packages: go.mod module, Maven/Gradle groupId and npm scope (see docs/structures.md,
+// section Repositories, packages and paths).
 
 func findPackages(s string, add func(ObjFinding)) {
 	if strings.Contains(s, "module ") {
@@ -75,7 +75,7 @@ func goModIn(s string, a int, add func(ObjFinding)) {
 		r++
 	}
 	if b == a || r < len(s) && s[r] != '\n' && !strings.HasPrefix(s[r:], "//") {
-		return // "module " no meio de uma frase
+		return // "module " in the middle of a sentence
 	}
 	sgms := strings.Split(s[a:b], "/")
 	x := a
@@ -98,8 +98,8 @@ func goModIn(s string, a int, add func(ObjFinding)) {
 	}
 }
 
-// groupId do Maven/Gradle: os pedaços depois do TLD invertido ("com.empresa.vendas" ->
-// empresa, vendas), fora dos prefixos públicos.
+// Maven/Gradle groupId: the pieces after the reversed TLD ("com.empresa.vendas" -> empresa,
+// vendas), outside public prefixes.
 func groupIn(s string, a, b int, add func(ObjFinding)) {
 	v := s[a:b]
 	if !simpleName(v) || strings.IndexByte(v, '.') < 0 {
@@ -113,7 +113,7 @@ func groupIn(s string, a, b int, add func(ObjFinding)) {
 	}
 	ps := strings.Split(v, ".")
 	x := a
-	start := true // TLD invertido no começo: "br.com.", "com.", "org."
+	start := true // reversed TLD at the start: "br.com.", "com.", "org."
 	for _, p := range ps {
 		tld := start && (publicTLDs[strings.ToLower(p)] || len(p) == 2)
 		start = tld
@@ -124,7 +124,7 @@ func groupIn(s string, a, b int, add func(ObjFinding)) {
 	}
 }
 
-// group = 'com.empresa' / group "com.empresa" (build.gradle, no começo da linha)
+// group = 'com.empresa' / group "com.empresa" (build.gradle, at the start of the line)
 func gradleIn(s string, i int, add func(ObjFinding)) {
 	j := i
 	for j > 0 && (s[j-1] == ' ' || s[j-1] == '\t') {

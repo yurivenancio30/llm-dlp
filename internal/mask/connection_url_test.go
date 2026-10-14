@@ -8,8 +8,9 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/config"
 )
 
-// A string de conexão "esquema://usuario:senha@servidor/banco": cada parte com o seu tipo, a
-// senha inteira (até o "@") e o mesmo servidor com UM pseudônimo, dentro e fora da URL.
+// The connection string "scheme://user:password@server/database": each part with its type, the
+// whole password (up to the "@") and the same server with ONE pseudonym, inside and outside the
+// URL.
 func TestConnectionURLEachPartItsType(t *testing.T) {
 	cfg := config.Default()
 	cfg.InternalDomains = []string{"acme"}
@@ -49,8 +50,8 @@ func TestConnectionURLEachPartItsType(t *testing.T) {
 	}
 }
 
-// Um e-mail de verdade continua sendo e-mail: solto, no caminho ou nos parâmetros de uma URL e
-// num mailto.
+// A real e-mail is still an e-mail: loose, in the path or in the parameters of a URL and in a
+// mailto.
 func TestEmailOutsideURLAuthority(t *testing.T) {
 	m := newTest(t)
 	const email = "joao.silva@empresa-ficticia.com.br"

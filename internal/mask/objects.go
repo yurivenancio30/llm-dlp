@@ -10,41 +10,40 @@ import (
 	"time"
 )
 
-// Objects: nomes de recursos internos (servidor, banco, schema, tabela, coluna, procedure,
-// índice, usuário, namespace, serviço, bucket, fila), reconhecidos pela estrutura do conteúdo
-// (ver docs/pt-BR/structures.md). Este arquivo é a base comum: tipos, pseudônimo, aprendizado com
-// freios e liga/desliga por tipo. Os leitores de cada formato entregam os achados por
-// m.leitores.
+// Objects: names of internal resources (server, database, schema, table, column, procedure, index,
+// user, namespace, service, bucket, queue), recognized by the structure of the content (see
+// docs/structures.md). This file is the common base: types, pseudonym, learning with brakes and
+// on/off per type. The readers of each format deliver their findings through m.readers.
 
-// ObjectPrefixes: tipo de entidade -> prefixo do pseudônimo.
+// ObjectPrefixes: entity type -> pseudonym prefix.
 var ObjectPrefixes = map[string]string{"servidor": "HOST", "database": "DB", "schema": "SCH", "tabela": "T",
 	"coluna": "C", "procedure": "PROC", "indice": "IDX", "usuario": "USR", "namespace": "NS",
 	"servico": "SVC", "bucket": "BKT", "fila": "TOP",
 	"repositorio": "REPO", "organizacao": "ORG", "pacote": "PKG", "pasta": "DIR", "conta_nuvem": "ACC"}
 
-// defaultPropagates: tipos que, aprendidos, são mascarados também fora da posição estrutural.
-// Column e índice não: nomes como user_id e created_at existem em todo código.
+// defaultPropagates: types that, once learned, are masked also outside the structural position.
+// Column and index are not: names like user_id and created_at exist in all code.
 var defaultPropagates = map[string]bool{"servidor": true, "database": true, "schema": true, "tabela": true,
 	"procedure": true, "usuario": true, "namespace": true, "servico": true, "bucket": true, "fila": true,
 	"repositorio": true, "organizacao": true, "pacote": true, "pasta": true, "conta_nuvem": true}
 
-const objTypePrefix = "obj." // o tipo interno de um objeto: "obj.tabela"
+const objTypePrefix = "obj." // the internal type of an object: "obj.tabela"
 
 func isObject(typ string) bool { return strings.HasPrefix(typ, objTypePrefix) }
 
-// ObjFinding: um nome de objeto achado por um leitor de estrutura.
+// ObjFinding: an object name found by a structure reader.
 type ObjFinding struct {
 	Start, End int
-	Ent        string // tipo de entidade (chave de ObjectPrefixes)
-	Rule       string // nome da regra, para contar e para a evidência "2 regras diferentes"
-	Strong     bool   // posição inequívoca: ensina sozinho
+	Ent        string // entity type (ObjectPrefixes key)
+	Rule       string // rule name, for counting and for the "2 different rules" evidence
+	Strong     bool   // unambiguous position: teaches by itself
 }
 
-// Reader procura nomes de objeto em s, pela estrutura.
+// Reader looks for object names in s, by structure.
 type Reader struct {
 	Name   string
 	Find   func(s string, add func(ObjFinding))
-	Public func(v string) bool // vocabulário do formato: nunca é mascarado nem aprendido
+	Public func(v string) bool // the format's vocabulary: never masked nor learned
 }
 
 // objMask / objPropagates: liga/desliga por tipo (config "objetos").
@@ -69,14 +68,14 @@ func (m *Masker) objPropagates(ent string) bool {
 	return defaultPropagates[ent]
 }
 
-// entSQL: tipos insensíveis à caixa: os de SQL (identificadores sem aspas são insensíveis à
-// caixa em todos os dialetos) e servidor (nome DNS não diferencia maiúsculas: "sqlprd01" e
-// "SQLPRD01" são a mesma máquina). Nos outros tipos (caminho, bucket, fila...) a grafia vale
-// como está: "/dados/Relatorios" e "/dados/relatorios" são duas pastas.
+// entSQL: case-insensitive types: the SQL ones (unquoted identifiers are case-insensitive in every
+// dialect) and server (a DNS name is case-insensitive: "sqlprd01" and "SQLPRD01" are the same
+// machine). In the other types (path, bucket, queue...) the spelling counts as it is:
+// "/dados/Relatorios" and "/dados/relatorios" are two folders.
 var entSQL = map[string]bool{"database": true, "schema": true, "tabela": true, "coluna": true, "procedure": true,
 	"indice": true, "servidor": true}
 
-// unquoted: o nome sem os colchetes, aspas ou crases em volta.
+// unquoted: the name without the brackets, quotes or backticks around it.
 func unquoted(v string) string {
 	v = strings.TrimSpace(v)
 	if len(v) >= 2 {
@@ -88,7 +87,7 @@ func unquoted(v string) string {
 	return v
 }
 
-// normObj: a forma do nome que identifica o objeto (sem citação; em minúsculas nos tipos de SQL).
+// normObj: the form of the name that identifies the object (unquoted; lowercase in the SQL types).
 func normObj(ent, v string) string {
 	v = unquoted(v)
 	if entSQL[ent] {
@@ -97,7 +96,8 @@ func normObj(ent, v string) string {
 	return v
 }
 
-// canonObj: a chave do nome na memória e no vistos.json. "o:" = sem caixa (SQL), "O:" = exata.
+// canonObj: the key of the name in the memory and in vistos.json. "o:" = caseless (SQL), "O:" =
+// exact.
 func canonObj(ent, v string) string {
 	if entSQL[ent] {
 		return "o:" + strings.ToLower(unquoted(v))
@@ -105,14 +105,14 @@ func canonObj(ent, v string) string {
 	return "O:" + unquoted(v)
 }
 
-// pseudoObject: prefixo do tipo + o ID do HMAC da chave (o mesmo tamanho dos outros tipos).
-// Estável entre conversas e reinícios. Name em minúsculas recebe o prefixo em minúsculas
-// ("t_..."), para combinar com o estilo do texto; em maiúsculas, o prefixo em maiúsculas. Name
-// de caixa mista (Pedido_Item) recebe o prefixo com só a primeira letra maiúscula e as letras
-// do ID na caixa que o HMAC da própria grafia diz (com a chave, como o resto do pseudônimo: um
-// hash sem chave deixaria conferir pela caixa um nome adivinhado): o mesmo nome de SQL em duas
-// grafias no mesmo texto ("ContAB" e "ContAb", que são o mesmo objeto) sai com dois pseudônimos, e a volta
-// devolve cada grafia como estava.
+// pseudoObject: the type prefix + the ID of the key's HMAC (the same length as the other types).
+// Stable across conversations and restarts. A lowercase name gets the prefix in lowercase
+// ("t_..."), to match the style of the text; an uppercase one, the prefix in uppercase. A
+// mixed-case name (Pedido_Item) gets the prefix with only the first letter capitalized and the
+// letters of the ID in the case the HMAC of the spelling itself says (with the key, like the rest
+// of the pseudonym: an unkeyed hash would let a guessed name be checked by the case): the same SQL
+// name in two spellings in the same text ("ContAB" and "ContAb", which are the same object) goes
+// out with two pseudonyms, and the return gives each spelling back as it was.
 func (m *Masker) pseudoObject(ent, real string) string {
 	pfx := ObjectPrefixes[ent]
 	if pfx == "" {
@@ -134,7 +134,7 @@ func (m *Masker) pseudoObject(ent, real string) string {
 				upper = true
 			}
 		}
-		for i := 0; !upper && i < len(b); i++ { // pelo menos uma: não confunde com a de maiúsculas
+		for i := 0; !upper && i < len(b); i++ { // at least one: not to be confused with the uppercase one
 			if b[i] >= 'a' && b[i] <= 'z' {
 				b[i] -= 32
 				upper = true
@@ -147,11 +147,11 @@ func (m *Masker) pseudoObject(ent, real string) string {
 	return ps
 }
 
-// rePseudoObj: a FORMA de um pseudônimo de objeto. Só a forma não basta para pular um nome
-// ("t_customer" é uma tabela real com essa cara): ver isPseudoObj.
+// rePseudoObj: the SHAPE of an object pseudonym. The shape alone is not enough to skip a name
+// ("t_customer" is a real table with that look): see isPseudoObj.
 var rePseudoObj = regexp.MustCompile(`^(?i:host|db|sch|t|c|proc|idx|usr|ns|svc|bkt|top|repo|org|pkg|dir|acc|obj)_[a-zA-Z2-7]{8}$`)
 
-// pseudônimos de objeto gerados neste processo (em minúsculas): só esses são pulados.
+// object pseudonyms generated in this process (lowercase): only those are skipped.
 var (
 	generatedPseudos sync.Map
 	nPseudos         atomic.Int64
@@ -167,7 +167,7 @@ func registerPseudo(ps string) {
 	}
 }
 
-// isPseudoObj: v é um pseudônimo de objeto gerado por nós (em qualquer caixa)?
+// isPseudoObj: is v an object pseudonym generated by us (in any case)?
 func isPseudoObj(v string) bool {
 	if !rePseudoObj.MatchString(v) {
 		return false
@@ -176,10 +176,10 @@ func isPseudoObj(v string) bool {
 	return ok
 }
 
-// identifierShape: o freio que separa um nome de recurso de uma palavra comum. Só nomes
-// assim são aprendidos e propagados: têm "_", dígito, ponto, hífen entre partes ou mistura de
-// caixa ("tb_pedido", "srv01", "app.config", "svc-pedidos", "contaCorrente"). Ficam de fora
-// versões, UUIDs e hashes, que têm dígitos mas não são nomes.
+// identifierShape: the brake that tells a resource name from a common word. Only names like this
+// are learned and propagated: they have "_", a digit, a dot, a hyphen between parts or mixed case
+// ("tb_pedido", "srv01", "app.config", "svc-pedidos", "contaCorrente"). Versions, UUIDs and hashes
+// stay out: they have digits but are not names.
 func identifierShape(v string) bool {
 	if len(v) < 3 || len(v) > 128 || hasDigit(v) && reVersionOrHash.MatchString(v) {
 		return false
@@ -208,14 +208,14 @@ func identifierShape(v string) bool {
 	return false
 }
 
-// versão (semver, regex oficial de semver.org sem âncoras internas), UUID e hash hexadecimal
+// version (semver, the official semver.org regex without inner anchors), UUID and hexadecimal hash
 var reVersionOrHash = regexp.MustCompile(`^(?:v?(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:\.(?:0|[1-9]\d*))?(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|[0-9a-fA-F]{16,})$`)
 
-// fracos: evidência fraca, só em RAM: nome -> regras diferentes em que foi visto. Duas regras
-// diferentes valem como evidência forte.
+// weakSet: weak evidence, RAM only: name -> different rules in which it was seen. Two different
+// rules count as strong evidence.
 type weakSet struct {
 	mu      sync.Mutex
-	rules   map[string]int // nome da regra -> bit
+	rules   map[string]int // rule name -> bit
 	seenSet map[string]uint64
 }
 
@@ -241,10 +241,11 @@ func (f *weakSet) markIt(name, rule string) (twoOf bool) {
 	}
 	f.seenSet[name] |= 1 << uint(b)
 	v := f.seenSet[name]
-	return v&(v-1) != 0 // mais de um bit
+	return v&(v-1) != 0 // more than one bit
 }
 
-// learnObj aplica os freios e, se passar, lembra o nome (RAM e, só o hash, vistos.json).
+// learnObj applies the brakes and, if it passes, remembers the name (RAM and, hash only,
+// vistos.json).
 func (m *Masker) learnObj(o ObjFinding, real string, public func(string) bool) {
 	v := strings.Trim(strings.TrimSpace(real), "[]\"`")
 	if len(v) < 4 || !m.objPropagates(o.Ent) || !identifierShape(v) || isPseudoObj(v) {
@@ -254,10 +255,10 @@ func (m *Masker) learnObj(o ObjFinding, real string, public func(string) bool) {
 		return
 	}
 	if ent, ok := m.learnedEnt(v); ok {
-		o.Ent = ent // já aprendido: mantém o tipo (e o pseudônimo) da primeira vez
+		o.Ent = ent // already learned: keeps the type (and the pseudonym) of the first time
 	}
 	if !o.Strong && !m.weakSet.markIt(canonObj(o.Ent, v), o.Rule) {
-		return // evidência fraca: mascara no lugar, mas não ensina
+		return // weak evidence: masks in place, but does not teach
 	}
 	m.known.learnIt(objTypePrefix+o.Ent, v)
 	if m.seenSet != nil {
@@ -265,7 +266,7 @@ func (m *Masker) learnObj(o ObjFinding, real string, public func(string) bool) {
 	}
 }
 
-// learnedEnt: o tipo com que o nome v já foi aprendido (em RAM ou no vistos.json), se foi.
+// learnedEnt: the type with which name v was already learned (in RAM or in vistos.json), if it was.
 func (m *Masker) learnedEnt(v string) (string, bool) {
 	v = unquoted(v)
 	low := strings.ToLower(v)
@@ -291,10 +292,10 @@ func (m *Masker) learnedEnt(v string) (string, bool) {
 	return ent, ok && today()-seen <= objValidity
 }
 
-// serversAsHost: um servidor achado pela estrutura (o host de uma string de conexão, de um
-// YAML) que é um hostname do domínio interno passa a ter o tipo "host", o mesmo que o detector de
-// hostname dá a ele fora da estrutura. Assim o mesmo servidor tem UM pseudônimo em qualquer lugar
-// (antes: host_x7k2... dentro da URL e x7k2....invalid solto no texto, e o modelo via dois).
+// serversAsHost: a server found by structure (the host of a connection string, of a YAML) that is a
+// hostname of the internal domain gets the type "host", the same the hostname detector gives it
+// outside the structure. This way the same server has ONE pseudonym everywhere (before:
+// host_x7k2... inside the URL and x7k2....invalid loose in the text, and the model saw two).
 func (m *Masker) serversAsHost(out []Finding) {
 	if len(m.cfg.InternalDomains) == 0 {
 		return
@@ -310,10 +311,10 @@ func (m *Masker) serversAsHost(out []Finding) {
 	}
 }
 
-// unifyObjects: o mesmo nome real fica com UM tipo (e, portanto, um pseudônimo) no texto,
-// mesmo quando regras diferentes o acham com tipos diferentes ("dir_..." numa linha e
-// "svc_..." noutra para a mesma pasta). Vale o tipo com que o nome já foi aprendido; se não
-// foi, o da primeira ocorrência no texto (no mesmo trecho, a ordem do tipo, como em applyT).
+// unifyObjects: the same real name gets ONE type (and therefore one pseudonym) in the text, even
+// when different rules find it with different types ("dir_..." on one line and "svc_..." on another
+// for the same folder). The type with which the name was already learned wins; if it was not, the
+// one of the first occurrence in the text (in the same piece, the type order, as in applyT).
 func (m *Masker) unifyObjects(out []Finding) {
 	m.serversAsHost(out)
 	var ix []int
@@ -347,16 +348,16 @@ func (m *Masker) unifyObjects(out []Finding) {
 	}
 }
 
-// objID: o hash com que o nome fica no vistos.json (o tipo vai no valor).
+// objID: the hash with which the name is kept in vistos.json (the type goes in the value).
 func (m *Masker) objID(key string) string { return m.p.ID("visto", key) }
 
-// hoje: dias desde 1970 (o vistos.json guarda datas assim). Variável para os testes.
+// today: days since 1970 (vistos.json keeps dates like this). A variable for the tests.
 var today = func() int { return int(time.Now().Unix() / 86400) }
 
-// objValidity: um nome não visto há mais que isso deixa de ser propagado.
+// objValidity: a name not seen for longer than this stops being propagated.
 const objValidity = 90
 
-// findObjects roda os leitores em s, devolve os achados (para mascarar) e ensina.
+// findObjects runs the readers on s, returns the findings (to mask) and teaches.
 func (m *Masker) findObjects(s string, learn bool, add func(ini, end int, typ string)) {
 	if !m.cfg.Objects.Enabled || len(m.readers) == 0 {
 		return
@@ -368,8 +369,8 @@ func (m *Masker) findObjects(s string, learn bool, add func(ini, end int, typ st
 		}
 		return
 	}
-	// texto grande: os leitores (que só leem s) rodam em paralelo; os achados são aplicados e
-	// aprendidos depois, na ordem dos leitores, como se tivessem rodado um depois do outro
+	// large text: the readers (which only read s) run in parallel; the findings are applied and
+	// learned afterwards, in reader order, as if they had run one after the other
 	res := make([][]ObjFinding, len(m.readers))
 	var next atomic.Int64
 	var wg sync.WaitGroup
@@ -394,17 +395,17 @@ func (m *Masker) findObjects(s string, learn bool, add func(ini, end int, typ st
 	}
 }
 
-// parallelReaders: a partir deste tamanho, os leitores rodam em paralelo (variável para os testes).
+// parallelReaders: from this size on, the readers run in parallel (a variable for the tests).
 var parallelReaders = 64 << 10
 
-// runReader: um leitor em s, com os freios comuns (tipo desligado, pseudônimo, vocabulário).
+// runReader: one reader on s, with the common brakes (type turned off, pseudonym, vocabulary).
 func (m *Masker) runReader(l Reader, s string, learn bool, add func(ini, end int, typ string)) {
 	ct := textContext(s)
 	l.Find(s, func(o ObjFinding) { m.applyFinding(l, s, ct, o, learn, add) })
 }
 
-// ctxText: o que vale para o texto inteiro, medido uma vez antes dos leitores: o software
-// público que ele roda como imagem (textSoftware).
+// ctxText: what applies to the whole text, measured once before the readers: the public software it
+// runs as an image (textSoftware).
 type ctxText struct {
 	software map[string]bool
 }
@@ -413,7 +414,7 @@ func textContext(s string) ctxText {
 	return ctxText{software: textSoftware(s)}
 }
 
-// applyFinding: um achado do leitor l, com os freios comuns. ct: o contexto do texto.
+// applyFinding: a finding of reader l, with the common brakes. ct: the text context.
 func (m *Masker) applyFinding(l Reader, s string, ct ctxText, o ObjFinding, learn bool, add func(ini, end int, typ string)) {
 	if o.Start < 0 || o.End > len(s) || o.End <= o.Start || !m.objMask(o.Ent) {
 		return
@@ -431,19 +432,19 @@ func (m *Masker) applyFinding(l Reader, s string, ct ctxText, o ObjFinding, lear
 	}
 }
 
-// hookFound: só para as medições (measurement_test.go): cada achado de cada leitor.
+// hookFound: only for the measurements (measurement_test.go): each finding of each reader.
 var hookFound func(reader string, o ObjFinding, v string)
 
-// objTokens chama fn para cada candidato a nome aprendido em s: [A-Za-z_][A-Za-z0-9_$#]*
-// (com letras acentuadas) e pedaços "-..." no meio (o mesmo que a regex
-// `[\p{L}_][\p{L}\d_$#]*(?:-[\p{L}\d_$#]+)*`, sem o custo de uma regex no texto inteiro).
+// objTokens calls fn for each candidate to a learned name in s: [A-Za-z_][A-Za-z0-9_$#]* (with
+// accented letters) and "-..." pieces in the middle (the same as the regex
+// `[\p{L}_][\p{L}\d_$#]*(?:-[\p{L}\d_$#]+)*`, without the cost of a regex over the whole text).
 func objTokens(s string, fn func(a, b int)) {
 	ident := func(c byte) bool { return isAlnum(c) || c == '_' || c == '$' || c == '#' }
 	for i := 0; i < len(s); {
 		c := s[i]
 		n0 := 1
 		if c >= 0x80 {
-			if n0 = utf8Letter(s, i); n0 == 0 { // letra acentuada também começa um nome
+			if n0 = utf8Letter(s, i); n0 == 0 { // an accented letter also starts a name
 				i++
 				continue
 			}
@@ -470,19 +471,19 @@ func objTokens(s string, fn func(a, b int)) {
 		}
 		fn(i, j)
 		if escapeIn(s, i) && j > i+1 && (isAlnum(s[i+1]) && !(s[i+1] >= '0' && s[i+1] <= '9') || s[i+1] == '_') {
-			fn(i+1, j) // "\nt_x" em texto escapado: o nome pode começar depois do escape
+			fn(i+1, j) // "\nt_x" in escaped text: the name may start after the escape
 		}
 		i = j
 	}
 }
 
-// escapeIn: s[i] é a letra de um escape \n, \t ou \r (texto de JSON escapado)?
+// escapeIn: is s[i] the letter of a \n, \t or \r escape (escaped JSON text)?
 func escapeIn(s string, i int) bool {
 	return i > 0 && s[i-1] == '\\' && (s[i] == 'n' || s[i] == 't' || s[i] == 'r') && (i < 2 || s[i-2] != '\\')
 }
 
-// findKnownObjects: nomes aprendidos (em RAM ou, só o hash, no vistos.json) que
-// aparecem em s, em qualquer caixa e fora de qualquer estrutura.
+// findKnownObjects: learned names (in RAM or, hash only, in vistos.json) that appear in s, in any
+// case and outside any structure.
 func (m *Masker) findKnownObjects(s string, add func(ini, end int, typ string)) {
 	c := m.known
 	c.mu.RLock()
@@ -497,8 +498,8 @@ func (m *Masker) findKnownObjects(s string, add func(ini, end int, typ string)) 
 		if a0 > 0 && (s[a0-1] == '-' || isAlnum(s[a0-1])) && !escapeIn(s, a0-1) {
 			return
 		}
-		// nome com ponto ("top_x.eventos", "app.config"): o token para no ponto, então tenta
-		// também as formas com os pedaços seguintes, da mais longa para a mais curta
+		// a dotted name ("top_x.eventos", "app.config"): the token stops at the dot, so it also
+		// tries the forms with the following pieces, from the longest to the shortest
 		ends := dottedShapes(s, a0, b0)
 		for k := len(ends) - 1; k >= 0; k-- {
 			if m.knownObjIn(s, a0, ends[k], c, disk, d, add) {
@@ -508,8 +509,8 @@ func (m *Masker) findKnownObjects(s string, add func(ini, end int, typ string)) 
 	})
 }
 
-// dottedShapes: os fins possíveis de um nome que começa em s[a:b] e continua com ".pedaço"
-// (até 3 pedaços a mais): [b, fim com 1 pedaço, fim com 2...].
+// dottedShapes: the possible ends of a name that starts at s[a:b] and continues with ".piece" (up
+// to 3 more pieces): [b, end with 1 piece, end with 2...].
 func dottedShapes(s string, a, b int) []int {
 	ends := []int{b}
 	ident := func(c byte) bool { return isAlnum(c) || c == '_' || c == '$' || c == '#' }
@@ -524,7 +525,7 @@ func dottedShapes(s string, a, b int) []int {
 	return ends
 }
 
-// knownObjIn: s[a:b] é um nome aprendido (RAM ou vistos.json)? Se for, entrega o achado.
+// knownObjIn: is s[a:b] a learned name (RAM or vistos.json)? If so, delivers the finding.
 func (m *Masker) knownObjIn(s string, a, b int, c *knownSet, disk bool, d int, add func(ini, end int, typ string)) bool {
 	ix := [2]int{a, b}
 	v := s[ix[0]:ix[1]]
@@ -534,7 +535,7 @@ func (m *Masker) knownObjIn(s string, a, b int, c *knownSet, disk bool, d int, a
 	c.mu.RLock()
 	tp, ok := c.canon["O:"+v] // grafia exata
 	if !ok {
-		tp, ok = c.canon["o:"+strings.ToLower(v)] // nome de SQL, em qualquer caixa
+		tp, ok = c.canon["o:"+strings.ToLower(v)] // SQL name, in any case
 		ok = ok && entSQL[strings.TrimPrefix(tp, objTypePrefix)]
 	}
 	c.mu.RUnlock()
@@ -558,10 +559,10 @@ func (m *Masker) knownObjIn(s string, a, b int, c *knownSet, disk bool, d int, a
 		return false
 	}
 	add(ix[0], ix[1], objTypePrefix+ent)
-	c.learnIt(objTypePrefix+ent, v) // volta para a memória
+	c.learnIt(objTypePrefix+ent, v) // goes back to the memory
 	m.seenSet.MarkObj(m.objID(key), ent, d)
 	return true
 }
 
-// UseReaders troca os leitores de estrutura (os testes usam leitores próprios).
+// UseReaders swaps the structure readers (the tests use their own readers).
 func (m *Masker) UseReaders(ls []Reader) { m.readers = ls }

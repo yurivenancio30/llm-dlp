@@ -9,9 +9,9 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/config"
 )
 
-// Rule geral: todo pseudônimo vem da chave. O mesmo texto mascarado com duas chaves dá, para
-// cada valor real, dois pseudônimos diferentes; e nenhum pseudônimo contém o valor real. Um
-// tipo novo que gere o pseudônimo sem a chave (ou com um pedaço do real) quebra este teste.
+// General rule: every pseudonym comes from the key. The same text masked with two keys gives, for
+// each real value, two different pseudonyms; and no pseudonym contains the real value. A new type
+// that produces the pseudonym without the key (or with a piece of the real value) breaks this test.
 func TestPseudonymsComeFromKey(t *testing.T) {
 	text := strings.Join([]string{
 		"Falar com João Carlos Silva (joao.silva@empresa-ficticia.com.br, U1001) e com João Silva.",
@@ -66,8 +66,8 @@ func TestPseudonymsComeFromKey(t *testing.T) {
 	t.Logf("tipos: %v", ts)
 }
 
-// A caixa do ID de um objeto de caixa mista também vem da chave: não segue um hash sem chave do
-// nome (com ele, quem adivinhasse o nome conferiria a caixa de cada letra).
+// The case of the ID of a mixed-case object also comes from the key: it does not follow an unkeyed
+// hash of the name (with one, whoever guessed the name could check the case of each letter).
 func TestObjectCaseComesFromKey(t *testing.T) {
 	m, err := NewMasker(config.Default(), []byte("0123456789abcdef0123456789abcdef"), nil, nil)
 	if err != nil {

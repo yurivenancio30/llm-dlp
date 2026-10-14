@@ -6,18 +6,18 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/config"
 )
 
-// Registro de todos os leitores de estrutura: os fixos e os que dependem da configuração.
-// Para acrescentar um formato, escreva o leitor no arquivo da família e registre-o aqui.
+// Registry of all structure readers: the fixed ones and the ones that depend on the configuration.
+// To add a format, write the reader in the family's file and register it here.
 
-// readersOf: todos os leitores para esta configuração (os fixos, depois os da configuração).
+// readersOf: all readers for this configuration (the fixed ones, then the configuration ones).
 func readersOf(cfg config.Config) []Reader {
 	return append(defaultReaders(), configReaders(cfg)...)
 }
 
-// DefaultReaders: os leitores fixos (para ferramentas de medição).
+// DefaultReaders: the fixed readers (for measurement tools).
 func DefaultReaders() []Reader { return defaultReaders() }
 
-// defaultReaders: os leitores de estrutura que vêm ligados.
+// defaultReaders: the structure readers that come on.
 func defaultReaders() []Reader {
 	return []Reader{
 		{Name: "sql", Find: findSQL, Public: publicSQL},
@@ -54,7 +54,7 @@ func defaultReaders() []Reader {
 	}
 }
 
-// configReaders: os leitores ligados conforme a configuração (IP público, termos).
+// configReaders: the readers turned on according to the configuration (public IP, terms).
 func configReaders(cfg config.Config) []Reader {
 	var ls []Reader
 	if cfg.Objects.PublicIP {

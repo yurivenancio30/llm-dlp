@@ -23,11 +23,11 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/mask"
 )
 
-// Testes de carga do proxy inteiro (só com LLM_DLP_ESTRESSE=1).
+// Load tests of the whole proxy (only with LLM_DLP_STRESS=1).
 
-// Testes de carga do proxy inteiro: pesados, rodam só com LLM_DLP_ESTRESSE=1.
+// Load tests of the whole proxy: heavy, they only run with LLM_DLP_STRESS=1.
 //
-//	LLM_DLP_ESTRESSE=1 go test ./internal/proxy -run Estresse -v -timeout 60m
+//	LLM_DLP_STRESS=1 go test ./internal/proxy -run Stress -v -timeout 60m
 func stressOnly(t *testing.T) {
 	if os.Getenv("LLM_DLP_ESTRESSE") == "" {
 		t.Skip("defina LLM_DLP_ESTRESSE=1 para rodar")
@@ -61,7 +61,7 @@ func buildStress(t *testing.T, upstream http.HandlerFunc) (px *httptest.Server) 
 	return px
 }
 
-// dados de um turno: ~4 KB com vários tipos de dado, distintos por cliente e turno
+// data of one turn: ~4 KB with several data types, distinct per client and turn
 func turnData(cli, turn int) string {
 	var b strings.Builder
 	for j := 0; j < 24; j++ {
@@ -74,7 +74,7 @@ func turnData(cli, turn int) string {
 
 var realMarks = []string{"@empresa-ficticia", "10.42.", ".empresa-ficticia.intra", "(11) 9", "senha: Kq"}
 
-// "modelo" que devolve, em streaming picotado, o último texto que recebeu (já mascarado)
+// "model" that returns, in chopped streaming, the last text it received (already masked)
 func modelEcho(leaked *atomic.Int64, broke *atomic.Int64, previousOnes *sync.Map) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
@@ -90,7 +90,7 @@ func modelEcho(leaked *atomic.Int64, broke *atomic.Int64, previousOnes *sync.Map
 			Messages []json.RawMessage `json:"messages"`
 		}
 		json.Unmarshal(body, &req)
-		// estabilidade do cache: as mensagens antigas têm que chegar byte a byte iguais
+		// cache stability: the old messages have to arrive byte for byte equal
 		if prev, ok := previousOnes.Load(req.Metadata.UserID); ok {
 			for i, a := range prev.([]json.RawMessage) {
 				if i >= len(req.Messages) || !bytes.Equal(a, req.Messages[i]) {
@@ -133,9 +133,9 @@ func readText(body io.Reader) string {
 	return text.String()
 }
 
-// 1) Carga: 16 conversas em paralelo, crescendo até ~1 MB cada. Confere, em toda requisição:
-// nada real chegou à "API", a resposta voltou exatamente real, e as mensagens antigas
-// chegaram idênticas às da requisição anterior (o cache da API depende disso).
+// 1) Load: 16 conversations in parallel, growing up to ~1 MB each. Checks, on every request:
+// nothing real reached the "API", the response came back exactly real, and the old messages arrived
+// identical to those of the previous request (the API cache depends on it).
 func TestStressProxyLoad(t *testing.T) {
 	stressOnly(t)
 	var leaked, broke atomic.Int64
@@ -192,7 +192,7 @@ func TestStressProxyLoad(t *testing.T) {
 	}
 }
 
-// 2) Cliente que desiste no meio da resposta, 400 vezes: não pode sobrar goroutine nem conexão.
+// 2) A client that gives up in the middle of the response, 400 times: no goroutine or connection may be left.
 func TestStressProxyAborts(t *testing.T) {
 	stressOnly(t)
 	px := buildStress(t, func(w http.ResponseWriter, r *http.Request) {
@@ -248,8 +248,8 @@ func TestStressProxyAborts(t *testing.T) {
 	}
 }
 
-// 3) API com problema: erro, corte no meio do streaming, sem resposta. O proxy repassa o
-// erro ou devolve 502; nunca trava nem derruba o processo.
+// 3) API with problems: error, a cut in the middle of streaming, no response. The proxy
+// passes the error on or returns 502; it never hangs nor brings the process down.
 func TestStressProxyBadUpstream(t *testing.T) {
 	stressOnly(t)
 	var mode atomic.Int64
@@ -263,7 +263,7 @@ func TestStressProxyBadUpstream(t *testing.T) {
 		case 1:
 			w.WriteHeader(500)
 			fmt.Fprint(w, "erro interno em texto puro")
-		case 2: // corta a conexão no meio do streaming
+		case 2: // cuts the connection in the middle of streaming
 			w.Header().Set("content-type", "text/event-stream")
 			fmt.Fprint(w, "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"meio p.\"}}\n\n")
 			w.(http.Flusher).Flush()
@@ -271,10 +271,10 @@ func TestStressProxyBadUpstream(t *testing.T) {
 				c, _, _ := hj.Hijack()
 				c.Close()
 			}
-		case 3: // lixo no lugar de SSE
+		case 3: // garbage in place of SSE
 			w.Header().Set("content-type", "text/event-stream")
 			fmt.Fprint(w, "data: {isto não é json\n\ndata: \n\nsem prefixo\n\n")
-		case 4: // nunca responde
+		case 4: // never answers
 			<-r.Context().Done()
 		}
 	})
@@ -313,7 +313,7 @@ func TestStressProxyBadUpstream(t *testing.T) {
 		wg.Wait()
 		t.Logf("%-42s 40 requisições em %-6s status (-1 = cliente desistiu): %v", name, time.Since(ti).Round(time.Millisecond), status)
 	}
-	// depois de tudo isso, o proxy continua respondendo
+	// after all of that, the proxy still answers
 	resp, err := http.Get(px.URL + "/__llm-dlp/saude")
 	if err != nil || resp.StatusCode != 200 {
 		t.Fatalf("proxy não responde mais: %v", err)
@@ -333,8 +333,8 @@ func TestStressProxyBadUpstream(t *testing.T) {
 	}
 }
 
-// 4) Requisição gigante (40 MB, 5 mil e-mails distintos): tem que passar, e a segunda vez
-// (conversa já memorizada) tem que ser rápida.
+// 4) Huge request (40 MB, 5 thousand distinct e-mails): it has to pass, and the second time
+// (conversation already memoized) has to be fast.
 func TestStressProxyHugeRequest(t *testing.T) {
 	stressOnly(t)
 	var leaked, broke atomic.Int64
@@ -365,8 +365,8 @@ func TestStressProxyHugeRequest(t *testing.T) {
 	}
 }
 
-// 5) Reinício no meio de uma conversa grande: a primeira requisição chega com ~1 MB de texto
-// que o proxy nunca viu. Mede o tempo dessa requisição (a frio) e da seguinte.
+// 5) Restart in the middle of a large conversation: the first request arrives with ~1 MB of
+// text the proxy never saw. Measures the time of that request (cold) and of the next one.
 func TestStressProxyAfterRestart(t *testing.T) {
 	stressOnly(t)
 	for _, tc := range []struct {

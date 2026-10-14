@@ -5,9 +5,9 @@ import (
 	"strings"
 )
 
-// Infraestrutura como código: Terraform/HCL, Bicep, ARM e CloudFormation (ver docs/pt-BR/structures.md).
+// Infrastructure as code: Terraform/HCL, Bicep, ARM and CloudFormation (see docs/structures.md).
 
-// entAzure: entidade pelo tipo do recurso (Microsoft.Sql/servers/databases -> último pedaço).
+// entAzure: entity by the resource type (Microsoft.Sql/servers/databases -> last piece).
 func entAzure(sgm string) string {
 	switch strings.ToLower(sgm) {
 	case "servers", "flexibleservers", "managedclusters", "clusters", "virtualmachines", "registries", "managedinstances":
@@ -24,7 +24,8 @@ func entAzure(sgm string) string {
 	return "servico"
 }
 
-// addAzureName: o nome de um recurso ARM/Bicep; filho vem como "pai/filho", um pedaço por tipo.
+// addAzureName: the name of an ARM/Bicep resource; a child comes as "parent/child", one piece per
+// type.
 func addAzureName(s string, a, b int, typ, rule string, add func(ObjFinding)) {
 	sgmT := strings.Split(typ, "/")[1:]
 	ps := strings.Split(s[a:b], "/")
@@ -45,7 +46,7 @@ var (
 	reTagName = regexp.MustCompile(`"?\bName"?[ \t]*[=:][ \t]*"([^"\n]*)"`)
 )
 
-// núcleo do nome do atributo -> entidade
+// core of the attribute name -> entity
 var hclCore = map[string]string{"bucket": "bucket", "database": "database", "db": "database", "server": "servidor",
 	"instance": "servidor", "cluster": "servidor", "host": "servidor", "hostname": "servidor", "account": "conta_nuvem",
 	"project": "conta_nuvem", "namespace": "namespace", "topic": "fila", "queue": "fila", "subscription": "fila",
@@ -53,7 +54,7 @@ var hclCore = map[string]string{"bucket": "bucket", "database": "database", "db"
 	"username": "usuario", "user": "usuario", "organization": "organizacao", "org": "organizacao", "folder": "pasta",
 	"function": "servico"}
 
-// entHCLType: a entidade do atributo name/identifier pelo tipo do recurso (aws_s3_bucket...).
+// entHCLType: the entity of the name/identifier attribute by the resource type (aws_s3_bucket...).
 func entHCLType(t string) string {
 	t = strings.ToLower(t)
 	for _, p := range [][2]string{{"storage_account", "bucket"}, {"bucket", "bucket"}, {"service_account", "usuario"},
@@ -69,7 +70,7 @@ func entHCLType(t string) string {
 	return "servico"
 }
 
-// entHCLAttr: (entidade, forte, ok) do atributo attr no recurso de tipo t, na profundidade prof.
+// entHCLAttr: (entity, strong, ok) of attribute attr in a resource of type t, at depth depth.
 func entHCLAttr(attr, t string, depth int, value string) (string, bool, bool) {
 	ps := strings.Split(strings.ToLower(attr), "_")
 	lastPos := ps[len(ps)-1]
@@ -116,7 +117,7 @@ func findTerraform(s string, add func(ObjFinding)) {
 		} else if !reHCLHdr1.MatchString(l) {
 			continue
 		}
-		stack := []string{""} // blocos abertos (nome); o do cabeçalho é ""
+		stack := []string{""} // open blocks (name); the header's is ""
 		stack = openCloseHCL(l[strings.IndexByte(l, '{')+1:], stack, "")
 		j := i + 1
 		for ; j < len(lines) && len(stack) > 0 && j-i < 5000; j++ {
@@ -139,7 +140,7 @@ func findTerraform(s string, add func(ObjFinding)) {
 	}
 }
 
-// openCloseHCL: atualiza a pilha de blocos com as chaves da linha (fora de strings).
+// openCloseHCL: updates the block stack with the braces of the line (outside strings).
 func openCloseHCL(l string, stack []string, name string) []string {
 	quotes := false
 	for k := 0; k < len(l); k++ {
@@ -160,16 +161,16 @@ func openCloseHCL(l string, stack []string, name string) []string {
 	return stack
 }
 
-// hclAttr: o lado direito de "attr = ..." (a partir de v): literal, literal -> literal, ou
-// mapa de tags em linha.
+// hclAttr: the right side of "attr = ..." (from v): literal, literal -> literal, or an inline tag
+// map.
 func hclAttr(s string, v, end int, attr, typ string, stack []string, add func(ObjFinding)) {
 	if v >= end {
 		return
 	}
 	depth := len(stack)
 	block := stack[len(stack)-1]
-	// metadata { name = ... }: o bloco de metadados descreve o próprio recurso (provedor do
-	// Kubernetes), então vale como o nível do recurso
+	// metadata { name = ... }: the metadata block describes the resource itself (Kubernetes
+	// provider), so it counts as the resource level
 	if depth == 2 && block == "metadata" {
 		depth = 1
 	}
@@ -210,7 +211,7 @@ func hclAttr(s string, v, end int, attr, typ string, stack []string, add func(Ob
 	}
 }
 
-// wrapLines: [ini, fim) de cada linha (sem o \r).
+// wrapLines: [start, end) of each line (without the \r).
 func wrapLines(s string) [][2]int {
 	var out [][2]int
 	for i := 0; i < len(s); {
@@ -229,8 +230,8 @@ func wrapLines(s string) [][2]int {
 	return out
 }
 
-// ---------------------------------------------------------------------------------------
-// Ansible: inventário INI
+// --------------------------------------------------------------------------------------- Ansible:
+// INI inventory
 
 var (
 	reBicepRes  = regexp.MustCompile(`(?m)^[ \t]*resource[ \t]+\w+[ \t]+'([A-Za-z0-9.]+/[A-Za-z0-9./]+)@[^'\n]*'[ \t]+(?:existing[ \t]+)?=[ \t]*\{`)
@@ -244,7 +245,7 @@ func findBicep(s string, add func(ObjFinding)) {
 	ms := reBicepRes.FindAllStringSubmatchIndex(s, -1)
 	for k, m := range ms {
 		typ := s[m[2]:m[3]]
-		lim := len(s) // o corpo vai no máximo até o próximo recurso
+		lim := len(s) // the body goes at most up to the next resource
 		if k+1 < len(ms) {
 			lim = ms[k+1][0]
 		}

@@ -10,13 +10,13 @@ import (
 	"testing"
 )
 
-// Testes do exame de texto grande em pedaços: cada dado em todas as posições de corte.
+// Tests of the examination of large text in pieces: each datum in every cut position.
 
-// Text grande é examinado em pedaços (ver detectLarge). Estes testes garantem que cortar
-// não deixa nada passar: cada tipo de dado é colocado em TODAS as posições em relação aos
-// cortes, e o resultado tem que ser idêntico ao do exame do texto inteiro.
+// Large text is examined in pieces (see detectLarge). These tests guarantee that cutting lets
+// nothing through: each data type is placed in EVERY position relative to the cuts, and the result
+// has to be identical to that of examining the whole text.
 
-// testSizes encolhe os pedaços para o teste poder varrer todas as posições depressa.
+// testSizes shrinks the pieces so the test can sweep every position quickly.
 func testSizes(t *testing.T, min, piece, margin int) {
 	a, b, c := largeMin, largePiece, largeMargin
 	largeMin, largePiece, largeMargin = min, piece, margin
@@ -76,8 +76,8 @@ func (m *Masker) resetMemory() {
 	m.mu.Unlock()
 }
 
-// compara o exame em pedaços com o do texto inteiro; devolve "" se igual. Com exigir, o
-// valor real também não pode aparecer no resultado.
+// compares the examination in pieces with that of the whole text; returns "" if equal. With
+// require, the real value also cannot appear in the result.
 func compareCut(m *Masker, s, real string, require bool) string {
 	m.resetMemory()
 	wants, _ := m.apply(s, m.detectWhole(s))
@@ -108,8 +108,8 @@ func scanCuts(t *testing.T, cases []cutCase, require bool, step, total int, buil
 	var errs atomic.Int64
 	var n atomic.Int64
 	var wg sync.WaitGroup
-	// os Maskers são criados um por vez: a criação do detector do gitleaks não pode ser
-	// feita em paralelo (o uso, depois de criado, pode)
+	// the Maskers are created one at a time: the creation of the gitleaks detector cannot be done
+	// in parallel (its use, once created, can)
 	ms := make([]*Masker, runtime.GOMAXPROCS(0))
 	for i := range ms {
 		ms[i] = newTest(t)
@@ -138,9 +138,9 @@ func scanCuts(t *testing.T, cases []cutCase, require bool, step, total int, buil
 	t.Logf("%d textos comparados, %d diferenças", n.Load(), errs.Load())
 }
 
-// sep: o que separa o dado do enchimento. Com enchimento sem quebra de linha o separador é
-// um espaço: assim o corte (que prefere quebras de linha) cai em posição fixa e o dado
-// desliza por cima dele. Com quebra de linha, testa o corte que procura a quebra.
+// sep: what separates the datum from the padding. With padding without line breaks the separator is
+// a space: this way the cut (which prefers line breaks) falls at a fixed position and the datum
+// slides over it. With a line break, it tests the cut that looks for the break.
 func sep(e string) string {
 	if strings.Contains(e, "\n") {
 		return "\n"
@@ -155,10 +155,10 @@ func fill(e string, n int) string {
 	return strings.Repeat(e, n/len(e)+1)[:n]
 }
 
-// O dado sensível desliza byte a byte por dois cortes inteiros.
+// The sensitive datum slides byte by byte over two whole cuts.
 func TestCutsAllPositions(t *testing.T) {
 	testSizes(t, 1000, 600, 200)
-	step := 31 // amostra, para a suíte normal ser rápida; com LLM_DLP_ESTRESSE=1, byte a byte
+	step := 31 // sample, so the normal suite is fast; with LLM_DLP_STRESS=1, byte by byte
 	if os.Getenv("LLM_DLP_ESTRESSE") != "" {
 		step = 1
 	}
@@ -167,15 +167,16 @@ func TestCutsAllPositions(t *testing.T) {
 	})
 }
 
-// O valor é ensinado (com a palavra-chave) numa ponta do texto e aparece solto em todas as
-// posições: tem que ser mascarado nos dois lugares, como no exame do texto inteiro.
+// The value is taught (with the keyword) at one end of the text and appears loose in every
+// position: it has to be masked in both places, as in the examination of the whole text.
 func TestCutsLooseKnownValue(t *testing.T) {
 	testSizes(t, 1000, 600, 200)
 	step := 53
 	if os.Getenv("LLM_DLP_ESTRESSE") != "" {
 		step = 3
 	}
-	// valores que são lembrados (os que dependem da palavra ao lado), na grafia aprendida
+	// values that are remembered (those that depend on the word next to them), in the learned
+	// spelling
 	cpfWithout := strings.NewReplacer(".", "", "-", "").Replace(genCPF("529982247"))
 	cases := []cutCase{
 		{"RG: 12.345.678-9 ok", "12.345.678-9"},
@@ -201,7 +202,7 @@ func TestCutsLooseKnownValue(t *testing.T) {
 	}
 }
 
-// Com os tamanhos reais (pedaços de 48 KB, margem de 8 KB), por amostragem de posições.
+// With the real sizes (48 KB pieces, 8 KB margin), by sampling positions.
 func TestCutsRealSize(t *testing.T) {
 	if os.Getenv("LLM_DLP_ESTRESSE") == "" {
 		t.Skip("lento (minutos): defina LLM_DLP_ESTRESSE=1 para rodar")
@@ -211,10 +212,10 @@ func TestCutsRealSize(t *testing.T) {
 	key16k := "-----BEGIN RSA PRIVATE KEY-----\n" + strings.Repeat("MIIEpAIBAAKCAQEA7bq2Xk9mQ2vLp7wZt4nBc6HfG1aE5uQiOk3Jd9sLq2mXv8Rt\n", 200) + "-----END RSA PRIVATE KEY-----"
 	cases := []cutCase{
 		{key4096, "MIIEpAIBAAKCAQEA7bq2Xk9mQ2vLp7wZt4nBc6HfG1aE5uQiOk3Jd9sLq2mXv8Rt"},
-		{key16k, "MIIEpAIBAAKCAQEA7bq2Xk9mQ2vLp7wZt4nBc6HfG1aE5uQiOk3Jd9sLq2mXv8Rt"}, // maior que a margem
+		{key16k, "MIIEpAIBAAKCAQEA7bq2Xk9mQ2vLp7wZt4nBc6HfG1aE5uQiOk3Jd9sLq2mXv8Rt"}, // larger than the margin
 		{"DB_PASSWORD=Ficticia@2024 ok", "Ficticia@2024"},
 		{"RG: 12.345.678-9 ok", "12.345.678-9"},
-		{"password=" + strings.Repeat("Zq9!", 5000) + " ok", strings.Repeat("Zq9!", 50)}, // valor de 20 KB: maior que a margem
+		{"password=" + strings.Repeat("Zq9!", 5000) + " ok", strings.Repeat("Zq9!", 50)}, // a 20 KB value: larger than the margin
 		{"password=" + strings.Repeat("Zq9a", 5000) + " ok", strings.Repeat("Zq9a", 50)},
 		{"token=" + strings.Repeat("ghp_k3Jd9sLq2mXv8RtY7wPz4nBc6HfG1aE5uQiO.", 400) + " ok", "ghp_k3Jd9sLq2mXv8RtY7wPz4nBc6HfG1aE5uQiO"},
 		{"mysql://app:" + strings.Repeat("Zq9!", 5000) + "@db1:3306/base ok", strings.Repeat("Zq9!", 50)},
@@ -238,7 +239,8 @@ func TestCutsRealSize(t *testing.T) {
 	t.Logf("%d textos comparados", n)
 }
 
-// O teste acima só vale se ele pegar um corte malfeito. Sem margem, tem que acusar diferença.
+// The test above only counts if it catches a badly made cut. Without a margin, it has to report a
+// difference.
 func TestCutsWithoutMarginFail(t *testing.T) {
 	testSizes(t, 1000, 600, 0)
 	m := newTest(t)
@@ -257,8 +259,8 @@ func TestCutsWithoutMarginFail(t *testing.T) {
 	}
 }
 
-// Text grande é examinado em pedaços paralelos. O resultado tem que ser o mesmo do exame
-// do texto inteiro de uma vez, inclusive para o que fica em cima de um corte.
+// Large text is examined in parallel pieces. The result has to be the same as that of examining the
+// whole text at once, including for what sits on top of a cut.
 func TestLargeEqualsWhole(t *testing.T) {
 	whole := func(m *Masker, s string) string {
 		txt, _ := m.apply(s, m.detectWhole(s))

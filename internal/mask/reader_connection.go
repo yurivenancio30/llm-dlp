@@ -5,11 +5,11 @@ import (
 	"strings"
 )
 
-// Leitores de conexão (ver docs/pt-BR/structures.md, seção Strings de conexão e endereços): strings
-// de conexão ODBC/ADO.NET/JDBC, DSN do libpq, URIs de banco, tnsnames.ora, URNs do DataHub e
-// as referências do dbt e do Airflow. Só padrões estáveis (especificação de cada formato).
+// Connection readers (see docs/structures.md, section Connection strings and addresses):
+// ODBC/ADO.NET/JDBC connection strings, libpq DSN, database URIs, tnsnames.ora, DataHub URNs and
+// the dbt and Airflow references. Only stable patterns (the specification of each format).
 
-// chaves de conexão (sem diferença de caixa, sem espaços) -> entidade
+// connection keys (case-insensitive, without spaces) -> entity
 var connectionKeys = map[string]string{
 	"server": "servidor", "datasource": "servidor", "address": "servidor", "addr": "servidor", "networkaddress": "servidor",
 	"host": "servidor", "hostname": "servidor", "hostaddr": "servidor", "failoverpartner": "servidor", "servername": "servidor",
@@ -28,19 +28,19 @@ var (
 	reURN         = regexp.MustCompile(`urn:li:dataset:\(urn:li:dataPlatform:[\w-]+,([^,()\n]+),[A-Z]+\)`)
 	reURNUser     = regexp.MustCompile(`urn:li:corpuser:([\w.\-@]+)`)
 	reURNFlow     = regexp.MustCompile(`urn:li:dataFlow:\([\w-]+,([\w.\-]+),[A-Za-z]+\)(?:,([\w.\-]+)\))?`)
-	// outras URNs com nome do cliente (https://docs.datahub.com/docs/what/urn): instância da
-	// plataforma, grupo (time), gráfico e painel (id na plataforma) e campo de dataset (coluna)
+	// other URNs with a client name (https://docs.datahub.com/docs/what/urn): platform instance,
+	// group (team), chart and dashboard (id in the platform) and dataset field (column)
 	reURNInstance  = regexp.MustCompile(`urn:li:dataPlatformInstance:\(urn:li:dataPlatform:[\w-]+,([\w.\-]+)\)`)
 	reURNGroup     = regexp.MustCompile(`urn:li:corpGroup:([\w.\-@]+)`)
 	reURNDashboard = regexp.MustCompile(`urn:li:(?:chart|dashboard):\([\w-]+,([\w.\-]+)\)`)
 	reURNField     = regexp.MustCompile(`urn:li:schemaField:\(urn:li:dataset:\([^()]*\),([\w.\-\[\]=]+)\)`)
-	reURNApp       = regexp.MustCompile(`urn:li:application:([\w.\-]+)`) // a aplicação (sistema) do cliente
+	reURNApp       = regexp.MustCompile(`urn:li:application:([\w.\-]+)`) // the client's application (system)
 	reDbtRef       = regexp.MustCompile(`\{\{[^}]*?\bref\(\s*['"]([\w.\-]+)['"](?:\s*,\s*['"]([\w.\-]+)['"])?\s*\)`)
 	reDbtSource    = regexp.MustCompile(`\{\{[^}]*?\bsource\(\s*['"]([\w.\-]+)['"]\s*,\s*['"]([\w.\-]+)['"]\s*\)`)
 	reConnID       = regexp.MustCompile(`\b\w*conn_id\s*=\s*['"]([\w.\-]+)['"]`)
 )
 
-// valores que nunca são nome de recurso
+// values that are never a resource name
 var publicConnectionValues = map[string]bool{"localhost": true, "true": true, "false": true, "yes": true, "no": true,
 	"sspi": true, "none": true, "null": true, "default": true, "admin": true, "root": true, "sa": true, "postgres": true}
 
@@ -59,8 +59,8 @@ func addParts(s string, a, b int, lastPos, rule string, add func(ObjFinding)) {
 	}
 }
 
-// addURNParts: o nome do dataset de uma URN, com as partes preenchidas com espaços à direita
-// (colunas CHAR de catálogo, como no DB2: "ABCD    .TABELA").
+// addURNParts: the dataset name of a URN, with the parts padded with spaces on the right (catalog
+// CHAR columns, as in DB2: "ABCD .TABELA").
 func addURNParts(s string, a, b int, add func(ObjFinding)) {
 	ps := strings.Split(s[a:b], ".")
 	ents := entQual(len(ps), "tabela")
@@ -73,8 +73,8 @@ func addURNParts(s string, a, b int, add func(ObjFinding)) {
 	}
 }
 
-// addServer: servidor com instância e porta ("srv01\INST,1433", "tcp:srv01,1433"):
-// mascara o nome e a instância, não a porta.
+// addServer: a server with an instance and a port ("srv01\INST,1433", "tcp:srv01,1433"): masks the
+// name and the instance, not the port.
 func addServer(s string, a, b int, rule string, add func(ObjFinding)) {
 	v := s[a:b]
 	if strings.HasPrefix(strings.ToLower(v), "tcp:") {
@@ -95,7 +95,7 @@ func addServer(s string, a, b int, rule string, add func(ObjFinding)) {
 	if v == "" || publicConnection(v) || v == "." || strings.HasPrefix(v, "(") {
 		return
 	}
-	// nome DNS de serviço do Kubernetes: fica com o leitor de Kubernetes (serviço e namespace)
+	// Kubernetes service DNS name: stays with the Kubernetes reader (service and namespace)
 	if l := strings.ToLower(v); strings.HasSuffix(l, ".svc.cluster.local") || strings.HasSuffix(l, ".svc") {
 		return
 	}
@@ -103,11 +103,12 @@ func addServer(s string, a, b int, rule string, add func(ObjFinding)) {
 }
 
 func findConnections(s string, add func(ObjFinding)) {
-	// string de conexão: pelo menos dois pares, um deles com chave de conexão (ou um par que é
-	// propriedade de uma URI de banco)
+	// connection string: at least two pairs, one of them with a connection key (or a pair that is a
+	// property of a database URI)
 	if n := strings.Count(s, "="); n >= 2 || n == 1 && strings.Contains(s, "://") {
 		pairs := connectionPairs(s)
-		// agrupa pares próximos (mesma string): basta que haja 2 chaves conhecidas a menos de 300 bytes
+		// groups nearby pairs (same string): it is enough that there are 2 known keys less than 300
+		// bytes apart
 		for k, m := range pairs {
 			key := strings.ToLower(strings.ReplaceAll(s[m[2]:m[3]], " ", ""))
 			ent, ok := connectionKeys[key]
@@ -123,15 +124,15 @@ func findConnections(s string, add func(ObjFinding)) {
 					continue
 				}
 				between := s[min(m[0], n[0]):max(m[1], n[1])]
-				// a mesma string de conexão: mesma linha, e pares ligados por ; ou & (ODBC, ADO.NET,
-				// JDBC, URL) ou escritos sem espaço em volta do "=" (DSN do libpq)
+				// the same connection string: same line, and pairs linked by ; or & (ODBC, ADO.NET,
+				// JDBC, URL) or written without spaces around the "=" (libpq DSN)
 				if !strings.Contains(between, "\n") && (strings.ContainsAny(between, ";&") || noSpaceEquals(s, m) && noSpaceEquals(s, n)) {
 					neighbor = true
 					break
 				}
 			}
-			// o par é uma propriedade de uma URI de banco ("jdbc:sqlserver://h:1433;databaseName=x",
-			// "postgresql://h/db?currentSchema=x"): a URI conta como o outro par
+			// the pair is a property of a database URI ("jdbc:sqlserver://h:1433;databaseName=x",
+			// "postgresql://h/db?currentSchema=x"): the URI counts as the other pair
 			if !neighbor && !uriProperty(s, m[2]) {
 				continue
 			}
@@ -146,8 +147,8 @@ func findConnections(s string, add func(ObjFinding)) {
 			}
 		}
 	}
-	// URIs de banco: em vez de rodar a regex no texto inteiro, parte de cada "://" e lê o
-	// esquema para trás; a regex só roda numa janela curta a partir do esquema
+	// database URIs: instead of running the regex over the whole text, it starts from each "://"
+	// and reads the scheme backwards; the regex only runs in a short window from the scheme
 	for i := strings.Index(s, "://"); i >= 0; {
 		a := i
 		for a > 0 && (isAlnum(s[a-1]) || s[a-1] == '+' || s[a-1] == ':' || s[a-1] == '_') {
@@ -156,7 +157,7 @@ func findConnections(s string, add func(ObjFinding)) {
 		ini := a
 		end := min(len(s), i+3+300)
 		if !databaseScheme(s[ini:i]) {
-			ini = end // http://, https://, ftp://...: não é URI de banco
+			ini = end // http://, https://, ftp://...: not a database URI
 		}
 		for _, m := range reDatabaseURI.FindAllStringSubmatchIndex(s[ini:end], 1) {
 			for k := range m {
@@ -167,7 +168,7 @@ func findConnections(s string, add func(ObjFinding)) {
 			if m[2] >= 0 && !publicConnection(s[m[2]:m[3]]) && !modelName(s[m[2]:m[3]]) {
 				add(ObjFinding{m[2], m[3], "usuario", "uri", true})
 			}
-			// vários hosts: h1:p1,h2:p2
+			// several hosts: h1:p1,h2:p2
 			a := m[4]
 			for _, h := range strings.Split(s[m[4]:m[5]], ",") {
 				if modelName(strings.SplitN(h, ":", 2)[0]) { // reader_connection_brakes.go
@@ -254,8 +255,8 @@ func findConnections(s string, add func(ObjFinding)) {
 	}
 }
 
-// uriProperty: a chave em s[k] vem logo depois de ; ? ou & de uma URI de banco da mesma
-// linha (sem espaço nem aspas entre o "://" e a chave).
+// uriProperty: the key at s[k] comes right after ; ? or & of a database URI on the same line
+// (without spaces or quotes between the "://" and the key).
 func uriProperty(s string, k int) bool {
 	if k == 0 || strings.IndexByte(";?&", s[k-1]) < 0 {
 		return false
@@ -276,10 +277,10 @@ func uriProperty(s string, k int) bool {
 	return databaseScheme(s[a:i])
 }
 
-// connectionPairs: os pares chave=valor de s cuja chave é de conexão, no formato de índices de
-// regex [ini, fim, chaveIni, chaveFim, valorIni, valorFim]. A chave pode ter até duas palavras
-// ("Initial Catalog", "User ID"); o valor vai até ; & espaço aspas parênteses ou fim, ou é
-// {entre chaves} (ODBC).
+// connectionPairs: the key=value pairs of s whose key is a connection key, in the regex index
+// format [start, end, keyStart, keyEnd, valueStart, valueEnd]. The key may have up to two words
+// ("Initial Catalog", "User ID"); the value goes up to ; & space quotes parentheses or the end, or
+// is {in braces} (ODBC).
 func connectionPairs(s string) [][]int {
 	var out [][]int
 	letter := func(c byte) bool { return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' }
@@ -303,8 +304,8 @@ func connectionPairs(s string) [][]int {
 			for k < keyEnd && s[k] == ' ' {
 				k++
 			}
-			// a chave tem que começar no início de um par: começo, ; & ? espaço aspas ( ou o ":"
-			// do prefixo de DSN do PDO (mysql:host=...;dbname=...)
+			// the key has to start at the beginning of a pair: start, ; & ? space quotes ( or the
+			// ":" of the PDO DSN prefix (mysql:host=...;dbname=...)
 			for k < keyEnd && !(k == 0 || strings.IndexByte(";&? \t\n\"'(", s[k-1]) >= 0 || pdoPrefix(s, k-1)) {
 				k++
 				for k < keyEnd && letter(s[k]) {
@@ -346,7 +347,8 @@ func connectionPairs(s string) [][]int {
 	return out
 }
 
-// databaseScheme: "jdbc:...", "postgresql", "mysql+pymysql", "mongodb+srv"... (o que vem antes de "://")
+// databaseScheme: "jdbc:...", "postgresql", "mysql+pymysql", "mongodb+srv"... (what comes before
+// "://")
 func databaseScheme(e string) bool {
 	e = strings.ToLower(e)
 	if strings.HasPrefix(e, "jdbc:") {
@@ -363,8 +365,8 @@ func databaseScheme(e string) bool {
 	return false
 }
 
-// pdoPrefix: s[i] é o ":" de um DSN do PDO (mysql:, pgsql:, sqlsrv:, oci:, odbc:, dblib:,
-// firebird:, ibm:, informix:) (https://www.php.net/manual/pdo.drivers.php)
+// pdoPrefix: s[i] is the ":" of a PDO DSN (mysql:, pgsql:, sqlsrv:, oci:, odbc:, dblib:, firebird:,
+// ibm:, informix:) (https://www.php.net/manual/pdo.drivers.php)
 func pdoPrefix(s string, i int) bool {
 	if i < 2 || s[i] != ':' {
 		return false
@@ -380,11 +382,11 @@ func pdoPrefix(s string, i int) bool {
 	return false
 }
 
-// Endereço de banco sem esquema, host:porta/banco (a forma do EZConnect do Oracle e das
-// mensagens de conexão: "conectando em srv01:5432/dwprd como svc_x", "connecting to
-// srv01:5432/dwprd as svc_x"). Só numa linha que fala de conexão (conectar, connect, conexão),
-// para "localhost:8080/api" de uma URL sem esquema não virar banco; "como|as <usuário>" logo
-// depois é o usuário.
+// Database address without a scheme, host:port/database (the form of Oracle's EZConnect and of
+// connection messages: "conectando em srv01:5432/dwprd como svc_x", "connecting to srv01:5432/dwprd
+// as svc_x"). Only on a line that talks about connection (conectar, connect, conexão), so that
+// "localhost:8080/api" of a URL without a scheme does not become a database; "como|as <user>" right
+// after is the user.
 var (
 	reDatabaseAddress = regexp.MustCompile(`(?:^|[\s"'=@(\[])([A-Za-z][\w.\-]*[A-Za-z0-9]):(\d{2,5})/([\pL_][\pL\w$\-]*)(?:\s+(?:como|as)\s+(?:(?:o\s+)?(?:usu[aá]rio|user|role)\s+)?([\pL_][\pL\w.$\-]*))?`)
 	reConnectionTalk  = regexp.MustCompile(`(?i)\b(?:conect|connect|conex)`)
@@ -393,13 +395,14 @@ var (
 func findDatabaseAddress(s string, add func(ObjFinding)) {
 	for _, m := range reDatabaseAddress.FindAllStringSubmatchIndex(s, -1) {
 		if f := m[7]; f < len(s) && (isAlnum(s[f]) || s[f] == '/' || s[f] == '_') && m[8] < 0 {
-			continue // caminho mais longo: host:porta/a/b é URL
+			continue // longer path: host:port/a/b is a URL
 		}
 		a, z := lineStartJ(s, m[2]), lineEndJ(s, m[2])
 		if !reConnectionTalk.MatchString(s[a:z]) {
 			continue
 		}
-		// "connecting to localhost:8080/api": sem usuário, só vale com host ou banco com cara de nome
+		// "connecting to localhost:8080/api": without a user, only counts with a name-shaped host
+		// or database
 		if db := s[m[6]:m[7]]; m[8] < 0 && publicConnection(s[m[2]:m[3]]) && !identifierShape(db) {
 			continue
 		}
@@ -415,11 +418,11 @@ func findDatabaseAddress(s string, add func(ObjFinding)) {
 	}
 }
 
-// DSN do driver MySQL do Go: usuario[:senha]@protocolo(endereço)/banco[?parâmetros]
+// Go MySQL driver DSN: user[:password]@protocol(address)/database[?parameters]
 // (https://github.com/go-sql-driver/mysql#dsn-data-source-name)
 var reDSNGo = regexp.MustCompile(`(?:^|[\s"'\x60=(,])([\pL_][\pL\w.\-]*)(?::[^@\s"'\x60]*)?@(?:tcp6?|unix)\(([^)\s"'\x60]+)\)/([\pL_][\pL\w$\-]*)`)
 
-// PDO do Oracle: oci:dbname=//host:porta/serviço
+// Oracle PDO: oci:dbname=//host:port/service
 var reDSNOci = regexp.MustCompile(`\boci:dbname=//([A-Za-z0-9_.\-]+)(?::\d+)?/([A-Za-z_][\w.$\-]*)`)
 
 func findDSN(s string, add func(ObjFinding)) {
@@ -428,7 +431,7 @@ func findDSN(s string, add func(ObjFinding)) {
 			if !publicConnection(s[m[2]:m[3]]) {
 				add(ObjFinding{m[2], m[3], "usuario", "dsn", true})
 			}
-			if s[m[4]] != '/' { // unix(/caminho/socket) não tem host
+			if s[m[4]] != '/' { // unix(/path/socket) has no host
 				addServer(s, m[4], m[5], "dsn", add)
 			}
 			if !publicConnection(s[m[6]:m[7]]) {
@@ -442,8 +445,8 @@ func findDSN(s string, add func(ObjFinding)) {
 			addParts(s, m[4], m[5], "database", "dsn", add)
 		}
 	}
-	// PDO: new PDO('mysql:host=...;dbname=...', 'usuario', $senha): a string logo depois do
-	// DSN, no mesmo argumento seguinte, é o usuário
+	// PDO: new PDO('mysql:host=...;dbname=...', 'user', $password): the string right after the DSN,
+	// in the next argument, is the user
 	for i := strings.IndexByte(s, ':'); i >= 0; {
 		if u, a, ok := userAfterDSN(s, i); ok {
 			add(ObjFinding{a, a + len(u), "usuario", "dsn", true})

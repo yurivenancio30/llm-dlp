@@ -6,8 +6,7 @@ import (
 	"time"
 )
 
-// Leitores de código, linha de comando, caminhos e URLs de nuvem.
-// Names fictícios.
+// Code, command-line, path and cloud URL readers. Made-up names.
 
 func TestReaderCodeName(t *testing.T) {
 	m := newTest(t)
@@ -38,7 +37,7 @@ func TestReaderCodeName(t *testing.T) {
 	for _, c := range pos {
 		check(t, m, c.s, []string{c.name}, nil)
 	}
-	// variável, função e classe comuns ficam; texto que não é nome de recurso fica
+	// common variables, functions and classes stay; text that is not a resource name stays
 	for _, s := range []string{
 		`pedidoId := calcularTotal(itens)`,
 		`class PedidoService { String status = "ativo"; }`,
@@ -141,8 +140,8 @@ func TestReaderCloudURLs(t *testing.T) {
 	}
 }
 
-// Escape de texto ("\nPALAVRA") não é DOMINIO\usuario; e valor de duas palavras com hífen,
-// sem dígito, é mascarado no lugar mas não ensina sozinho.
+// A text escape ("\nPALAVRA") is not DOMAIN\user; and a two-word hyphenated value, without a digit,
+// is masked in place but does not teach alone.
 func TestBrakesCodeAndNetworkUser(t *testing.T) {
 	m := newTest(t)
 	if out, ents := m.Mask(`fmt.Printf("TEXTO\nPCALIGN %d")`); len(ents) > 0 {
@@ -183,8 +182,8 @@ func TestFinalFormatAdjustments(t *testing.T) {
 	}
 }
 
-// Line única longa (JSON minificado, resposta de API) cresce de
-// forma linear. Quadrático daria ~16x de 128 KB para 512 KB; o limite é 8x.
+// A long single line (minified JSON, API response) grows linearly. Quadratic would give ~16x from
+// 128 KB to 512 KB; the limit is 8x.
 func TestLongLineLinear(t *testing.T) {
 	if testing.Short() {
 		t.Skip("mede tempo")
@@ -205,15 +204,15 @@ func TestLongLineLinear(t *testing.T) {
 			t.Errorf("%s: 512 KB levou %.1fx o tempo de 128 KB (%v / %v)", typ, r, g, p)
 		}
 	}
-	// a janela não muda o resultado: git config com a seção acima do url e git clone no fim
-	// de uma linha longa
+	// the window does not change the result: git config with the section above the url and git
+	// clone at the end of a long line
 	cfg := "[remote \"origin\"]\n\turl = https://git.ficticia.local/fin-x1/repo-x1\n"
 	check(t, m, cfg, []string{"fin-x1", "repo-x1"}, []string{"[remote \"origin\"]"})
 	longOne := strings.Repeat("x ", 3000) + "git clone https://git.ficticia.local/fin-x2/repo-x2"
 	check(t, m, longOne, []string{"repo-x2"}, nil)
 }
 
-// SELECT em maiúsculas com uma cláusula ensina, como em minúsculas.
+// Uppercase SELECT with one clause teaches, as in lowercase.
 func TestUppercaseSQLOneClauseTeaches(t *testing.T) {
 	m := newTest(t)
 	check(t, m, "SELECT * FROM fin.tb_nota_fiscal", []string{"tb_nota_fiscal"}, []string{"SELECT * FROM "})
@@ -222,8 +221,7 @@ func TestUppercaseSQLOneClauseTeaches(t *testing.T) {
 	}
 }
 
-// Tópico/fila com ponto vindo de chave de fila/tópico; atributo de código, domínio e
-// arquivo ficam.
+// Dotted topic/queue coming from a queue/topic key; code attribute, domain and file stay.
 func TestDottedTopic(t *testing.T) {
 	m := newTest(t)
 	check(t, m, "KAFKA_TOPIC=fin.notas.emitidas", []string{"fin.notas.emitidas"}, []string{"KAFKA_TOPIC="})
@@ -239,12 +237,12 @@ func TestDottedTopic(t *testing.T) {
 	}
 }
 
-// Usuário posicional depois do DSN do PDO e name no bloco metadata do Terraform.
+// Positional user after the PDO DSN and name in Terraform's metadata block.
 func TestPDOUserAndTerraformMetadata(t *testing.T) {
 	m := newTest(t)
 	u := "svc" + "_pdo_x1"
 	check(t, m, "$pdo = new PDO('mysql:host=db-x1;dbname=vendas_x1', '"+u+"', $senha);", []string{"db-x1", "vendas_x1", u}, []string{"', $senha);"})
-	// sem DSN literal antes, o argumento não tem dono; "root" é público
+	// without a literal DSN before it, the argument has no owner; "root" is public
 	if out, ents := m.Mask("$pdo = new PDO($dsn, 'svc_pdo_x2', $senha);"); len(ents) > 0 {
 		t.Errorf("string sem DSN antes mascarada: %q", out)
 	}

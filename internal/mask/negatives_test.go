@@ -2,9 +2,9 @@ package mask
 
 import "testing"
 
-// Nada mascarado a mais em texto comum (prosa em português e inglês, código Go e Python,
-// YAML público, logs comuns, saídas de ps, ls e git log), com e sem a extensão da dica de uma
-// saída de comando.
+// Nothing masked in excess in common text (prose in Portuguese and English, Go and Python code,
+// public YAML, common logs, outputs of ps, ls and git log), with and without the hint extension of
+// a command output.
 var t8Negatives = []struct{ name, text string }{
 	{"prosa pt", "Hoje revisei o relatório de vendas com a equipe e combinamos de rodar a carga de novo amanhã cedo.\nO resultado ficou melhor que o da semana passada.\n"},
 	{"prosa en", "We reviewed the quarterly report with the team and agreed to rerun the load tomorrow morning.\nThe numbers look better than last week.\n"},

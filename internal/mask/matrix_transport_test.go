@@ -8,16 +8,16 @@ import (
 	"testing"
 )
 
-// Matriz CONTEÚDO × TRANSPORTE × DESENHO: cada conteúdo (registros com
-// campos de tipo conhecido) é escrito em cada desenho e embrulhado em cada transporte. Rule:
-// os mesmos nomes mascarados em todas as células, sem nada no config. Meta: 95%. Os negativos
-// (conteúdo sem nome interno) não podem ter nada mascarado em célula nenhuma.
+// CONTENT × TRANSPORT × LAYOUT matrix: each content (records with fields of a known type) is
+// written in each layout and wrapped in each transport. Rule: the same names masked in every cell,
+// with nothing in the config. Target: 95%. The negatives (content without internal names) cannot
+// have anything masked in any cell.
 
 type contentM struct {
 	name  string
 	cols  []string
 	rows  [][]string
-	names []int // as colunas que guardam nome
+	names []int // the columns that hold names
 }
 
 var matrixContents = []contentM{
@@ -45,7 +45,7 @@ var matrixNegatives = []contentM{
 type layoutM struct {
 	name       string
 	f          func(cols []string, rows [][]string) string
-	propagated bool // só pela propagação: o texto não tem a estrutura (vem depois do CSV)
+	propagated bool // only by propagation: the text does not have the structure (it comes after the CSV)
 }
 
 func widths(cols []string, rows [][]string) []int {
@@ -206,7 +206,7 @@ var matrixLayouts = []layoutM{
 	}, true},
 }
 
-// matrixCell: quantos nomes do conteúdo foram mascarados no texto (desenho, transporte).
+// matrixCell: how many names of the content were masked in the text (layout, transport).
 func matrixCell(t *testing.T, c contentM, d layoutM, tr transport) (ok, tot int, out string) {
 	m := newTest(t)
 	m.cfg.InternalDomains = nil
@@ -218,7 +218,8 @@ func matrixCell(t *testing.T, c contentM, d layoutM, tr transport) (ok, tot int,
 			if seen[r[j]] {
 				continue
 			}
-			// só pela propagação: coluna não é propagada (nomes como user_id existem em todo código)
+			// only by propagation: a column is not propagated (names like user_id exist in all
+			// code)
 			if d.propagated && strings.Contains(c.cols[j], "column") {
 				continue
 			}
@@ -227,7 +228,7 @@ func matrixCell(t *testing.T, c contentM, d layoutM, tr transport) (ok, tot int,
 		}
 	}
 	if d.propagated {
-		m.Mask(join(",")(c.cols, c.rows)) // o arquivo passou antes pela conversa
+		m.Mask(join(",")(c.cols, c.rows)) // the file went through the conversation before
 	}
 	txt := tr.f(d.f(c.cols, c.rows))
 	ok, tot = checkMasked(t, m, c.name+"/"+d.name+"/"+tr.name, txt, names)

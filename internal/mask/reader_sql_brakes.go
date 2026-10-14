@@ -2,27 +2,26 @@ package mask
 
 import "strings"
 
-// Freios do leitor de SQL (medidos no corpus público: TestMeasurePublicCorpus com
-// LLM_DLP_AMOSTRA). Os falsos positivos vinham de três formas, nenhuma delas de SQL:
+// Brakes of the SQL reader (measured on the public corpus: TestMeasurePublicCorpus with
+// LLM_DLP_SAMPLE). The false positives came from three shapes, none of them SQL:
 //
-//   - comentário de código que fala do código ("// Use x.Errors", "# delete FROM line",
+//   - code comment talking about the code ("// Use x.Errors", "# delete FROM line",
 //     "// Insert into hash table", "would never call drain(), so");
-//   - palavra-chave em maiúsculas no meio de outra frase em maiúsculas ("# 0x3B -> CUSTOMER
-//     USE THREE", tabela de caracteres);
-//   - campo de struct com nome de palavra-chave ("Use   uint32", "Exec  string").
+//   - uppercase keyword in the middle of another uppercase sentence ("# 0x3B -> CUSTOMER
+//     USE THREE", character table);
+//   - struct field named like a keyword ("Use   uint32", "Exec  string").
 //
-// Os freios são de forma (posição na linha, o que vem depois do nome), sem lista de palavras.
+// The brakes are about shape (position in the line, what comes after the name), with no word list.
 
-// lineComment: s[i] está num comentário de linha de código (#, //, /*, * de bloco); primeira
-// diz se a palavra em i é a primeira depois do marcador.
+// lineComment: s[i] is in a code line comment (#, //, /*, block *); firstOne says whether the word
+// at i is the first one after the marker.
 func lineComment(s string, i int) (with, firstOne bool) {
 	ls := strings.LastIndexByte(s[:i], '\n') + 1
 	p := strings.TrimLeft(s[ls:i], " \t")
 	if strings.HasPrefix(p, "#") || strings.HasPrefix(p, "//") || strings.HasPrefix(p, "/*") || strings.HasPrefix(p, "* ") {
 		return true, strings.Trim(p, "#/*! \t") == ""
 	}
-	// comentário no fim de uma linha de código ("x = 1   # ...", "f() // ..."): o marcador
-	// depois de um espaço
+	// comment at the end of a code line ("x = 1 # ...", "f() // ..."): the marker after a space
 	for _, mk := range []string{" #", "\t#", " //", "\t//"} {
 		if k := strings.LastIndex(p, mk); k >= 0 {
 			return true, strings.Trim(p[k:], "#/*! \t") == ""
@@ -31,8 +30,8 @@ func lineComment(s string, i int) (with, firstOne bool) {
 	return false, false
 }
 
-// wordBeforeInLine: há uma palavra (letras) logo antes de s[i], na mesma linha, separada
-// só por espaço: a palavra em i está no meio de uma frase ("you can use x", "should call f()").
+// wordBeforeInLine: there is a word (letters) right before s[i], on the same line, separated only
+// by space: the word at i is in the middle of a sentence ("you can use x", "should call f()").
 func wordBeforeInLine(s string, i int) bool {
 	k := i
 	for k > 0 && (s[k-1] == ' ' || s[k-1] == '\t') {
@@ -45,9 +44,9 @@ func wordBeforeInLine(s string, i int) bool {
 	return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c == '\''
 }
 
-// statementStart: uma instrução em maiúsculas não começa logo depois de outra palavra em
-// maiúsculas que não é do SQL ("CUSTOMER USE THREE": frase em maiúsculas; "EXPLAIN SELECT"
-// continua valendo, EXPLAIN é do vocabulário).
+// statementStart: an uppercase statement does not start right after another uppercase word that is
+// not SQL ("CUSTOMER USE THREE": an uppercase sentence; "EXPLAIN SELECT" still counts, EXPLAIN is
+// in the vocabulary).
 func statementStart(s string, i int) bool {
 	k := i
 	for k > 0 && (s[k-1] == ' ' || s[k-1] == '\t') {
@@ -63,14 +62,14 @@ func statementStart(s string, i int) bool {
 	return publicSQL(s[j:k])
 }
 
-// statementOutsideProse: a instrução que não está em maiúsculas (kw em i, forma já sem os
-// comentários de SQL) não é código falando de código. prosa: a palavra-chave é palavra comum
-// (use, call, exec...).
+// statementOutsideProse: the statement that is not in uppercase (kw at i, shape already without SQL
+// comments) is not code talking about code. prose: the keyword is a common word (use, call,
+// exec...).
 func statementOutsideProse(s string, i int, shape, kw string, prose bool) bool {
 	target, after := sqlTarget(shape, kw)
 	if with, firstOne := lineComment(s, i); with {
-		// num comentário de código, só uma instrução que abre o comentário e cujo alvo tem cara
-		// de identificador ("# delete from tb_log_x where"); palavra comum é prosa ali
+		// in a code comment, only a statement that opens the comment and whose target looks like an
+		// identifier ("# delete from tb_log_x where"); a common word is prose there
 		if prose || !firstOne || !identifierShape(strings.Trim(target, "[]\"`")) {
 			return false
 		}
@@ -78,17 +77,17 @@ func statementOutsideProse(s string, i int, shape, kw string, prose bool) bool {
 	if !prose {
 		return true
 	}
-	// palavra comum no meio de uma frase ("you can use x", "can't use x", "should call f()")
+	// common word in the middle of a sentence ("you can use x", "can't use x", "should call f()")
 	if wordBeforeInLine(s, i) {
 		return false
 	}
-	// "Use   uint32": campo de struct, não USE; o alvo de uma instrução não é tipo de dado
+	// "Use uint32": struct field, not USE; the target of a statement is not a data type
 	if isDataType(target) {
 		return false
 	}
-	// "call drain(), so", "Call data.encode(...) but": chamada de função citada numa frase.
-	// CALL/EXEC de SQL termina depois dos parênteses (";", fim da linha ou do texto).
-	// CALL sempre leva parênteses (Snowflake, Postgres, MySQL, Oracle): "call    pkg.Type" é campo
+	// "call drain(), so", "Call data.encode(...) but": function call cited in a sentence. SQL
+	// CALL/EXEC ends after the parentheses (";", end of line or of the text). CALL always takes
+	// parentheses (Snowflake, Postgres, MySQL, Oracle): "call pkg.Type" is a field
 	if kw == "CALL" && !strings.HasPrefix(strings.TrimLeft(after, " \t"), "(") {
 		return false
 	}
@@ -113,8 +112,9 @@ func statementOutsideProse(s string, i int, shape, kw string, prose bool) bool {
 	return true
 }
 
-// sqlTarget: o primeiro nome da instrução (a tabela do SELECT/INSERT/DELETE/UPDATE, o objeto do
-// DDL, a procedure do CALL) e o resto do texto depois dele. "" se a forma não for das curtas.
+// sqlTarget: the first name of the statement (the table of the SELECT/INSERT/DELETE/UPDATE, the DDL
+// object, the CALL procedure) and the rest of the text after it. "" if the shape is not one of the
+// short ones.
 func sqlTarget(shape, kw string) (string, string) {
 	switch kw {
 	case "SELECT":

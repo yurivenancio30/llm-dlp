@@ -8,17 +8,17 @@ import (
 	"unicode/utf8"
 )
 
-// Swap dos achados por pseudônimos.
+// Swapping the findings for pseudonyms.
 
-// Swap dos achados por pseudônimos.
+// Swapping the findings for pseudonyms.
 
-// aplicar resolve sobreposições (fica o trecho mais longo) e troca por pseudônimos.
+// apply resolves overlaps (the longest piece stays) and swaps for pseudonyms.
 func (m *Masker) apply(s string, findings []Finding) (string, []Entry) {
 	t, e, _ := m.applyT(s, findings)
 	return t, e
 }
 
-// applyT é o aplicar que devolve também os trechos trocados (ver memory_sent.go).
+// applyT is apply that also returns the swapped pieces (see memory_sent.go).
 func (m *Masker) applyT(s string, findings []Finding) (string, []Entry, []snippet) {
 	if len(findings) == 0 {
 		return s, nil, nil
@@ -31,8 +31,8 @@ func (m *Masker) applyT(s string, findings []Finding) (string, []Entry, []snippe
 		if a.End-a.Start != b.End-b.Start {
 			return a.End-a.Start > b.End-b.Start
 		}
-		// mesmo trecho com dois tipos: sempre a mesma escolha (o pseudônimo não pode variar).
-		// Fica o detector de dado pessoal; entre objetos, a ordem do tipo.
+		// the same piece with two types: always the same choice (the pseudonym cannot vary). The
+		// personal data detector wins; among objects, the type order.
 		if isObject(a.Type) != isObject(b.Type) {
 			return !isObject(a.Type)
 		}
@@ -57,12 +57,12 @@ func (m *Masker) applyT(s string, findings []Finding) (string, []Entry, []snippe
 	return b.String(), entries, ts
 }
 
-// entryOf acrescenta a entrada de um trecho trocado. As outras caixas do pseudônimo, que o
-// modelo pode escrever ("T_abc", "t_abc", "T_ABC"), não entram aqui: NewTable as acrescenta
-// depois de todas as grafias que apareceram (ver caseVariants).
+// entryOf adds the entry of a swapped piece. The other cases of the pseudonym, which the model may
+// write ("T_abc", "t_abc", "T_ABC"), do not enter here: NewTable adds them after all the spellings
+// that appeared (see caseVariants).
 func entryOf(entries []Entry, ps, real, typ string) []Entry {
 	entries = append(entries, Entry{ps, real, typ})
-	if typ == "email" { // o modelo às vezes cita só o domínio: "dxxxx.invalid" volta a ser o domínio real
+	if typ == "email" { // the model sometimes cites only the domain: "dxxxx.invalid" goes back to the real domain
 		if i, j := strings.LastIndexByte(ps, '@'), strings.LastIndexByte(real, '@'); i >= 0 && j >= 0 {
 			entries = append(entries, Entry{ps[i+1:], real[j+1:], "dominio"})
 		}
@@ -70,8 +70,8 @@ func entryOf(entries []Entry, ps, real, typ string) []Entry {
 	return entries
 }
 
-// remontar refaz o texto enviado antes a partir dos trechos guardados: sai igual, byte a
-// byte, mesmo que hoje se saiba mais (ver memory_sent.go). Trecho inválido: não remonta.
+// rebuild redoes the text sent before from the stored pieces: it goes out the same, byte for byte,
+// even if more is known today (see memory_sent.go). Invalid piece: does not rebuild.
 func rebuild(s string, ts []snippet) (string, []Entry, bool) {
 	var b strings.Builder
 	var entries []Entry
@@ -89,8 +89,8 @@ func rebuild(s string, ts []snippet) (string, []Entry, bool) {
 	return b.String(), entries, true
 }
 
-// Pseudonym devolve o pseudônimo estável de um valor real de um tipo. Todo pseudônimo fica
-// registrado: um que sobre na volta, sem desmascarar, é com certeza nosso (ver NotUndone).
+// Pseudonym returns the stable pseudonym of a real value of a type. Every pseudonym is registered:
+// one left over on the return path, without unmasking, is surely ours (see NotUndone).
 func (m *Masker) Pseudonym(typ, real string) string {
 	ps := m.pseudonym(typ, real)
 	registerPseudo(ps)
@@ -112,8 +112,8 @@ func (m *Masker) pseudonym(typ, real string) string {
 		if pid == "" {
 			pid = m.p.ID("email", e)
 		}
-		// formato curto de propósito: medido, "pessoa.X@dom-YYYYYYYY.invalid" custava ~16% mais
-		// tokens que o e-mail real; este custa ~1,5% (o domínio só precisa distinguir domínios)
+		// short format on purpose: measured, "pessoa.X@dom-YYYYYYYY.invalid" cost ~16% more tokens
+		// than the real e-mail; this one costs ~1.5% (the domain only needs to tell domains apart)
 		return "p." + pid + "@d" + m.p.ID("dominio", e[at+1:])[:4] + ".invalid"
 	case "nome":
 		pid := ""
@@ -123,8 +123,8 @@ func (m *Masker) pseudonym(typ, real string) string {
 		if pid == "" {
 			pid = m.p.ID("nome", NormName(real))
 		}
-		// a mesma pessoa, com a caixa da grafia ("MARIA SILVA", "maria silva"): a volta devolve
-		// cada grafia como estava (ver nameVariants)
+		// the same person, with the case of the spelling ("MARIA SILVA", "maria silva"): the return
+		// gives each spelling back as it was (see nameVariants)
 		switch nameCase(real) {
 		case 'A':
 			return "PESSOA " + strings.ToUpper(pid)
@@ -146,7 +146,7 @@ func (m *Masker) pseudonym(typ, real string) string {
 	case "segredo":
 		return "SEGREDO-" + m.p.ID("segredo", real)
 	case "usuario":
-		// código de uma pessoa importada: mesmo id do nome e do e-mail dela
+		// code of an imported person: the same id as their name and e-mail
 		pid := ""
 		if m.people != nil {
 			pid = m.people.PID(m.p, "codigo", NormName(real))
@@ -157,7 +157,7 @@ func (m *Masker) pseudonym(typ, real string) string {
 		return pseudoLabel("USUARIO", pid, real)
 	}
 	if numericTypes[typ] {
-		if typ == "cnpj" && ValidAlphaCNPJ(real) { // o formato novo tem letras: não vale só os dígitos
+		if typ == "cnpj" && ValidAlphaCNPJ(real) { // the new format has letters: the digits alone are not enough
 			return "CNPJ-" + m.p.ID(typ, NormName(real))
 		}
 		return strings.ToUpper(typ) + "-" + m.p.ID(typ, canonNum(real))
@@ -166,13 +166,13 @@ func (m *Masker) pseudonym(typ, real string) string {
 	return pseudoLabel(strings.ToUpper(lbl), m.p.ID(typ, NormName(real)), real)
 }
 
-// numericTypes: o pseudônimo vem só dos dígitos (canonNum).
+// numericTypes: the pseudonym comes only from the digits (canonNum).
 var numericTypes = setOf("cpf", "cnpj", "pis", "cnh", "telefone", "cep", "cartao", "rg", "conta")
 
-// pseudoWithCase: o pseudônimo do tipo segue a caixa da grafia real, e a volta acrescenta as
-// outras caixas dele (caseVariants): os objetos (pseudoObject) e os tipos com rótulo cuja chave
-// não tem caixa (pseudoLabel: usuário, termo cadastrado, padrão extra, endereço...). Pessoa tem
-// as próprias formas (nameVariants); e-mail, host, IP, segredo e números, não.
+// pseudoWithCase: the type's pseudonym follows the case of the real spelling, and the return adds
+// its other cases (caseVariants): objects (pseudoObject) and labeled types whose key has no case
+// (pseudoLabel: user, registered term, extra pattern, address...). A person has its own forms
+// (nameVariants); e-mail, host, IP, secret and numbers do not.
 func pseudoWithCase(typ string) bool {
 	if isObject(typ) {
 		return true
@@ -184,7 +184,7 @@ func pseudoWithCase(typ string) bool {
 	return !numericTypes[typ]
 }
 
-// pseudoSep: o separador entre o prefixo e o id do pseudônimo ("T_abc", "EMPRESA-abc").
+// pseudoSep: the separator between the prefix and the id of the pseudonym ("T_abc", "EMPRESA-abc").
 func pseudoSep(typ string) byte {
 	if isObject(typ) {
 		return '_'
@@ -192,19 +192,20 @@ func pseudoSep(typ string) byte {
 	return '-'
 }
 
-// pseudoLabel: rótulo + id, na caixa da grafia, como o nome de pessoa: o mesmo valor escrito
-// "SGP", "sgp" e "SgP" (a chave do id não tem caixa) sai "EMPRESA-x", "empresa-x" e "Empresa-x",
-// e a volta devolve cada grafia como estava. Sem letras, a forma de sempre (rótulo em maiúsculas).
-// O id fica em minúsculas em todas: as três formas custam os mesmos tokens.
+// pseudoLabel: label + id, in the case of the spelling, like a person's name: the same value
+// written "SGP", "sgp" and "SgP" (the id key has no case) goes out as "EMPRESA-x", "empresa-x" and
+// "Empresa-x", and the return gives each spelling back as it was. Without letters, the usual form
+// (label in uppercase). The id stays lowercase in all of them: the three forms cost the same
+// tokens.
 func pseudoLabel(lbl, id, real string) string {
 	ps := labelShape(lbl, id, real)
-	if ps[:len(lbl)] != lbl { // len(ps) > len(rot): ps = rot na caixa da grafia + "-" + id
-		registerPseudo(ps) // as formas novas não têm a cara que reReadyPseudo conhece (ver isPseudoLabel)
+	if ps[:len(lbl)] != lbl { // len(ps) > len(lbl): ps = lbl in the case of the spelling + "-" + id
+		registerPseudo(ps) // the new forms do not have the look reReadyPseudo knows (see isPseudoLabel)
 	}
 	return ps
 }
 
-// labelShape: o pseudônimo de pseudoLabel, sem registrar.
+// labelShape: the pseudonym of pseudoLabel, without registering it.
 func labelShape(lbl, id, real string) string {
 	switch caseOf(real) {
 	case 'a':
@@ -215,8 +216,8 @@ func labelShape(lbl, id, real string) string {
 	return lbl + "-" + id
 }
 
-// primaryLabel: ps (rot + "-" + id) é a forma que labelShape dá para a grafia real? Sem
-// montar a string (NewTable pergunta isso de cada entrada).
+// primaryLabel: is ps (lbl + "-" + id) the form labelShape gives for the real spelling? Without
+// building the string (NewTable asks this of every entry).
 func primaryLabel(lbl, id, real string) bool {
 	if id != strings.ToLower(id) {
 		return false
@@ -231,8 +232,8 @@ func primaryLabel(lbl, id, real string) bool {
 	return lbl == strings.ToUpper(lbl)
 }
 
-// caseOf: 'A' (só maiúsculas), 'a' (só minúsculas), 'M' (as duas) ou 0 (nenhuma letra com
-// caixa), sem alocar.
+// caseOf: 'A' (uppercase only), 'a' (lowercase only), 'M' (both) or 0 (no letter with case),
+// without allocating.
 func caseOf(s string) byte {
 	upper, lowerSeen := false, false
 	for _, r := range s {
@@ -255,7 +256,7 @@ func caseOf(s string) byte {
 	return 0
 }
 
-// capitalizar: a primeira letra em maiúscula, o resto em minúsculas.
+// capitalize: the first letter in uppercase, the rest in lowercase.
 func capitalize(s string) string {
 	r, n := utf8.DecodeRuneInString(s)
 	if n == 0 {
@@ -264,12 +265,12 @@ func capitalize(s string) string {
 	return string(unicode.ToUpper(r)) + strings.ToLower(s[n:])
 }
 
-// rePseudoLabel: a FORMA de um pseudônimo de rótulo em qualquer caixa. Só a forma não basta
-// ("maria-fernanda" tem essa cara): ver isPseudoLabel.
+// rePseudoLabel: the SHAPE of a label pseudonym in any case. The shape alone is not enough
+// ("maria-fernanda" has that look): see isPseudoLabel.
 var rePseudoLabel = regexp.MustCompile(`^[A-Za-z:]+-[a-zA-Z2-7]{8}$`)
 
-// isPseudoLabel: v é um pseudônimo de rótulo em minúsculas ou com só a primeira maiúscula gerado
-// por nós (a forma em maiúsculas, a de sempre, reReadyPseudo já reconhece)?
+// isPseudoLabel: is v a label pseudonym in lowercase or with only the first letter capitalized,
+// generated by us (the uppercase form, the usual one, reReadyPseudo already recognizes)?
 func isPseudoLabel(v string) bool {
 	if !rePseudoLabel.MatchString(v) {
 		return false
@@ -278,12 +279,13 @@ func isPseudoLabel(v string) bool {
 	return ok
 }
 
-// caseVariants: as outras caixas do pseudônimo de um objeto ou de um tipo com rótulo, que o
-// modelo pode escrever ("T_abc", "t_abc", "T_ABC", "Empresa-x"). A variante volta ao valor real
-// como ele entrou: o modelo que troca a caixa de um pseudônimo não inventa uma grafia nova
-// ("/dados/SGP" e "/dados/sgp" são duas pastas). Cada forma que uma grafia gera já está em m
-// quando a grafia apareceu (e então a variante não entra); a toda em maiúsculas, que nenhuma
-// grafia gera, volta à grafia em maiúsculas quando ela apareceu. m: o de:para já montado.
+// caseVariants: the other cases of the pseudonym of an object or of a labeled type, which the model
+// may write ("T_abc", "t_abc", "T_ABC", "Empresa-x"). The variant goes back to the real value as it
+// entered: a model that changes the case of a pseudonym does not invent a new spelling
+// ("/dados/SGP" and "/dados/sgp" are two folders). Each form a spelling generates is already in m
+// when the spelling appeared (and then the variant does not enter); the all-uppercase one, which no
+// spelling generates, goes back to the uppercase spelling when it appeared. m: the mapping already
+// built.
 func caseVariants(ps, real, typ string, m map[string]string) []Entry {
 	i := strings.LastIndexByte(ps, pseudoSep(typ))
 	if i <= 0 {
@@ -292,7 +294,7 @@ func caseVariants(ps, real, typ string, m map[string]string) []Entry {
 	pfx := ps[:i]
 	alts := [4]string{strings.ToUpper(pfx) + ps[i:], strings.ToLower(ps), strings.ToUpper(ps)}
 	if !isObject(typ) {
-		alts[3] = capitalize(pfx) + ps[i:] // "Empresa-x": a forma da grafia com caixa mista
+		alts[3] = capitalize(pfx) + ps[i:] // "Empresa-x": the form of the mixed-case spelling
 	}
 	var out []Entry
 	for k, alt := range alts {
@@ -300,7 +302,7 @@ func caseVariants(ps, real, typ string, m map[string]string) []Entry {
 			continue
 		}
 		r := real
-		if k == 2 { // "T_ABC": a grafia do "T_abc" (em maiúsculas), se apareceu
+		if k == 2 { // "T_ABC": the spelling of "T_abc" (in uppercase), if it appeared
 			if g, ok := m[strings.ToUpper(pfx)+strings.ToLower(ps[i:])]; ok && sameValue(typ, g, real) {
 				r = g
 			}
@@ -310,7 +312,7 @@ func caseVariants(ps, real, typ string, m map[string]string) []Entry {
 	return out
 }
 
-// nameCase: 'A' para nome todo em maiúsculas, 'a' para todo em minúsculas, 'M' para o resto.
+// nameCase: 'A' for a name all in uppercase, 'a' for all in lowercase, 'M' for the rest.
 func nameCase(s string) byte {
 	switch {
 	case strings.ToUpper(s) == s && strings.ToLower(s) != s:
@@ -321,11 +323,11 @@ func nameCase(s string) byte {
 	return 'M'
 }
 
-// nameConnectives: as palavras que ficam minúsculas num nome com as iniciais maiúsculas.
+// nameConnectives: the words that stay lowercase in a name with capital initials.
 var nameConnectives = setOf("da", "das", "de", "do", "dos", "e", "del", "di", "du", "van", "von")
 
-// nameVariants: as outras caixas do pseudônimo de uma pessoa (o modelo pode reescrever a
-// caixa, como faz com os nomes de objeto), com o nome real na mesma caixa.
+// nameVariants: the other cases of a person's pseudonym (the model may rewrite the case, as it does
+// with object names), with the real name in the same case.
 func nameVariants(ps, real string) []Entry {
 	i := strings.IndexByte(ps, ' ')
 	if i < 0 {

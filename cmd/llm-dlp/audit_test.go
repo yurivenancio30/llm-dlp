@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// O resumo do "llm-dlp audit" a partir de linhas de log como o proxy escreve.
+// The "llm-dlp audit" summary from log lines as the proxy writes them.
 func TestLogSummary(t *testing.T) {
 	now := time.Now()
 	h := func(d time.Duration) string { return now.Add(-d).Format("2006/01/02 15:04:05") + " " }
@@ -48,8 +48,8 @@ func TestLogSummary(t *testing.T) {
 	}
 }
 
-// O log gira ao passar do tamanho máximo, também com o processo no ar, e quem escreve depois
-// que outro processo girou continua no arquivo novo.
+// The log rotates when it passes the maximum size, also with the process running, and whoever
+// writes after another process rotated it goes on in the new file.
 func TestLogRotates(t *testing.T) {
 	before := maxLog
 	maxLog = 200

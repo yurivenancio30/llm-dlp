@@ -9,32 +9,32 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/config"
 )
 
-// Endereços inventados. Cada caso: o texto, o que tem de sumir e o que tem de ficar.
+// Made-up addresses. Each case: the text, what has to disappear and what has to stay.
 func TestInternalIPByData(t *testing.T) {
 	m := newTest(t)
 	cases := []struct {
 		s           string
 		gone, stays []string
 	}{
-		// faixa compartilhada (RFC 6598), como a privada
+		// shared range (RFC 6598), like the private one
 		{"cgnat 100.72.5.9 e 100.127.255.1", []string{"100.72.5.9", "100.127.255.1"}, nil},
 		{"fora da faixa 100.128.0.1 e 100.63.255.255", nil, []string{"100.128.0.1", "100.63.255.255"}},
-		// com hífens, no nome da máquina (AWS, Kubernetes)
+		// with hyphens, in the machine name (AWS, Kubernetes)
 		{"ubuntu@ip-10-42-7-15:~$ ls", []string{"10-42-7-15"}, []string{"ubuntu@ip-"}},
 		{"[ec2-user@ip-172-31-20-7 ~]$", []string{"172-31-20-7"}, []string{"ec2-user@ip-"}},
 		{"pod 10-42-7-15.default.pod.cluster.local", []string{"10-42-7-15"}, []string{".default.pod.cluster.local"}},
 		{"versão 10-1-2-3 do pacote, data 2024-10-05, faixa 10-20-30-40-50", nil, []string{"10-1-2-3", "2024-10-05", "10-20-30-40-50"}},
-		// nome reverso (RFC 1035, 3.5): endereço e zona /24
+		// reverse name (RFC 1035, 3.5): address and /24 zone
 		{"PTR 15.7.42.10.in-addr.arpa", []string{"15.7.42.10"}, []string{".in-addr.arpa"}},
 		{"zona 7.42.10.in-addr.arpa", []string{"7.42.10."}, []string{".in-addr.arpa"}},
-		{"PTR 21.88.14.52.in-addr.arpa", nil, []string{"21.88.14.52.in-addr.arpa"}}, // 52.14.88.21: público
-		// IPv6: local único, link-local com identificador de interface, IPv4 interno em hexadecimal
+		{"PTR 21.88.14.52.in-addr.arpa", nil, []string{"21.88.14.52.in-addr.arpa"}}, // 52.14.88.21: public
+		// IPv6: unique local, link-local with an interface identifier, internal IPv4 in hexadecimal
 		{"ula fd12:3456:789a:1::15 e [fd12:3456:789a:1::15]:8080", []string{"fd12:3456:789a:1::15"}, []string{"]:8080"}},
 		{"link fe80::1c2d:3e4f:5a6b:7c8d%eth0", []string{"fe80::1c2d:3e4f:5a6b:7c8d"}, []string{"%eth0"}},
 		{"mapped ::ffff:a2a:70f", []string{"a2a:70f"}, nil},
 		{"PTR 5.1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.1.0.0.0.a.9.8.7.6.5.4.3.2.1.d.f.ip6.arpa", []string{"a.9.8.7"}, []string{".ip6.arpa"}},
-		// não identificam rede de ninguém: faixa escrita numa explicação, endereço posto à mão,
-		// endereços fixos da AWS, IPv6 público (só com public_ip)
+		// they identify nobody's network: a range written in an explanation, an address set by
+		// hand, fixed AWS addresses, public IPv6 (only with public_ip)
 		{"a faixa fd00::/8 e fc00::/7; gateway fe80::1; metadados [fd00:ec2::254] e DNS fd00:ec2::253", nil,
 			[]string{"fd00::/8", "fc00::/7", "fe80::1", "fd00:ec2::254", "fd00:ec2::253"}},
 		{"global 2804:14c:5b81:8a00::15 link-local 169.254.12.3", nil, []string{"2804:14c:5b81:8a00::15", "169.254.12.3"}},
@@ -57,8 +57,9 @@ func TestInternalIPByData(t *testing.T) {
 	}
 }
 
-// O IP falso tem a grafia do real, e a mesma rede /24 vira sempre a mesma rede falsa, em
-// qualquer grafia: o modelo continua vendo que são a mesma máquina e a mesma rede.
+// The fake IP has the spelling of the real one, and the same /24 network always becomes the same
+// fake network, in any spelling: the model still sees they are the same machine and the same
+// network.
 func TestFakeIPSameSpelling(t *testing.T) {
 	m := newTest(t)
 	dot := m.Pseudonym("ip", "10.42.7.15")
@@ -87,7 +88,8 @@ func TestReaderInternalIP(t *testing.T) {
 	})
 }
 
-// IP público no nome da máquina (AWS) e no nome reverso: só com public_ip, como o IP solto.
+// Public IP in the machine name (AWS) and in the reverse name: only with public_ip, like the loose
+// IP.
 func TestPublicIPInName(t *testing.T) {
 	b := netip.MustParseAddr("2600:1f18:abcd::3").As16()
 	var ptr []string
@@ -111,12 +113,12 @@ func TestPublicIPInName(t *testing.T) {
 	}
 }
 
-// ID de recurso da AWS solto: o mesmo pseudônimo que tem dentro do ARN.
+// A loose AWS resource ID: the same pseudonym it has inside the ARN.
 func TestIDsAWS(t *testing.T) {
 	checkReader(t, "nuvem", findCloud, nil, []readerCase{
 		{"vpc-0a1b2c3d4e5f67890 subnet-0f1e2d3c i-0abc1234def567890 tgw-attach-0123456789abcdef0",
 			[]string{"servico:i-0abc1234def567890!", "servico:subnet-0f1e2d3c!", "servico:tgw-attach-0123456789abcdef0!", "servico:vpc-0a1b2c3d4e5f67890!"}},
-		// prefixo fora da lista, tamanho errado, sem dígito, colado, imagem pública da AWS
+		// prefix outside the list, wrong length, no digit, glued, AWS public image
 		{"fix-1a2b3c4d vpc-0a1b2c3 sg-deadbeef xvpc-0a1b2c3d ami-0abcdef1234567890", nil},
 	})
 	m := newTest(t)

@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-// O resultado de uma ferramenta é tipado pelo comando do tool_use do mesmo
-// id. A mesma saída com outro comando não é tipada.
+// The result of a tool is typed by the command of the tool_use with the same id. The same output
+// with another command is not typed.
 func TestCommandTypesResult(t *testing.T) {
 	output := "t_lanc_diario\nt_nota_entrada\nt_saldo_mes\n"
 	names := []string{"t_lanc_diario", "t_nota_entrada", "t_saldo_mes"}

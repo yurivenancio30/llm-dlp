@@ -10,10 +10,10 @@ import (
 
 var rePseTab = regexp.MustCompile(`\bt_[a-z2-7]{8}\b`)
 
-// O que acontece quando o modelo não devolve o pseudônimo exatamente como recebeu: num arquivo
-// gerado, nenhuma das formas abaixo deixa o pseudônimo no arquivo. Ele é trocado onde aparece
-// inteiro, também dentro de um nome maior (vw_<nome>, <nome>_bkp); com a caixa trocada, volta o
-// nome real na caixa em que entrou na conversa.
+// What happens when the model does not return the pseudonym exactly as it received it: in a
+// generated file, none of the forms below leaves the pseudonym in the file. It is swapped where it
+// appears whole, also inside a larger name (vw_<name>, <name>_bkp); with the case changed, the real
+// name comes back in the case it entered the conversation.
 func TestPseudonymDerivedByModel(t *testing.T) {
 	const table = "pedidos_acme"
 	ddl := "CREATE TABLE " + table + " (id INT PRIMARY KEY, nota TEXT);\n"
@@ -28,13 +28,13 @@ func TestPseudonymDerivedByModel(t *testing.T) {
 		{"com sufixo", func(p string) string { return p + "_bkp" }, table + "_bkp", true},
 		{"entre crases", func(p string) string { return "`" + p + "`" }, "`" + table + "`", true},
 		{"qualificado", func(p string) string { return "dbo." + p + ".id" }, "dbo." + table + ".id", true},
-		// com a caixa trocada pelo modelo, volta o nome real na caixa em que ele entrou
+		// with the case changed by the model, the real name comes back in the case it entered
 		{"em maiúsculas", func(p string) string { return strings.ToUpper(p) }, table, true},
 		{"só a inicial maiúscula", func(p string) string { return strings.ToUpper(p[:1]) + p[1:] }, table, true},
 	}
 	var bodies [][]byte
 	px := buildMem(t, t.TempDir(), &bodies, func(body []byte, w http.ResponseWriter) {
-		// o modelo "escreve" um arquivo usando o pseudônimo da tabela em cada forma
+		// the model "writes" a file using the table's pseudonym in each form
 		var req struct {
 			Messages []json.RawMessage `json:"messages"`
 		}

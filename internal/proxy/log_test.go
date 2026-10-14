@@ -14,8 +14,9 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/mask"
 )
 
-// A linha de cada requisição no log diz quantos valores de cada tipo foram mascarados e quais
-// pseudônimos voltaram ao cliente sem virar o valor real. Nenhum valor real vai para o log.
+// The line of each request in the log says how many values of each type were masked and which
+// pseudonyms came back to the client without becoming the real value. No real value goes to the
+// log.
 func TestLogByTypeAndNotUndone(t *testing.T) {
 	cfg := config.Default()
 	m, err := mask.NewMasker(cfg, []byte("0123456789abcdef0123456789abcdef"), nil, nil)
@@ -26,8 +27,8 @@ func TestLogByTypeAndNotUndone(t *testing.T) {
 	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		b, _ := io.ReadAll(r.Body)
 		w.Header().Set("content-type", "application/json")
-		// o modelo repete o pseudônimo (volta ao valor real) e escreve um IP da faixa falsa que
-		// não veio desta conversa (fica: não desfeito)
+		// the model repeats the pseudonym (goes back to the real value) and writes an IP of the
+		// fake range that did not come from this conversation (stays: not undone)
 		w.Write([]byte(`{"type":"message","role":"assistant","content":[{"type":"text","text":"o ` +
 			reCPF.FindString(string(b)) + ` usa 245.1.2.3"}]}`))
 	}))

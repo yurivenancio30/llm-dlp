@@ -6,11 +6,11 @@ import (
 	"time"
 )
 
-// Os campos do config.json eram em português até a 0.8.0. Os nomes antigos continuam sendo
-// lidos (viram os novos ao carregar), e o arquivo é sempre gravado com os novos. O "llm-dlp
-// update" passa o arquivo para os nomes da versão que põe no ar (MigrateFile): os novos, ou
-// os antigos ao voltar para uma versão anterior, que ignoraria os campos com nome novo e
-// deixaria de mascarar o que eles pedem (domínios internos, nomes protegidos...).
+// The config.json fields were in Portuguese up to 0.8.0. The old names are still read (they become
+// the new ones on load), and the file is always written with the new ones. "llm-dlp update" moves
+// the file to the names of the version it puts online (MigrateFile): the new ones, or the old ones
+// when going back to an earlier version, which would ignore the fields with a new name and stop
+// masking what they ask for (internal domains, protected names...).
 
 var (
 	oldFields = map[string]string{
@@ -23,7 +23,7 @@ var (
 		"objetos": "objects",
 	}
 	oldProviderFields = map[string]string{"formato": "format"}
-	// por lista, pelo nome novo da lista
+	// by list, by the new name of the list
 	oldFieldsList = map[string]map[string]string{
 		"extra_patterns": {"rotulo": "label"},
 		"terms":          {"rotulo": "label", "valores": "values"},
@@ -33,11 +33,11 @@ var (
 		"pdf_estrito": "strict_pdf"}
 	oldObjectFields = map[string]string{"ligado": "enabled", "mascarar": "mask", "propagar": "propagate",
 		"ip_publico": "public_ip"}
-	// valores antigos de ocr.mode
+	// old values of ocr.mode
 	oldOCRModes = map[string]string{"mascarar": "mask", "bloquear": "block", "permitir": "allow"}
 )
 
-// Read interpreta o conteúdo de um config.json (com os nomes novos ou os antigos) sobre c.
+// Read interprets the content of a config.json (with the new or the old names) over c.
 func Read(b []byte, c *Config) error {
 	var m map[string]any
 	if err := json.Unmarshal(b, &m); err != nil {
@@ -52,8 +52,8 @@ func Read(b []byte, c *Config) error {
 	return json.Unmarshal(b, c)
 }
 
-// migrateNames troca, em m, os nomes antigos pelos novos (ou os novos pelos antigos, com
-// toOld) e diz se trocou algum. Se os dois estão lá, fica o do destino.
+// migrateNames swaps, in m, the old names for the new ones (or the new for the old, with toOld) and
+// says whether it swapped any. If both are there, the destination's stays.
 func migrateNames(m map[string]any, toOld bool) bool {
 	names := func(n map[string]string) map[string]string {
 		if !toOld {
@@ -65,8 +65,8 @@ func migrateNames(m map[string]any, toOld bool) bool {
 		}
 		return inv
 	}
-	// o que está dentro primeiro, achado pelo nome novo: indo para os antigos, o nome de
-	// fora ainda é o novo; vindo deles, já foi trocado
+	// what is inside first, found by the new name: going to the old names, the outer name is still
+	// the new one; coming from them, it was already swapped
 	foundIt := false
 	if !toOld {
 		foundIt = rename(m, names(oldFields))
@@ -122,10 +122,9 @@ func rename(m map[string]any, names map[string]string) bool {
 	return foundIt
 }
 
-// MigrateFile passa o config.json para os nomes novos (ou para os antigos, com
-// toOld), se houver o que trocar, guardando o anterior ao lado (config.json.bak-DATA).
-// Devolve o caminho da cópia ("" se não havia o que trocar). Campos que este programa não
-// conhece ficam como estão.
+// MigrateFile moves config.json to the new names (or to the old ones, with toOld), if there is
+// something to swap, keeping the previous one alongside (config.json.bak-DATE). Returns the path of
+// the copy ("" if there was nothing to swap). Fields this program does not know stay as they are.
 func MigrateFile(toOld bool) (string, error) {
 	p := Path("config.json")
 	b, err := os.ReadFile(p)

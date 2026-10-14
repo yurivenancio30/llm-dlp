@@ -5,27 +5,27 @@ import (
 	"unicode"
 )
 
-// Detecção pelo nome do campo, parte 1: o vocabulário (que nomes de campo guardam que dado).
+// Detection by field name, part 1: the vocabulary (which field names hold which data).
 
-// Detecção pelo RÓTULO do campo. Muito dado pessoal não tem formato próprio (um nome, um
-// código de usuário, um CPF sem pontuação numa coluna, a religião de alguém), mas vem com
-// o nome do campo ao lado: o cabeçalho de um CSV ou do resultado de uma consulta, a chave de
-// um JSON, um "campo: valor". Aqui o nome do campo decide o que fazer com o valor.
+// Detection by the field LABEL. A lot of personal data has no format of its own (a name, a user
+// code, a CPF without punctuation in a column, someone's religion), but comes with the field name
+// next to it: the header of a CSV or of a query result, the key of a JSON, a "field: value". Here
+// the field name decides what to do with the value.
 //
-// As categorias seguem a política de classificação do cliente (PII: CPF, CNPJ, nome, e-mail,
-// telefone, endereço...) e os dados pessoais sensíveis da LGPD (art. 5º, II).
+// The categories follow the client's classification policy (PII: CPF, CNPJ, name, e-mail,
+// telephone, address...) and the LGPD sensitive personal data (art. 5, II).
 
-// vocabulario: as palavras que o detector conhece nos nomes de campo. O padrão junta o que
-// as ferramentas de classificação de dados usam (piicatcher, OpenMetadata, datahub-classify,
-// em inglês) com os termos e prefixos usados no Brasil (NM_, NO_, NU_, CO_, CD_...). Como
-// cada empresa abrevia do seu jeito, dá para acrescentar palavras no config.json
-// (extra_fields) e ver o que foi reconhecido com "llm-dlp columns arquivo".
+// vocabulary: the words the detector knows in field names. The default joins what data
+// classification tools use (piicatcher, OpenMetadata, datahub-classify, in English) with the terms
+// and prefixes used in Brazil (NM_, NO_, NU_, CO_, CD_...). Since each company abbreviates its own
+// way, words can be added in config.json (extra_fields) and what was recognized can be seen with
+// "llm-dlp columns file".
 type vocabulary struct {
-	class   map[string]string // palavra -> tipo de dado do campo
-	person  map[string]bool   // de quem é o campo: "cliente", "titular", "owner"...
-	abrev   map[string]bool   // pessoa abreviada ("cli", "func"): só vale junto de nome/código
-	neutral map[string]bool   // palavras que não mudam o que o campo guarda
-	almost  bool              // classes de "quase identificadores" ligadas (opcional)
+	class   map[string]string // word -> data type of the field
+	person  map[string]bool   // whose field it is: "cliente", "titular", "owner"...
+	abrev   map[string]bool   // abbreviated person ("cli", "func"): only counts together with name/code
+	neutral map[string]bool   // words that do not change what the field holds
+	almost  bool              // classes of "quasi-identifiers" turned on (optional)
 }
 
 func setOf(ps ...string) map[string]bool {
@@ -43,8 +43,8 @@ func defaultVocabulary() *vocabulary {
 			v.class[p] = typ
 		}
 	}
-	// e-mail é mascarado pelo formato, em qualquer campo; a classe existe só para o comando
-	// "colunas" dizer isso em vez de "não reconhecido"
+	// e-mail is masked by its format, in any field; the class exists only so the "columns" command
+	// says that instead of "not recognized"
 	by("email", "email", "mail")
 	by("cpf", "cpf")
 	by("cnpj", "cnpj")
@@ -84,13 +84,13 @@ func defaultVocabulary() *vocabulary {
 
 var numericDoc = setOf("cpf", "cnpj", "rg", "cnh", "pis", "doc")
 
-// labelClass devolve o tipo de dado que um campo com esse nome guarda ("" = nada sensível).
+// labelClass returns the data type a field with this name holds ("" = nothing sensitive).
 //
-// É de propósito rígido: TODAS as palavras do rótulo têm que ser conhecidas (a palavra da
-// classe, a pessoa, ou uma palavra neutra). "NUM_CPF_CLIENTE" vale; "login_timeout",
-// "usuario_erro_pct" e uma frase com "nome" no meio não valem. As ferramentas de catálogo
-// usam regex larga (".*name.*") porque só marcam a coluna para revisão; aqui o valor é
-// trocado, e uma regra larga mascararia "NOM_SISTEMA" e "file_name".
+// It is strict on purpose: ALL words of the label have to be known (the class word, the person, or
+// a neutral word). "NUM_CPF_CLIENTE" counts; "login_timeout", "usuario_erro_pct" and a sentence
+// with "nome" in the middle do not. Catalog tools use a broad regex (".*name.*") because they only
+// mark the column for review; here the value is swapped, and a broad rule would mask "NOM_SISTEMA"
+// and "file_name".
 func (v *vocabulary) labelClass(label string) string {
 	ts := labelTokens(label)
 	if len(ts) == 0 || len(ts) > 5 {
@@ -109,13 +109,13 @@ func (v *vocabulary) labelClass(label string) string {
 			}
 			if class != "" && class != c {
 				if !numericDoc[class] || !numericDoc[c] {
-					return "" // duas classes no mesmo rótulo: não é um campo simples
+					return "" // two classes in the same label: not a simple field
 				}
 				continue // "CPF/CNPJ", "RG_CPF": fica a primeira
 			}
 			class = c
 		case t == "nome" || t == "nom" || t == "name" || t == "nm" || (t == "no" && i == 0 && len(ts) > 1):
-			name = true // "NO_" no começo é o prefixo de nome de alguns padrões (DATASUS)
+			name = true // "NO_" at the start is the name prefix of some standards (DATASUS)
 		case v.person[t]:
 			person, abbrevOnly = true, false
 			user = user || t == "usuario" || t == "usu" || t == "user"
@@ -129,7 +129,7 @@ func (v *vocabulary) labelClass(label string) string {
 			t == "conta" || t == "account" || t == "bank" || t == "bancaria" || t == "corrente" || t == "agencia" || t == "poupanca" ||
 			t == "estado" || t == "civil" || t == "marital" || t == "status" || t == "tax" || t == "social" || t == "security" ||
 			t == "license" || t == "licence" || t == "driver" || t == "drivers":
-			// só valem nas combinações abaixo
+			// only count in the combinations below
 		default:
 			return ""
 		}
@@ -169,7 +169,7 @@ func (v *vocabulary) labelClass(label string) string {
 	case class != "":
 		return class
 	case name && user && len(ts) <= 3:
-		return "usuario" // "user_name", "nome_usuario": é o login
+		return "usuario" // "user_name", "nome_usuario": it is the login
 	case name && person:
 		return "nome"
 	case codeID && person:
@@ -177,22 +177,22 @@ func (v *vocabulary) labelClass(label string) string {
 	case len(ts) == 1 && (ts[0] == "usuario" || ts[0] == "usu"):
 		return "usuario"
 	case person && !abbrevOnly && !codeID && !name && !user && !has("completo", "full", "first", "last") &&
-		!has("pai"): // "pai" sozinho costuma ser "processo pai", "nó pai"
-		// "Cliente", "Paciente", "Owner", "Data Steward", "Responsável": costuma ser o nome da
-		// pessoa, mas também pode ser um papel ou sistema ("SYSADMIN", "TI"); só vale para
-		// valor com nome e sobrenome
+		!has("pai"): // "pai" alone is usually "parent process", "parent node"
+		// "Cliente", "Paciente", "Owner", "Data Steward", "Responsável": usually the person's name,
+		// but it can also be a role or a system ("SYSADMIN", "TI"); only counts for a value with
+		// first and last name
 		return "nomecompleto"
 	case name && len(ts) == 1:
-		// "nome" ou "name" sozinho: só vale numa tabela que tenha outra coluna de pessoa
+		// "nome" or "name" alone: only counts in a table that has another person column
 		return "nomesolto"
 	}
 	return ""
 }
 
-// compoundSensitive: rótulos de dado sensível (LGPD, art. 5º, II) feitos de palavras que sozinhas
-// são de outra classe ou de nenhuma: "identidade de gênero" (identidade é RG), "filiação
-// partidária" e "filiação sindical" (filiação é o nome dos pais), "opinião política",
-// "convicção religiosa", "vida sexual", "impressão digital", "cor/raça".
+// compoundSensitive: labels of sensitive data (LGPD, art. 5, II) made of words that alone belong to
+// another class or to none: "identidade de gênero" (identidade is the RG), "filiação partidária"
+// and "filiação sindical" (filiação is the parents' names), "opinião política", "convicção
+// religiosa", "vida sexual", "impressão digital", "cor/raça".
 func compoundSensitive(ts []string) bool {
 	has := map[string]bool{}
 	for _, t := range ts {
@@ -208,12 +208,13 @@ func compoundSensitive(ts []string) bool {
 	return false
 }
 
-// labelClass com o vocabulário padrão (usado nos testes).
+// labelClass with the default vocabulary (used in the tests).
 func labelClass(label string) string { return defaultVocab.labelClass(label) }
 
 var defaultVocab = defaultVocabulary()
 
-// labelTokens: "NOM_DATA_OWNER", "nomeCliente", "Name da Mãe" -> [nom data owner], [nome cliente], [nome da mae]
+// labelTokens: "NOM_DATA_OWNER", "nomeCliente", "Nome da Mãe" -> [nom data owner], [nome cliente],
+// [nome da mae]
 func labelTokens(r string) []string {
 	var ts []string
 	var b strings.Builder
@@ -224,7 +225,7 @@ func labelTokens(r string) []string {
 		}
 	}
 	prev := rune(0)
-	for _, c := range NormName(strings.TrimSpace(noGluedCapitals(r))) { // NormName tira acentos e põe em maiúsculas
+	for _, c := range NormName(strings.TrimSpace(noGluedCapitals(r))) { // NormName removes accents and uppercases
 		if unicode.IsLetter(c) || unicode.IsDigit(c) {
 			b.WriteRune(unicode.ToLower(c))
 		} else {
@@ -251,7 +252,7 @@ func noGluedCapitals(r string) string {
 	return b.String()
 }
 
-// classe é labelClass com memória (os mesmos rótulos se repetem em toda linha).
+// class is labelClass with memory (the same labels repeat on every line).
 func (m *Masker) class(label string) string {
 	if c, ok := m.classes.Load(label); ok {
 		return c.(string)

@@ -6,9 +6,9 @@ import (
 	"testing"
 )
 
-// Ponta a ponta, com a memória da conversa de verdade: o pedido, o inventário e, numa
-// saída de comando seguinte (sem arquivo: recebe o contágio), o mesmo nome solto em 6 formatos.
-// Alvo: 0 em claro. (Na prosa da mensagem do usuário a palavra comum fica como palavra:
+// End to end, with the real conversation memory: the request, the inventory and, in a following
+// command output (no file: it receives the contagion), the same name loose in 6 formats. Target: 0
+// in the clear. (In the prose of the user message the common word stays a word:
 // mask/vocab_words.go.)
 
 func sixFormatsP(n string) []string {
@@ -27,7 +27,7 @@ type areaT2P struct {
 	user   string
 	cmd    string
 	output string
-	names  []string // os nomes (palavra comum) que a saída traz
+	names  []string // the names (common words) the output brings
 	typ    string   // o tipo esperado ("" = qualquer)
 }
 

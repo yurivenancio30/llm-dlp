@@ -18,24 +18,23 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/version"
 )
 
-// Mode emergência: libera o Claude sem máscara por tempo limitado (exige sudo).
+// Emergency mode: lets Claude through without masking for a limited time (requires sudo).
 
-// Mode emergência: quando o llm-dlp quebra, o Claude Code para de funcionar (falha
-// fechada) e você fica sem ele justamente para consertar o llm-dlp. A emergência troca o
-// proxy por um repasse SEM máscara, por tempo limitado.
+// Emergency mode: when llm-dlp breaks, Claude Code stops working (fail closed) and you are left
+// without it precisely to fix llm-dlp. Emergency replaces the proxy with a pass-through WITHOUT
+// masking, for a limited time.
 //
-// Só o administrador liga (sudo): o estado fica em dirEmergencia, que só o root escreve.
-// O proxy roda como o usuário e apenas LÊ esse arquivo. Assim, nada que rode com o seu
-// usuário — inclusive o agente, induzido por uma página maliciosa — consegue ligar a
-// emergência. (Se o seu sudo não pede senha, essa barreira não existe. A configuração não tem
-// essa barreira: quem a muda para tirar proteção gera um aviso a cada mensagem, ver
-// reducedProtection.)
+// Only the administrator turns it on (sudo): the state lives in dirEmergencia, which only root
+// writes. The proxy runs as the user and only READS that file. So nothing running as your user —
+// including the agent, induced by a malicious page — can turn emergency on. (If your sudo does not
+// ask for a password, this barrier does not exist. The configuration does not have this barrier:
+// whoever changes it to remove protection gets a warning on every message, see reducedProtection.)
 //
-// O repasse não carrega config/chave/detectores: funciona mesmo se o que quebrou foi isso.
+// The pass-through does not load config/key/detectors: it works even if that is what broke.
 
-// dirEmergencia é fixo no binário de produção. Testes trocam via
-// -ldflags "-X main.dirEmergencia=..." (de propósito NÃO é variável de ambiente: o agente
-// poderia reiniciar o proxy apontando para uma pasta que ele mesmo controla).
+// dirEmergencia is fixed in the production binary. Tests change it via -ldflags "-X
+// main.dirEmergencia=..." (on purpose it is NOT an environment variable: the agent could restart
+// the proxy pointing to a folder it controls).
 var dirEmergencia = "/etc/llm-dlp"
 
 const defaultEmergencyDuration = 30 * time.Minute
@@ -102,7 +101,7 @@ Digite LIBERAR para continuar: `, dur)
 	return nil
 }
 
-// watchEmergency encerra o processo quando o modo muda (o supervisor sobe o modo certo).
+// watchEmergency ends the process when the mode changes (the supervisor starts the right mode).
 func watchEmergency(inEmergency bool) {
 	for range time.Tick(2 * time.Second) {
 		if _, active := emergencyActive(); active != inEmergency {
@@ -111,11 +110,12 @@ func watchEmergency(inEmergency bool) {
 	}
 }
 
-// serveEmergency: repasse mínimo, sem máscara, até o prazo ou até o arquivo sumir.
+// serveEmergency: minimal pass-through, without masking, until the deadline or until the file
+// disappears.
 func serveEmergency(until time.Time) error {
 	cfg, err := config.Load()
 	if err != nil {
-		cfg = config.Default() // a config pode ser justamente o que quebrou
+		cfg = config.Default() // the config may be exactly what broke
 	}
 	ln, borrowed, err := servicePort(address(cfg))
 	if err != nil {
@@ -127,7 +127,7 @@ func serveEmergency(until time.Time) error {
 	}
 	lg := openLog()
 	rp := httputil.NewSingleHostReverseProxy(target)
-	rp.FlushInterval = -1 // streaming sem atraso
+	rp.FlushInterval = -1 // streaming without delay
 	dir := rp.Director
 	rp.Director = func(r *http.Request) {
 		dir(r)

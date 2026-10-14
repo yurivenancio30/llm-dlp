@@ -15,41 +15,41 @@ import (
 	"unicode"
 )
 
-// Gerador da referência pública. Só roda com LLM_DLP_GERAR_REF=1 e lê só o
-// material público da máquina, os diretórios de LLM_DLP_CORPUS (código e documentação de
-// terceiros: módulos Go, bibliotecas Python, /usr/share/doc). Grava public_ref.txt e
-// language_types.txt (vocab_generated.go os lê com go:embed). Nada é escrito à mão: para mudar a
-// lista, muda-se o critério aqui e gera-se de novo.
+// Generator of the public reference. Only runs with LLM_DLP_GEN_REF=1 and reads only the machine's
+// public material, the directories in LLM_DLP_CORPUS (third-party code and documentation: Go
+// modules, Python libraries, /usr/share/doc). Writes public_ref.txt and language_types.txt
+// (vocab_generated.go reads them with go:embed). Nothing is written by hand: to change the list,
+// change the criterion here and generate again.
 //
-//	LLM_DLP_GERAR_REF=1 LLM_DLP_CORPUS=dir1:dir2 go test ./internal/mask -run TestGeneratePublicRef -v
+//	LLM_DLP_GEN_REF=1 LLM_DLP_CORPUS=dir1:dir2 go test ./internal/mask -run TestGeneratePublicRef -v
 //
-// Critério (public_ref.txt): uma palavra entra quando aparece em posição de nome de recurso em
-// pelo menos minRefProjects projetos distintos do corpus. Posição de nome, pela gramática:
-//   - valor inteiro de uma chave cujo último pedaço é palavra de tipo (entKey: namespace,
-//     schema, table, bucket, app, service, user...) ou "name", em YAML, JSON, TOML, INI, .env
-//     e argumentos nomeados ("namespace: x", "\"schema\": \"x\"", "bucket = 'x'"); em código
-//     (.go, .py), só o literal de texto ("name = x" é atribuição de variável);
-//   - valor de uma opção de linha de comando com palavra de tipo ("--namespace x", "--schema=x");
-//   - nome depois de FROM, JOIN, INTO, UPDATE, TABLE, SCHEMA, DATABASE no SQL (cada parte de um
-//     nome qualificado; em minúsculas, só o nome qualificado e fora de "from x.y import");
-//   - primeiro rótulo do host (api.exemplo.org) e primeiro pedaço do caminho de uma URL;
-//   - organização e nome de uma imagem de container (image:, FROM) sem registro ou de registro
-//     público (bitnami/redis, grafana/loki, redis).
+// Criterion (public_ref.txt): a word gets in when it appears in a resource name position in at
+// least minRefProjects distinct projects of the corpus. Name position, by the grammar:
+//   - whole value of a key whose last piece is a type word (entKey: namespace,
+//     schema, table, bucket, app, service, user...) or "name", in YAML, JSON, TOML, INI, .env
+//     and named arguments ("namespace: x", "\"schema\": \"x\"", "bucket = 'x'"); in code
+//     (.go, .py), only the string literal ("name = x" is a variable assignment);
+//   - value of a command-line option with a type word ("--namespace x", "--schema=x");
+//   - name after FROM, JOIN, INTO, UPDATE, TABLE, SCHEMA, DATABASE in SQL (each part of a
+//     qualified name; in lowercase, only the qualified name and outside "from x.y import");
+//   - first label of the host (api.exemplo.org) and first piece of a URL's path;
+//   - organization and name of a container image (image:, FROM) without a registry or from a
+//     public registry (bitnami/redis, grafana/loki, redis).
 //
-// Projeto: o módulo (o caminho até o pedaço com "@" nos módulos Go) ou o primeiro diretório
-// abaixo da raiz do corpus (pacote Python, pasta de /usr/share/doc). Um nome que só um projeto
-// usa nunca entra; um nome interno de empresa não aparece em projetos públicos distintos.
+// Project: the module (the path up to the piece with "@" in Go modules) or the first directory
+// under the corpus root (Python package, /usr/share/doc folder). A name only one project uses never
+// gets in; a company's internal name does not appear in distinct public projects.
 //
-// Critério (language_types.txt): um tipo do vocabulário de tipos de dado (dataTypes) entra
-// quando é tipo de campo ou de variável ("\tnome    tipo") em código Go de pelo menos
-// minTypeProjects projetos distintos.
+// Criterion (language_types.txt): a type from the data type vocabulary (dataTypes) gets in when it
+// is a field or variable type ("\tname type") in Go code from at least minTypeProjects distinct
+// projects.
 
 const (
 	minRefProjects  = 8
 	minTypeProjects = 5
 )
 
-// readCorpus: o arquivo, descompactado se for .gz (no máximo 2 MB).
+// readCorpus: the file, decompressed if it is .gz (at most 2 MB).
 func readCorpus(p string, gz bool) ([]byte, error) {
 	if !gz {
 		return os.ReadFile(p)
@@ -74,7 +74,7 @@ func TestGeneratePublicRef(t *testing.T) {
 	names := map[string]map[string]bool{} // palavra -> projetos
 	types := map[string]map[string]bool{} // tipo -> projetos
 	projects := map[string]bool{}
-	officialOnes := map[string]map[string]bool{} // pasta-mãe -> imagens
+	officialOnes := map[string]map[string]bool{} // parent folder -> images
 	var fileList int
 	var bytes int64
 	exts := setOf(".go", ".py", ".md", ".rst", ".txt", ".yaml", ".yml", ".json", ".toml", ".sql", ".sh", ".cfg", ".ini", ".conf", ".env")
@@ -90,8 +90,8 @@ func TestGeneratePublicRef(t *testing.T) {
 				}
 				return nil
 			}
-			// Imagens Oficiais do Docker: no docker-library/docs, uma pasta por imagem com
-			// content.md e metadata.json
+			// Docker Official Images: in docker-library/docs, one folder per image with content.md
+			// and metadata.json
 			if e.Name() == "metadata.json" {
 				if _, err := os.Stat(filepath.Join(filepath.Dir(p), "content.md")); err == nil {
 					parent := filepath.Dir(filepath.Dir(p))
@@ -103,7 +103,7 @@ func TestGeneratePublicRef(t *testing.T) {
 			}
 			gz := strings.HasSuffix(p, ".gz")
 			ext := strings.ToLower(filepath.Ext(strings.TrimSuffix(p, ".gz")))
-			// páginas de manual (.1.gz, .8.gz...) e documentação compactada também contam
+			// manual pages (.1.gz, .8.gz...) and compressed documentation count too
 			if !exts[ext] && !(gz && len(ext) == 2 && ext[1] >= '1' && ext[1] <= '9') && !(gz && (ext == ".md" || ext == ".txt")) &&
 				!strings.Contains(p, "/locales/") && !strings.HasSuffix(p, ".catalog") {
 				return nil
@@ -170,7 +170,7 @@ func TestGeneratePublicRef(t *testing.T) {
 	saveIt("data/language_types.txt", hdr("Tipos de dado (vocab_types.go) que também são tipo de linguagem.",
 		fmt.Sprintf("tipo de campo ou de variável (\"\\tnome    tipo\") em código Go de pelo menos %d projetos distintos. %d tipos.",
 			minTypeProjects, len(tl))), tl)
-	// a pasta-mãe com mais imagens (o docker-library/docs); com menos de 50 não é ele
+	// the parent folder with the most images (docker-library/docs); with fewer than 50 it is not it
 	var img []string
 	for _, ims := range officialOnes {
 		if len(ims) >= 50 && len(ims) > len(img) {
@@ -203,8 +203,8 @@ func refSelect(m map[string]map[string]bool, min int) []string {
 	return out
 }
 
-// corpusProject: o projeto de um arquivo do corpus (módulo Go até o "@", senão o primeiro
-// pedaço do caminho abaixo da raiz, sem a extensão).
+// corpusProject: the project of a corpus file (Go module up to the "@", otherwise the first path
+// piece under the root, without the extension).
 func corpusProject(rootDir, p string) string {
 	rel, err := filepath.Rel(rootDir, p)
 	if err != nil {
@@ -219,8 +219,8 @@ func corpusProject(rootDir, p string) string {
 	return rootDir + "/" + strings.TrimSuffix(ps[0], filepath.Ext(ps[0]))
 }
 
-// nameValue: forma de nome de recurso (uma palavra, letras, dígitos, "_" e "-", começa com
-// letra, 2 a 63 caracteres, não é número nem versão).
+// nameValue: resource name shape (one word, letters, digits, "_" and "-", starts with a letter, 2
+// to 63 characters, not a number nor a version).
 func nameValue(v string) bool {
 	if len(v) < 2 || len(v) > 63 || !(v[0] >= 'a' && v[0] <= 'z' || v[0] >= 'A' && v[0] <= 'Z') {
 		return false
@@ -233,7 +233,7 @@ func nameValue(v string) bool {
 	return !(hasDigit(v) && reVersionOrHash.MatchString(v))
 }
 
-// nameKey: a chave diz que o valor é nome de recurso (palavra de tipo ou "name").
+// nameKey: the key says the value is a resource name (type word or "name").
 func nameKey(k string) bool {
 	if k == "" || len(k) > 64 {
 		return false
@@ -252,14 +252,14 @@ func nameKey(k string) bool {
 
 var sqlNameWords = setOf("from", "join", "into", "update", "table", "schema", "database")
 
-// refNamesInLine: os valores em posição de nome numa linha. codigo: a linha é de código-fonte
-// (.go, .py), onde só o literal de texto conta como valor ("name = x" é atribuição).
+// refNamesInLine: the values in name position on a line. codeValue: the line is source code (.go,
+// .py), where only the string literal counts as a value ("name = x" is an assignment).
 func refNamesInLine(l string, codeValue bool, fn func(v string)) {
 	if strings.TrimSpace(l) == "" {
 		return
 	}
-	// chave: valor / chave = valor, em qualquer ponto da linha (YAML, JSON, TOML, INI, .env,
-	// argumento nomeado: schema='x')
+	// key: value / key = value, anywhere on the line (YAML, JSON, TOML, INI, .env, named argument:
+	// schema='x')
 	for i := 1; i < len(l); i++ {
 		c := l[i]
 		if c != ':' && c != '=' {
@@ -268,7 +268,7 @@ func refNamesInLine(l string, codeValue bool, fn func(v string)) {
 		if i+1 < len(l) && strings.IndexByte(":=>", l[i+1]) >= 0 || strings.IndexByte(":=!<>", l[i-1]) >= 0 {
 			continue // ::, :=, ==, =>, !=, <=, >=
 		}
-		// a chave: identificador logo antes (com aspas e espaços)
+		// the key: identifier right before (with quotes and spaces)
 		k := i
 		for k > 0 && (l[k-1] == ' ' || l[k-1] == '\t') {
 			k--
@@ -283,7 +283,7 @@ func refNamesInLine(l string, codeValue bool, fn func(v string)) {
 		if k == fk || !nameKey(l[k:fk]) {
 			continue
 		}
-		// o valor: literal entre aspas, ou palavra solta (fora de código)
+		// the value: quoted literal, or a loose word (outside code)
 		v := strings.TrimLeft(l[i+1:], " \t")
 		var val string
 		if v != "" && (v[0] == '"' || v[0] == '\'' || v[0] == '`') {
@@ -315,7 +315,7 @@ func refNamesInLine(l string, codeValue bool, fn func(v string)) {
 			}
 			continue
 		}
-		// SQL: FROM a.b, JOIN "c" (em minúsculas, só nome qualificado e fora de "from x import")
+		// SQL: FROM a.b, JOIN "c" (in lowercase, only a qualified name and outside "from x import")
 		if lw := strings.ToLower(w); sqlNameWords[lw] && i+1 < len(ws) {
 			q := strings.TrimRight(ws[i+1], ",;()")
 			if w != strings.ToUpper(w) && (!strings.Contains(q, ".") || i+2 < len(ws) && ws[i+2] == "import") {
@@ -328,8 +328,8 @@ func refNamesInLine(l string, codeValue bool, fn func(v string)) {
 			}
 		}
 	}
-	// imagem de container (image:, FROM) num registro público ou sem registro: a organização e o
-	// nome (bitnami/redis, grafana/loki, redis); registro privado não conta
+	// container image (image:, FROM) on a public registry or without a registry: the organization
+	// and the name (bitnami/redis, grafana/loki, redis); a private registry does not count
 	if m := reAnyImage.FindStringSubmatch(l); m != nil {
 		ref, _, _ := strings.Cut(m[1], "@")
 		ps := strings.Split(ref, "/")
@@ -349,7 +349,7 @@ func refNamesInLine(l string, codeValue bool, fn func(v string)) {
 			}
 		}
 	}
-	// URL: o primeiro rótulo do host (api.exemplo.com) e o primeiro pedaço do caminho (/api/...)
+	// URL: the first label of the host (api.exemplo.com) and the first piece of the path (/api/...)
 	for o := strings.Index(l, "://"); o >= 0; {
 		r := l[o+3:]
 		e := 0
@@ -377,8 +377,8 @@ func refNamesInLine(l string, codeValue bool, fn func(v string)) {
 	}
 }
 
-// goFieldType: o tipo de uma linha "\tnome    tipo" (campo de struct ou variável em bloco)
-// quando é do vocabulário de tipos de dado; "" se não.
+// goFieldType: the type of a "\tname type" line (struct field or variable in a block) when it is in
+// the data type vocabulary; "" otherwise.
 func goFieldType(l string) string {
 	if !strings.HasPrefix(l, "\t") {
 		return ""
@@ -403,16 +403,16 @@ func goFieldType(l string) string {
 	return ""
 }
 
-// Software público (TestGeneratePublicSoftware): os repositórios públicos populares do GitHub,
-// numa lista JSONL ({"r": "dono/nome", "s": estrelas}) baixada com a busca da API (gh api
-// search/repositories, fatiada por faixa de estrelas; ver docs/pt-BR/structures.md). Grava:
-//   - public_software.txt: o nome de cada repositório com pelo menos minSoftwareStars
-//     estrelas (airflow, datahub, minio, kube-rbac-proxy), normalizado (normSoftware);
-//   - vendors.txt: o dono de cada um (apache, bitnami, confluentinc, grafana), normalizado.
+// Public software (TestGeneratePublicSoftware): GitHub's popular public repositories, in a JSONL
+// list ({"r": "owner/name", "s": stars}) downloaded with the API search (gh api
+// search/repositories, sliced by star range; see docs/structures.md). Writes:
+//   - public_software.txt: the name of each repository with at least minSoftwareStars
+//     stars (airflow, datahub, minio, kube-rbac-proxy), normalized (normSoftware);
+//   - vendors.txt: the owner of each one (apache, bitnami, confluentinc, grafana), normalized.
 //
-// Só servem juntos, na regra de imagem (publicPath): org/nome fica em claro quando a
-// organização é fornecedor E o nome é software público. Sozinha, a lista não libera nada: nome
-// de repositório popular inclui codinome típico de cliente (atlas, hermes, phoenix).
+// They only work together, in the image rule (publicPath): org/name stays in plain text when the
+// organization is a vendor AND the name is public software. Alone, the list lets nothing through:
+// popular repository names include typical customer codenames (atlas, hermes, phoenix).
 const minSoftwareStars = 3000
 
 func TestGeneratePublicSoftware(t *testing.T) {
@@ -469,12 +469,12 @@ func TestGeneratePublicSoftware(t *testing.T) {
 	t.Logf("%d repositórios; software_publico: %d; fornecedores: %d", n, len(ns), len(ds))
 }
 
-// Dicionário (TestGenerateDictionary): as 50000 palavras mais frequentes de cada idioma no
-// FrequencyWords (en e pt_br, OpenSubtitles 2018, CC BY-SA 4.0), só letras, 2 ou mais,
-// minúsculas, menos as que já estão em common_words.txt (as 20000 primeiras). Serve à prova
-// de software (memory_software.go): palavra real (polaris, kraken, nexus) é o que um codinome de
-// cliente costuma ser, e nunca recebe a prova. LLM_DLP_FREQWORDS: a pasta com en_50k.txt e
-// pt_br_50k.txt (github.com/hermitdave/FrequencyWords, content/2018/<idioma>/).
+// Dictionary (TestGenerateDictionary): the 50000 most frequent words of each language in
+// FrequencyWords (en and pt_br, OpenSubtitles 2018, CC BY-SA 4.0), letters only, 2 or more,
+// lowercase, minus the ones already in common_words.txt (the first 20000). Serves the software
+// proof (memory_software.go): a real word (polaris, kraken, nexus) is what a customer codename
+// usually is, and never gets the proof. LLM_DLP_FREQWORDS: the folder with en_50k.txt and
+// pt_br_50k.txt (github.com/hermitdave/FrequencyWords, content/2018/<language>/).
 func TestGenerateDictionary(t *testing.T) {
 	dir := os.Getenv("LLM_DLP_FREQWORDS")
 	if dir == "" {

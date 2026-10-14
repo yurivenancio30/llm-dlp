@@ -8,14 +8,14 @@ import (
 	"testing"
 )
 
-// Teste de aceite do experimento real (catálogo inventado): o Claude lê um CSV de catálogo com
-// head, escreve um script que gera as tags (com as tags e as regex como literais), roda o
-// script, que imprime "ordem | plataforma | objeto | coluna | tipo | [regex]" sem cabeçalho, e
-// depois lê um SQL com comentário em português.
+// Acceptance test of the real experiment (made-up catalog): Claude reads a catalog CSV with head,
+// writes a script that generates the tags (with the tags and the regexes as literals), runs the
+// script, which prints "ordem | plataforma | objeto | coluna | tipo | [regex]" without a header,
+// and then reads an SQL file with a comment in Portuguese.
 //
-// Esperado: na saída do script, colunas e tabelas mascaradas (menos as palavras que o próprio
-// script traz, que continuam legíveis), as regex do script intactas, e o comentário do SQL sem
-// pseudônimo.
+// Expected: in the script output, columns and tables masked (except the words the script itself
+// brings, which stay readable), the script's regexes intact, and the SQL comment without
+// pseudonyms.
 
 var (
 	acSchemas = []string{"fin_contab", "rh_folha", "crm_vendas"}
@@ -28,7 +28,7 @@ var (
 		"dt_emissao", "vl_total", "cd_produto", "qt_itens", "cd_funcionario", "nm_funcionario",
 		"dt_admissao", "vl_salario", "cd_cargo", "nome", "valor", "situacao"}
 	acTypes = []string{"VARCHAR(20)", "NUMBER(12,2)", "DATE", "VARCHAR(100)", "INTEGER"}
-	// as tags do script: palavra -> regex (literais do programa)
+	// the script's tags: word -> regex (program literals)
 	acTags = [][2]string{{"cpf", `.*cpf.*`}, {"email", `.*email.*`}, {"telefone", `.*telefone.*`},
 		{"nascimento", `.*nascimento.*`}, {"salario", `.*salario.*`}, {"documento", `^nr_documento$`}}
 )
@@ -106,7 +106,7 @@ func TestAcceptanceCatalogScript(t *testing.T) {
 		json.Unmarshal([]byte(r[8]), &v)
 		outSQL = textOf(v["content"].([]any)[0].(map[string]any)["content"])
 	}
-	// palavras do programa (o comando e o script): continuam legíveis, por regra
+	// program words (the command and the script): stay readable, by rule
 	prog := map[string]bool{}
 	for _, w := range regexp.MustCompile(`[A-Za-z_][A-Za-z0-9_]*`).FindAllString(script+" python3 scripts/gerar_tags.py", -1) {
 		prog[w] = true
@@ -172,7 +172,7 @@ func TestAcceptanceCatalogScript(t *testing.T) {
 	if regexOK != len(ls) {
 		t.Errorf("regex do script trocadas em %d linhas", len(ls)-regexOK)
 	}
-	// o comentário do SQL em português continua legível
+	// the SQL comment in Portuguese stays readable
 	if !strings.Contains(outSQL, "-- busca o nome e o valor do cliente pelo codigo") {
 		t.Errorf("comentário do SQL alterado: %q", outSQL)
 	}

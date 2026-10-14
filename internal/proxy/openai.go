@@ -12,28 +12,29 @@ import (
 	"github.com/yurivenancio30/llm-dlp/internal/mask"
 )
 
-// Format da OpenAI (Chat Completions): o que o Copilot (provedor próprio), o opencode e a
-// maioria dos clientes mandam para a OpenAI, a xAI (Grok), o OpenRouter e o endereço compatível
-// do Gemini. Vale para todo caminho terminado em /chat/completions, de qualquer provedor.
+// OpenAI format (Chat Completions): what Copilot (own provider), opencode and most clients send to
+// OpenAI, xAI (Grok), OpenRouter and Gemini's compatible endpoint. It applies to every path ending
+// in /chat/completions, from any provider.
 //
-// Como no Gemini (gemini.go), a ida não tem um mascarador próprio: a requisição é vista na forma
-// da Anthropic (openAIBridge) e passa pelo mesmo caminho de /v1/messages. O que muda de nome:
+// As with Gemini (gemini.go), the outbound side has no masker of its own: the request is seen in
+// the Anthropic shape (openAIBridge) and goes through the same path as /v1/messages. What changes
+// name:
 //
-//	messages[] com role "system"/"developer"   -> system
-//	tools[].function                           -> tools (descrição e schema)
-//	messages[].content (texto ou partes)       -> blocos de texto, imagem e PDF
-//	messages[].tool_calls[].function           -> tool_use (arguments é um JSON em texto)
-//	messages[] com role "tool"                 -> tool_result
-//	reasoning_content / reasoning              -> não muda (o modelo só viu pseudônimos)
+//	messages[] with role "system"/"developer"  -> system
+//	tools[].function                           -> tools (description and schema)
+//	messages[].content (text or parts)         -> text, image and PDF blocks
+//	messages[].tool_calls[].function           -> tool_use (arguments is JSON in text)
+//	messages[] with role "tool"                -> tool_result
+//	reasoning_content / reasoning              -> unchanged (the model only saw pseudonyms)
 
-// parâmetros da OpenAI que não levam dado do usuário (ou que não podem mudar)
+// OpenAI parameters that carry no user data (or that cannot change)
 var openAIParams = map[string]bool{"messages": true, "tools": true, "model": true, "stream": true, "stream_options": true,
 	"tool_choice": true, "parallel_tool_calls": true, "temperature": true, "top_p": true, "n": true, "max_tokens": true,
 	"max_completion_tokens": true, "presence_penalty": true, "frequency_penalty": true, "logit_bias": true, "logprobs": true,
 	"top_logprobs": true, "seed": true, "stop": true, "reasoning_effort": true, "reasoning": true, "service_tier": true,
 	"store": true, "modalities": true, "verbosity": true, "prompt_cache_key": true, "safety_identifier": true}
 
-// callMark: no tool_use criado pela ponte, o índice da chamada (tool_calls) de onde ele veio.
+// callMark: in the tool_use created by the bridge, the index of the call (tool_calls) it came from.
 const callMark = "\x00chamada"
 
 const openAIFileNote = "[llm-dlp] Um arquivo anexado foi retirado daqui e não foi enviado: o llm-dlp só consegue verificar imagem e PDF. Avise o usuário."
@@ -51,8 +52,8 @@ func dataURL(u string) (typ, data string, ok bool) {
 	return strings.TrimSuffix(hdr, ";base64"), data, true
 }
 
-// openAIBlocks: o conteúdo de uma mensagem (texto ou lista de partes) como blocos da Anthropic.
-// partes: as partes de onde os blocos vieram (nil quando o conteúdo era um texto só).
+// openAIBlocks: the content of a message (text or list of parts) as Anthropic blocks. parts: the
+// parts the blocks came from (nil when the content was a single text).
 func openAIBlocks(content any) (blocks []any, parts []map[string]any) {
 	blocks = []any{}
 	switch c := content.(type) {
@@ -71,7 +72,7 @@ func openAIBlocks(content any) (blocks []any, parts []map[string]any) {
 				typ, data, ok := dataURL(u)
 				switch {
 				case !ok:
-					b["type"] = "server_tool_use" // endereço ou arquivo já do lado da API: não muda
+					b["type"] = "server_tool_use" // address or file already on the API side: unchanged
 					return
 				case typ == "application/pdf":
 					b["type"] = "document"
@@ -96,10 +97,10 @@ func openAIBlocks(content any) (blocks []any, parts []map[string]any) {
 				u, _ := fm["file_data"].(string)
 				media(u)
 			case "input_audio", "audio":
-				delete(b, partMark) // áudio: não há como verificar; não sai (falha fechada)
+				delete(b, partMark) // audio: there is no way to check; does not go out (fail closed)
 				b["type"], b["text"] = "text", openAIFileNote
 			default:
-				b["type"], b["parte"] = "parte desconhecida", pm // mascara todo texto dela, por precaução
+				b["type"], b["parte"] = "parte desconhecida", pm // masks all of its text, as a precaution
 			}
 			blocks = append(blocks, b)
 		}
@@ -107,9 +108,9 @@ func openAIBlocks(content any) (blocks []any, parts []map[string]any) {
 	return blocks, parts
 }
 
-// openAIContent: os blocos já mascarados, de volta como o conteúdo de uma mensagem da OpenAI.
-// O bloco que veio de uma parte atualiza a própria parte; o bloco novo (a nota do llm-dlp, a
-// página de um PDF) vira uma parte de texto nova. Com partes == nil o conteúdo era um texto.
+// openAIContent: the already masked blocks, back as the content of an OpenAI message. The block
+// that came from a part updates that part; a new block (the llm-dlp note, a PDF page) becomes a new
+// text part. With parts == nil the content was a text.
 func openAIContent(blocks any, parts []map[string]any) any {
 	bs, _ := blocks.([]any)
 	if parts == nil {
@@ -140,7 +141,7 @@ func openAIContent(blocks any, parts []map[string]any) any {
 			}
 			pm["text"] = b["text"]
 		case "image", "document":
-			if src["type"] != "base64" { // PDF que virou texto mascarado
+			if src["type"] != "base64" { // PDF that became masked text
 				t, _ := src["data"].(string)
 				if title, _ := b["title"].(string); title != "" {
 					t = title + "\n\n" + t
@@ -169,9 +170,9 @@ func openAIContent(blocks any, parts []map[string]any) any {
 	return out
 }
 
-// openAIBridge devolve a requisição da OpenAI na forma da Anthropic e a função que, depois de
-// mascarada, copia o resultado de volta para a requisição original. ok = false: não é uma
-// requisição com "messages" (cai no modo genérico, que mascara todo texto).
+// openAIBridge returns the OpenAI request in the Anthropic shape and the function that, after
+// masking, copies the result back to the original request. ok = false: not a request with
+// "messages" (falls into generic mode, which masks all text).
 func openAIBridge(v any) (map[string]any, func(), bool) {
 	req, _ := v.(map[string]any)
 	list, ok := req["messages"].([]any)
@@ -186,7 +187,7 @@ func openAIBridge(v any) (map[string]any, func(), bool) {
 		for _, t := range ts {
 			tm, _ := t.(map[string]any)
 			if fm, _ := tm["function"].(map[string]any); fm != nil {
-				tools = append(tools, fm) // o mesmo mapa: descrição e schema são mascarados no lugar
+				tools = append(tools, fm) // the same map: description and schema are masked in place
 			}
 		}
 		anth["tools"] = tools
@@ -204,7 +205,7 @@ func openAIBridge(v any) (map[string]any, func(), bool) {
 		hasContent := mm["content"] != nil
 		switch hostRole {
 		case "system", "developer":
-			// instruções do cliente: cada texto é mascarado no lugar
+			// client instructions: each text is masked in place
 			for _, bx := range blocks {
 				b := bx.(map[string]any)
 				if b["type"] != "text" {
@@ -253,7 +254,7 @@ func openAIBridge(v any) (map[string]any, func(), bool) {
 				if dec, ok := decode([]byte(args)); ok {
 					entry = dec
 				} else {
-					entry = map[string]any{"\x00cru": args} // não é JSON: mascara o texto como veio
+					entry = map[string]any{"\x00cru": args} // not JSON: mask the text as it came
 				}
 			}
 			blocks = append(blocks, map[string]any{"type": "tool_use", "id": tm["id"], "name": fm["name"], "input": entry, callMark: len(calls)})
@@ -272,7 +273,8 @@ func openAIBridge(v any) (map[string]any, func(), bool) {
 					rest = append(rest, bx)
 					continue
 				}
-				// só reescreve os argumentos que mudaram (o texto original fica como o cliente mandou)
+				// only rewrites the arguments that changed (the original text stays as the client
+				// sent it)
 				if newOne := encode(b["input"]); !bytes.Equal(newOne, before[i]) {
 					if m, _ := b["input"].(map[string]any); m != nil && len(m) == 1 && m["\x00cru"] != nil {
 						calls[i]["arguments"] = m["\x00cru"]
@@ -292,7 +294,7 @@ func openAIBridge(v any) (map[string]any, func(), bool) {
 	anth["messages"] = msgs
 
 	for _, k := range keys(req) {
-		if !openAIParams[k] { // campo que não conheço: mascara por precaução, como na Anthropic
+		if !openAIParams[k] { // field I do not know: mask as a precaution, as with Anthropic
 			k := k
 			anth["openai:"+k] = req[k]
 			returns = append(returns, func() { req[k] = anth["openai:"+k] })
@@ -307,22 +309,22 @@ func openAIBridge(v any) (map[string]any, func(), bool) {
 
 // ---- volta --------------------------------------------------------------------------------
 
-// openAIReturn desmascara a resposta em streaming. O texto de cada escolha (choice) passa por um
-// Stream, que segura o pseudônimo cortado entre dois pedaços; os argumentos de cada chamada de
-// ferramenta chegam em pedaços de JSON e passam por um Stream próprio (o valor real é escapado).
+// openAIReturn unmasks the streaming response. The text of each choice goes through a Stream, which
+// holds a pseudonym cut between two pieces; the arguments of each tool call arrive in JSON pieces
+// and go through a Stream of their own (the real value is escaped).
 type openAIReturn struct {
 	p     *Proxy
 	tab   *mask.Table
 	texts map[int]*openAIStream
-	args  map[[2]int]*openAIStream // (escolha, índice da chamada)
-	// cabecalho: os campos de fora do último pedaço (id, model...), para um pedaço a mais no fim
+	args  map[[2]int]*openAIStream // (choice, call index)
+	// header: the outer fields of the last piece (id, model...), for one more piece at the end
 	header map[string]any
 }
 
 type openAIStream struct {
 	f        *mask.Stream
 	orig     strings.Builder
-	rawValue bool // ferramenta que vai para a internet: os argumentos seguem com os pseudônimos
+	rawValue bool // tool that goes to the internet: the arguments keep the pseudonyms
 }
 
 func (p *Proxy) newOpenAIReturn(tab *mask.Table) *openAIReturn {
@@ -331,7 +333,7 @@ func (p *Proxy) newOpenAIReturn(tab *mask.Table) *openAIReturn {
 
 func (g *openAIReturn) reg(s string) string { return g.p.m.RecordResponse(s, g.tab) }
 
-// releaseText: o texto que o fluxo da escolha ainda segurava, e registra o que a API escreveu.
+// releaseText: the text the choice's stream was still holding, and records what the API wrote.
 func (g *openAIReturn) releaseText(i int) string {
 	fx := g.texts[i]
 	if fx == nil {
@@ -342,7 +344,7 @@ func (g *openAIReturn) releaseText(i int) string {
 	return fx.f.Close()
 }
 
-// releaseArgs: o que os fluxos das chamadas da escolha ainda seguravam, como pedaços de tool_calls.
+// releaseArgs: what the streams of the choice's calls were still holding, as tool_calls pieces.
 func (g *openAIReturn) releaseArgs(i int) []any {
 	var ks [][2]int
 	for k := range g.args {
@@ -366,7 +368,7 @@ func (g *openAIReturn) releaseArgs(i int) []any {
 	return out
 }
 
-// pedaco desmascara um pedaço do streaming, no lugar.
+// piece unmasks a streaming piece, in place.
 func (g *openAIReturn) piece(resp map[string]any) {
 	g.header = map[string]any{}
 	for _, k := range []string{"id", "object", "created", "model", "system_fingerprint"} {
@@ -399,7 +401,7 @@ func (g *openAIReturn) piece(resp map[string]any) {
 			d["content"] = fx.f.Push(t)
 		}
 		end := cm["finish_reason"] != nil
-		if len(tcs) > 0 || end { // o texto acabou: entrega o que estava segurado
+		if len(tcs) > 0 || end { // the text is over: deliver what was held
 			if rest := g.releaseText(i); rest != "" {
 				t, _ := d["content"].(string)
 				d["content"] = t + rest
@@ -435,7 +437,7 @@ func (g *openAIReturn) piece(resp map[string]any) {
 	}
 }
 
-// resto: o que ficou segurado quando o streaming acaba sem finish_reason, como um pedaço a mais.
+// rest: what was held when streaming ends without finish_reason, as one more piece.
 func (g *openAIReturn) rest() map[string]any {
 	idx := map[int]bool{}
 	for i := range g.texts {
@@ -472,7 +474,7 @@ func (g *openAIReturn) rest() map[string]any {
 	return m
 }
 
-// unmaskSSEOpenAI: streaming. Cada linha "data:" é um pedaço; a última é "data: [DONE]".
+// unmaskSSEOpenAI: streaming. Each "data:" line is a piece; the last one is "data: [DONE]".
 func (p *Proxy) unmaskSSEOpenAI(w http.ResponseWriter, body io.Reader, tab *mask.Table) error {
 	fl, _ := w.(http.Flusher)
 	rd := bufio.NewReaderSize(body, 64<<10)
@@ -512,8 +514,8 @@ func (p *Proxy) unmaskSSEOpenAI(w http.ResponseWriter, body io.Reader, tab *mask
 	}
 }
 
-// unmaskOpenAIJSON: resposta sem streaming. O texto de cada escolha e os argumentos de cada
-// chamada de ferramenta voltam reais; o raciocínio (reasoning_content) não muda.
+// unmaskOpenAIJSON: response without streaming. The text of each choice and the arguments of each
+// tool call come back real; the reasoning (reasoning_content) does not change.
 func (p *Proxy) unmaskOpenAIJSON(b []byte, tab *mask.Table) []byte {
 	v, ok := decode(b)
 	resp, _ := v.(map[string]any)

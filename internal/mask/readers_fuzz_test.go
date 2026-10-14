@@ -2,7 +2,7 @@ package mask
 
 import "testing"
 
-// Os leitores nunca podem quebrar com entrada estranha (o proxy recusaria a mensagem).
+// The readers can never break on odd input (the proxy would refuse the message).
 func FuzzReaders(f *testing.F) {
 	for _, s := range []string{"SELECT a FROM `x..y`", "SELECT [", "Server=;Database=", "a|b\n---\n|", "jdbc:oracle:thin:@", "{{ ref('') }}", "urn:li:dataset:(urn:li:dataPlatform:x,,PROD)", "CREATE TABLE \"\" (", "relation \"\" does"} {
 		f.Add(s)

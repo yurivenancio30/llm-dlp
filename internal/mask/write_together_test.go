@@ -5,9 +5,9 @@ import (
 	"testing"
 )
 
-// Dois processos com o mesmo registro (a versão antiga e a nova durante uma troca, ou o
-// importar-pessoas com o proxy no ar): cada gravação junta o que o outro gravou, e nenhuma
-// apaga a outra. Antes, a última gravação ficava só com o que o seu processo sabia.
+// Two processes with the same registry (the old and new versions during a swap, or import-people
+// with the proxy running): each write merges what the other wrote, and neither erases the other.
+// Before, the last write kept only what its own process knew.
 
 func TestSeenFromTwoProcessesKept(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "vistos.json")
@@ -35,7 +35,7 @@ func TestSeenFromTwoProcessesKept(t *testing.T) {
 			t.Errorf("%s sumiu do arquivo", id)
 		}
 	}
-	// o que veio do outro processo vale também na memória de quem juntou
+	// what came from the other process also counts in the memory of whoever merged
 	if !a.Has("email") || !a.HasObj() {
 		t.Errorf("a juntou o arquivo mas não conta o que veio dele: email=%v obj=%v", a.Has("email"), a.HasObj())
 	}
@@ -57,7 +57,7 @@ func TestPeopleFromTwoProcessesKept(t *testing.T) {
 	if err := b.SaveNow(); err != nil {
 		t.Fatal(err)
 	}
-	// o mesmo registro feito num processo só (cada nome entra em mais de uma forma)
+	// the same registry made in a single process (each name goes in in more than one form)
 	together, _ := LoadPeople(filepath.Join(t.TempDir(), "x.json"))
 	together.Import(ps, "João Carlos Silva", "joao.silva@empresa-ficticia.com.br", "U1001")
 	together.Import(ps, "Ana Paula Souza", "", "U2001")

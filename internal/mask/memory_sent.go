@@ -9,33 +9,35 @@ import (
 	"sync"
 )
 
-// Sent: o que cada texto já enviado à API levou no lugar do dado real, para que ele saia
-// igual nos reenvios, inclusive depois de um reinício.
+// Sent: what each text already sent to the API carried in place of the real data, so it goes out
+// the same on resends, including after a restart.
 //
-// O Claude Code reenvia a conversa inteira a cada mensagem, e a API só aproveita o cache se
-// o começo da requisição for idêntico ao da anterior. Se um valor aprendido depois mudasse
-// um texto antigo, a conversa inteira seria regravada no cache, sem proteger nada (o texto
-// antigo já tinha saído com o valor em claro). Por isso, texto que saiu fica congelado.
+// Claude Code resends the whole conversation with every message, and the API only uses the cache if
+// the start of the request is identical to the previous one. If a value learned later changed an
+// old text, the whole conversation would be rewritten in the cache, protecting nothing (the old
+// text had already gone out with the value in the clear). So a text that went out stays frozen.
 //
-// O registro é por posição na conversa (ver Position): só o reenvio exato fica congelado.
+// The record is per position in the conversation (see Position): only the exact resend stays
+// frozen.
 //
-// Em disco fica só: o HMAC (com a chave) da posição mais o texto e, para cada trecho trocado,
-// onde ele está no texto, o tipo e o pseudônimo (o que a API recebeu). Nenhum valor real.
+// On disk there is only: the HMAC (with the key) of the position plus the text and, for each
+// swapped piece, where it is in the text, the type and the pseudonym (what the API received). No
+// real value.
 
 type snippet struct {
 	Start, End   int
 	Type, Pseudo string
 }
 
-// Sent guarda os registros em RAM e acrescenta os novos ao arquivo (uma linha JSON cada).
+// Sent keeps the records in RAM and appends the new ones to the file (one JSON line each).
 type Sent struct {
 	path        string
-	fingerprint string // config + versão: se mudar, os registros não valem mais
+	fingerprint string // config + version: if it changes, the records are no longer valid
 	mu          sync.Mutex
 	reg         map[string]*sentRecord
 	usage       int64
-	pend        [][]byte // linhas ainda não gravadas
-	lines       int      // linhas no arquivo (registros repetidos contam)
+	pend        [][]byte // lines not yet written
+	lines       int      // lines in the file (repeated records count)
 }
 
 type sentRecord struct {
@@ -46,16 +48,16 @@ type sentRecord struct {
 type sentLine struct {
 	ID string  `json:"i,omitempty"`
 	T  [][]any `json:"t,omitempty"`
-	// só na primeira linha
+	// only on the first line
 	Fingerprint string `json:"impressao,omitempty"`
 }
 
-// maxSent: teto de textos guardados. Passou disso, sai o décimo usado há mais tempo.
+// maxSent: ceiling of stored texts. Past it, the tenth used longest ago goes.
 var maxSent = 400_000
 
-// LoadSent lê o arquivo. Se ele for de outra configuração ou de outra versão do
-// llm-dlp, recomeça vazio: o texto passa a ser mascarado com as regras atuais (a conversa
-// é regravada no cache uma vez).
+// LoadSent reads the file. If it is from another configuration or another llm-dlp version, it
+// starts over empty: the text is masked with the current rules (the conversation is rewritten in
+// the cache once).
 func LoadSent(path, fingerprint string) (*Sent, error) {
 	e := &Sent{path: path, fingerprint: fingerprint, reg: map[string]*sentRecord{}}
 	f, err := os.Open(path)
@@ -71,7 +73,7 @@ func LoadSent(path, fingerprint string) (*Sent, error) {
 	for sc.Scan() {
 		var l sentLine
 		if json.Unmarshal(sc.Bytes(), &l) != nil {
-			continue // linha quebrada (gravação interrompida): o texto é mascarado de novo
+			continue // broken line (interrupted write): the text is masked again
 		}
 		if firstOne {
 			firstOne, valid = false, l.Fingerprint == fingerprint
@@ -118,7 +120,7 @@ func lineSnippets(t [][]any) ([]snippet, bool) {
 	return out, true
 }
 
-// Lookup devolve os trechos com que o texto foi enviado naquela posição (pelo HMAC).
+// Lookup returns the pieces the text was sent with at that position (by the HMAC).
 func (e *Sent) Lookup(id string) ([]snippet, bool) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -131,7 +133,7 @@ func (e *Sent) Lookup(id string) ([]snippet, bool) {
 	return r.ts, true
 }
 
-// Record registra um texto que acabou de sair (vai para o arquivo no próximo Save).
+// Record records a text that just went out (it goes to the file on the next Save).
 func (e *Sent) Record(id string, ts []snippet) {
 	t := make([][]any, len(ts))
 	for i, x := range ts {
@@ -148,8 +150,8 @@ func (e *Sent) Record(id string, ts []snippet) {
 	e.pend = append(e.pend, b)
 }
 
-// Save acrescenta ao arquivo o que foi registrado desde a última vez. Passou do teto,
-// tira os usados há mais tempo e reescreve o arquivo.
+// Save appends to the file what was recorded since the last time. Past the ceiling, it removes
+// those used longest ago and rewrites the file.
 func (e *Sent) Save() error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -178,8 +180,8 @@ func (e *Sent) Save() error {
 	return err
 }
 
-// podar deixa no máximo 90% do teto, ficando os usados mais recentemente (com e.mu travado
-// ou antes de o Sent ser compartilhado).
+// prune leaves at most 90% of the ceiling, keeping the most recently used ones (with e.mu locked or
+// before Sent is shared).
 func (e *Sent) prune() {
 	if len(e.reg) <= maxSent {
 		return
@@ -194,7 +196,7 @@ func (e *Sent) prune() {
 	}
 }
 
-// reescrever grava o arquivo inteiro (cabeçalho + registros, do mais antigo ao mais recente).
+// rewrite writes the whole file (header + records, from oldest to newest).
 func (e *Sent) rewrite() error {
 	ids := make([]string, 0, len(e.reg))
 	for id := range e.reg {

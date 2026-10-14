@@ -2,7 +2,7 @@ package mask
 
 import "testing"
 
-// Name + tipo de dado. Os nomes de coluna devem sair mascarados em todas as formas.
+// Name + data type. The column names must come out masked in every shape.
 
 func TestSchemaNameType(t *testing.T) {
 	cols := []string{"cd_conta", "vl_lancto", "dt_lancto"}
@@ -44,7 +44,7 @@ models:
 			txt := tr.f(c.text)
 			names := cols
 			if c.name == "protobuf" {
-				names = cols[:2] // o tipo de mensagem (Timestamp) não é tipo de dado do vocabulário
+				names = cols[:2] // the message type (Timestamp) is not a data type of the vocabulary
 			}
 			if c.name == "dbt schema.yml" {
 				names = append(names, "lanc_diario")
@@ -57,7 +57,7 @@ models:
 	}
 }
 
-// negativos: anotações de tipo em código e configuração comum não viram coluna
+// negatives: type annotations in code and common configuration do not become a column
 func TestSchemaNegatives(t *testing.T) {
 	m := newTest(t)
 	for _, s := range []string{
