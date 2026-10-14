@@ -9,7 +9,7 @@ Em cada versão: **Mascaramento** é o que passou a ser (ou deixou de ser) masca
 **Programa** é comando, instalação, configuração, desempenho e documentação; **Código** é o
 que só interessa a quem mexe no código.
 
-## [Não lançado]
+## [0.10.0] - 2026-10-14
 
 Mais dados passam a ser reconhecidos pelo próprio dado, cada um pela regra de quem define o
 formato (IANA e RFCs, documentação da AWS e do Kubernetes, manual do contribuinte da NF-e,
