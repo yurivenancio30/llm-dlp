@@ -9,6 +9,52 @@ Em cada versão: **Mascaramento** é o que passou a ser (ou deixou de ser) masca
 **Programa** é comando, instalação, configuração, desempenho e documentação; **Código** é o
 que só interessa a quem mexe no código.
 
+## [Não lançado]
+
+Passam a ser mascarados os dados de autenticação, que a Resolução CD/ANPD nº 15/2024 (art. 5º,
+IV) lista entre os dados que tornam um incidente de segurança um risco relevante. Instalações
+antigas recebem as regras novas do Claude Code ao atualizar.
+
+### Mascaramento
+
+- Senha só de dígitos: `senha: 4821`, `SENHA_BANCO=4821`, "a senha é 4821". Antes, um número de
+  menos de 6 dígitos ao lado da palavra saía. Uma chave que guarda uma quantidade da senha
+  (`password_min_length: 8`, `senha_tentativas: 3`) fica.
+- Códigos de autenticação, ao lado do rótulo: PIN (`PIN: 4821`), o código de segurança do
+  cartão (`CVV: 123`, `código de segurança`), códigos de uso único e de verificação
+  (`OTP: 482913`, `2FA`, `código de verificação`, `código de acesso`, `token: 482913`), códigos
+  de recuperação e a resposta de uma pergunta de segurança. CVV e PIN são os "dados de
+  autenticação sensíveis" do PCI DSS; o código de uso único tem de 6 a 8 dígitos (RFC 4226 e
+  6238). Nome do detector: `secret`.
+- Frase de recuperação de carteira (BIP-39): 12 a 24 palavras da lista oficial, em inglês ou em
+  português, cujo dígito verificador confere, também sem rótulo e também numerada
+  (`1. legal 2. winner…`). Depois de um rótulo (`frase de recuperação:`, `seed phrase:`),
+  qualquer valor.
+
+### Programa
+
+- O `llm-dlp update` e o `llm-dlp reload` acrescentam no `~/.claude/settings.json` as regras
+  que mantêm o agente longe do llm-dlp quando uma versão nova as traz. Até aqui só o `install`
+  as gravava, então uma instalação antiga não tinha `Bash(*.config/llm-dlp*)` (ler ou mudar a
+  configuração por comando) nem `Bash(*llm-dlp emergency*)`. Para a trava, que precisa de
+  `sudo`, eles dizem o que falta e oferecem acrescentar; o `install` faz o mesmo, e o
+  `llm-dlp status` avisa enquanto faltar alguma regra.
+- O `llm-dlp install`, rodado de novo, grava num `config.json` que já existe só o que foi
+  respondido (domínios internos, nomes protegidos), mantém o resto do arquivo como estava e
+  guarda o anterior como `config.json.bak-DATA`. Antes, ele regravava o arquivo inteiro a partir
+  do que conhecia, sem cópia.
+- As últimas mensagens em português passam para o inglês: os passos do `install` ("Program",
+  "Apply?", "Summary"), o `llm-dlp columns`, o aviso de corte do `llm-dlp last`, o uso do
+  `simulate`, um erro do OCR e o aviso que o modelo recebe por uma imagem coberta. A resposta da
+  checagem de saúde (`llm-dlp status`) diz `requests` e `online_since`.
+- O resumo do `simulate` volta a classificar a recusa por imagem ou PDF que não deu para
+  verificar (ele procurava o texto em português).
+
+### Código
+
+- `detectors_auth.go`, com as listas da BIP-39 em `internal/mask/data/` (licença MIT, origem no
+  cabeçalho). `config.SetFields` grava alguns campos do `config.json` mantendo o resto.
+
 ## [0.10.0] - 2026-10-14
 
 Mais dados passam a ser reconhecidos pelo próprio dado, cada um pela regra de quem define o

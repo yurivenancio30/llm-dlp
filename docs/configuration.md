@@ -45,7 +45,8 @@ does not go to the API.
 | `upstream` | Address of the API | `https://api.anthropic.com` |
 | `providers` | **Beta.** Other APIs served on the same port, under the path `/<name>` (see [Other clients and APIs](#other-clients-and-apis-beta)). Each one has `upstream` and `format` (`gemini`, `openai` or `anthropic`; any other value falls into the generic mode) | `gemini`, `openai` and `xai`, each with the address of its API |
 
-Names accepted in `disabled_detectors`: `secret`, `email`, `ip`, `host`, `cpf`, `cnpj`,
+Names accepted in `disabled_detectors`: `secret` (passwords, tokens, authentication codes and
+recovery phrases), `email`, `ip`, `host`, `cpf`, `cnpj`,
 `pis`, `cnh`, `rg`, `phone`, `cep`, `card`, `account`, `pix`, `address`, `birthdate`,
 `name`, `field` (detection by the field name), `user`, `doc`, `iban`, `lawsuit` (court case
 number), `mac`, `nfe` (electronic invoice access key), `boleto` (bank slip, bill and barcode),

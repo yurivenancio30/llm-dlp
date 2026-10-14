@@ -21,7 +21,9 @@ remove the lock. If your `sudo` does not ask for a password, this barrier does n
 command run by the agent can change it (turn a detector off, let images through, point
 `upstream` to another server, which would then receive the messages and the API credential).
 The rules that `llm-dlp install` adds to Claude Code forbid the agent to read, edit and
-mention the folder in a command, but that is not a guarantee. So, while the configuration
+mention the folder in a command, but that is not a guarantee. A newer version can bring new
+rules: `llm-dlp update` and `llm-dlp reload` add them to `~/.claude/settings.json`, and for the
+lock, which needs `sudo`, they offer to add them (`llm-dlp status` warns while one is missing). So, while the configuration
 removes protection or sends the messages somewhere other than the Anthropic API, Claude
 Code shows a warning **on every message**, and so does `llm-dlp status`. If you changed
 nothing and the warning showed up, check `config.json`.

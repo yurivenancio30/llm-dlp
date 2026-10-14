@@ -9,6 +9,50 @@ In each version: **Masking** is what started (or stopped) being masked; **Progra
 commands, installation, configuration, performance and documentation; **Code** is what only
 matters to whoever changes the code.
 
+## [Unreleased]
+
+Authentication data, which Resolução CD/ANPD nº 15/2024 (art. 5º, IV) lists among the data that
+make a security incident a relevant risk, is now masked. Older installations get the newer
+Claude Code rules on update.
+
+### Masking
+
+- A password of digits only: `senha: 4821`, `SENHA_BANCO=4821`, "a senha é 4821". Before, a
+  number of fewer than 6 digits next to the word went out. A key that holds a quantity of the
+  password (`password_min_length: 8`, `senha_tentativas: 3`) stays.
+- Authentication codes, next to their label: PIN (`PIN: 4821`), the card security code
+  (`CVV: 123`, `código de segurança`), one-time and verification codes (`OTP: 482913`,
+  `2FA`, `código de verificação`, `código de acesso`, `token: 482913`), recovery codes and the
+  answer to a security question. CVV and PIN are the "sensitive authentication data" of PCI DSS;
+  one-time codes have 6 to 8 digits (RFC 4226 and 6238). Detector name: `secret`.
+- A wallet recovery phrase (BIP-39): 12 to 24 words of the official list, in English or
+  Portuguese, whose checksum matches, also without a label and also numbered
+  (`1. legal 2. winner…`). After a label (`seed phrase:`, `frase de recuperação:`), any value.
+
+### Program
+
+- `llm-dlp update` and `llm-dlp reload` add to `~/.claude/settings.json` the rules that keep
+  the agent away from llm-dlp when a newer version brings them. Until now only `install` wrote
+  them, so an older installation lacked `Bash(*.config/llm-dlp*)` (reading or changing the
+  configuration by a command) and `Bash(*llm-dlp emergency*)`. For the lock, which needs `sudo`,
+  they say what is missing and offer to add it; `install` does the same, and `llm-dlp status`
+  warns while a rule is missing.
+- `llm-dlp install`, run again, writes into an existing `config.json` only what was answered
+  (internal domains, protected names), keeps the rest of the file as it was and saves the
+  previous one as `config.json.bak-DATE`. Before, it rewrote the whole file from what it knew,
+  without a copy.
+- The last messages in Portuguese are now in English: the `install` steps ("Program", "Apply?",
+  "Summary"), `llm-dlp columns`, the cut note of `llm-dlp last`, the usage of `simulate`, an OCR
+  error and the note the model gets for a covered image. The health check answer (`llm-dlp
+  status`) says `requests` and `online_since`.
+- The `simulate` summary classifies again a refusal for an image or PDF that could not be
+  checked (it looked for the Portuguese text).
+
+### Code
+
+- `detectors_auth.go`, with the BIP-39 lists in `internal/mask/data/` (MIT License, origin in
+  the header). `config.SetFields` writes some fields of `config.json` keeping the rest.
+
 ## [0.10.0] - 2026-10-14
 
 More data is now recognized by the data itself, each by the rule of whoever defines the format

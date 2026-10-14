@@ -44,7 +44,8 @@ Anthropic, o Claude Code mostra um aviso a cada mensagem (ver
 | `upstream` | Endereço da API | `https://api.anthropic.com` |
 | `providers` | **Beta.** Outras APIs atendidas na mesma porta, pelo caminho `/<nome>` (ver [Outros clientes e APIs](#outros-clientes-e-apis-beta)). Cada uma tem `upstream` e `format` (`gemini`, `openai` ou `anthropic`; outro valor cai no modo genérico) | `gemini`, `openai` e `xai`, cada um com o endereço da sua API |
 
-Nomes aceitos em `disabled_detectors`: `secret` (segredo), `email`, `ip`, `host`, `cpf`, `cnpj`,
+Nomes aceitos em `disabled_detectors`: `secret` (senhas, tokens, códigos de autenticação e
+frases de recuperação), `email`, `ip`, `host`, `cpf`, `cnpj`,
 `pis`, `cnh`, `rg`, `phone` (telefone), `cep`, `card` (cartão), `account` (conta bancária), `pix`,
 `address` (endereço), `birthdate` (data de nascimento), `name` (nome), `field` (detecção pelo nome
 do campo), `user` (usuário), `doc`, `iban`, `lawsuit` (número de processo), `mac`, `nfe` (chave de

@@ -14,6 +14,8 @@ keywords are recognized as well.
 |---|---|
 | Tokens and API keys | `ghp_k3Jd9s…`, also inside base64 ([gitleaks](https://github.com/gitleaks/gitleaks) rules) |
 | Passwords | `DB_PASSWORD=…`, `senha: …`, "a senha é …", `mysql://usuario:senha@host`, `mysql -pSENHA` |
+| Authentication codes | `senha: 4821` (digits only), `PIN: 4821`, `CVV: 123`, `código de verificação: 482913`, `OTP: 482913`, recovery codes, the answer to a security question. Authentication data is one of the categories of Resolução CD/ANPD nº 15/2024 (art. 5º, IV); CVV and PIN are the "sensitive authentication data" of PCI DSS; one-time codes have 6 to 8 digits (RFC 4226 and 6238). They are numbers like any other, so they count only next to their label |
+| Wallet recovery phrase | 12 to 24 words of the BIP-39 list (English or Portuguese) whose checksum matches, also without a label. After a label (`seed phrase:`, `frase de recuperação:`), any value |
 | Credential in an HTTP header | `Authorization: Basic …`, `Authorization: Bearer …`, `Cookie: sessionid=…` |
 | E-mail | `joao.silva@empresa.com.br` (except the ones you allow) |
 | CPF and CNPJ with punctuation | `529.982.247-25`, `11.222.333/0001-81`, `12.ABC.345/01DE-35` (new CNPJ, with letters) |
@@ -189,7 +191,9 @@ name always gets the same pseudonym, even when two rules find it with different 
 ## When in doubt, mask
 
 Near `senha`, `password` or `secret`, any value with a digit or a symbol is treated as a
-password, even if it is just a name (`secretRef: db-credentials`). In a one-row table, where
+password, even if it is just a name (`secretRef: db-credentials`). So is a number of 4 to 12
+digits, unless the key says it is a quantity of the password (`password_min_length: 8`,
+`senha_tentativas: 3`). In a one-row table, where
 the columns cannot be told apart, it masks more than needed. This breaks nothing: on the way
 back, you and the commands see the real value.
 

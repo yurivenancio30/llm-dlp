@@ -11,6 +11,7 @@ Uma linha por ideia: o que foi visto e ainda não foi feito. Nada aqui é promes
 - Chave em português que não é palavra de tipo (`"Banco": "vendashx_prod"`): `banco` também é banco de dinheiro, por isso não entrou no vocabulário.
 - Nome de CTE com cara de identificador (`WITH clientes_inadimplentes AS (`): hoje todo nome de CTE é nome local da consulta, como apelido de tabela.
 - Diretório de trabalho da sessão (vem na requisição): usar como origem, para saber que todo caminho debaixo dele é do projeto.
+- Rosto em imagem (foto de documento, print de videochamada): dado biométrico é dado sensível (LGPD, art. 5º, II; ANPD, Radar Tecnológico nº 2). O OCR só cobre texto; precisaria detectar rostos.
 
 ## Mascarar menos (hoje sobra)
 

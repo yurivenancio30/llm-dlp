@@ -807,7 +807,7 @@ URN), senão o modelo perde a ligação entre os textos.
 - DataHub SchemaField / DataJob: https://docs.datahub.com/docs/generated/metamodel/entities/schemafield , .../datajob
 
 
-### 8. Armazenamento e filas: o que está implementado (leitor `endereço`)
+### 8. Armazenamento e filas: o que está implementado (leitor `address`)
 
 Código: `internal/mask/reader_addresses.go` (`urlIn`). As URIs de banco continuam com o leitor
 `conexão`; estas são as de armazenamento e de fila:
@@ -3002,8 +3002,8 @@ Comprehend PII não tem tipo para host, database, tabela ou coluna (tem `USERNAM
 A reserva de chave-valor é o leitor `key-value` (ver a seção JSON, YAML, TOML..., §8). Além
 dele, dois leitores genéricos sem formato:
 
-**Host interno em URL e endereço solto** (leitor `endereço`, regras `url-interna` e
-`host-interno`). Em `http(s)://`, `ws(s)://`, `grpc://`, `ftp://`, `redis://`... (qualquer
+**Host interno em URL e endereço solto** (leitor `address`, regras `internal-url` e
+`internal-host`). Em `http(s)://`, `ws(s)://`, `grpc://`, `ftp://`, `redis://`... (qualquer
 esquema que não seja de banco, armazenamento, fila ou git), o host é servidor **forte** quando é
 interno: rótulo único sem ponto (`http://wiki-interna/`) ou terminado em `.local` (RFC 6762),
 `.internal` (reserva da ICANN, 2024), `.home.arpa` (RFC 8375), `.svc`/`.cluster.local` (DNS do
@@ -3013,7 +3013,7 @@ com esses sufixos (`db01.corp:5432`, `redis.vendas.svc.cluster.local`) também �
 dígito ou hífen, ou dois rótulos antes do sufixo, e não for atributo de código (`threading.local()`)
 nem pacote Java (`org.foo.internal`).
 
-**Termo cadastrado dentro de um identificador** (leitor `termo-embutido`, ligado quando há
+**Termo cadastrado dentro de um identificador** (leitor `embedded-term`, ligado quando há
 `terms` de uma palavra só). O detector de termos troca a palavra inteira; este troca o
 identificador com cara de identificador que tem o termo como pedaço inteiro (separado por
 `_ . -` ou camelCase): termo `acmex` pega `acmex_pedidos`, `dbAcmexVendas01`, `svc-acmex-carga`,
@@ -3023,9 +3023,9 @@ servidor); sem posição, servico. Sempre forte.
 
 | Regra | Pega | Forte? |
 |---|---|---|
-| `url-interna` | host interno em URL; usuário da URL | sim |
-| `host-interno` | `nome.sufixo-interno` fora de URL | sim |
-| `termo-embutido` | identificador com um termo cadastrado como pedaço | sim |
+| `internal-url` | host interno em URL; usuário da URL | sim |
+| `internal-host` | `nome.sufixo-interno` fora de URL | sim |
+| `embedded-term` | identificador com um termo cadastrado como pedaço | sim |
 
 
 ## Pipelines de CI

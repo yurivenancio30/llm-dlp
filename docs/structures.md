@@ -813,7 +813,7 @@ the URN), otherwise the model loses the link between the texts.
 - DataHub SchemaField / DataJob: https://docs.datahub.com/docs/generated/metamodel/entities/schemafield , .../datajob
 
 
-### 8. Storage and queues: what is implemented (the `endereço` reader)
+### 8. Storage and queues: what is implemented (the `address` reader)
 
 Code: `internal/mask/reader_addresses.go` (`urlIn`). Database URIs stay with the `conexão`
 reader; these are the storage and queue ones:
@@ -3008,8 +3008,8 @@ Comprehend PII has no type for host, database, table or column (it has `USERNAME
 The key-value fallback is the `key-value` reader (see the section JSON, YAML, TOML..., §8). Besides
 it, two generic readers with no format:
 
-**Internal host in a URL and loose address** (the `endereço` reader, rules `url-interna` and
-`host-interno`). In `http(s)://`, `ws(s)://`, `grpc://`, `ftp://`, `redis://`... (any
+**Internal host in a URL and loose address** (the `address` reader, rules `internal-url` and
+`internal-host`). In `http(s)://`, `ws(s)://`, `grpc://`, `ftp://`, `redis://`... (any
 scheme that is not a database, storage, queue or git one), the host is a **strong** server when it is
 internal: a single label with no dot (`http://wiki-interna/`) or ending in `.local` (RFC 6762),
 `.internal` (ICANN reservation, 2024), `.home.arpa` (RFC 8375), `.svc`/`.cluster.local` (Kubernetes
@@ -3019,7 +3019,7 @@ with those suffixes (`db01.corp:5432`, `redis.vendas.svc.cluster.local`) is also
 digit or a hyphen, or two labels before the suffix, and is not a code attribute (`threading.local()`)
 nor a Java package (`org.foo.internal`).
 
-**Registered term inside an identifier** (the `termo-embutido` reader, on when there are
+**Registered term inside an identifier** (the `embedded-term` reader, on when there are
 one-word `terms`). The term detector replaces the whole word; this one replaces the
 identifier-looking identifier that has the term as a whole piece (separated by
 `_ . -` or camelCase): the term `acmex` catches `acmex_pedidos`, `dbAcmexVendas01`, `svc-acmex-carga`,
@@ -3029,9 +3029,9 @@ server); with no position, service. Always strong.
 
 | Rule | Catches | Strong? |
 |---|---|---|
-| `url-interna` | internal host in a URL; user of the URL | yes |
-| `host-interno` | `name.internal-suffix` outside a URL | yes |
-| `termo-embutido` | identifier with a registered term as a piece | yes |
+| `internal-url` | internal host in a URL; user of the URL | yes |
+| `internal-host` | `name.internal-suffix` outside a URL | yes |
+| `embedded-term` | identifier with a registered term as a piece | yes |
 
 
 ## CI pipelines

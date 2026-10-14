@@ -11,6 +11,7 @@ One line per idea: what was seen and has not been done yet. Nothing here is a pr
 - A Portuguese key that is not a type word (`"Banco": "vendashx_prod"`): `banco` is also a bank for money, so it did not enter the vocabulary.
 - An identifier-looking CTE name (`WITH clientes_inadimplentes AS (`): today every CTE name is a local name of the query, like a table alias.
 - The session's working directory (it comes in the request): use it as the origin, to know that every path under it belongs to the project.
+- Faces in images (a document photo, a screenshot of a video call): biometric data is sensitive data (LGPD, art. 5º, II; ANPD, Radar Tecnológico nº 2). OCR covers only text; it would need face detection.
 
 ## Mask less (too much today)
 

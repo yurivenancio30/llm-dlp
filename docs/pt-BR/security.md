@@ -21,7 +21,10 @@ a trava. Se o seu `sudo` não pede senha, essa barreira não existe.
 rodado pelo agente consegue mudá-lo (desligar um detector, liberar imagens, apontar o
 `upstream` para outro servidor, que passaria a receber as mensagens e a credencial da API).
 As regras que o `llm-dlp install` põe no Claude Code proíbem o agente de ler, editar e
-citar a pasta num comando, mas isso não é uma garantia. Por isso, enquanto a configuração
+citar a pasta num comando, mas isso não é uma garantia. Uma versão nova pode trazer regras
+novas: o `llm-dlp update` e o `llm-dlp reload` as acrescentam no `~/.claude/settings.json`, e
+para a trava, que precisa de `sudo`, oferecem acrescentar (o `llm-dlp status` avisa enquanto
+faltar alguma). Por isso, enquanto a configuração
 tirar proteção ou mandar as mensagens para fora da API da Anthropic, o Claude Code mostra
 um aviso **a cada mensagem**, e o `llm-dlp status` também. Se você não mudou nada e o aviso
 apareceu, confira o `config.json`.
