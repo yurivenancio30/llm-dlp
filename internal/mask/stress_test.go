@@ -211,7 +211,7 @@ func TestStressConcurrency(t *testing.T) {
 	m.Mask("DB_PASSWORD=Ficticia@2024 e RG: 12.345.678-9")
 	wants, _ := m.Mask(fixed)
 	if strings.Contains(wants, "Ficticia@2024") || strings.Contains(wants, "12.345.678-9") {
-		t.Fatalf("premissa: %s", wants)
+		t.Fatalf("premise: %s", wants)
 	}
 	var wg sync.WaitGroup
 	var errs sync.Map

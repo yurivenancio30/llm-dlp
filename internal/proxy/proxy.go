@@ -118,7 +118,7 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/__llm-dlp/saude" {
 		w.Header().Set("content-type", "application/json")
 		info := map[string]any{"ok": true, "servico": "llm-dlp", "versao": Version, "commit": version.Commit, "pid": os.Getpid(),
-			"requisicoes": p.reqs.Load(), "no_ar_desde": p.start.Format(time.RFC3339),
+			"requests": p.reqs.Load(), "online_since": p.start.Format(time.RFC3339),
 			"troca": p.swap}
 		if d := r.URL.Query().Get("desafio"); len(p.key) > 0 && validChallenge(d) {
 			info["prova"] = Proof(p.key, "saude\x00"+d)

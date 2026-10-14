@@ -74,7 +74,7 @@ func (o *OCR) Read(data []byte) (image.Image, []Line, error) {
 	if c, _, err := image.DecodeConfig(bytes.NewReader(data)); err != nil {
 		return nil, nil, fmt.Errorf("unreadable image: %w", err)
 	} else if c.Width <= 0 || c.Height <= 0 || c.Width > sideMax || c.Height > sideMax || c.Width*c.Height > maxDots {
-		return nil, nil, fmt.Errorf("imagem grande demais (%d x %d pontos)", c.Width, c.Height)
+		return nil, nil, fmt.Errorf("image too large (%d x %d pixels)", c.Width, c.Height)
 	}
 	img, _, err := image.Decode(bytes.NewReader(data))
 	if err != nil {

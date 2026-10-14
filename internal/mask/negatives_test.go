@@ -24,7 +24,7 @@ func TestT8Negatives(t *testing.T) {
 			m.cfg.InternalDomains, m.cfg.Terms = nil, nil
 			r, _ := m.maskD(c.text, true, hint)
 			if r.text != c.text {
-				t.Errorf("%s (dica %q): mascarou\n%s", c.name, hint, r.text)
+				t.Errorf("%s (hint %q): masked\n%s", c.name, hint, r.text)
 			}
 		}
 	}

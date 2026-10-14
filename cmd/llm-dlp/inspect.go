@@ -74,7 +74,7 @@ func lastConv(args []string) error {
 	for _, m := range msgs[len(msgs)-n:] {
 		for _, t := range m.texts {
 			if len(t) > 3000 {
-				t = t[:3000] + fmt.Sprintf("\n… (mais %d caracteres)", len(t)-3000)
+				t = t[:3000] + fmt.Sprintf("\n… (%d more characters)", len(t)-3000)
 			}
 			fmt.Printf("\n── %s ──\n%s\n", m.hostRole, t)
 		}
@@ -278,7 +278,7 @@ func simulate(args []string) error {
 		return err
 	}
 	if fs.NArg() == 0 {
-		return fmt.Errorf("uso: llm-dlp simulate [--max N] [--window KB] SESSAO.jsonl...")
+		return fmt.Errorf("usage: llm-dlp simulate [--max N] [--window KB] SESSION.jsonl...")
 	}
 	cfg, key, _, _, _, err := loadAll()
 	if err != nil {
@@ -286,7 +286,7 @@ func simulate(args []string) error {
 	}
 	for _, file := range fs.Args() {
 		// a copy of the people registry and no hash file: the simulation changes nothing
-		tmp, err := os.MkdirTemp("", "llm-dlp-simular-")
+		tmp, err := os.MkdirTemp("", "llm-dlp-simulate-")
 		if err != nil {
 			return err
 		}
@@ -356,7 +356,7 @@ func simulateSession(file string, cfg config.Config, m *mask.Masker, limitN, win
 		}
 		if usage := lastUse(contentList); usage != nil {
 			ev("content_block_start", map[string]any{"type": "content_block_start", "index": 1,
-				"content_block": map[string]any{"type": "tool_use", "id": "toolu_simulacao", "name": usage["name"], "input": map[string]any{}}})
+				"content_block": map[string]any{"type": "tool_use", "id": "toolu_simulation", "name": usage["name"], "input": map[string]any{}}})
 			var in bytes.Buffer
 			enc := json.NewEncoder(&in)
 			enc.SetEscapeHTML(false)
@@ -441,7 +441,7 @@ func simulateSession(file string, cfg config.Config, m *mask.Masker, limitN, win
 		for i, c := range conversation {
 			msgs[i] = c.raw
 		}
-		body, _ := json.Marshal(map[string]any{"model": "simulacao", "stream": true, "max_tokens": 1000, "messages": msgs})
+		body, _ := json.Marshal(map[string]any{"model": "simulation", "stream": true, "max_tokens": 1000, "messages": msgs})
 		images += bytes.Count(body, []byte(`"type":"image"`))
 		expected := ""
 		if ts := contentTexts(mm["content"]); len(ts) > 0 {
@@ -465,9 +465,9 @@ func simulateSession(file string, cfg config.Config, m *mask.Masker, limitN, win
 				Error struct{ Message string } `json:"error"`
 			}
 			json.Unmarshal([]byte(response), &er)
-			rsn := "outro motivo"
+			rsn := "other reason"
 			switch {
-			case strings.Contains(response, "OCR") || strings.Contains(response, "image") || strings.Contains(response, "verificar"):
+			case strings.Contains(response, "OCR") || strings.Contains(response, "image") || strings.Contains(response, "could not check"):
 				rsn = "image or PDF that could not be checked (OCR missing)"
 			}
 			reasons[rsn]++

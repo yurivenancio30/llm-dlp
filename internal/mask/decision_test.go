@@ -82,7 +82,7 @@ func TestContractGeneric(t *testing.T) {
 	defer func() { publicRef = prev }()
 	publicRef = map[string]bool{"default": true}
 	if !isGeneric("Default") || isGeneric("pagamentos") {
-		t.Fatal("ehGenerica")
+		t.Fatal("isGeneric")
 	}
 }
 
@@ -105,7 +105,7 @@ func TestContractWhoWrote(t *testing.T) {
 		t.Fatalf("unmasked: %q", des)
 	}
 	if o, ok := m.OriginalOf(des); !ok || o != orig {
-		t.Fatalf("OriginalDe: %q %v", o, ok)
+		t.Fatalf("OriginalOf: %q %v", o, ok)
 	}
 	tr, ok := m.Translated(des)
 	if !ok || len(tr) != 1 || des[tr[0].Start:tr[0].End] != "t_lanc" || tr[0].Pseudo != ps {

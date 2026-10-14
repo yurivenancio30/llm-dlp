@@ -145,7 +145,7 @@ func TestCommandNegatives(t *testing.T) {
 			txt := tr.f(c.output)
 			_, _, out, seen := checkCommand(t, m, c.cmd, []step{{c.cmd, txt}}, nil)
 			if o2, _ := without.Mask(txt); out != o2 {
-				t.Errorf("%s / %s: a dica mascarou\n%s", c.cmd, tr.name, seen)
+				t.Errorf("%s / %s: the hint masked\n%s", c.cmd, tr.name, seen)
 			}
 		}
 	}
@@ -165,7 +165,7 @@ func TestCommandHint(t *testing.T) {
 		{`psql -c "select * from information_schema.tables"`, ""},
 	} {
 		if d := cs.Hint(c.cmd, ""); d != c.wants {
-			t.Errorf("%q: dica %q, queria %q", c.cmd, d, c.wants)
+			t.Errorf("%q: hint %q, want %q", c.cmd, d, c.wants)
 		}
 	}
 }
@@ -215,7 +215,7 @@ func TestQualifiedTypeNegatives(t *testing.T) {
 		m := newTest(t)
 		m.cfg.InternalDomains = nil
 		if out, _ := m.Mask(s); out != s {
-			t.Errorf("mascarou %q\n-> %q", s, show(m, s))
+			t.Errorf("masked %q\n-> %q", s, show(m, s))
 		}
 	}
 }
@@ -274,7 +274,7 @@ func TestHomogeneousListNegatives(t *testing.T) {
 		for _, e := range ents {
 			for _, stays := range []string{"foo_bar", "baz_qux", "qux_1", "x_train", "resumo", "pronto", "relatorio_final", "build_cache", "notas_reuniao", "read_csv"} {
 				if e.Real == stays {
-					t.Errorf("%q: mascarou %s\n-> %q", s, stays, show(m, s))
+					t.Errorf("%q: masked %s\n-> %q", s, stays, show(m, s))
 				}
 			}
 		}

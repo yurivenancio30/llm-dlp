@@ -97,7 +97,7 @@ func TestMeasurePublicCorpus(t *testing.T) {
 		}
 		bytes += int64(len(b))
 		if i%200 == 0 { // a new Masker from time to time: what is learned in one project does not leak into another
-			t.Logf("... %d/%d arquivos", i, len(files))
+			t.Logf("... %d/%d files", i, len(files))
 		}
 		m := newTest(t)
 		m.cfg.InternalDomains, m.cfg.Terms = nil, nil
@@ -119,7 +119,7 @@ func TestMeasurePublicCorpus(t *testing.T) {
 					break
 				}
 			}
-			t.Logf("amostra %s: %s", k, strings.Join(xs, " "))
+			t.Logf("sample %s: %s", k, strings.Join(xs, " "))
 		}
 	}
 	t.Logf("public corpus: %d files, %.1f MB, %d findings (%.2f/MB)\n%s", len(files), mb, tot, float64(tot)/mb, strings.Join(ls, "\n"))

@@ -254,7 +254,7 @@ func openAIBridge(v any) (map[string]any, func(), bool) {
 				if dec, ok := decode([]byte(args)); ok {
 					entry = dec
 				} else {
-					entry = map[string]any{"\x00cru": args} // not JSON: mask the text as it came
+					entry = map[string]any{"\x00raw": args} // not JSON: mask the text as it came
 				}
 			}
 			blocks = append(blocks, map[string]any{"type": "tool_use", "id": tm["id"], "name": fm["name"], "input": entry, callMark: len(calls)})
@@ -276,8 +276,8 @@ func openAIBridge(v any) (map[string]any, func(), bool) {
 				// only rewrites the arguments that changed (the original text stays as the client
 				// sent it)
 				if newOne := encode(b["input"]); !bytes.Equal(newOne, before[i]) {
-					if m, _ := b["input"].(map[string]any); m != nil && len(m) == 1 && m["\x00cru"] != nil {
-						calls[i]["arguments"] = m["\x00cru"]
+					if m, _ := b["input"].(map[string]any); m != nil && len(m) == 1 && m["\x00raw"] != nil {
+						calls[i]["arguments"] = m["\x00raw"]
 					} else {
 						calls[i]["arguments"] = string(newOne)
 					}

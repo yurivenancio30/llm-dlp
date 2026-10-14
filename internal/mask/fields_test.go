@@ -24,7 +24,7 @@ func TestLabelClass(t *testing.T) {
 	}
 	for r, wants := range cases {
 		if got := labelClass(r); got != wants {
-			t.Errorf("classeRotulo(%q) = %q, queria %q", r, got, wants)
+			t.Errorf("labelClass(%q) = %q, want %q", r, got, wants)
 		}
 	}
 }
@@ -220,7 +220,7 @@ func TestExtraAndOptionalFields(t *testing.T) {
 	}
 	cols := m.DescribeFields("RE;NOME_COOPERADO;NOM_SISTEMA\n1;a;b\n")
 	if len(cols) != 3 || cols[0].Class != "user" || cols[1].Class != "name" || cols[2].Class != "" {
-		t.Errorf("DescreverCampos: %+v", cols)
+		t.Errorf("DescribeFields: %+v", cols)
 	}
 }
 

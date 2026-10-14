@@ -192,7 +192,7 @@ func TestTableNegatives(t *testing.T) {
 			m.cfg.Terms = nil
 			txt := tr.f(c.text)
 			if out, _ := m.Mask(txt); out != txt {
-				t.Errorf("%s / %s: mascarou\n%s", c.name, tr.name, out)
+				t.Errorf("%s / %s: masked\n%s", c.name, tr.name, out)
 			}
 		}
 	}

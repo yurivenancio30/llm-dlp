@@ -44,7 +44,7 @@ func TestLogByTypeAndNotUndone(t *testing.T) {
 	back, _ := io.ReadAll(resp.Body)
 	resp.Body.Close()
 	if !strings.Contains(string(back), "529.982.247-25") {
-		t.Fatalf("resposta: %s", back)
+		t.Fatalf("response: %s", back)
 	}
 	l := lg.String()
 	if !strings.Contains(l, "| types: cpf 1, ip 1") || !strings.Contains(l, "| NOT UNDONE 1: 245.1.2.3") ||

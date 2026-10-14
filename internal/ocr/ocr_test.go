@@ -28,17 +28,17 @@ func pngDeclaring(t *testing.T, l, a uint32) []byte {
 // A file of a few bytes that declares a huge image is refused by the header, before any memory is
 // reserved for it (decoding would bring the process down).
 func TestImageDeclaringHugeSize(t *testing.T) {
-	o := New(Config{Tesseract: "/nao/existe"})
+	o := New(Config{Tesseract: "/does/not/exist"})
 	for _, d := range [][2]uint32{{60000, 60000}, {sideMax + 1, 10}, {10, sideMax + 1}, {12000, 12000}} {
 		_, _, err := o.Read(pngDeclaring(t, d[0], d[1]))
-		if err == nil || !strings.Contains(err.Error(), "grande demais") {
+		if err == nil || !strings.Contains(err.Error(), "too large") {
 			t.Errorf("%d x %d: should refuse by size, got: %v", d[0], d[1], err)
 		}
 	}
 	// the normal-size one passes the header and only fails at tesseract (which does not exist here)
 	_, _, err := o.Read(pngDeclaring(t, 1, 1))
-	if err == nil || strings.Contains(err.Error(), "grande demais") || !Missing(err) {
-		t.Errorf("imagem normal: %v", err)
+	if err == nil || strings.Contains(err.Error(), "too large") || !Missing(err) {
+		t.Errorf("normal image: %v", err)
 	}
 }
 

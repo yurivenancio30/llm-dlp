@@ -71,7 +71,7 @@ func TestMigrateFileRoundTrip(t *testing.T) {
 
 	bak, err := MigrateFile(false, false)
 	if err != nil || bak == "" {
-		t.Fatalf("ida: bak=%q err=%v", bak, err)
+		t.Fatalf("going forward: bak=%q err=%v", bak, err)
 	}
 	b, _ := os.ReadFile(p)
 	for stale := range oldFields {

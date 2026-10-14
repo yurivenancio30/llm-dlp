@@ -40,7 +40,7 @@ func defaultReaders() []Reader {
 		{Name: "git", Find: findGitSCP, Public: publicDev},
 		{Name: "package", Find: findPackages, Public: publicDev},
 		{Name: "path", Find: findPaths, Public: publicDev},
-		{Name: "usuário de rede", Find: findNetworkUsers, Public: publicDev},
+		{Name: "network-user", Find: findNetworkUsers, Public: publicDev},
 		{Name: "cloud", Find: findCloud, Public: publicDev},
 		{Name: "code-name", Find: findCodeName, Public: publicDev},
 		{Name: "code-call", Find: findCodeCall, Public: publicDev},

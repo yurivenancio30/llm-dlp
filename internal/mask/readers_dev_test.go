@@ -170,7 +170,7 @@ func TestReaderPaths(t *testing.T) {
 }
 
 func TestReaderNetworkUsers(t *testing.T) {
-	checkReader(t, "usuário de rede", findNetworkUsers, publicDev, []readerCase{
+	checkReader(t, "network-user", findNetworkUsers, publicDev, []readerCase{
 		{`entrou como CORPX\jsilva01 ontem`, []string{"user:jsilva01!"}},
 		{`"user": "CORPX\\svc_relatorio"`, []string{"user:svc_relatorio!"}},
 		{"ssh -i ~/.ssh/id -p 2222 svc_relatorio@db-exemplo-01 'ls'", []string{"server:db-exemplo-01!", "user:svc_relatorio!"}},
@@ -287,7 +287,7 @@ func TestDevReadersPropagate(t *testing.T) {
 	// a learned plain word does not propagate (it does not look like an identifier)
 	m.Mask("database: vendas\n")
 	if out, _ := m.Mask("as vendas subiram"); !strings.Contains(out, "vendas") {
-		t.Errorf("palavra comum propagou: %q", out)
+		t.Errorf("common word propagated: %q", out)
 	}
 }
 

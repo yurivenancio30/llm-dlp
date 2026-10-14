@@ -387,7 +387,7 @@ func TestNameSegmentMasked(t *testing.T) {
 // with nothing masked.
 func TestMatrixNegativesAsOutput(t *testing.T) {
 	if testing.Short() {
-		t.Skip("matriz grande")
+		t.Skip("large matrix")
 	}
 	n, bad := 0, 0
 	for _, c := range matrixNegatives {
@@ -405,7 +405,7 @@ func TestMatrixNegativesAsOutput(t *testing.T) {
 				ch := cs.Usage("python3 relatorio.py", nil)
 				if r, _ := m.maskD(txt, true, WithExtension("", cs.Result(ch, txt))); r.text != txt {
 					bad++
-					t.Errorf("%s / %s / %s: mascarou\n%s", c.name, d.name, tr.name, r.text)
+					t.Errorf("%s / %s / %s: masked\n%s", c.name, d.name, tr.name, r.text)
 				}
 			}
 		}

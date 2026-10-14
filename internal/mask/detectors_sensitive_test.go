@@ -59,6 +59,6 @@ func TestSensitiveLabels(t *testing.T) {
 	}
 	// "filiação" alone is still the name of the parents; "identidade", the RG
 	if labelClass("filiacao") != "name" || labelClass("identidade") != "rg" {
-		t.Errorf("filiacao %q, identidade %q", labelClass("filiacao"), labelClass("identidade"))
+		t.Errorf("parentage %q, identity %q", labelClass("filiacao"), labelClass("identidade"))
 	}
 }

@@ -193,7 +193,7 @@ func TestGeminiReturnWithoutStreaming(t *testing.T) {
 	}
 	ps := r.Candidates[0].Content.Parts
 	if len(ps) != 3 {
-		t.Fatalf("partes: %v", ps)
+		t.Fatalf("parts: %v", ps)
 	}
 	if s, _ := ps[0]["text"].(string); strings.Contains(s, email) || ps[0]["thought"] != true {
 		t.Errorf("the reasoning should not be unmasked: %v", ps[0])
@@ -331,7 +331,7 @@ func TestGeminiFileWithoutCheck(t *testing.T) {
 	json.Unmarshal(body, &v)
 	ps := v.Contents[0].Parts
 	if len(ps) != 3 || ps[0]["text"] != "veja os anexos" {
-		t.Fatalf("partes: %v", ps)
+		t.Fatalf("parts: %v", ps)
 	}
 	if s, _ := ps[1]["text"].(string); !strings.Contains(s, "An image was removed") {
 		t.Errorf("image notice: %v", ps[1])
@@ -397,7 +397,7 @@ func TestGeminiLast(t *testing.T) {
 	}
 	st, b := ask(t, "GET", px.URL+"/__llm-dlp/ultima", nil, func(r *http.Request) { r.Header.Set(ProofHeader, Proof(testKey, "ultima")) })
 	if st != 200 || !bytes.Contains(b, []byte("texto da conversa")) || bytes.Contains(b, []byte("contagem de tokens")) {
-		t.Errorf("status %d, corpo %.120s", st, b)
+		t.Errorf("status %d, body %.120s", st, b)
 	}
 	if bytes.Contains(b, []byte("joao.silva@")) || !bytes.Contains(b, []byte(".invalid")) {
 		t.Errorf("the last conversation should be masked: %.160s", b)

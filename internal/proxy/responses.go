@@ -238,7 +238,7 @@ func responsesBridge(v any) (map[string]any, func(), bool) {
 				if dec, ok := decode([]byte(args)); ok {
 					entry = dec
 				} else {
-					entry = map[string]any{"\x00cru": args} // not JSON: mask the text as it came
+					entry = map[string]any{"\x00raw": args} // not JSON: mask the text as it came
 				}
 			}
 			before := encode(entry)
@@ -248,8 +248,8 @@ func responsesBridge(v any) (map[string]any, func(), bool) {
 				// only rewrites the arguments that changed (the original text stays as the client
 				// sent it)
 				if newOne := encode(b["input"]); string(newOne) != string(before) {
-					if m, _ := b["input"].(map[string]any); m != nil && len(m) == 1 && m["\x00cru"] != nil {
-						it["arguments"] = m["\x00cru"]
+					if m, _ := b["input"].(map[string]any); m != nil && len(m) == 1 && m["\x00raw"] != nil {
+						it["arguments"] = m["\x00raw"]
 					} else {
 						it["arguments"] = string(newOne)
 					}

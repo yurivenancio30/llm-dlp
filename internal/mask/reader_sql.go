@@ -750,7 +750,7 @@ func findQualifiedType(s string, add func(ObjFinding)) {
 		ents := entQual(len(ps), e)
 		for k, v := range ps {
 			if !publicSQL(v) {
-				add(ObjFinding{a, a + len(v), ents[k], "tipo-qualificado", strong && len(v) >= 3})
+				add(ObjFinding{a, a + len(v), ents[k], "qualified-type", strong && len(v) >= 3})
 			}
 			a += len(v) + 1
 		}

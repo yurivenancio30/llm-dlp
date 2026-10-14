@@ -161,7 +161,7 @@ func TestPasswords(t *testing.T) {
 	}
 	for _, text := range cleanedOnes {
 		if out, ents := newTest(t).Mask(text); len(ents) > 0 {
-			t.Errorf("falso positivo: %q -> %q", text, out)
+			t.Errorf("false positive: %q -> %q", text, out)
 		}
 	}
 }
@@ -231,7 +231,7 @@ func TestNameAnySpelling(t *testing.T) {
 	}
 	// common words that are not an imported name stay intact
 	if out, _ := m.Mask("a silva e souza são sobrenomes comuns"); strings.Contains(strings.ToLower(out), "person ") {
-		t.Errorf("falso positivo: %q", out)
+		t.Errorf("false positive: %q", out)
 	}
 }
 

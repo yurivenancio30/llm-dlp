@@ -186,7 +186,7 @@ func TestFinalFormatAdjustments(t *testing.T) {
 // 128 KB to 512 KB; the limit is 8x.
 func TestLongLineLinear(t *testing.T) {
 	if testing.Short() {
-		t.Skip("mede tempo")
+		t.Skip("measures time")
 	}
 	m := newTest(t)
 	elapsed := func(s string) time.Duration {

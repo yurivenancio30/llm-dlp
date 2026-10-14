@@ -134,7 +134,7 @@ func TestLastOnlyWithProof(t *testing.T) {
 		"prova de outro uso": Proof(testKey, "saude\x00"+strings.Repeat("ab", 16))} {
 		st, b := ask(t, "GET", px.URL+"/__llm-dlp/ultima", nil, func(r *http.Request) { r.Header.Set(ProofHeader, proof) })
 		if st != http.StatusForbidden || bytes.Contains(b, []byte("texto da conversa")) {
-			t.Errorf("%s: status %d, corpo %.80s", name, st, b)
+			t.Errorf("%s: status %d, body %.80s", name, st, b)
 		}
 	}
 	st, b := ask(t, "GET", px.URL+"/__llm-dlp/ultima", nil, func(r *http.Request) { r.Header.Set(ProofHeader, Proof(testKey, "ultima")) })

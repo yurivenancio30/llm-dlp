@@ -27,7 +27,7 @@ func TestPseudonymDerivedByModel(t *testing.T) {
 		{"com prefixo", func(p string) string { return "vw_" + p }, "vw_" + table, true},
 		{"com sufixo", func(p string) string { return p + "_bkp" }, table + "_bkp", true},
 		{"entre crases", func(p string) string { return "`" + p + "`" }, "`" + table + "`", true},
-		{"qualificado", func(p string) string { return "dbo." + p + ".id" }, "dbo." + table + ".id", true},
+		{"qualified", func(p string) string { return "dbo." + p + ".id" }, "dbo." + table + ".id", true},
 		// with the case changed by the model, the real name comes back in the case it entered
 		{"em maiúsculas", func(p string) string { return strings.ToUpper(p) }, table, true},
 		{"só a inicial maiúscula", func(p string) string { return strings.ToUpper(p[:1]) + p[1:] }, table, true},
@@ -54,7 +54,7 @@ func TestPseudonymDerivedByModel(t *testing.T) {
 		msg("user", []any{map[string]any{"type": "tool_result", "tool_use_id": "t1", "content": ddl}})})
 	var entry struct{ Content string }
 	if err := json.Unmarshal([]byte(rawText), &entry); err != nil || entry.Content == "" {
-		t.Fatalf("resposta: %s", rawText)
+		t.Fatalf("response: %s", rawText)
 	}
 	lines := strings.Split(entry.Content, "\n")
 	if len(lines) != len(shapes) {

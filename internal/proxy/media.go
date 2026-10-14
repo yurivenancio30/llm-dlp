@@ -174,7 +174,7 @@ func (md *Media) image(b map[string]any, bin []byte) (mediaRes, error) {
 	newOne := copyPath(b)
 	data := base64.StdEncoding.EncodeToString(png)
 	newOne["source"] = map[string]any{"type": "base64", "media_type": "image/png", "data": data}
-	return mediaRes{blocks: []any{newOne, note(n, ents, "nesta imagem")}, ents: ents, size: len(data)}, nil
+	return mediaRes{blocks: []any{newOne, note(n, ents, "in this image")}, ents: ents, size: len(data)}, nil
 }
 
 // cover: OCR + detection; returns the image (PNG) with the pieces covered.
@@ -325,7 +325,7 @@ func note(n int, ents []mask.Entry, where string) map[string]any {
 		for _, e := range ents {
 			ps = append(ps, e.Pseudo)
 		}
-		t += " Entre eles: " + strings.Join(ps, ", ") + "."
+		t += " Among them: " + strings.Join(ps, ", ") + "."
 	}
 	return map[string]any{"type": "text", "text": t}
 }

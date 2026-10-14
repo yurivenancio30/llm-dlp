@@ -270,7 +270,7 @@ func TestMatrixCoverage(t *testing.T) {
 		lines = append(lines, fmt.Sprintf("%-12s %3d/%-3d %5.1f%%", k, c[0], c[1], 100*float64(c[0])/float64(c[1])))
 	}
 	pct := 100 * float64(ok) / float64(tot)
-	t.Logf("cobertura por caso:\n%s\nTOTAL %d/%d = %.1f%%", strings.Join(lines, "\n"), ok, tot, pct)
+	t.Logf("coverage by case:\n%s\nTOTAL %d/%d = %.1f%%", strings.Join(lines, "\n"), ok, tot, pct)
 	if testing.Verbose() {
 		var ss []string
 		for k, v := range leftover {

@@ -238,7 +238,7 @@ func matrixCell(t *testing.T, c contentM, d layoutM, tr transport) (ok, tot int,
 
 func TestMatrixTransportLayout(t *testing.T) {
 	if testing.Short() {
-		t.Skip("matriz grande")
+		t.Skip("large matrix")
 	}
 	type pair struct{ ok, tot int }
 	byDT := map[[2]string]pair{}
@@ -293,7 +293,7 @@ func TestMatrixTransportLayout(t *testing.T) {
 
 func TestMatrixNegatives(t *testing.T) {
 	if testing.Short() {
-		t.Skip("matriz grande")
+		t.Skip("large matrix")
 	}
 	n, bad := 0, 0
 	for _, c := range matrixNegatives {
@@ -309,7 +309,7 @@ func TestMatrixNegatives(t *testing.T) {
 				n++
 				if out, _ := m.Mask(txt); out != txt {
 					bad++
-					t.Errorf("%s / %s / %s: mascarou\n%s", c.name, d.name, tr.name, out)
+					t.Errorf("%s / %s / %s: masked\n%s", c.name, d.name, tr.name, out)
 				}
 			}
 		}

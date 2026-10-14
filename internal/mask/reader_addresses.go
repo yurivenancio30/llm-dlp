@@ -211,8 +211,8 @@ func urlIn(s string, i int, add func(ObjFinding)) {
 	default:
 		internal := internalHost(host) && simpleName(host)
 		if internal {
-			addHost(s, ha, hb, "url-interna", true, add)
-			user("url-interna")
+			addHost(s, ha, hb, "internal-url", true, add)
+			user("internal-url")
 		}
 		if (left == "http" || left == "https") && gitContext(s, a, pa, pb) {
 			addRepo(s, pa, pb, add)

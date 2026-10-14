@@ -106,7 +106,7 @@ func TestWeakObjectTeachesOnlyWithTwoRules(t *testing.T) {
 	}
 	m.Mask("e ref tb_fraca_01") // outra regra
 	if out, _ := m.Mask("agora solto: tb_fraca_01"); strings.Contains(out, "tb_fraca_01") {
-		t.Errorf("duas regras diferentes deveriam ensinar: %q", out)
+		t.Errorf("two different rules should teach: %q", out)
 	}
 }
 
@@ -116,7 +116,7 @@ func TestSimpleWordAndColumnDoNotPropagate(t *testing.T) {
 		t.Fatalf("in position it should mask the plain word: %q", out)
 	}
 	if out, _ := m.Mask("o cliente ligou"); out != "o cliente ligou" {
-		t.Errorf("palavra simples propagou: %q", out)
+		t.Errorf("plain word propagated: %q", out)
 	}
 	if out, _ := m.Mask("COLUMN vl_total_x2"); strings.Contains(out, "vl_total_x2") {
 		t.Fatalf("column in position: %q", out)

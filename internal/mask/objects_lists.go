@@ -352,7 +352,7 @@ func knownQualified(s string, knownOne func(string) (string, bool), add func(Obj
 		}
 		for k, p := range ps {
 			if v := s[p[0]:p[1]]; !knows[k] && !isPseudoObj(v) && len(v) >= 2 {
-				add(ObjFinding{p[0], p[1], ents[k], "qualificado", identifierShape(v)})
+				add(ObjFinding{p[0], p[1], ents[k], "qualified", identifierShape(v)})
 			}
 		}
 	}

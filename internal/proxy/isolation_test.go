@@ -101,7 +101,7 @@ func TestClaudeReturnsWithoutOthersTools(t *testing.T) {
 		}
 	}
 	if err := json.Unmarshal(b, &resp); err != nil || len(resp.Content) != 2 {
-		t.Fatalf("resposta: %s", b)
+		t.Fatalf("response: %s", b)
 	}
 	if resp.Content[0].Input["q"] != oaEmail {
 		t.Errorf("web_fetch in Claude should come back with the real value: %q", resp.Content[0].Input["q"])

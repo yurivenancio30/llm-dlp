@@ -175,7 +175,7 @@ spec:
 	}
 	// "nginx" in metadata.name is masked in place, but a plain word does not propagate
 	if o, _ := m.Mask("instale o nginx no servidor"); !strings.Contains(o, "nginx") {
-		t.Errorf("palavra simples propagou: %q", o)
+		t.Errorf("plain word propagated: %q", o)
 	}
 	// without apiVersion/kind it is not a manifest
 	for _, s := range []string{"metadata:\n  name: algo-x9\n", "kind: Pessoa\nnome: algo-x9\n", "apiVersion: str\nkind: str\nmetadata:\n  name: algo-x9\n"} {

@@ -203,7 +203,7 @@ func TestMemoryWhoWroteEndToEnd(t *testing.T) {
 			ps := rePseNS.FindString(string(bodies[0]))
 			original := strings.ReplaceAll(template, "%s", ps)
 			if ps == "" || text != strings.ReplaceAll(template, "%s", nsWord) {
-				t.Fatalf("premissa: %q %q", ps, text)
+				t.Fatalf("premise: %q %q", ps, text)
 			}
 			if restartN {
 				px.Close()

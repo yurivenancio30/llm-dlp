@@ -138,7 +138,7 @@ func TestDottedNameAfterRestart(t *testing.T) {
 // URLs glued without a separator and repeated "a://" are not quadratic.
 func TestGluedURLsLinear(t *testing.T) {
 	if testing.Short() {
-		t.Skip("mede tempo")
+		t.Skip("measures time")
 	}
 	m := newTest(t)
 	for _, typ := range []string{"urlcolada", "esquemas"} {

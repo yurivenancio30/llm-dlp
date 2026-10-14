@@ -126,7 +126,7 @@ func serveUntilSignal(srv *http.Server, ln net.Listener, lg *log.Logger, end fun
 		if end != nil {
 			end()
 		}
-		lg.Printf("saiu (pid %d)", os.Getpid())
+		lg.Printf("exited (pid %d)", os.Getpid())
 		return nil
 	}
 }
@@ -397,7 +397,7 @@ func waitRelease(pid, port int, deadline time.Duration) bool {
 	for limitN := time.Now().Add(deadline); time.Now().Before(limitN); time.Sleep(5 * time.Millisecond) {
 		fds, err := os.ReadDir(dir)
 		if err != nil {
-			return errors.Is(err, os.ErrNotExist) // saiu
+			return errors.Is(err, os.ErrNotExist) // exited
 		}
 		has := false
 		for _, f := range fds {

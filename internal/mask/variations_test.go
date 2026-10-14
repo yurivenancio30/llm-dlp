@@ -260,7 +260,7 @@ func variations(c varCase) []varText {
 	}
 	if c.parts {
 		for n := 2; n <= 4; n++ {
-			add(fmt.Sprintf("%d partes", n), build(c, 0, " ", "", "", n, "", false))
+			add(fmt.Sprintf("%d parts", n), build(c, 0, " ", "", "", n, "", false))
 			if len(c.quoted) > 0 {
 				add(fmt.Sprintf("%d parts quoted %s", n, c.quoted[0]), build(c, 0, " ", c.quoted[0], "", n, "", false))
 			}

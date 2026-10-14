@@ -188,7 +188,7 @@ func TestStressProxyLoad(t *testing.T) {
 	t.Logf("errors %d | leaks %d | cache breaks %d | goroutines %d -> %d | heap %.0f -> %.0f MB",
 		errs.Load(), leaked.Load(), broke.Load(), g0, runtime.NumGoroutine(), h0, heapMB())
 	if errs.Load() > 0 || leaked.Load() > 0 || broke.Load() > 0 {
-		t.Fatal("falhou sob carga")
+		t.Fatal("failed under load")
 	}
 }
 
@@ -265,7 +265,7 @@ func TestStressProxyBadUpstream(t *testing.T) {
 			fmt.Fprint(w, "internal error in plain text")
 		case 2: // cuts the connection in the middle of streaming
 			w.Header().Set("content-type", "text/event-stream")
-			fmt.Fprint(w, "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"meio p.\"}}\n\n")
+			fmt.Fprint(w, "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"middle p.\"}}\n\n")
 			w.(http.Flusher).Flush()
 			if hj, ok := w.(http.Hijacker); ok {
 				c, _, _ := hj.Hijack()
@@ -273,7 +273,7 @@ func TestStressProxyBadUpstream(t *testing.T) {
 			}
 		case 3: // garbage in place of SSE
 			w.Header().Set("content-type", "text/event-stream")
-			fmt.Fprint(w, "data: {isto não é json\n\ndata: \n\nsem prefixo\n\n")
+			fmt.Fprint(w, "data: {this is not json\n\ndata: \n\nno prefix\n\n")
 		case 4: // never answers
 			<-r.Context().Done()
 		}
@@ -354,7 +354,7 @@ func TestStressProxyHugeRequest(t *testing.T) {
 		}
 		got := readText(resp.Body)
 		resp.Body.Close()
-		t.Logf("%-26s %d MB, %d mensagens: %s | status %d | resposta correta=%v | heap %.0f MB", turnNo, len(body)>>20, len(msgs),
+		t.Logf("%-26s %d MB, %d messages: %s | status %d | correct response=%v | heap %.0f MB", turnNo, len(body)>>20, len(msgs),
 			time.Since(ti).Round(time.Millisecond), resp.StatusCode, got == "fim "+turnData(7, 1), heapMB())
 		if resp.StatusCode != 200 || got != "fim "+turnData(7, 1) {
 			t.Fatal("giant request failed")

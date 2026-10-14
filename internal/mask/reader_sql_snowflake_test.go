@@ -67,6 +67,6 @@ func TestSnowflakeLoose(t *testing.T) {
 	txt := "a conta acme-erpfin usa o papel papel_fin_leitura no wh_fin_carga"
 	if ok, tot := checkMasked(t, m, "solto", txt, []string{"acme-erpfin", "papel_fin_leitura", "wh_fin_carga"}); ok != tot {
 		out, _ := m.Mask(txt)
-		t.Errorf("solto: %d/%d: %s", ok, tot, out)
+		t.Errorf("loose: %d/%d: %s", ok, tot, out)
 	}
 }

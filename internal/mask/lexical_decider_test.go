@@ -33,7 +33,7 @@ func TestLexicalT7(t *testing.T) {
 		`log.info("namespace payments")`, // a sentence inside the literal
 	} {
 		if out, ents := m.Mask(s); len(ents) > 0 {
-			t.Errorf("mascarou a mais: %q -> %q", s, out)
+			t.Errorf("masked needlessly: %q -> %q", s, out)
 		}
 	}
 }
@@ -67,7 +67,7 @@ func TestLexicalKeyClue(t *testing.T) {
 		"[1]\ntable_name = pedidos\n",
 	} {
 		if out, ents := m.Mask(s); len(ents) > 0 {
-			t.Errorf("mascarou a mais: %q -> %q", s, out)
+			t.Errorf("masked needlessly: %q -> %q", s, out)
 		}
 	}
 }
@@ -122,7 +122,7 @@ func TestLexicalINIHeader(t *testing.T) {
 		"[1]": false, "[x for x in y]": false, "[]": false, `[a "b]`: false, "[a, b]": false,
 	} {
 		if iniHeader(v) != wants {
-			t.Errorf("cabecalhoINI(%q) = %v", v, !wants)
+			t.Errorf("iniHeader(%q) = %v", v, !wants)
 		}
 	}
 }

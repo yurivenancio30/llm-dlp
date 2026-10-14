@@ -276,7 +276,7 @@ func columns(args []string) error {
 	}
 	names := map[string]string{"name": "person's name", "name_full": "person's name (only a value with first name and surname)",
 		"name_loose": "person's name (if the table has another person column)", "user": "user code/login",
-		"doc": "documento", "sensitive": "sensitive personal data", "quasi": "quase identificador", "address": "address",
+		"doc": "document", "sensitive": "sensitive personal data", "quasi": "quasi-identifier", "address": "address",
 		"birthdate": "birth date", "phone": "phone", "account": "bank account", "card": "card",
 		"email": "e-mail (by the shape of the value)"}
 	for _, file := range args {
@@ -288,7 +288,7 @@ func columns(args []string) error {
 		n, _ := io.ReadFull(f, buf)
 		f.Close()
 		cols := m.DescribeFields(string(buf[:n]))
-		fmt.Printf("%s: %d campos\n", file, len(cols))
+		fmt.Printf("%s: %d fields\n", file, len(cols))
 		negated := 0
 		for _, c := range cols {
 			switch {

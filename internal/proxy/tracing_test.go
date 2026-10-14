@@ -138,7 +138,7 @@ func TestTracingRoundTrip(t *testing.T) {
 		return txt
 	}
 	for i := 1; i <= 3; i++ {
-		txt := verify(fmt.Sprintf("turno %d", i), hist)
+		txt := verify(fmt.Sprintf("turn %d", i), hist)
 		hist = append(hist, map[string]any{"role": "assistant", "content": []any{map[string]any{"type": "text", "text": txt}}},
 			map[string]any{"role": "user", "content": "continua"})
 	}

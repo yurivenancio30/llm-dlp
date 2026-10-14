@@ -143,7 +143,7 @@ func TestSamePersonNamesDoNotCollide(t *testing.T) {
 		{"Person abcdefgh", "Maria Silva", "name"},
 	})
 	if got := tab.Unmask("fale com Person abcdefgh", false); got != "fale com Maria Fernanda Silva" || tab.Conflicts != 0 {
-		t.Errorf("%q, conflitos %d", got, tab.Conflicts)
+		t.Errorf("%q, conflicts %d", got, tab.Conflicts)
 	}
 }
 

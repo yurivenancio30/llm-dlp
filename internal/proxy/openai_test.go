@@ -266,7 +266,7 @@ func TestOpenAIReturnStreaming(t *testing.T) {
 		}
 		var a struct{ Content string }
 		if err := json.Unmarshal([]byte(args.String()), &a); err != nil || a.Content != "AVISAR "+oaEmail {
-			t.Errorf("comFim=%v: argumentos: %q (%v)", withEnd, args.String(), err)
+			t.Errorf("withEnd=%v: arguments: %q (%v)", withEnd, args.String(), err)
 		}
 	}
 }
