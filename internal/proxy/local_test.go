@@ -113,7 +113,7 @@ func TestServesOnlyLocalProgram(t *testing.T) {
 	if *arrived != 0 {
 		t.Errorf("requisição de fora chegou à API %d vez(es)", *arrived)
 	}
-	if !strings.Contains(lg.String(), "RECUSADO") {
+	if !strings.Contains(lg.String(), "REFUSED") {
 		t.Errorf("a recusa devia estar no log: %s", lg.String())
 	}
 	if st, _ := ask(t, "POST", px.URL+"/v1/messages", body, nil); st != 200 || *arrived != 1 {

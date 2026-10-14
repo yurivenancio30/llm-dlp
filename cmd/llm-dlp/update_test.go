@@ -450,7 +450,7 @@ func TestUpdateRollsBackIfNotUp(t *testing.T) {
 	updateOutput := out
 	time.Sleep(time.Second)
 	c.stop(t, "durante e depois da tentativa")
-	if err == nil || !strings.Contains(out, "voltei para a") {
+	if err == nil || !strings.Contains(out, "went back to") {
 		t.Fatalf("o atualizar devia falhar e voltar; err=%v\n%s", err, out)
 	}
 	if s, _ := e.health(); s.PID != old.PID || s.Commit != "aaaaaaa" {
@@ -533,7 +533,7 @@ func TestSupervisorWithoutPidFile(t *testing.T) {
 	if r, _ := e.health(); r.Commit != "bbbbbbb" || r.PID == old.PID {
 		t.Errorf("depois do reload responde %+v; esperado o bbbbbbb num processo novo", r)
 	}
-	if !strings.Contains(e.log(), fmt.Sprintf("agora no binário instalado (pid %d)", sup)) {
+	if !strings.Contains(e.log(), fmt.Sprintf("now on the installed binary (pid %d)", sup)) {
 		t.Errorf("o supervisor %d não fez a troca (SIGHUP) nem se reexecutou\nlog:\n%s", sup, e.log())
 	}
 	if p := e.supervisor(); p != sup {

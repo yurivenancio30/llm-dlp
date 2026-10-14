@@ -59,35 +59,35 @@ func emergencyActive() (time.Time, bool) {
 
 func emergency(args []string) error {
 	if os.Geteuid() != 0 {
-		return errors.New("o modo emergência desliga a máscara, então só o administrador liga. Rode: sudo llm-dlp emergency [30m|off]")
+		return errors.New("emergency mode turns masking off, so only the administrator turns it on. Run: sudo llm-dlp emergency [30m|off]")
 	}
 	if len(args) > 0 && (args[0] == "off" || args[0] == "sair") {
 		if err := os.Remove(emergencyFile()); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
-		fmt.Println("modo emergência encerrado; em até 2 segundos o proxy normal (com máscara) volta.")
+		fmt.Println("emergency mode ended; within 2 seconds the normal proxy (with masking) is back.")
 		return nil
 	}
 	dur := defaultEmergencyDuration
 	for _, a := range args {
 		d, err := time.ParseDuration(a)
 		if err != nil || d <= 0 || d > 4*time.Hour {
-			return fmt.Errorf("duração inválida %q (use, p.ex., 15m ou 1h; máximo 4h)", a)
+			return fmt.Errorf("invalid duration %q (use, e.g., 15m or 1h; at most 4h)", a)
 		}
 		dur = d
 	}
 	if st, err := os.Stdin.Stat(); err != nil || st.Mode()&os.ModeCharDevice == 0 {
-		return errors.New("rode num terminal (a confirmação é digitada)")
+		return errors.New("run it in a terminal (the confirmation is typed)")
 	}
 	fmt.Printf(`
-⚠️  MODO EMERGÊNCIA: por %s, as mensagens irão para a API SEM MÁSCARA.
-    Use uma sessão NOVA do Claude Code, sem dados de cliente, só para consertar o llm-dlp.
-    Para sair antes: sudo llm-dlp emergency off
+⚠️  EMERGENCY MODE: for %s, messages will go to the API UNMASKED.
+    Use a NEW Claude Code session, with no customer data, only to fix llm-dlp.
+    To leave earlier: sudo llm-dlp emergency off
 
-Digite LIBERAR para continuar: `, dur)
+Type UNLOCK to continue: `, dur)
 	line, _ := bufio.NewReader(os.Stdin).ReadString('\n')
-	if strings.TrimSpace(line) != "LIBERAR" {
-		return errors.New("cancelado")
+	if strings.TrimSpace(line) != "UNLOCK" {
+		return errors.New("canceled")
 	}
 	if err := os.MkdirAll(dirEmergencia, 0o755); err != nil {
 		return err
@@ -96,7 +96,7 @@ Digite LIBERAR para continuar: `, dur)
 	if err := os.WriteFile(emergencyFile(), b, 0o644); err != nil {
 		return err
 	}
-	fmt.Printf("ligado até %s (em até 2 segundos o repasse sem máscara assume). Depois disso, o proxy normal volta sozinho.\n",
+	fmt.Printf("on until %s (within 2 seconds the unmasked pass-through takes over). After that, the normal proxy comes back by itself.\n",
 		time.Now().Add(dur).Format("15:04"))
 	return nil
 }
@@ -141,10 +141,10 @@ func serveEmergency(until time.Time) error {
 			"troca": borrowed})
 	})
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		lg.Printf("EMERGÊNCIA (sem máscara): %s %s", r.Method, proxy.Clean(r.URL.Path))
+		lg.Printf("EMERGENCY (unmasked): %s %s", r.Method, proxy.Clean(r.URL.Path))
 		rp.ServeHTTP(w, r)
 	})
-	lg.Printf("EMERGÊNCIA: repasse sem máscara no ar até %s", until.Local().Format("15:04"))
+	lg.Printf("EMERGENCY: unmasked pass-through online until %s", until.Local().Format("15:04"))
 	go watchEmergency(true)
 	return serveUntilSignal(&http.Server{Handler: proxy.LocalOnly(mux), ReadHeaderTimeout: 30 * time.Second}, ln, lg, nil)
 }

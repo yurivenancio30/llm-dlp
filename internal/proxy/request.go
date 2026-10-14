@@ -29,7 +29,7 @@ func (p *Proxy) maskBody(format, typ string, body []byte) ([]byte, []mask.Entry,
 	dec.UseNumber()
 	var original any
 	if err := dec.Decode(&original); err != nil {
-		return nil, nil, nil, fmt.Errorf("corpo não é JSON (%s)", typ)
+		return nil, nil, nil, fmt.Errorf("body is not JSON (%s)", typ)
 	}
 	anthropic := format == "anthropic"
 	v, goBack := original, func() {}
@@ -278,7 +278,7 @@ func (w walker) media(b map[string]any) []any {
 	return blocks
 }
 
-var errNoMedia = errorString("tratamento de imagens/PDF não configurado")
+var errNoMedia = errorString("image/PDF handling not configured")
 
 type errorString string
 

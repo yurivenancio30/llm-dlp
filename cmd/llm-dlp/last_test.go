@@ -16,17 +16,17 @@ func TestLastMessages(t *testing.T) {
 			{"role":"assistant","content":[{"type":"tool_use","name":"Read","input":{"file_path":"a.txt"}}]},
 			{"role":"user","content":[{"type":"tool_result","content":[{"type":"text","text":"linha"}]}]}]}`,
 			[]seenMessage{{"user", []string{"oi"}},
-				{"assistant", []string{`[ferramenta Read] {"file_path":"a.txt"}`}},
-				{"user", []string{"[resultado de ferramenta]\nlinha"}}}},
+				{"assistant", []string{`[tool Read] {"file_path":"a.txt"}`}},
+				{"user", []string{"[tool result]\nlinha"}}}},
 		{"gemini", `{"contents":[{"role":"user","parts":[{"text":"oi"}]},
 			{"role":"model","parts":[{"text":"vou ler"},{"functionCall":{"name":"read_file","args":{"path":"a.txt"}}}]},
 			{"role":"user","parts":[{"functionResponse":{"name":"read_file","response":{"output":"linha"}}}]},
 			{"role":"user","parts":[{"functionResponse":{"name":"read","response":{"name":"read","content":"linha"}}},
 				{"functionResponse":{"name":"conta","response":{"total":2}}},{"inlineData":{"mimeType":"image/png","data":"AAAA"}}]}]}`,
 			[]seenMessage{{"user", []string{"oi"}},
-				{"model", []string{"vou ler", `[ferramenta read_file] {"path":"a.txt"}`}},
-				{"user", []string{"[resultado de ferramenta]\nlinha"}},
-				{"user", []string{"[resultado de ferramenta]\ncontent: linha\nname: read", "[resultado de ferramenta]\n" + `{"total":2}`, "[arquivo]"}}}},
+				{"model", []string{"vou ler", `[tool read_file] {"path":"a.txt"}`}},
+				{"user", []string{"[tool result]\nlinha"}},
+				{"user", []string{"[tool result]\ncontent: linha\nname: read", "[tool result]\n" + `{"total":2}`, "[file]"}}}},
 		{"vazio", `{}`, nil},
 		{"não é JSON", `x`, nil},
 	}
@@ -50,8 +50,8 @@ func TestLastMessagesSignatures(t *testing.T) {
 		{"type":"custom_tool_call","name":"apply_patch","input":"*** Begin Patch","call_id":"c2"},
 		{"type":"reasoning","summary":[]}]}`
 	wants := []seenMessage{{"instructions", []string{"seja breve"}}, {"user", []string{"oi"}},
-		{"assistant", []string{`[ferramenta shell] {"command":["ls"]}`}}, {"user", []string{"[resultado de ferramenta]\na.txt"}},
-		{"assistant", []string{"[ferramenta apply_patch] *** Begin Patch"}}}
+		{"assistant", []string{`[tool shell] {"command":["ls"]}`}}, {"user", []string{"[tool result]\na.txt"}},
+		{"assistant", []string{"[tool apply_patch] *** Begin Patch"}}}
 	if came := lastMessages([]byte(responses)); !reflect.DeepEqual(came, wants) {
 		t.Errorf("responses:\n veio %q\n quer %q", came, wants)
 	}

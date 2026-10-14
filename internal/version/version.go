@@ -9,7 +9,7 @@ const Version = "0.9.2"
 
 // Commit: filled by -ldflags "-X .../internal/version.Commit=abc1234" (the Makefile does it).
 // "-mod" at the end: built with uncommitted changes.
-var Commit = "desconhecido"
+var Commit = "unknown"
 
 // Complete: "0.2.0 (abc1234)".
 func Complete() string { return Version + " (" + Commit + ")" }

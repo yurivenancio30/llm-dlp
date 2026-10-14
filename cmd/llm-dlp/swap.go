@@ -59,7 +59,7 @@ func servicePort(address string) (ln net.Listener, borrowed bool, err error) {
 		ln, err = net.Listen("tcp", address)
 		return ln, false, err
 	}
-	f := os.NewFile(3, "porta")
+	f := os.NewFile(3, "port")
 	ln, err = net.FileListener(f)
 	f.Close()
 	return ln, true, err
@@ -106,15 +106,15 @@ func serveUntilSignal(srv *http.Server, ln net.Listener, lg *log.Logger, end fun
 			deadline = swapDeadline
 			exiting.Store(true)
 			ln.Close()
-			lg.Printf("saindo (troca de versão, pid %d): não aceita mais conexões; as abertas ainda são atendidas por %s", os.Getpid(), graceDeadline)
+			lg.Printf("exiting (version swap, pid %d): no longer accepts connections; the open ones are still served for %s", os.Getpid(), graceDeadline)
 			time.Sleep(graceDeadline)
 		}
-		lg.Printf("saindo (%v, pid %d): terminando as respostas em andamento (até %s)", s, os.Getpid(), deadline)
+		lg.Printf("exiting (%v, pid %d): finishing the responses in progress (up to %s)", s, os.Getpid(), deadline)
 		ctx, cancel := context.WithTimeout(context.Background(), deadline)
 		defer cancel()
 		// (the port already closed during a swap is not an error)
 		if err := srv.Shutdown(ctx); err != nil && !errors.Is(err, net.ErrClosed) {
-			lg.Printf("saindo (pid %d): %v (respostas cortadas)", os.Getpid(), err)
+			lg.Printf("exiting (pid %d): %v (responses cut)", os.Getpid(), err)
 		}
 		if end != nil {
 			end()
@@ -168,7 +168,7 @@ func startProxy(bin string, port int, lg *log.Logger) (*childProxy, *os.File, er
 		r.Close()
 		return nil, nil, err
 	}
-	lg.Printf("supervisor: proxy iniciado (pid %d)", pid)
+	lg.Printf("supervisor: proxy started (pid %d)", pid)
 	return inheritProxy(pid), r, nil
 }
 
@@ -203,9 +203,9 @@ func waitReady(f *childProxy, ready *os.File) error {
 		}
 		err := <-f.end // closed without notice: it exited
 		f.end <- err
-		return fmt.Errorf("o proxy novo saiu sem ficar pronto (%v)", err)
+		return fmt.Errorf("the new proxy exited without becoming ready (%v)", err)
 	case <-time.After(readyDeadline):
-		return fmt.Errorf("o proxy novo não ficou pronto em %s", readyDeadline)
+		return fmt.Errorf("the new proxy did not become ready within %s", readyDeadline)
 	}
 }
 
@@ -245,17 +245,17 @@ func supervise(args []string) error {
 		os.Unsetenv(envInherit)
 		var tfd, proxyPid, draining int
 		if n, _ := fmt.Sscanf(h, "%d %d %d %d", &port, &tfd, &proxyPid, &draining); n != 4 {
-			return fmt.Errorf("herança inválida: %q", h)
+			return fmt.Errorf("invalid inheritance: %q", h)
 		}
 		syscall.CloseOnExec(port)
 		syscall.CloseOnExec(tfd)
-		lock = os.NewFile(uintptr(tfd), "trava")
+		lock = os.NewFile(uintptr(tfd), "lock")
 		current = inheritProxy(proxyPid)
 		if draining > 0 {
 			inheritProxy(draining) // only to reap when it exits
 		}
 		os.WriteFile(pidFile, []byte(mine), 0o600) // (the same pid; writes it again in case it disappeared)
-		lg.Printf("supervisor: agora no binário instalado (pid %d); proxy %d", os.Getpid(), proxyPid)
+		lg.Printf("supervisor: now on the installed binary (pid %d); proxy %d", os.Getpid(), proxyPid)
 	} else {
 		var err error
 		if lock, err = os.OpenFile(config.Path("supervisor.lock"), os.O_CREATE|os.O_RDWR, 0o600); err != nil {
@@ -287,7 +287,7 @@ func supervise(args []string) error {
 		if current == nil {
 			f, ready, err := startProxy(me, port, lg)
 			if err != nil {
-				lg.Printf("supervisor: não consegui iniciar: %v", err)
+				lg.Printf("supervisor: could not start: %v", err)
 			} else {
 				ready.Close()
 				current = f
@@ -303,7 +303,7 @@ func supervise(args []string) error {
 				}
 				current.p.Signal(syscall.SIGTERM)
 				<-current.end
-				lg.Printf("supervisor: encerrado (%v)", s)
+				lg.Printf("supervisor: stopped (%v)", s)
 				stripPid()
 				return nil
 			case err := <-current.end:
@@ -311,11 +311,11 @@ func supervise(args []string) error {
 				if err == nil {
 					// intentional exit (switch between normal mode and emergency): comes back right
 					// away
-					lg.Printf("supervisor: troca de modo; reiniciando já")
+					lg.Printf("supervisor: mode change; restarting now")
 					wait = time.Second
 					continue
 				}
-				lg.Printf("supervisor: proxy caiu (%v); reiniciando em %s (a porta segue aberta)", err, wait)
+				lg.Printf("supervisor: proxy went down (%v); restarting in %s (the port stays open)", err, wait)
 				if time.Since(ini) > time.Minute {
 					wait = time.Second
 				}
@@ -360,9 +360,9 @@ func swapProxy(me string, port int, lock *os.File, old *childProxy, lg *log.Logg
 		// "ok" only when the old one released the socket: from then on, only the new one accepts
 		// connections
 		if !waitRelease(draining, port, 2*time.Second) {
-			lg.Printf("supervisor: o proxy %d ainda segura a porta", draining)
+			lg.Printf("supervisor: proxy %d still holds the port", draining)
 		}
-		lg.Printf("supervisor: proxy %d no ar; o %d termina o que está em andamento e sai", newOne.p.Pid, draining)
+		lg.Printf("supervisor: proxy %d online; %d finishes what is in progress and exits", newOne.p.Pid, draining)
 	}
 	os.WriteFile(state, []byte("ok "+strconv.Itoa(newOne.p.Pid)), 0o600)
 	// the supervisor also moves to the installed binary, without releasing the port or the lock
@@ -370,7 +370,7 @@ func swapProxy(me string, port int, lock *os.File, old *childProxy, lg *log.Logg
 	if err := noCloseOnExec(port, tfd); err == nil {
 		env := append(os.Environ(), fmt.Sprintf("%s=%d %d %d %d", envInherit, port, tfd, newOne.p.Pid, draining))
 		err = syscall.Exec(me, []string{me, "supervisionar"}, env)
-		lg.Printf("supervisor: não consegui me reexecutar no binário novo (%v); sigo neste", err)
+		lg.Printf("supervisor: could not re-execute myself on the new binary (%v); staying on this one", err)
 	}
 	syscall.CloseOnExec(port)
 	syscall.CloseOnExec(tfd)
@@ -456,13 +456,13 @@ func openPort(address string, assume bool, signals <-chan os.Signal, lg *log.Log
 			continue
 		}
 		if !warnedIt {
-			lg.Printf("supervisor: a porta %s está ocupada; tentando de novo", address)
+			lg.Printf("supervisor: port %s is taken; trying again", address)
 			warnedIt = true
 		}
 		select {
 		case <-time.After(wait):
 		case s := <-signals:
-			return -1, fmt.Errorf("encerrado (%v) esperando a porta", s)
+			return -1, fmt.Errorf("stopped (%v) while waiting for the port", s)
 		}
 		if wait < 10*time.Second {
 			wait *= 2

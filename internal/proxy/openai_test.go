@@ -286,7 +286,7 @@ func TestOpenAIAttachmentAndUnknownField(t *testing.T) {
 		t.Fatalf("status %d", st)
 	}
 	b := (*requests)[0].body
-	if bytes.Contains(b, []byte("QUJDREVGRw")) || !bytes.Contains(b, []byte("[llm-dlp] Um arquivo anexado foi retirado")) {
+	if bytes.Contains(b, []byte("QUJDREVGRw")) || !bytes.Contains(b, []byte("[llm-dlp] An attached file was removed")) {
 		t.Errorf("o áudio devia ter sido retirado, com a nota no lugar: %s", b)
 	}
 	if !bytes.Contains(b, []byte("https://exemplo.example/foto.png")) {

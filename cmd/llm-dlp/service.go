@@ -40,12 +40,12 @@ func serve(args []string) error {
 	if err != nil {
 		return err
 	}
-	lg.Printf("no ar em %s (pid %d, versão %s)", address(cfg), os.Getpid(), version.Complete())
+	lg.Printf("online at %s (pid %d, version %s)", address(cfg), os.Getpid(), version.Complete())
 	// what already went out to the API goes out the same on resends, also after this restart
 	// (cache). If the configuration or the version changed, the record starts over.
 	imp, _ := json.Marshal(cfg)
 	if err := m.UseSent(config.Path("enviados.log"), version.Complete()+"\x00"+string(imp)); err != nil {
-		lg.Printf("AVISO enviados.log: %v (o histórico pode ser regravado no cache uma vez)", err)
+		lg.Printf("WARNING enviados.log: %v (the history may be rewritten in the cache once)", err)
 	}
 	go watchEmergency(false) // if the administrator turns on emergency, it exits and the supervisor switches mode
 	px := proxy.New(cfg, m, seenSet, lg).WithKey(key).WithSwap(borrowed)
@@ -113,9 +113,9 @@ func health(cfg config.Config) (healthInfo, bool) {
 
 // errNoProof: what answers on the port is not this llm-dlp (an earlier version still running, or
 // another program).
-var errNoProof = errors.New("o programa que responde na porta do llm-dlp não provou ser o seu llm-dlp. " +
-	"Se você acabou de atualizar: feche o Claude Code, rode \"llm-dlp stop\" e abra de novo. " +
-	"Se não: outro programa está usando a porta")
+var errNoProof = errors.New("the program answering on the llm-dlp port did not prove it is your llm-dlp. " +
+	"If you just updated: close Claude Code, run \"llm-dlp stop\" and open it again. " +
+	"If not: another program is using the port")
 
 func healthy(cfg config.Config) bool {
 	_, ok := health(cfg)
@@ -153,7 +153,7 @@ func ensure() error {
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
-	return fmt.Errorf("o proxy não subiu em %s; veja %s", ensureDeadline, config.Path("llm-dlp.log"))
+	return fmt.Errorf("the proxy did not start within %s; see %s", ensureDeadline, config.Path("llm-dlp.log"))
 }
 
 // ensureDeadline + the health check stay well below timeoutHook.
@@ -172,7 +172,7 @@ func verifyIt() error {
 	}
 	expected := "http://" + address(cfg)
 	if current := strings.TrimRight(os.Getenv("ANTHROPIC_BASE_URL"), "/"); current != expected {
-		return blockRequest(fmt.Sprintf("o Claude Code não está apontando para o llm-dlp (ANTHROPIC_BASE_URL=%q, esperado %q)", current, expected))
+		return blockRequest(fmt.Sprintf("Claude Code is not pointing to llm-dlp (ANTHROPIC_BASE_URL=%q, expected %q)", current, expected))
 	}
 	info, ok := health(cfg)
 	if !ok && !info.WithoutProof {
@@ -183,8 +183,8 @@ func verifyIt() error {
 		if info.WithoutProof {
 			return blockRequest(errNoProof.Error())
 		}
-		return blockRequest("o llm-dlp está fora do ar e não consegui subi-lo; veja " + config.Path("llm-dlp.log") +
-			". Para usar o Claude sem máscara enquanto conserta: rode, no seu terminal, sudo llm-dlp emergency")
+		return blockRequest("llm-dlp is offline and I could not start it; see " + config.Path("llm-dlp.log") +
+			". To use Claude unmasked while you fix it: run, in your terminal, sudo llm-dlp emergency")
 	}
 	// warnings only for you (systemMessage does not go to the API: zero tokens)
 	warning := ""
@@ -193,10 +193,10 @@ func verifyIt() error {
 		if t, err := time.Parse(time.RFC3339, info.Until); err == nil {
 			until = t.Local().Format("15:04")
 		}
-		warning = "⚠️ llm-dlp em MODO EMERGÊNCIA: mensagens SEM máscara até " + until + " (sudo llm-dlp emergency off)"
+		warning = "⚠️ llm-dlp in EMERGENCY MODE: messages UNMASKED until " + until + " (sudo llm-dlp emergency off)"
 	} else if weakSet := reducedProtection(cfg); len(weakSet) > 0 {
-		warning = "⚠️ llm-dlp com a proteção reduzida pela configuração: " + strings.Join(weakSet, "; ") +
-			". Se não foi você, confira " + config.Path("config.json")
+		warning = "⚠️ llm-dlp with protection reduced by the configuration: " + strings.Join(weakSet, "; ") +
+			". If it was not you, check " + config.Path("config.json")
 	}
 	if warning != "" {
 		json.NewEncoder(os.Stdout).Encode(map[string]string{"systemMessage": warning})
@@ -216,34 +216,34 @@ func reducedProtection(cfg config.Config) []string {
 		if err == nil && u.Host != "" {
 			destination = u.Scheme + "://" + u.Host
 		}
-		out = append(out, "as mensagens e a credencial da API vão para "+proxy.Clean(destination)+" (upstream), não para a API da Anthropic")
+		out = append(out, "the messages and the API credential go to "+proxy.Clean(destination)+" (upstream), not to the Anthropic API")
 	}
 	pattern := config.DefaultProviders()
 	for _, name := range []string{"gemini"} {
 		if pv, ok := cfg.Providers[name]; ok && pv.Upstream != pattern[name].Upstream {
-			out = append(out, "as mensagens e a credencial do provedor "+name+" vão para "+proxy.Clean(pv.Upstream)+", não para a API dele")
+			out = append(out, "the messages and the credential of the provider "+name+" go to "+proxy.Clean(pv.Upstream)+", not to its API")
 		}
 	}
 	if !cfg.FailClosed {
-		out = append(out, "uma falha ao mascarar manda a mensagem sem máscara (fail_closed = false)")
+		out = append(out, "a failure while masking sends the message unmasked (fail_closed = false)")
 	}
 	if cfg.OCR.Mode == "allow" {
-		out = append(out, "imagens e PDFs saem sem verificação (ocr.mode = allow)")
+		out = append(out, "images and PDFs go out unchecked (ocr.mode = allow)")
 	}
 	if !cfg.Objects.Enabled {
-		out = append(out, "nomes de recursos internos não são mascarados (objects.enabled = false)")
+		out = append(out, "internal resource names are not masked (objects.enabled = false)")
 	}
 	if len(cfg.DisabledDetectors) > 0 {
-		out = append(out, "detectores desligados: "+proxy.Clean(strings.Join(cfg.DisabledDetectors, ", ")))
+		out = append(out, "disabled detectors: "+proxy.Clean(strings.Join(cfg.DisabledDetectors, ", ")))
 	}
 	if d := os.Getenv("LLM_DLP_HOME"); d != "" {
-		out = append(out, "a configuração é lida de "+proxy.Clean(d)+" (LLM_DLP_HOME)")
+		out = append(out, "the configuration is read from "+proxy.Clean(d)+" (LLM_DLP_HOME)")
 	}
 	return out
 }
 
 func blockRequest(reason string) error {
-	fmt.Fprintln(os.Stderr, "🛑 llm-dlp: mensagem NÃO enviada — "+reason)
+	fmt.Fprintln(os.Stderr, "🛑 llm-dlp: message NOT sent — "+reason)
 	os.Exit(2)
 	return nil
 }
@@ -256,28 +256,28 @@ func status() error {
 	c := http.Client{Timeout: time.Second}
 	r, err := c.Get("http://" + address(cfg) + "/__llm-dlp/saude")
 	if err != nil {
-		fmt.Println("fora do ar")
+		fmt.Println("offline")
 		return nil
 	}
 	defer r.Body.Close()
 	b, _ := io.ReadAll(r.Body)
-	fmt.Println("no ar:", string(b))
+	fmt.Println("online:", string(b))
 	var info struct {
 		Commit string `json:"commit"`
 		PID    int    `json:"pid"`
 	}
 	json.Unmarshal(b, &info)
 	if warning := newBinary(info.Commit, info.PID); warning != "" {
-		fmt.Println("⚠️  " + warning + ": rode llm-dlp update para trocar o que está no ar (sem fechar o Claude Code)")
+		fmt.Println("⚠️  " + warning + ": run llm-dlp update to swap the one online (without closing Claude Code)")
 	}
 	if _, ok := health(cfg); !ok {
 		fmt.Println("⚠️  " + errNoProof.Error())
 	}
 	for _, f := range reducedProtection(cfg) {
-		fmt.Println("⚠️  proteção reduzida pela configuração: " + f)
+		fmt.Println("⚠️  protection reduced by the configuration: " + f)
 	}
 	if missingOne := missingOCR(cfg); missingOne != "" && cfg.OCR.Mode == "mask" {
-		fmt.Printf("⚠️  sem OCR (falta %s): imagens e PDFs não são enviados. Para instalar: %s\n", missingOne, ocr.InstallHint())
+		fmt.Printf("⚠️  no OCR (%s missing): images and PDFs are not sent. To install: %s\n", missingOne, ocr.InstallHint())
 	}
 	return nil
 }
@@ -287,13 +287,13 @@ func status() error {
 func newBinary(commit string, pid int) string {
 	if commit != version.Commit {
 		if commit == "" {
-			commit = "sem commit (versão antiga)"
+			commit = "no commit (old version)"
 		}
-		return fmt.Sprintf("binário novo instalado (no ar: %s; instalado: %s)", commit, version.Commit)
+		return fmt.Sprintf("new binary installed (online: %s; installed: %s)", commit, version.Commit)
 	}
 	if pid > 0 {
 		if target, err := os.Readlink(fmt.Sprintf("/proc/%d/exe", pid)); err == nil && strings.HasSuffix(target, " (deleted)") {
-			return "binário novo instalado (o arquivo do processo no ar foi substituído)"
+			return "new binary installed (the file of the process online was replaced)"
 		}
 	}
 	return ""
@@ -306,14 +306,14 @@ func stop() error {
 	pid := supervisorUp()
 	if pid == 0 {
 		os.Remove(config.Path("supervisor.pid"))
-		return errors.New("supervisor não está rodando")
+		return errors.New("the supervisor is not running")
 	}
 	if err := syscall.Kill(pid, syscall.SIGTERM); err != nil {
 		return err
 	}
 	// waits for it to exit (and release the lock), so an "ensure" right after does not collide
 	if !waitExit(pid, 5*time.Second) {
-		return errors.New("o supervisor não encerrou em 5s")
+		return errors.New("the supervisor did not exit within 5s")
 	}
 	return nil
 }

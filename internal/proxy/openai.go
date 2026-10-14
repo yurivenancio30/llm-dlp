@@ -35,9 +35,9 @@ var openAIParams = map[string]bool{"messages": true, "tools": true, "model": tru
 	"store": true, "modalities": true, "verbosity": true, "prompt_cache_key": true, "safety_identifier": true}
 
 // callMark: in the tool_use created by the bridge, the index of the call (tool_calls) it came from.
-const callMark = "\x00chamada"
+const callMark = "\x00call"
 
-const openAIFileNote = "[llm-dlp] Um arquivo anexado foi retirado daqui e não foi enviado: o llm-dlp só consegue verificar imagem e PDF. Avise o usuário."
+const openAIFileNote = "[llm-dlp] An attached file was removed from here and was not sent: llm-dlp can only check images and PDFs. Tell the user."
 
 // dataURL separa "data:<tipo>;base64,<dados>".
 func dataURL(u string) (typ, data string, ok bool) {
@@ -100,7 +100,7 @@ func openAIBlocks(content any) (blocks []any, parts []map[string]any) {
 				delete(b, partMark) // audio: there is no way to check; does not go out (fail closed)
 				b["type"], b["text"] = "text", openAIFileNote
 			default:
-				b["type"], b["parte"] = "parte desconhecida", pm // masks all of its text, as a precaution
+				b["type"], b["part"] = "unknown part", pm // masks all of its text, as a precaution
 			}
 			blocks = append(blocks, b)
 		}

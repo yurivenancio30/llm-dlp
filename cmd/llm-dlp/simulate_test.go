@@ -73,12 +73,12 @@ func TestSimulateReadsSubagent(t *testing.T) {
 		lines []string
 		wants string
 	}{
-		{"subagente", conversation(true), "2 requisições simuladas"},
-		{"sessão com subagente no meio", append(conversation(false), conversation(true)...), "2 requisições simuladas"},
-		{"sem mensagem", []string{`{"type":"summary","summary":"x"}`}, "ATENÇÃO: nenhuma requisição"},
+		{"subagente", conversation(true), "2 simulated requests"},
+		{"sessão com subagente no meio", append(conversation(false), conversation(true)...), "2 simulated requests"},
+		{"sem mensagem", []string{`{"type":"summary","summary":"x"}`}, "WARNING: no request replayed"},
 		// below 4000 bytes, but above that after masking (the pseudonym of a short e-mail is longer
 		// than it): the fake API's echo is cut and does not count as a difference
-		{"texto que cresce ao mascarar", []string{line("user", false, almostFourThousand())}, "resposta voltou diferente do original: 0"},
+		{"texto que cresce ao mascarar", []string{line("user", false, almostFourThousand())}, "response came back different from the original: 0"},
 	} {
 		file := filepath.Join(dir, strings.ReplaceAll(c.name, " ", "_")+".jsonl")
 		if err := os.WriteFile(file, []byte(strings.Join(c.lines, "\n")+"\n"), 0o600); err != nil {

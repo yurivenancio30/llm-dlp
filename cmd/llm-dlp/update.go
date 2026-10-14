@@ -45,7 +45,7 @@ func update(args []string) error {
 		switch a := args[i]; a {
 		case "--version", "--file", "--versao", "--arquivo": // (--versao e --arquivo: nomes antigos)
 			if i+1 >= len(args) {
-				return fmt.Errorf("%s precisa de um valor", a)
+				return fmt.Errorf("%s needs a value", a)
 			}
 			i++
 			if a == "--file" || a == "--arquivo" {
@@ -54,22 +54,22 @@ func update(args []string) error {
 				asked = strings.TrimPrefix(args[i], "v")
 			}
 		default:
-			return fmt.Errorf("opção desconhecida: %q (uso: llm-dlp update [--version X.Y.Z] [--file ARQ.tar.gz])", a)
+			return fmt.Errorf("unknown option: %q (usage: llm-dlp update [--version X.Y.Z] [--file FILE.tar.gz])", a)
 		}
 	}
 	if os.Geteuid() == 0 {
-		return errors.New("rode sem sudo: a instalação é do seu usuário")
+		return errors.New("run it without sudo: the installation is your user's")
 	}
 	destination := installedBinary()
 	if st, err := os.Stat(destination); err != nil || !st.Mode().IsRegular() {
-		return fmt.Errorf("o llm-dlp não está instalado em %s; para instalar, use o install.sh (README)", destination)
+		return fmt.Errorf("llm-dlp is not installed at %s; to install it, use install.sh (README)", destination)
 	}
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("config: %w", err)
 	}
 	// in the destination folder: the new binary comes in with a rename (atomic)
-	tmp, err := os.MkdirTemp(filepath.Dir(destination), ".llm-dlp-atualizar-")
+	tmp, err := os.MkdirTemp(filepath.Dir(destination), ".llm-dlp-update-")
 	if err != nil {
 		return err
 	}
@@ -79,11 +79,11 @@ func update(args []string) error {
 		if err != nil {
 			return err
 		}
-		fmt.Printf("Baixando o llm-dlp %s (linux/%s)...\n", v, runtime.GOARCH)
+		fmt.Printf("Downloading llm-dlp %s (linux/%s)...\n", v, runtime.GOARCH)
 		if fileName, err = downloadRelease(urlReleases, v, tmp); err != nil {
 			return err
 		}
-		fmt.Println("✓ checksum conferido")
+		fmt.Println("✓ checksum verified")
 	}
 	newOne := filepath.Join(tmp, "llm-dlp")
 	if err := extractBinary(fileName, newOne); err != nil {
@@ -91,7 +91,7 @@ func update(args []string) error {
 	}
 	vNew, cNew, err := versionOf(newOne)
 	if err != nil {
-		return fmt.Errorf("o binário novo não roda nesta máquina: %w", err)
+		return fmt.Errorf("the new binary does not run on this machine: %w", err)
 	}
 	vCurrent, cCurrent, _ := versionOf(destination)
 	info, isUp := health(cfg)
@@ -100,7 +100,7 @@ func update(args []string) error {
 	}
 	same := vNew == vCurrent && cNew == cCurrent
 	if same && (!isUp || info.Commit == cNew && info.Version == vNew) {
-		fmt.Printf("✓ já está na %s (%s)\n", vNew, cNew)
+		fmt.Printf("✓ already on %s (%s)\n", vNew, cNew)
 		home, _ := os.UserHomeDir()
 		adjustNames(home, destination, vNew)
 		return nil
@@ -112,9 +112,9 @@ func update(args []string) error {
 	previous, typesPrevious := minorVersion(vNew, firstInEnglish), minorVersion(vNew, firstWithEnglishTypes)
 	if previous || typesPrevious {
 		if c, err := config.MigrateFile(previous, typesPrevious); err != nil {
-			return fmt.Errorf("não consegui passar o config.json para os nomes da %s: %w", vNew, err)
+			return fmt.Errorf("could not move config.json to the names of %s: %w", vNew, err)
 		} else if c != "" {
-			fmt.Printf("✓ config.json com os nomes de campo da %s (o anterior em %s)\n", vNew, c)
+			fmt.Printf("✓ config.json with the names of %s (the previous one at %s)\n", vNew, c)
 		}
 	}
 	bak := ""
@@ -122,7 +122,7 @@ func update(args []string) error {
 		if bak, err = swapBinary(newOne, destination); err != nil {
 			return err
 		}
-		fmt.Printf("✓ %s (%s) → %s (%s) em %s\n", vCurrent, cCurrent, vNew, cNew, destination)
+		fmt.Printf("✓ %s (%s) → %s (%s) at %s\n", vCurrent, cCurrent, vNew, cNew, destination)
 	}
 	goBack := func() {
 		if bak != "" {
@@ -138,17 +138,17 @@ func update(args []string) error {
 	if !isUp {
 		if !claudeEnabled(home, cfg) {
 			cleanCopies(destination, bak)
-			fmt.Println("– o llm-dlp não estava no ar: ele sobe já na versão nova quando for usado")
-			fmt.Println("  (o Claude Code não passa pelo llm-dlp; para ligar: llm-dlp install)")
+			fmt.Println("– llm-dlp was not online: it starts on the new version when it is used")
+			fmt.Println("  (Claude Code does not go through llm-dlp; to turn it on: llm-dlp install)")
 			return nil
 		}
 		if err := ensure(); err != nil {
 			goBack()
-			return fmt.Errorf("a versão nova não subiu (%v); voltei para a %s. Veja %s", err, vCurrent, log)
+			return fmt.Errorf("the new version did not start (%v); went back to %s. See %s", err, vCurrent, log)
 		}
 		cleanCopies(destination, bak)
 		adjustHooks()
-		fmt.Printf("✓ llm-dlp %s no ar\n", vNew)
+		fmt.Printf("✓ llm-dlp %s online\n", vNew)
 		return nil
 	}
 	if err := swapService(cfg, info, cNew); err != nil {
@@ -157,14 +157,14 @@ func update(args []string) error {
 		if _, ok := health(cfg); !ok {
 			ensure()
 		}
-		return fmt.Errorf("%v; voltei para a %s. Veja %s", err, vCurrent, log)
+		return fmt.Errorf("%v; went back to %s. See %s", err, vCurrent, log)
 	}
 	cleanCopies(destination, bak)
 	adjustHooks()
-	fmt.Printf("✓ llm-dlp %s no ar. Não precisa fechar o Claude Code.\n", vNew)
+	fmt.Printf("✓ llm-dlp %s online. No need to close Claude Code.\n", vNew)
 	if !info.Swap {
-		fmt.Println("  A versão anterior não sabia passar a vez: uma resposta que estivesse no meio foi cortada" +
-			" (o Claude Code repete sozinho). As próximas atualizações não cortam nada.")
+		fmt.Println("  The previous version did not know how to hand over: a response that was in the middle was cut" +
+			" (Claude Code retries by itself). The next updates cut nothing.")
 	}
 	return nil
 }
@@ -175,16 +175,16 @@ func update(args []string) error {
 // (the old names still apply; they just had not been swapped).
 func adjustNames(home, bin, v string) {
 	if changed, err := hooksForVersion(home, bin, v); err != nil {
-		fmt.Printf("! não consegui ajustar os hooks do Claude Code (%v); rode: llm-dlp install\n", err)
+		fmt.Printf("! could not adjust the Claude Code hooks (%v); run: llm-dlp install\n", err)
 	} else if changed {
-		fmt.Println("✓ hooks do Claude Code com os nomes desta versão (valem nas sessões novas;" +
-			" as já abertas seguem com os de antes, que também funcionam)")
+		fmt.Println("✓ Claude Code hooks with this version's names (they apply to new sessions;" +
+			" the ones already open keep the previous ones, which also work)")
 	}
 	if !minorVersion(v, firstInEnglish) {
 		if c, err := config.MigrateFile(false, minorVersion(v, firstWithEnglishTypes)); err != nil {
-			fmt.Printf("! o config.json continua com os nomes antigos (%v); eles seguem valendo\n", err)
+			fmt.Printf("! config.json keeps the old names (%v); they still apply\n", err)
 		} else if c != "" {
-			fmt.Printf("✓ config.json com os nomes de campo em inglês (o anterior em %s)\n", c)
+			fmt.Printf("✓ config.json with the English names (the previous one at %s)\n", c)
 		}
 	}
 }
@@ -203,13 +203,13 @@ func reload() error {
 	}
 	if !ok {
 		if supervisorUp() > 0 {
-			return errors.New("o llm-dlp no ar não responde na porta da configuração (a porta mudou?): " +
-				"feche o Claude Code, rode llm-dlp stop e depois llm-dlp install")
+			return errors.New("the llm-dlp online does not answer on the configured port (did the port change?): " +
+				"close Claude Code, run llm-dlp stop and then llm-dlp install")
 		}
 		if v, _, err := versionOf(installedBinary()); err == nil {
 			adjustNames(home, installedBinary(), v)
 		}
-		fmt.Println("– o llm-dlp não está no ar: ele sobe com a configuração nova quando for usado")
+		fmt.Println("– llm-dlp is not online: it starts with the new configuration when it is used")
 		return nil
 	}
 	v, commit, err := versionOf(serviceBinary())
@@ -217,10 +217,10 @@ func reload() error {
 		return err
 	}
 	if err := swapService(cfg, info, commit); err != nil {
-		return fmt.Errorf("%v; o llm-dlp anterior continua no ar. Veja %s", err, config.Path("llm-dlp.log"))
+		return fmt.Errorf("%v; the previous llm-dlp is still online. See %s", err, config.Path("llm-dlp.log"))
 	}
 	adjustNames(home, serviceBinary(), v)
-	fmt.Println("✓ configuração aplicada; o llm-dlp não saiu do ar")
+	fmt.Println("✓ configuration applied; llm-dlp did not go offline")
 	return nil
 }
 
@@ -237,13 +237,13 @@ func swapService(cfg config.Config, old healthInfo, commit string) error {
 		}
 		r, ok := waitContent(state, readyDeadline+5*time.Second)
 		if !ok {
-			return errors.New("o supervisor não respondeu ao pedido de troca")
+			return errors.New("the supervisor did not answer the swap request")
 		}
 		if reason, failed := strings.CutPrefix(r, "falhou: "); failed {
-			return errors.New("a versão nova não subiu: " + reason)
+			return errors.New("the new version did not start: " + reason)
 		}
 		if !waitNew(cfg, commit, old.PID, 5, nil) {
-			return errors.New("a versão nova subiu mas não responde")
+			return errors.New("the new version started but does not answer")
 		}
 		return nil
 	}
@@ -272,7 +272,7 @@ func swapService(cfg config.Config, old healthInfo, commit string) error {
 		return errors.New(reason)
 	}
 	if !waitFile(config.Path("supervisor.esperando"), wentOut) {
-		return giveUp(fmt.Sprintf("a versão nova não ficou pronta em %s", readyDeadline))
+		return giveUp(fmt.Sprintf("the new version did not become ready within %s", readyDeadline))
 	}
 	// the old supervisor (otherwise it starts the proxy again); without a supervisor, the proxy
 	// itself
@@ -280,7 +280,7 @@ func swapService(cfg config.Config, old healthInfo, commit string) error {
 		syscall.Kill(target, syscall.SIGTERM)
 	}
 	if !waitNew(cfg, commit, old.PID, 5, wentOut) {
-		return giveUp("a versão nova não assumiu a porta")
+		return giveUp("the new version did not take over the port")
 	}
 	return nil
 }
@@ -336,7 +336,7 @@ func waitFile(p string, wentOut <-chan struct{}) bool {
 func publishedVersion(base, asked string) (string, error) {
 	if asked != "" {
 		if !reExactVersion.MatchString(asked) {
-			return "", fmt.Errorf("versão inválida: %q (formato X.Y.Z)", asked)
+			return "", fmt.Errorf("invalid version: %q (format X.Y.Z)", asked)
 		}
 		return asked, nil
 	}
@@ -344,12 +344,12 @@ func publishedVersion(base, asked string) (string, error) {
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	r, err := c.Get(base + "/latest")
 	if err != nil {
-		return "", fmt.Errorf("não consegui falar com o GitHub para achar a versão mais nova: %w", err)
+		return "", fmt.Errorf("could not talk to GitHub to find the newest version: %w", err)
 	}
 	r.Body.Close()
 	v := strings.TrimPrefix(path.Base(r.Header.Get("Location")), "v")
 	if !reExactVersion.MatchString(v) {
-		return "", fmt.Errorf("não achei a versão mais nova (o GitHub respondeu %s)", r.Status)
+		return "", fmt.Errorf("could not find the newest version (GitHub answered %s)", r.Status)
 	}
 	return v, nil
 }
@@ -358,7 +358,7 @@ func publishedVersion(base, asked string) (string, error) {
 // the checksums.txt published with it. Returns the archive path.
 func downloadRelease(base, v, dir string) (string, error) {
 	if runtime.GOOS != "linux" {
-		return "", errors.New("só há binário pronto para Linux (inclusive WSL); em outro sistema, compile do código (README)")
+		return "", errors.New("there is a ready binary only for Linux (including WSL); on another system, build from the source (README)")
 	}
 	name := fmt.Sprintf("llm-dlp_%s_linux_%s.tar.gz", v, runtime.GOARCH)
 	url := base + "/download/v" + v + "/"
@@ -377,7 +377,7 @@ func downloadRelease(base, v, dir string) (string, error) {
 	if real, err := sha256Of(file); err != nil {
 		return "", err
 	} else if real != expected {
-		return "", fmt.Errorf("checksum não confere para %s (esperado %s, veio %s): nada foi trocado", name, expected, real)
+		return "", fmt.Errorf("checksum does not match for %s (expected %s, got %s): nothing was swapped", name, expected, real)
 	}
 	return file, nil
 }
@@ -386,11 +386,11 @@ func download(url, to string, max int64) error {
 	c := &http.Client{Timeout: 5 * time.Minute}
 	r, err := c.Get(url)
 	if err != nil {
-		return fmt.Errorf("não consegui baixar %s: %w", url, err)
+		return fmt.Errorf("could not download %s: %w", url, err)
 	}
 	defer r.Body.Close()
 	if r.StatusCode != http.StatusOK {
-		return fmt.Errorf("não consegui baixar %s: %s", url, r.Status)
+		return fmt.Errorf("could not download %s: %s", url, r.Status)
 	}
 	f, err := os.OpenFile(to, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 	if err != nil {
@@ -401,7 +401,7 @@ func download(url, to string, max int64) error {
 		err = cerr
 	}
 	if err == nil && n > max {
-		err = fmt.Errorf("%s passou de %d bytes", url, max)
+		err = fmt.Errorf("%s passed %d bytes", url, max)
 	}
 	return err
 }
@@ -418,7 +418,7 @@ func checksumOf(sums, name string) (string, error) {
 			return c[0], nil
 		}
 	}
-	return "", fmt.Errorf("%s não está no checksums.txt", name)
+	return "", fmt.Errorf("%s is not in checksums.txt", name)
 }
 
 func sha256Of(p string) (string, error) {
@@ -443,13 +443,13 @@ func extractBinary(pkgName, to string) error {
 	defer f.Close()
 	gz, err := gzip.NewReader(f)
 	if err != nil {
-		return fmt.Errorf("%s não é um .tar.gz: %w", pkgName, err)
+		return fmt.Errorf("%s is not a .tar.gz: %w", pkgName, err)
 	}
 	tr := tar.NewReader(gz)
 	for {
 		h, err := tr.Next()
 		if err == io.EOF {
-			return fmt.Errorf("o pacote %s não tem o llm-dlp", pkgName)
+			return fmt.Errorf("package %s does not have llm-dlp", pkgName)
 		}
 		if err != nil {
 			return fmt.Errorf("pacote %s: %w", pkgName, err)

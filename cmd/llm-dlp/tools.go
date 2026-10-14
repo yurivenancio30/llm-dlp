@@ -26,17 +26,17 @@ import (
 func importPeople(args []string) error {
 	fs := flag.NewFlagSet("import-people", flag.ExitOnError)
 	var groups multi
-	fs.Var(&groups, "group", "COD:NOME:EMAIL (colunas da mesma pessoa; qualquer uma pode ficar vazia)")
-	fs.Var(&groups, "grupo", "nome antigo de --group")
-	sep := fs.String("name-separator", "", `o nome vem como "PESSOA/ÁREA": só a parte antes deste separador é o nome`)
-	fs.StringVar(sep, "separador-nome", "", "nome antigo de --name-separator")
+	fs.Var(&groups, "group", "CODE:NAME:EMAIL (columns of the same person; any of them may be empty)")
+	fs.Var(&groups, "grupo", "old name of --group")
+	sep := fs.String("name-separator", "", `the name comes as "PERSON/AREA": only the part before this separator is the name`)
+	fs.StringVar(sep, "separador-nome", "", "old name of --name-separator")
 	if len(args) == 0 {
-		return errors.New("informe o arquivo CSV")
+		return errors.New("give the CSV file")
 	}
 	file := args[0]
 	fs.Parse(args[1:])
 	if len(groups) == 0 {
-		return errors.New("informe ao menos um --group")
+		return errors.New("give at least one --group")
 	}
 	_, key, people, _, _, err := loadAll()
 	if err != nil {
@@ -90,15 +90,15 @@ func importPeople(args []string) error {
 	// what already went out to the API stays frozen (see memory_sent.go); with new names, the
 	// history is masked again, with them
 	os.Remove(config.Path("enviados.log"))
-	fmt.Printf("%d linhas lidas; variantes de nome conhecidas: %d (antes: %d). Nada em texto puro foi gravado.\n",
+	fmt.Printf("%d lines read; known name variants: %d (before: %d). Nothing in plain text was written.\n",
 		lines, people.Total(), before)
 	// the proxy reads the registry on start: restart it so the new names apply right away
 	if cfg, err := config.Load(); err == nil && healthy(cfg) {
 		if err := stop(); err == nil {
 			if err := ensure(); err != nil {
-				return fmt.Errorf("nomes importados, mas o proxy não voltou: %w", err)
+				return fmt.Errorf("names imported, but the proxy did not come back: %w", err)
 			}
-			fmt.Println("proxy reiniciado para usar os nomes novos.")
+			fmt.Println("proxy restarted to use the new names.")
 		}
 	}
 	return nil
@@ -125,14 +125,14 @@ func test() error {
 	for _, e := range ents {
 		types[e.Type]++
 	}
-	fmt.Fprintf(os.Stderr, "\n[llm-dlp] %d substituições: %v\n", len(ents), types)
+	fmt.Fprintf(os.Stderr, "\n[llm-dlp] %d replacements: %v\n", len(ents), types)
 	return nil
 }
 
 // testMedia processes an image/PDF as the proxy would and writes what would go out into DIR.
 func testMedia(args []string) error {
 	if len(args) < 2 {
-		return errors.New("uso: llm-dlp test-media ARQUIVO DIR_SAIDA")
+		return errors.New("usage: llm-dlp test-media FILE OUTPUT_DIR")
 	}
 	cfg, _, _, _, m, err := loadAll()
 	if err != nil {
@@ -152,7 +152,7 @@ func testMedia(args []string) error {
 		block["type"] = "document"
 	}
 	md := proxy.NewMedia(cfg, m)
-	md.Warning = func(msg string) { fmt.Fprintln(os.Stderr, "  aviso:", msg) }
+	md.Warning = func(msg string) { fmt.Fprintln(os.Stderr, "  warning:", msg) }
 	t0 := time.Now()
 	blocks, ents, err := md.Process(block)
 	cold := time.Since(t0)
@@ -168,21 +168,21 @@ func testMedia(args []string) error {
 		src, _ := bl["source"].(map[string]any)
 		switch {
 		case bl["type"] == "text":
-			fmt.Printf("  bloco %d: nota: %s\n", i, bl["text"])
+			fmt.Printf("  block %d: note: %s\n", i, bl["text"])
 		case src != nil && src["type"] == "text":
-			os.WriteFile(filepath.Join(args[1], fmt.Sprintf("bloco%d.txt", i)), []byte(src["data"].(string)), 0o600)
-			fmt.Printf("  bloco %d: texto extraído e mascarado (bloco%d.txt)\n", i, i)
+			os.WriteFile(filepath.Join(args[1], fmt.Sprintf("block%d.txt", i)), []byte(src["data"].(string)), 0o600)
+			fmt.Printf("  block %d: text extracted and masked (block%d.txt)\n", i, i)
 		case src != nil && src["type"] == "base64":
 			d, _ := base64.StdEncoding.DecodeString(src["data"].(string))
 			ext := ".png"
 			if src["media_type"] == "application/pdf" {
 				ext = ".pdf"
 			}
-			os.WriteFile(filepath.Join(args[1], fmt.Sprintf("bloco%d%s", i, ext)), d, 0o600)
-			fmt.Printf("  bloco %d: %s (bloco%d%s)\n", i, src["media_type"], i, ext)
+			os.WriteFile(filepath.Join(args[1], fmt.Sprintf("block%d%s", i, ext)), d, 0o600)
+			fmt.Printf("  block %d: %s (block%d%s)\n", i, src["media_type"], i, ext)
 		}
 	}
-	fmt.Printf("  %d pseudônimos | 1ª vez: %s | repetido (memória): %s\n", len(ents), cold.Round(time.Millisecond), hot.Round(time.Microsecond))
+	fmt.Printf("  %d pseudonyms | 1st time: %s | repeated (memory): %s\n", len(ents), cold.Round(time.Millisecond), hot.Round(time.Microsecond))
 	return nil
 }
 
@@ -234,7 +234,7 @@ func measure(args []string) error {
 		for _, t := range timings {
 			sum += t
 		}
-		fmt.Printf("### %s: %d textos (%d linhas inválidas puladas) | mascarados: %d | ocorrências por tipo: %v\n   tempo: mediana %s | p95 %s | máx %s | soma %s\n",
+		fmt.Printf("### %s: %d texts (%d invalid lines skipped) | masked: %d | occurrences by type: %v\n   time: median %s | p95 %s | max %s | total %s\n",
 			filepath.Base(file)[:8], n, bad, mod, types, q(.5), q(.95), q(1), sum.Round(time.Millisecond))
 	}
 	return nil
@@ -268,17 +268,17 @@ func texts(c any) []string {
 // extra_fields in config.json.
 func columns(args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("uso: llm-dlp columns ARQUIVO...")
+		return fmt.Errorf("usage: llm-dlp columns FILE...")
 	}
 	_, _, _, _, m, err := loadAll()
 	if err != nil {
 		return err
 	}
-	names := map[string]string{"name": "nome de pessoa", "name_full": "nome de pessoa (só valor com nome e sobrenome)",
-		"name_loose": "nome de pessoa (se a tabela tiver outra coluna de pessoa)", "user": "código/login de usuário",
-		"doc": "documento", "sensitive": "dado pessoal sensível", "quasi": "quase identificador", "address": "address",
-		"birthdate": "data de nascimento", "phone": "phone", "account": "conta bancária", "card": "cartão",
-		"email": "e-mail (pelo formato do valor)"}
+	names := map[string]string{"name": "person's name", "name_full": "person's name (only a value with first name and surname)",
+		"name_loose": "person's name (if the table has another person column)", "user": "user code/login",
+		"doc": "documento", "sensitive": "sensitive personal data", "quasi": "quase identificador", "address": "address",
+		"birthdate": "birth date", "phone": "phone", "account": "bank account", "card": "card",
+		"email": "e-mail (by the shape of the value)"}
 	for _, file := range args {
 		f, err := os.Open(file)
 		if err != nil {
@@ -294,17 +294,17 @@ func columns(args []string) error {
 			switch {
 			case c.Class == "":
 				negated++
-				fmt.Printf("  %-34s não reconhecido como dado pessoal (fica como está)\n", c.Name)
+				fmt.Printf("  %-34s not recognized as personal data (stays as it is)\n", c.Name)
 			case names[c.Class] != "":
-				fmt.Printf("  %-34s MASCARADO: %s\n", c.Name, names[c.Class])
+				fmt.Printf("  %-34s MASKED: %s\n", c.Name, names[c.Class])
 			default:
-				fmt.Printf("  %-34s MASCARADO: %s\n", c.Name, strings.ToUpper(c.Class))
+				fmt.Printf("  %-34s MASKED: %s\n", c.Name, strings.ToUpper(c.Class))
 			}
 		}
 		if negated > 0 {
-			fmt.Println("\nSe algum campo não reconhecido guarda dado pessoal, acrescente a palavra dele em extra_fields no config.json, por exemplo:")
-			fmt.Println(`  "extra_fields": [{"type": "usuario", "words": ["chapa"]}, {"type": "pessoa", "words": ["segurado"]}]`)
-			fmt.Println("Valores com formato próprio (e-mail, CPF com pontos, telefone, IP) são mascarados em qualquer campo.")
+			fmt.Println("\nIf an unrecognized field holds personal data, add its word to extra_fields in config.json, for example:")
+			fmt.Println(`  "extra_fields": [{"type": "user", "words": ["chapa"]}, {"type": "person", "words": ["segurado"]}]`)
+			fmt.Println("Values with a shape of their own (e-mail, CPF with dots, phone, IP) are masked in any field.")
 		}
 	}
 	return nil

@@ -135,7 +135,7 @@ func TestImageWithoutOCRDoesNotBlockConversation(t *testing.T) {
 		t.Fatalf("devia sair um bloco de texto, com o marcador de cache da imagem: %v", blocks)
 	}
 	warning, _ := blocks[0]["text"].(string)
-	for _, part := range []string{"[llm-dlp] Uma imagem foi retirada", "OCR não está instalado", "tesseract"} {
+	for _, part := range []string{"[llm-dlp] An image was removed", "OCR is not installed", "tesseract"} {
 		if !strings.Contains(warning, part) {
 			t.Errorf("o aviso devia ter %q: %s", part, warning)
 		}
@@ -143,7 +143,7 @@ func TestImageWithoutOCRDoesNotBlockConversation(t *testing.T) {
 	if !bytes.Equal((*bodies)[0], (*bodies)[1]) {
 		t.Error("o reenvio devia sair igual (cache da API)")
 	}
-	if n := strings.Count(lg.String(), "AVISO"); n != 1 {
+	if n := strings.Count(lg.String(), "WARNING"); n != 1 {
 		t.Errorf("o motivo devia ir uma vez para o log, foi %d:\n%s", n, lg.String())
 	}
 }
@@ -157,13 +157,13 @@ func TestUnreadableImageIsRemoved(t *testing.T) {
 		t.Fatalf("recusada: status %d", st)
 	}
 	warning, _ := whatWentOut(t, (*bodies)[0])[0]["text"].(string)
-	if !strings.Contains(warning, "a leitura do arquivo falhou") || strings.Contains(warning, "não está instalado") || strings.Contains(warning, "ilegível") {
+	if !strings.Contains(warning, "reading the file failed") || strings.Contains(warning, "is not installed") || strings.Contains(warning, "unreadable") {
 		t.Errorf("aviso: %s", warning)
 	}
 	if bytes.Contains((*bodies)[0], []byte(junk)) {
 		t.Error("o arquivo ilegível saiu")
 	}
-	if !strings.Contains(lg.String(), "imagem ilegível") {
+	if !strings.Contains(lg.String(), "unreadable image") {
 		t.Errorf("o detalhe devia estar no log: %s", lg.String())
 	}
 }
@@ -176,7 +176,7 @@ func TestMediaBlockedByConfig(t *testing.T) {
 		t.Fatalf("recusada: status %d", st)
 	}
 	warning, _ := whatWentOut(t, (*bodies)[0])[0]["text"].(string)
-	if !strings.Contains(warning, "[llm-dlp] Um PDF foi retirado") || !strings.Contains(warning, "ocr.mode = block") {
+	if !strings.Contains(warning, "[llm-dlp] A PDF was removed") || !strings.Contains(warning, "ocr.mode = block") {
 		t.Errorf("aviso: %s", warning)
 	}
 	if bytes.Contains((*bodies)[0], []byte(minimalPNG)) {

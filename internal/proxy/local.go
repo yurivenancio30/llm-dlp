@@ -64,7 +64,7 @@ func LocalOnly(h http.Handler) http.Handler {
 func refuseNonLocal(w http.ResponseWriter) {
 	w.Header().Set("content-type", "application/json")
 	w.WriteHeader(http.StatusForbidden)
-	w.Write([]byte(`{"type":"error","error":{"type":"llm_dlp_error","message":"llm-dlp: só atende programas desta máquina, pelo endereço 127.0.0.1."}}` + "\n"))
+	w.Write([]byte(`{"type":"error","error":{"type":"llm_dlp_error","message":"llm-dlp: only serves programs on this machine, at the address 127.0.0.1."}}` + "\n"))
 }
 
 // Proof: what only whoever reads the llm-dlp key can compute for a use ("ultima", or "saude" plus

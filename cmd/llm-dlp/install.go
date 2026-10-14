@@ -95,40 +95,40 @@ func install(args []string) error {
 		}
 	}
 	if os.Geteuid() == 0 {
-		return errors.New("rode sem sudo (a instalação é do seu usuário; o único passo com sudo é a trava, no fim)")
+		return errors.New("run it without sudo (the installation is your user's; the only step with sudo is the lock, at the end)")
 	}
 	home, _ := os.UserHomeDir()
-	fmt.Println(`Instalação do llm-dlp. São 5 passos; ele pergunta o que precisa e mostra o que vai mudar.
-Em dois passos (OCR e trava) ele usa sudo: a sua senha será pedida nessa hora.`)
+	fmt.Println(`llm-dlp installation. There are 5 steps; it asks what it needs and shows what will change.
+In two steps (OCR and lock) it uses sudo: your password will be asked at that time.`)
 
 	// 1. programa
-	step(1, "Programa", "copia o llm-dlp para ~/.local/bin, para você e o Claude Code poderem chamá-lo de qualquer pasta.")
+	step(1, "Programa", "copies llm-dlp to ~/.local/bin, so you and Claude Code can call it from any folder.")
 	destination := filepath.Join(home, ".local", "bin", "llm-dlp")
 	me, _ := os.Executable()
 	if me, _ = filepath.EvalSymlinks(me); me != destination {
 		if err := copyFile(me, destination, 0o755); err != nil {
 			return err
 		}
-		fmt.Println("      ✓ copiado para", destination)
+		fmt.Println("      ✓ copied to", destination)
 	} else {
-		fmt.Println("      ✓ já está em", destination)
+		fmt.Println("      ✓ already at", destination)
 	}
 	if !strings.Contains(":"+os.Getenv("PATH")+":", ":"+filepath.Dir(destination)+":") {
-		fmt.Printf("      ! %s não está no seu PATH. Acrescente ao ~/.bashrc:  export PATH=\"$HOME/.local/bin:$PATH\"\n", filepath.Dir(destination))
+		fmt.Printf("      ! %s is not in your PATH. Add to ~/.bashrc:  export PATH=\"$HOME/.local/bin:$PATH\"\n", filepath.Dir(destination))
 	}
 
 	// 2. configuration and key
-	step(2, "Configuração e chave", "cria "+config.Dir()+" com a configuração e a chave secreta que gera os pseudônimos.")
+	step(2, "Configuration and key", "cria "+config.Dir()+" with the configuration and the secret key that generates the pseudonyms.")
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("config: %w", err)
 	}
 	changed := false
 	if len(cfg.InternalDomains) == 0 {
-		fmt.Println("\n      a) Domínio interno: o trecho que aparece no nome dos servidores da empresa.")
-		fmt.Println("         Com \"empresa\", mysql-prd.empresa.intra vira mysql-x7k2.invalid. Sem isso, nomes de")
-		fmt.Println("         servidor saem como estão. (E-mails são mascarados sempre, não precisa informar.)")
-		r := in.askIt("         Digite um ou mais, separados por vírgula (Enter para pular): ")
+		fmt.Println("\n      a) Internal domain: the piece that appears in the names of the company's servers.")
+		fmt.Println("         With \"empresa\", mysql-prd.empresa.intra becomes mysql-x7k2.invalid. Without it, server")
+		fmt.Println("         names go out as they are. (E-mails are always masked, no need to tell.)")
+		r := in.askIt("         Type one or more, separated by commas (Enter to skip): ")
 		for _, d := range strings.Split(r, ",") {
 			if d = strings.TrimSpace(strings.ToLower(d)); d != "" {
 				cfg.InternalDomains = append(cfg.InternalDomains, d)
@@ -137,9 +137,9 @@ Em dois passos (OCR e trava) ele usa sudo: a sua senha será pedida nessa hora.`
 		}
 	}
 	if len(cfg.Terms) == 0 {
-		fmt.Println("\n      b) Nomes que nunca podem sair: o nome da empresa ou cliente, de projetos, de sistemas.")
-		fmt.Println("         São mascarados em qualquer lugar, inclusive em nomes de pasta e arquivo.")
-		r := in.askIt("         Digite um ou mais, separados por vírgula (Enter para pular): ")
+		fmt.Println("\n      b) Names that can never go out: the name of the company or customer, of projects, of systems.")
+		fmt.Println("         They are masked anywhere, including in folder and file names.")
+		r := in.askIt("         Type one or more, separated by commas (Enter to skip): ")
 		var vs []string
 		for _, v := range strings.Split(r, ",") {
 			if v = strings.TrimSpace(v); v != "" {
@@ -159,34 +159,34 @@ Em dois passos (OCR e trava) ele usa sudo: a sua senha será pedida nessa hora.`
 	if _, err := mask.Key(config.Path("chave")); err != nil {
 		return err
 	}
-	fmt.Printf("\n      ✓ configuração: %s (domínios internos: %d, nomes protegidos: %d)\n", config.Path("config.json"), len(cfg.InternalDomains), countTerms(cfg))
-	fmt.Printf("      ✓ chave: %s — guarde uma cópia no seu gerenciador de senhas\n", config.Path("chave"))
+	fmt.Printf("\n      ✓ configuration: %s (internal domains: %d, protected names: %d)\n", config.Path("config.json"), len(cfg.InternalDomains), countTerms(cfg))
+	fmt.Printf("      ✓ key: %s — keep a copy in your password manager\n", config.Path("chave"))
 
 	// 3. OCR
-	step(3, "OCR de imagens e PDFs", "com o OCR, prints e PDFs têm os dados sensíveis cobertos antes de sair. Sem ele, não são enviados (o Claude recebe um aviso no lugar).")
+	step(3, "OCR of images and PDFs", "with OCR, screenshots and PDFs have the sensitive data covered before going out. Without it, they are not sent (Claude gets a notice in their place).")
 	if missingOne := missingOCR(cfg); missingOne != "" {
 		cmd := ocr.InstallCommand()
-		fmt.Printf("      falta %s. Comando:  sudo sh -c '%s'\n", missingOne, cmd)
-		if cmd != "" && !in.noQuestion && in.confirm("      Instalar agora? (pede a senha do sudo)") {
+		fmt.Printf("      %s missing. Command:  sudo sh -c '%s'\n", missingOne, cmd)
+		if cmd != "" && !in.noQuestion && in.confirm("      Install now? (asks for the sudo password)") {
 			if err := withSudo("sh", "-c", cmd); err != nil {
-				fmt.Println("      ! a instalação falhou; rode o comando acima à mão e depois rode o llm-dlp install de novo")
+				fmt.Println("      ! the installation failed; run the command above by hand and then run llm-dlp install again")
 			}
 		}
 		if missingOne := missingOCR(cfg); missingOne != "" {
-			fmt.Println("      ✗ OCR ausente: imagens e PDFs não serão enviados ao Claude (nada vaza; ele recebe um aviso no lugar)")
+			fmt.Println("      ✗ OCR missing: images and PDFs will not be sent to Claude (nothing leaks; it gets a notice in their place)")
 		} else {
-			fmt.Println("      ✓ OCR instalado")
+			fmt.Println("      ✓ OCR installed")
 		}
 	} else {
-		fmt.Println("      ✓ tesseract (português) e poppler encontrados")
+		fmt.Println("      ✓ tesseract (Portuguese) and poppler found")
 	}
 
 	// 4. Claude Code
-	step(4, "Claude Code", "só para quem usa o Claude Code (com o Gemini CLI, o Codex, o opencode ou o Copilot, responda n:\n      eles são apontados à mão, ver o README). Faz o Claude Code passar pelo llm-dlp. Muda o\n      ~/.claude/settings.json (com backup):")
-	fmt.Printf(`        • ANTHROPIC_BASE_URL=http://%s  → as mensagens passam pelo llm-dlp
-        • ao abrir uma sessão: "llm-dlp ensure"   → sobe o llm-dlp se não estiver no ar
-        • a cada mensagem:     "llm-dlp check"  → barra a mensagem se algo estiver errado
-        • proíbe o agente de ler/editar ~/.config/llm-dlp e de mexer na emergência e na trava
+	step(4, "Claude Code", "only for those who use Claude Code (with Gemini CLI, Codex, opencode or Copilot, answer n:\n      they are pointed by hand, see the README). Makes Claude Code go through llm-dlp. Changes\n      ~/.claude/settings.json (with a backup):")
+	fmt.Printf(`        • ANTHROPIC_BASE_URL=http://%s  → messages go through llm-dlp
+        • when a session opens: "llm-dlp ensure"   → starts llm-dlp if it is not online
+        • on every message:     "llm-dlp check"    → blocks the message if something is wrong
+        • forbids the agent from reading/editing ~/.config/llm-dlp and from touching emergency and the lock
 `, address(cfg))
 	if in.confirm("      Aplicar?") {
 		bak, err := applyClaude(home, destination, cfg)
@@ -194,42 +194,42 @@ Em dois passos (OCR e trava) ele usa sudo: a sua senha será pedida nessa hora.`
 			return err
 		}
 		if bak != "" {
-			fmt.Println("      ✓ aplicado; backup em", bak)
+			fmt.Println("      ✓ applied; backup at", bak)
 		} else {
-			fmt.Println("      ✓ aplicado")
+			fmt.Println("      ✓ applied")
 		}
 		if err := ensure(); errors.Is(err, errNoProof) {
-			fmt.Println("      ! há outro llm-dlp no ar (de antes desta instalação): feche o Claude Code e rode \"llm-dlp stop\" para este assumir")
+			fmt.Println("      ! another llm-dlp is online (from before this installation): close Claude Code and run \"llm-dlp stop\" for this one to take over")
 		} else if err != nil {
 			return err
 		} else if info, _ := health(cfg); info.Commit != version.Commit || info.Version != version.Version {
 			// an earlier version running: swap it for this one without taking llm-dlp offline
 			if err := swapService(cfg, info, version.Commit); err != nil {
-				fmt.Printf("      ! a versão anterior (%s) continua no ar: %v. Tente: llm-dlp update\n", info.Version, err)
+				fmt.Printf("      ! the previous version (%s) is still online: %v. Try: llm-dlp update\n", info.Version, err)
 			} else {
-				fmt.Printf("      ✓ llm-dlp no ar (a %s no lugar da %s, sem sair do ar)\n", version.Version, info.Version)
+				fmt.Printf("      ✓ llm-dlp online (%s in place of %s, without going offline)\n", version.Version, info.Version)
 			}
 		} else {
-			fmt.Println("      ✓ llm-dlp no ar")
+			fmt.Println("      ✓ llm-dlp online")
 		}
 	} else {
-		fmt.Println("      – pulado (se você usa o Claude Code, ele NÃO está protegido)")
+		fmt.Println("      – skipped (if you use Claude Code, it is NOT protected)")
 	}
 	withClaude := claudeEnabled(home, cfg)
 
 	// 5. trava
-	step(5, "Trava contra vazamento silencioso (recomendada)",
-		"se a configuração do passo 4 for apagada, o Claude Code iria direto para a API sem máscara.\n      A trava faz o Claude Code se recusar a funcionar fora do llm-dlp. Fica numa pasta do sistema,\n      que o agente não consegue alterar — por isso precisa de sudo:")
+	step(5, "Lock against silent leaks (recommended)",
+		"if the configuration of step 4 is erased, Claude Code would go straight to the API unmasked.\n      The lock makes Claude Code refuse to work outside llm-dlp. It lives in a system folder,\n      which the agent cannot change — that is why it needs sudo:")
 	if lockInstalled(address(cfg)) {
-		fmt.Println("      ✓ trava já instalada")
+		fmt.Println("      ✓ lock already installed")
 	} else if !withClaude {
-		fmt.Println("      – pulado: a trava é do Claude Code, que não foi ligado no passo 4")
+		fmt.Println("      – skipped: the lock is Claude Code's, which was not turned on in step 4")
 	} else {
 		if v := claudeCodeVersion(); v != "" && minorVersion(v, "2.1.285") {
-			fmt.Printf("      ! seu Claude Code está na %s; a trava exige a 2.1.285 ou mais nova. Atualize e rode o llm-dlp install de novo.\n", v)
-		} else if !in.noQuestion && in.confirm("      Instalar a trava agora? (pede a senha do sudo)") {
-			if err := withSudo(destination, "instalar-trava"); err != nil {
-				fmt.Println("      ! falhou; rode à mão:  sudo", destination, "instalar-trava")
+			fmt.Printf("      ! your Claude Code is at %s; the lock requires 2.1.285 or newer. Update it and run llm-dlp install again.\n", v)
+		} else if !in.noQuestion && in.confirm("      Install the lock now? (asks for the sudo password)") {
+			if err := withSudo(destination, "install-lock"); err != nil {
+				fmt.Println("      ! failed; run by hand:  sudo", destination, "install-lock")
 			}
 		}
 	}
@@ -247,39 +247,39 @@ Em dois passos (OCR e trava) ele usa sudo: a sua senha será pedida nessa hora.`
 	nothing := func(msg string) { fmt.Println("  –", msg) }
 	switch {
 	case healthy(cfg):
-		fmt.Println("  ✓ llm-dlp no ar")
+		fmt.Println("  ✓ llm-dlp online")
 	case withClaude:
-		ok(false, "", "llm-dlp fora do ar: veja "+config.Path("llm-dlp.log"))
+		ok(false, "", "llm-dlp offline: see "+config.Path("llm-dlp.log"))
 	default:
-		nothing("llm-dlp ainda não está no ar: com outro cliente, ele sobe com llm-dlp ensure (o README mostra como deixar isso automático)")
+		nothing("llm-dlp is not online yet: with another client, it starts with llm-dlp ensure (the README shows how to make that automatic)")
 	}
 	if withClaude {
-		ok(true, "Claude Code passa pelo llm-dlp", "")
+		ok(true, "Claude Code goes through llm-dlp", "")
 	} else {
-		nothing("Claude Code não ligado (passo 4 pulado). Se você usa o Claude Code, rode o llm-dlp install de novo e aceite o passo 4")
+		nothing("Claude Code not turned on (step 4 skipped). If you use Claude Code, run llm-dlp install again and accept step 4")
 	}
-	ok(missingOCR(cfg) == "", "OCR de imagens e PDFs", "sem OCR: imagens e PDFs não são enviados (para instalar: "+ocr.InstallHint()+")")
+	ok(missingOCR(cfg) == "", "OCR of images and PDFs", "no OCR: images and PDFs are not sent (to install: "+ocr.InstallHint()+")")
 	switch {
 	case lockInstalled(address(cfg)):
-		fmt.Println("  ✓ trava instalada")
+		fmt.Println("  ✓ lock installed")
 	case withClaude:
-		ok(false, "", "sem trava: rode o llm-dlp install de novo e aceite o passo 5")
+		ok(false, "", "no lock: run llm-dlp install again and accept step 5")
 	default:
-		nothing("sem trava (ela é só do Claude Code)")
+		nothing("no lock (it is only Claude Code's)")
 	}
 	if len(cfg.InternalDomains) > 0 || countTerms(cfg) > 0 {
-		fmt.Println("  ✓ domínios internos e nomes protegidos configurados")
+		fmt.Println("  ✓ internal domains and protected names configured")
 	} else {
-		fmt.Println("  – sem domínio interno nem nomes protegidos (opcional: rode o llm-dlp install de novo para informar)")
+		fmt.Println("  – no internal domain nor protected names (optional: run llm-dlp install again to add them)")
 	}
 	if withClaude {
-		fmt.Println("\nPara valer: feche e abra o Claude Code (no VS Code, recarregue a janela).")
+		fmt.Println("\nTo take effect: close and open Claude Code (in VS Code, reload the window).")
 	}
 	fmt.Println(`
-Outros clientes, em beta (Gemini CLI, Codex, opencode, Copilot com a sua chave): esta
-instalação não os aponta para o llm-dlp nem os trava. Falta pôr o endereço do llm-dlp no
-cliente; ele fica protegido enquanto apontar para cá. Como fazer, cliente por cliente: README,
-seção "Gemini CLI, Codex, opencode e Copilot (beta)".`)
+Other clients, in beta (Gemini CLI, Codex, opencode, Copilot with your key): this
+installation neither points them to llm-dlp nor locks them. The llm-dlp address still has to go
+into the client; it stays protected while it points here. How to do it, client by client: README,
+section "Gemini CLI, Codex, opencode and Copilot (beta)".`)
 	return nil
 }
 
@@ -347,22 +347,22 @@ func uninstall(args []string) error {
 	// The proxy is NOT stopped here: Claude Code applies settings.json to sessions already open,
 	// but an open session keeps pointing to the proxy until it is restarted. Stopping now would
 	// leave those sessions without an answer (fail closed).
-	fmt.Println("✓ removido do Claude Code (backup em " + bak + ").")
-	fmt.Println("  O llm-dlp continua no ar para as sessões que já estão abertas. Feche e abra o Claude Code")
-	fmt.Println("  (ou o VS Code) e depois rode: llm-dlp stop")
+	fmt.Println("✓ removed from Claude Code (backup at " + bak + ").")
+	fmt.Println("  llm-dlp stays online for the sessions already open. Close and open Claude Code")
+	fmt.Println("  (or VS Code) and then run: llm-dlp stop")
 	cfg, _ := config.Load()
 	if lockInstalled(address(cfg)) {
-		fmt.Println("! A trava continua instalada: sem o llm-dlp, o Claude Code vai se recusar a funcionar. Remova com:")
+		fmt.Println("! The lock is still installed: without llm-dlp, Claude Code will refuse to work. Remove it with:")
 		fmt.Println("      sudo llm-dlp uninstall-lock")
 	}
-	fmt.Println("A pasta", config.Dir(), "(config e chave) foi mantida; apague à mão se quiser.")
+	fmt.Println("The folder", config.Dir(), "(config and key) was kept; delete it by hand if you want.")
 	return nil
 }
 
 // installLock writes allowedProviders + ANTHROPIC_BASE_URL into managed-settings (root).
 func installLock(remove bool) error {
 	if os.Geteuid() != 0 {
-		return errors.New("precisa de sudo (o arquivo da trava fica numa pasta do sistema)")
+		return errors.New("needs sudo (the lock file lives in a system folder)")
 	}
 	port := 8787
 	if u := os.Getenv("SUDO_USER"); u != "" { // uses the port configured by the user
@@ -383,12 +383,12 @@ func installLock(remove bool) error {
 		return err
 	}
 	if remove {
-		fmt.Println("✓ trava removida de", lockFile)
+		fmt.Println("✓ lock removed from", lockFile)
 	} else {
 		if bak != "" {
-			bak = " (backup em " + bak + ")"
+			bak = " (backup at " + bak + ")"
 		}
-		fmt.Printf("✓ trava instalada em %s%s\n  O Claude Code só funcionará passando pelo llm-dlp em 127.0.0.1:%d.\n", lockFile, bak, port)
+		fmt.Printf("✓ lock installed at %s%s\n  Claude Code will only work going through llm-dlp at 127.0.0.1:%d.\n", lockFile, bak, port)
 	}
 	return nil
 }
@@ -557,7 +557,7 @@ func readSettings(target string) (map[string]any, []byte, error) {
 	}
 	if len(strings.TrimSpace(string(orig))) > 0 {
 		if err := json.Unmarshal(orig, &s); err != nil {
-			return nil, nil, fmt.Errorf("%s não é JSON válido: %w", target, err)
+			return nil, nil, fmt.Errorf("%s is not valid JSON: %w", target, err)
 		}
 	}
 	return s, orig, nil
@@ -633,7 +633,7 @@ func missingOCR(cfg config.Config) string {
 	if _, err := exec.LookPath(cfg.OCR.Tesseract); err != nil {
 		missingOne = append(missingOne, "tesseract")
 	} else if out, err := exec.Command(cfg.OCR.Tesseract, "--list-langs").CombinedOutput(); err != nil || !strings.Contains(string(out), "\npor") {
-		missingOne = append(missingOne, "o idioma português do tesseract")
+		missingOne = append(missingOne, "tesseract's Portuguese language")
 	}
 	if _, err := exec.LookPath(cfg.OCR.PDFToText); err != nil {
 		missingOne = append(missingOne, "poppler (pdftotext)")

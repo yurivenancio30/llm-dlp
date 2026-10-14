@@ -333,10 +333,10 @@ func TestGeminiFileWithoutCheck(t *testing.T) {
 	if len(ps) != 3 || ps[0]["text"] != "veja os anexos" {
 		t.Fatalf("partes: %v", ps)
 	}
-	if s, _ := ps[1]["text"].(string); !strings.Contains(s, "Uma imagem foi retirada") {
+	if s, _ := ps[1]["text"].(string); !strings.Contains(s, "An image was removed") {
 		t.Errorf("aviso da imagem: %v", ps[1])
 	}
-	if s, _ := ps[2]["text"].(string); !strings.Contains(s, "só consegue verificar imagem e PDF") {
+	if s, _ := ps[2]["text"].(string); !strings.Contains(s, "can only check images and PDFs") {
 		t.Errorf("aviso do áudio: %v", ps[2])
 	}
 }

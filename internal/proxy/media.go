@@ -88,7 +88,7 @@ func (md *Media) Process(b map[string]any) ([]any, []mask.Entry, error) {
 	case "allow":
 		return []any{b}, nil, nil
 	case "block":
-		return md.removeIt(b, isPDF, "o envio de imagens e PDFs está bloqueado na configuração do llm-dlp (ocr.mode = block). Avise o usuário"), nil, nil
+		return md.removeIt(b, isPDF, "sending images and PDFs is blocked in the llm-dlp configuration (ocr.mode = block). Tell the user"), nil, nil
 	}
 	k := sha256.Sum256([]byte(data))
 	md.mu.Lock()
@@ -101,20 +101,20 @@ func (md *Media) Process(b map[string]any) ([]any, []mask.Entry, error) {
 	bin, err := base64.StdEncoding.DecodeString(data)
 	var r mediaRes
 	if err != nil {
-		err = errors.New("base64 inválido")
+		err = errors.New("invalid base64")
 	} else if isPDF {
 		r, err = md.pdf(b, bin)
 	} else {
 		r, err = md.image(b, bin)
 	}
 	if err != nil {
-		md.warn(k, fmt.Sprintf("%q retirado da requisição, não deu para verificar: %v", typ, err))
-		reason := "o llm-dlp não conseguiu verificar se o arquivo tem dado sensível, porque "
+		md.warn(k, fmt.Sprintf("%q removed from the request, it could not be checked: %v", typ, err))
+		reason := "llm-dlp could not check whether the file has sensitive data, because "
 		if ocr.Missing(err) {
-			reason += "o OCR não está instalado nesta máquina. Avise o usuário: para enviar imagens e PDFs, instalar o OCR (" +
-				ocr.InstallHint() + ") e mandar o arquivo de novo"
+			reason += "OCR is not installed on this machine. Tell the user: to send images and PDFs, install OCR (" +
+				ocr.InstallHint() + ") and send the file again"
 		} else {
-			reason += "a leitura do arquivo falhou. Avise o usuário: o motivo está no log do llm-dlp (llm-dlp.log); se o OCR estiver incompleto: " +
+			reason += "reading the file failed. Tell the user: the reason is in the llm-dlp log (llm-dlp.log); if OCR is incomplete: " +
 				ocr.InstallHint()
 		}
 		return md.removeIt(b, isPDF, reason), nil, nil
@@ -142,9 +142,9 @@ func (md *Media) Process(b map[string]any) ([]any, []mask.Entry, error) {
 // may cite a path on the machine, stays in the log) and the result is not memoized: with OCR
 // installed, the next message already carries the file.
 func (md *Media) removeIt(b map[string]any, isPDF bool, reason string) []any {
-	t := "[llm-dlp] Uma imagem foi retirada daqui e não foi enviada: "
+	t := "[llm-dlp] An image was removed from here and was not sent: "
 	if isPDF {
-		t = "[llm-dlp] Um PDF foi retirado daqui e não foi enviado: "
+		t = "[llm-dlp] A PDF was removed from here and was not sent: "
 	}
 	return mediaRes{blocks: []any{map[string]any{"type": "text", "text": t + reason + "."}}}.output(b)
 }
@@ -259,7 +259,7 @@ func (md *Media) pdf(b map[string]any, bin []byte) (mediaRes, error) {
 		newOne := map[string]any{"type": "document",
 			"source": map[string]any{"type": "text", "media_type": "text/plain", "data": masked}}
 		title, _ := b["title"].(string)
-		newOne["title"] = strings.TrimSpace(title + " (texto extraído do PDF; dados sensíveis mascarados pelo llm-dlp)")
+		newOne["title"] = strings.TrimSpace(title + " (text extracted from the PDF; sensitive data masked by llm-dlp)")
 		for _, k := range []string{"context", "citations", "cache_control"} {
 			if v, ok := b[k]; ok {
 				newOne[k] = v
@@ -314,12 +314,12 @@ func (md *Media) pdf(b map[string]any, bin []byte) (mediaRes, error) {
 		size += len(data)
 		blocks = append(blocks, map[string]any{"type": "image", "source": map[string]any{"type": "base64", "media_type": "image/png", "data": data}})
 	}
-	blocks = append(blocks, note(total, dedup(ents), fmt.Sprintf("nas %d páginas acima (PDF escaneado)", len(pages))))
+	blocks = append(blocks, note(total, dedup(ents), fmt.Sprintf("in the %d pages above (scanned PDF)", len(pages))))
 	return mediaRes{blocks: blocks, ents: dedup(ents), size: size}, nil
 }
 
 func note(n int, ents []mask.Entry, where string) map[string]any {
-	t := fmt.Sprintf("[llm-dlp] %d trecho(s) com dado sensível foram cobertos %s.", n, where)
+	t := fmt.Sprintf("[llm-dlp] %d piece(s) with sensitive data were covered %s.", n, where)
 	if len(ents) > 0 {
 		var ps []string
 		for _, e := range ents {

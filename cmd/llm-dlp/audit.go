@@ -21,10 +21,10 @@ import (
 // out without masking; what was refused.
 
 var (
-	reLogReq       = regexp.MustCompile(` -> (\d{3}) \| (\d+) substituições \| (\d+) colisões`)
-	reLogTypes     = regexp.MustCompile(` \| tipos: ([^|]+)`)
-	reLogNotUndone = regexp.MustCompile(` \| NÃO DESFEITOS \d+: ([^|]+)`)
-	reLogCol       = regexp.MustCompile(` \| colididos: ([^|]+)`)
+	reLogReq       = regexp.MustCompile(` -> (\d{3}) \| (\d+) (?:replacements|substituições) \| (\d+) (?:collisions|colisões)`)
+	reLogTypes     = regexp.MustCompile(` \| (?:types|tipos): ([^|]+)`)
+	reLogNotUndone = regexp.MustCompile(` \| (?:NOT UNDONE|NÃO DESFEITOS) \d+: ([^|]+)`)
+	reLogCol       = regexp.MustCompile(` \| (?:collided|colididos): ([^|]+)`)
 	reLogAPI       = regexp.MustCompile(` \| API: ([\w.-]+)`)
 )
 
@@ -62,7 +62,7 @@ func (r *logSummary) readIt(in io.Reader) {
 		}
 		msg := l[20:]
 		switch {
-		case strings.HasPrefix(msg, "RECUSADO "):
+		case strings.HasPrefix(msg, "REFUSED "), strings.HasPrefix(msg, "RECUSADO "): // (the Portuguese ones: a log up to 0.9)
 			r.refusedN++
 			if i := strings.Index(msg, ": "); i >= 0 {
 				m := msg[i+2:]
@@ -71,9 +71,10 @@ func (r *logSummary) readIt(in io.Reader) {
 				}
 				r.refusalReasons[m]++
 			}
-		case strings.HasPrefix(msg, "AVISO ") && strings.Contains(msg, "sem máscara"):
+		case strings.HasPrefix(msg, "WARNING ") && strings.Contains(msg, "sent unmasked"),
+			strings.HasPrefix(msg, "AVISO ") && strings.Contains(msg, "sem máscara"):
 			r.unmasked++
-		case strings.HasPrefix(msg, "ERRO "):
+		case strings.HasPrefix(msg, "ERROR "), strings.HasPrefix(msg, "ERRO "):
 			r.errs++
 		}
 		m := reLogReq.FindStringSubmatch(msg)
@@ -145,39 +146,39 @@ func counts(m map[string]int) string {
 
 func (r *logSummary) text(period string) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "llm-dlp: log das últimas %s (desde %s)\n", period, r.since.Format("02/01 15:04"))
-	fmt.Fprintf(&b, "  requisições: %d", r.req)
+	fmt.Fprintf(&b, "llm-dlp: log of the last %s (since %s)\n", period, r.since.Format("02/01 15:04"))
+	fmt.Fprintf(&b, "  requests: %d", r.req)
 	if len(r.status) > 0 {
 		fmt.Fprintf(&b, " (status HTTP: %s)", counts(r.status))
 	}
 	b.WriteString("\n")
 	if len(r.apiErrors) > 0 {
-		fmt.Fprintf(&b, "  erros da API: %s\n", counts(r.apiErrors))
+		fmt.Fprintf(&b, "  API errors: %s\n", counts(r.apiErrors))
 	}
-	fmt.Fprintf(&b, "  substituições: %d; colisões (pseudônimo que ficou sem desmascarar): %d\n", r.substs, r.collisions)
+	fmt.Fprintf(&b, "  replacements: %d; collisions (pseudonym left masked): %d\n", r.substs, r.collisions)
 	if len(r.collided) > 0 {
-		fmt.Fprintf(&b, "    pseudônimos colididos: %s\n", strings.Join(r.collided, ", "))
+		fmt.Fprintf(&b, "    collided pseudonyms: %s\n", strings.Join(r.collided, ", "))
 	}
 	if len(r.types) > 0 {
-		fmt.Fprintf(&b, "  mascarados por tipo (valores distintos de cada requisição, somados): %s\n", counts(r.types))
+		fmt.Fprintf(&b, "  masked by type (distinct values of each request, added up): %s\n", counts(r.types))
 	}
 	if r.ndResponses == 0 {
-		b.WriteString("  pseudônimos que voltaram sem virar o valor real: nenhum\n")
+		b.WriteString("  pseudonyms that came back without turning into the real value: none\n")
 	} else {
-		fmt.Fprintf(&b, "  ATENÇÃO: %d resposta(s) chegaram ao cliente com pseudônimo no lugar do valor real: %s\n",
+		fmt.Fprintf(&b, "  WARNING: %d response(s) reached the client with a pseudonym in place of the real value: %s\n",
 			r.ndResponses, strings.Join(r.pseudosNotUndone, ", "))
-		b.WriteString("    (procure-os nos arquivos gravados nesse período: eles ficaram com o pseudônimo)\n")
+		b.WriteString("    (look for them in the files written in this period: they kept the pseudonym)\n")
 	}
 	if r.unmasked > 0 {
-		fmt.Fprintf(&b, "  ATENÇÃO: %d requisição(ões) enviada(s) SEM máscara (fail_closed desligado e o mascaramento falhou)\n", r.unmasked)
+		fmt.Fprintf(&b, "  WARNING: %d request(s) sent UNMASKED (fail_closed off and masking failed)\n", r.unmasked)
 	} else {
-		b.WriteString("  enviadas sem máscara: nenhuma\n")
+		b.WriteString("  sent unmasked: none\n")
 	}
 	if r.refusedN > 0 {
-		fmt.Fprintf(&b, "  recusadas: %d (%s)\n", r.refusedN, counts(r.refusalReasons))
+		fmt.Fprintf(&b, "  refused: %d (%s)\n", r.refusedN, counts(r.refusalReasons))
 	}
 	if r.errs > 0 {
-		fmt.Fprintf(&b, "  falhas ao falar com a API: %d\n", r.errs)
+		fmt.Fprintf(&b, "  failures talking to the API: %d\n", r.errs)
 	}
 	return b.String()
 }
@@ -194,7 +195,7 @@ func period(s string) (time.Duration, error) {
 	}
 	d, err := time.ParseDuration(s)
 	if err != nil || d <= 0 {
-		return 0, fmt.Errorf("período inválido: %q (use, por exemplo, 24h, 90m ou 7d)", s)
+		return 0, fmt.Errorf("invalid period: %q (use, for example, 24h, 90m or 7d)", s)
 	}
 	return d, nil
 }
@@ -221,7 +222,7 @@ func audit(args []string) error {
 		readOnes++
 	}
 	if readOnes == 0 {
-		return fmt.Errorf("sem log em %s", file)
+		return fmt.Errorf("no log at %s", file)
 	}
 	fmt.Print(r.text(p))
 	return nil

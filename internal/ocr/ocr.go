@@ -49,7 +49,7 @@ func New(c Config) *OCR {
 func (o *OCR) Available() error {
 	_, err := o.runIt(context.Background(), nil, o.c.Tesseract, "--version")
 	if err != nil {
-		return fmt.Errorf("tesseract indisponível (%s): %w", o.c.Tesseract, err)
+		return fmt.Errorf("tesseract unavailable (%s): %w", o.c.Tesseract, err)
 	}
 	return nil
 }
@@ -72,13 +72,13 @@ func (o *OCR) Read(data []byte) (image.Image, []Line, error) {
 	// the size declared in the header, before decoding: a file of a few KB can declare an image of
 	// gigabytes and bring the process down for lack of memory
 	if c, _, err := image.DecodeConfig(bytes.NewReader(data)); err != nil {
-		return nil, nil, fmt.Errorf("imagem ilegível: %w", err)
+		return nil, nil, fmt.Errorf("unreadable image: %w", err)
 	} else if c.Width <= 0 || c.Height <= 0 || c.Width > sideMax || c.Height > sideMax || c.Width*c.Height > maxDots {
 		return nil, nil, fmt.Errorf("imagem grande demais (%d x %d pontos)", c.Width, c.Height)
 	}
 	img, _, err := image.Decode(bytes.NewReader(data))
 	if err != nil {
-		return nil, nil, fmt.Errorf("imagem ilegível: %w", err)
+		return nil, nil, fmt.Errorf("unreadable image: %w", err)
 	}
 	// dark screen (dark theme, terminal): invert before OCR, which reads black on white better
 	entry := img
@@ -186,7 +186,7 @@ func (o *OCR) PDFPages(pdf []byte, maxPages int) ([][]byte, error) {
 	names, _ := filepath.Glob(filepath.Join(dir, "p-*.png"))
 	sort.Strings(names)
 	if len(names) > maxPages {
-		return nil, fmt.Errorf("PDF com mais de %d páginas", maxPages)
+		return nil, fmt.Errorf("PDF with more than %d pages", maxPages)
 	}
 	var pages [][]byte
 	for _, n := range names {
@@ -209,7 +209,7 @@ func (o *OCR) runIt(ctx context.Context, entry []byte, bin string, args ...strin
 	cmd.Stdout, cmd.Stderr = out, errb
 	if err := cmd.Run(); err != nil {
 		if out.overflowed {
-			return nil, fmt.Errorf("a saída de %s passou de %d MB", filepath.Base(bin), maxOutput>>20)
+			return nil, fmt.Errorf("the output of %s passed %d MB", filepath.Base(bin), maxOutput>>20)
 		}
 		return nil, fmt.Errorf("%w: %s", err, strings.TrimSpace(errb.b.String()))
 	}
@@ -239,7 +239,7 @@ func (l *limited) Write(p []byte) (int, error) {
 			return len(p), nil
 		}
 		l.overflowed = true
-		return 0, errors.New("saída grande demais")
+		return 0, errors.New("output too large")
 	}
 	return l.b.Write(p)
 }

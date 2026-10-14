@@ -88,7 +88,7 @@ func responsesBlocks(content any) (blocks []any, parts []map[string]any) {
 			case "refusal":
 				b["type"] = "server_tool_use" // refusal of the model itself: unchanged
 			default:
-				b["type"], b["parte"] = "parte desconhecida", pm // masks all of its text, as a precaution
+				b["type"], b["part"] = "unknown part", pm // masks all of its text, as a precaution
 			}
 			blocks = append(blocks, b)
 		}
@@ -276,7 +276,7 @@ func responsesBridge(v any) (map[string]any, func(), bool) {
 			}
 		default:
 			// item I do not know: mask all of its text, as a precaution
-			b := map[string]any{"type": "parte desconhecida", "parte": it}
+			b := map[string]any{"type": "unknown part", "part": it}
 			msgs = append(msgs, map[string]any{"role": "user", "content": []any{b}})
 		}
 	}

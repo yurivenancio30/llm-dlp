@@ -14,48 +14,48 @@ import (
 
 // llm-dlp: entry point and command list.
 
-const help = `llm-dlp %s — mascara dado sensível entre você e a LLM (Claude Code)
+const help = `llm-dlp %s — masks sensitive data between you and the LLM (Claude Code)
 
-Uso: llm-dlp COMANDO [argumentos]
+Usage: llm-dlp COMMAND [arguments]
 
-Instalar e atualizar
-  llm-dlp install               instala e configura tudo, explicando cada passo (pode rodar de novo)
-  sudo llm-dlp install-lock     (recomendado) o Claude Code só funciona passando pelo llm-dlp
-  llm-dlp uninstall             desfaz a configuração do Claude Code
-  sudo llm-dlp uninstall-lock   tira a trava
-  llm-dlp update [--version X.Y.Z] [--file ARQ.tar.gz]
-                                baixa a versão nova (ou a pedida), confere e troca a que está no ar
-                                sem tirá-lo do ar: não precisa fechar o Claude Code
+Install and update
+  llm-dlp install               installs and configures everything, explaining each step (can run again)
+  sudo llm-dlp install-lock     (recommended) Claude Code only works going through llm-dlp
+  llm-dlp uninstall             undoes the Claude Code configuration
+  sudo llm-dlp uninstall-lock   removes the lock
+  llm-dlp update [--version X.Y.Z] [--file FILE.tar.gz]
+                                downloads the new version (or the one asked), checks it and swaps the
+                                one online without taking it offline: no need to close Claude Code
 
-Dia a dia (normalmente você não precisa de nada disto)
-  llm-dlp status                mostra se está no ar, em qual versão, e o que falta (OCR, binário novo)
-  llm-dlp reload                aplica uma mudança na configuração, sem tirar o llm-dlp do ar
-  llm-dlp stop                  para o llm-dlp, com o Claude Code fechado; ele volta sozinho na próxima
-                                mensagem
-  llm-dlp import-people ARQ.csv --group COD:NOME:EMAIL [--name-separator /]
-                                ensina nomes e e-mails de pessoas (guardados só como hash)
+Day to day (usually you need none of this)
+  llm-dlp status                shows whether it is online, which version, and what is missing (OCR, new binary)
+  llm-dlp reload                applies a configuration change, without taking llm-dlp offline
+  llm-dlp stop                  stops llm-dlp, with Claude Code closed; it comes back by itself on the next
+                                message
+  llm-dlp import-people FILE.csv --group CODE:NAME:EMAIL [--name-separator /]
+                                teaches people's names and e-mails (stored only as hashes)
   sudo llm-dlp emergency [30m|off]
-                                se o llm-dlp quebrar: libera o Claude SEM máscara por tempo limitado
+                                if llm-dlp breaks: lets Claude through UNMASKED for a limited time
 
-Conferir o que é mascarado
-  llm-dlp last [N]              mostra as últimas N mensagens como a API recebeu (já mascaradas)
-  llm-dlp audit [24h|7d]        resume o log do período: o que foi mascarado por tipo, pseudônimos que
-                                voltaram sem virar o valor real, envios sem máscara, recusas
-  llm-dlp test < ARQ            mostra a versão mascarada de um texto
-  llm-dlp test-media ARQ DIR    processa uma imagem ou PDF como o proxy e grava o resultado em DIR
-  llm-dlp columns ARQ           mostra como os campos de um arquivo são entendidos
-  llm-dlp simulate SESSAO.jsonl repete uma sessão antiga do Claude Code, sem falar com a API, e confere
-  llm-dlp measure ARQ.jsonl...  tempo e cobertura sobre sessões antigas (só contagens)
+Check what is masked
+  llm-dlp last [N]              shows the last N messages as the API received them (already masked)
+  llm-dlp audit [24h|7d]        sums up the log of the period: what was masked by type, pseudonyms that
+                                came back without turning into the real value, unmasked sends, refusals
+  llm-dlp test < FILE           shows the masked version of a text
+  llm-dlp test-media FILE DIR   processes an image or PDF as the proxy does and writes the result to DIR
+  llm-dlp columns FILE          shows how the fields of a file are understood
+  llm-dlp simulate SESSION.jsonl replays an old Claude Code session, without talking to the API, and checks it
+  llm-dlp measure FILE.jsonl... time and coverage over old sessions (counts only)
 
-Outros
-  llm-dlp version               mostra a versão e o commit (também: --version)
-  llm-dlp help                  mostra esta ajuda (também: --help, -h)
+Other
+  llm-dlp version               shows the version and the commit (also: --version)
+  llm-dlp help                  shows this help (also: --help, -h)
 
-Configuração: %s (depois de mudar: llm-dlp reload)
-Log:          %s
-Documentação: https://github.com/yurivenancio30/llm-dlp
+Configuration: %s (after changing it: llm-dlp reload)
+Log:           %s
+Documentation: https://github.com/yurivenancio30/llm-dlp
 
-Internos (quem chama são os ganchos do Claude Code e o supervisor):
+Internal (called by the Claude Code hooks and the supervisor):
   ensure, check, serve, supervise
 `
 
@@ -134,7 +134,7 @@ func main() {
 	case "version", "--version", "-v":
 		fmt.Println("llm-dlp", version.Complete())
 	default:
-		fmt.Fprintf(os.Stderr, "llm-dlp: comando desconhecido: %q\n\n", cmd)
+		fmt.Fprintf(os.Stderr, "llm-dlp: unknown command: %q\n\n", cmd)
 		fmt.Fprint(os.Stderr, helpText())
 		os.Exit(2)
 	}

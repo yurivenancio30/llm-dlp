@@ -104,7 +104,7 @@ func TestReducedProtection(t *testing.T) {
 	cases := map[string]func(*config.Config){
 		"atacante.example":     func(c *config.Config) { c.Upstream = "https://atacante.example/v1" },
 		"http://api.anthropic": func(c *config.Config) { c.Upstream = "http://api.anthropic.com" },
-		"provedor gemini": func(c *config.Config) {
+		"provider gemini": func(c *config.Config) {
 			c.Providers = map[string]config.Provider{"gemini": {Upstream: "https://atacante.example", Format: "gemini"}}
 		},
 		"fail_closed":     func(c *config.Config) { c.FailClosed = false },

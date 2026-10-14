@@ -209,7 +209,7 @@ func geminiBridge(v any) (map[string]any, func(), bool) {
 					// audio, video and others: there is no way to check; does not go out (fail
 					// closed)
 					delete(b, partMark)
-					b["type"], b["text"] = "text", "[llm-dlp] Um arquivo anexado foi retirado daqui e não foi enviado: o llm-dlp só consegue verificar imagem e PDF. Avise o usuário."
+					b["type"], b["text"] = "text", "[llm-dlp] An attached file was removed from here and was not sent: llm-dlp can only check images and PDFs. Tell the user."
 				}
 				if b["type"] != "text" {
 					b["source"] = map[string]any{"type": "base64", "media_type": typ, "data": im["data"]}
@@ -219,7 +219,7 @@ func geminiBridge(v any) (map[string]any, func(), bool) {
 			case pm["fileData"] != nil || pm["file_data"] != nil || pm["executableCode"] != nil || pm["codeExecutionResult"] != nil:
 				b["type"] = "server_tool_use" // already on the API side, or the API generated it: unchanged
 			default:
-				b["type"], b["parte"] = "parte desconhecida", pm // masks all of its text, as a precaution
+				b["type"], b["part"] = "unknown part", pm // masks all of its text, as a precaution
 			}
 			blocks = append(blocks, b)
 		}

@@ -47,7 +47,7 @@ func TestLogByTypeAndNotUndone(t *testing.T) {
 		t.Fatalf("resposta: %s", back)
 	}
 	l := lg.String()
-	if !strings.Contains(l, "| tipos: cpf 1, ip 1") || !strings.Contains(l, "| NÃO DESFEITOS 1: 245.1.2.3") ||
+	if !strings.Contains(l, "| types: cpf 1, ip 1") || !strings.Contains(l, "| NOT UNDONE 1: 245.1.2.3") ||
 		strings.Contains(l, "529.982") || strings.Contains(l, "10.42.7") {
 		t.Errorf("log: %s", l)
 	}

@@ -31,7 +31,7 @@ func InstallHint() string {
 	case strings.Contains(ids, "suse"):
 		return "sudo zypper install tesseract-ocr tesseract-ocr-traineddata-portuguese poppler-tools"
 	}
-	return "instale tesseract (com o idioma português) e poppler pelo gerenciador de pacotes do sistema"
+	return "install tesseract (with the Portuguese language) and poppler with the system package manager"
 }
 
 // InstallCommand returns the command (to run as administrator) that installs OCR on the current

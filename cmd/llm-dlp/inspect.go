@@ -50,22 +50,22 @@ func lastConv(args []string) error {
 	request.Header.Set(proxy.ProofHeader, proxy.Proof(key, "ultima"))
 	resp, err := http.DefaultClient.Do(request)
 	if err != nil {
-		return fmt.Errorf("o llm-dlp não está no ar: %w", err)
+		return fmt.Errorf("llm-dlp is not online: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusForbidden {
-		return errors.New("o llm-dlp no ar não aceitou a prova: ele é de outra versão ou usa outra chave (rode llm-dlp status)")
+		return errors.New("the llm-dlp online did not accept the proof: it is another version or uses another key (run llm-dlp status)")
 	}
 	body, _ := io.ReadAll(resp.Body)
 	msgs := lastMessages(body)
 	if len(msgs) == 0 {
-		fmt.Println("Ainda não passou nenhuma mensagem desde que o llm-dlp subiu.")
+		fmt.Println("No message has gone through since llm-dlp started.")
 		return nil
 	}
 	if n > len(msgs) {
 		n = len(msgs)
 	}
-	fmt.Printf("Últimas %d de %d mensagens, como a API recebeu (os pseudônimos estão no lugar dos valores reais):\n", n, len(msgs))
+	fmt.Printf("Last %d of %d messages, as the API received them (the pseudonyms are in place of the real values):\n", n, len(msgs))
 	for _, m := range msgs[len(msgs)-n:] {
 		for _, t := range m.texts {
 			if len(t) > 3000 {
@@ -120,7 +120,7 @@ func lastMessages(body []byte) []seenMessage {
 	for _, m := range req.Messages {
 		ts := contentTexts(m.Content)
 		for _, tc := range m.ToolCalls {
-			ts = append(ts, fmt.Sprintf("[ferramenta %s] %s", tc.Function.Name, tc.Function.Arguments))
+			ts = append(ts, fmt.Sprintf("[tool %s] %s", tc.Function.Name, tc.Function.Arguments))
 		}
 		out = append(out, seenMessage{m.Role, ts})
 	}
@@ -150,7 +150,7 @@ func responsesItems(entry any) []seenMessage {
 			if t, ok := pm["text"].(string); ok {
 				out = append(out, t)
 			} else if pm != nil {
-				out = append(out, "[arquivo]")
+				out = append(out, "[file]")
 			}
 		}
 		return out
@@ -163,13 +163,13 @@ func responsesItems(entry any) []seenMessage {
 		case "message", nil:
 			out = append(out, seenMessage{hostRole, texts(it["content"])})
 		case "function_call":
-			out = append(out, seenMessage{"assistant", []string{fmt.Sprintf("[ferramenta %v] %v", it["name"], it["arguments"])}})
+			out = append(out, seenMessage{"assistant", []string{fmt.Sprintf("[tool %v] %v", it["name"], it["arguments"])}})
 		case "custom_tool_call":
-			out = append(out, seenMessage{"assistant", []string{fmt.Sprintf("[ferramenta %v] %v", it["name"], it["input"])}})
+			out = append(out, seenMessage{"assistant", []string{fmt.Sprintf("[tool %v] %v", it["name"], it["input"])}})
 		case "function_call_output", "custom_tool_call_output":
 			var ts []string
 			for _, t := range texts(it["output"]) {
-				ts = append(ts, "[resultado de ferramenta]\n"+t)
+				ts = append(ts, "[tool result]\n"+t)
 			}
 			out = append(out, seenMessage{"user", ts})
 		}
@@ -187,14 +187,14 @@ func partTexts(parts []any) []string {
 		}
 		if fc, _ := pt["functionCall"].(map[string]any); fc != nil {
 			b, _ := json.Marshal(fc["args"])
-			out = append(out, fmt.Sprintf("[ferramenta %v] %s", fc["name"], b))
+			out = append(out, fmt.Sprintf("[tool %v] %s", fc["name"], b))
 		}
 		if fr, _ := pt["functionResponse"].(map[string]any); fr != nil {
-			out = append(out, "[resultado de ferramenta]\n"+responseText(fr["response"]))
+			out = append(out, "[tool result]\n"+responseText(fr["response"]))
 		}
 		for _, k := range []string{"inlineData", "inline_data", "fileData", "file_data"} {
 			if d, _ := pt[k].(map[string]any); d != nil {
-				out = append(out, "[arquivo]")
+				out = append(out, "[file]")
 			}
 		}
 	}
@@ -244,11 +244,11 @@ func contentTexts(c any) []string {
 				}
 			case "tool_result":
 				for _, t := range contentTexts(bl["content"]) {
-					out = append(out, "[resultado de ferramenta]\n"+t)
+					out = append(out, "[tool result]\n"+t)
 				}
 			case "tool_use":
 				b, _ := json.Marshal(bl["input"])
-				out = append(out, fmt.Sprintf("[ferramenta %v] %s", bl["name"], b))
+				out = append(out, fmt.Sprintf("[tool %v] %s", bl["name"], b))
 			case "image", "document":
 				out = append(out, fmt.Sprintf("[%v]", bl["type"]))
 			}
@@ -266,9 +266,9 @@ func contentTexts(c any) []string {
 // previous request (the API cache depends on it). It only prints counts.
 func simulate(args []string) error {
 	fs := flag.NewFlagSet("simulate", flag.ContinueOnError)
-	max := fs.Int("max", 400, "número máximo de requisições por sessão")
-	window := fs.Int("window", 600, "tamanho máximo da conversa, em KB (como o limite de contexto)")
-	fs.IntVar(window, "janela", 600, "nome antigo de --window")
+	max := fs.Int("max", 400, "maximum number of requests per session")
+	window := fs.Int("window", 600, "maximum conversation size, in KB (like the context limit)")
+	fs.IntVar(window, "janela", 600, "old name of --window")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -461,7 +461,7 @@ func simulateSession(file string, cfg config.Config, m *mask.Masker, limitN, win
 			rsn := "outro motivo"
 			switch {
 			case strings.Contains(response, "OCR") || strings.Contains(response, "image") || strings.Contains(response, "verificar"):
-				rsn = "imagem ou PDF que não deu para verificar (falta o OCR)"
+				rsn = "image or PDF that could not be checked (OCR missing)"
 			}
 			reasons[rsn]++
 			continue
@@ -537,7 +537,7 @@ func simulateSession(file string, cfg config.Config, m *mask.Masker, limitN, win
 								sb.WriteRune(r)
 							}
 						}
-						debug["ORIGEM "+a.Type+" | antes "+sb.String()]++
+						debug["ORIGEM "+a.Type+" | before "+sb.String()]++
 					}
 				}
 			}
@@ -570,7 +570,7 @@ func simulateSession(file string, cfg config.Config, m *mask.Masker, limitN, win
 						}
 						return sb.String()
 					}
-					debug[typ+" | valor "+shape(real)+" | antes "+strings.ToLower(sent[a:i])+"▮"+shape(sent[i+len(real):b])]++
+					debug[typ+" | value "+shape(real)+" | before "+strings.ToLower(sent[a:i])+"▮"+shape(sent[i+len(real):b])]++
 				}
 				leftovers++
 				leftoverTypes[typ]++
@@ -618,23 +618,23 @@ func simulateSession(file string, cfg config.Config, m *mask.Masker, limitN, win
 	if i := strings.LastIndexByte(file, '/'); i >= 0 {
 		name = file[i+1:]
 	}
-	fmt.Printf("### %.8s: %d requisições simuladas (conversa de até %d KB), %d com imagem\n", name, reqs, window>>10, images)
+	fmt.Printf("### %.8s: %d simulated requests (conversation up to %d KB), %d with an image\n", name, reqs, window>>10, images)
 	if reqs == 0 {
-		fmt.Println("    ATENÇÃO: nenhuma requisição repetida: o arquivo não tem mensagem do usuário que o simular leia. Nada foi conferido.")
+		fmt.Println("    WARNING: no request replayed: the file has no user message for simulate to read. Nothing was checked.")
 	}
-	fmt.Printf("    aceitas: %d | recusadas pelo llm-dlp: %d %v | erros de conexão: %d\n", reqs-refused, refused, reasons, errs)
-	fmt.Printf("    resposta voltou diferente do original: %d\n", roundTripDiff)
-	fmt.Printf("    escrita (chamada de ferramenta que o modelo escreve com pseudônimos): %d conferidas, %d tinham valor mascarado\n", writes, maskedWrites)
-	fmt.Printf("    escrita que voltou diferente da original: %d %v, das quais %d com pseudônimo sobrando | para a internet (ficam mascaradas): %d\n",
+	fmt.Printf("    accepted: %d | refused by llm-dlp: %d %v | connection errors: %d\n", reqs-refused, refused, reasons, errs)
+	fmt.Printf("    response came back different from the original: %d\n", roundTripDiff)
+	fmt.Printf("    writing (tool call the model writes with pseudonyms): %d checked, %d had a masked value\n", writes, maskedWrites)
+	fmt.Printf("    writing that came back different from the original: %d %v, of which %d with a pseudonym left | to the internet (stay masked): %d\n",
 		writesDiff, diffByTool, writesWithLeftover, webWrites)
-	fmt.Printf("    valor detectado que sobrou em outro ponto da requisição: %d ocorrências em %d requisições %v\n", leftovers, withLeftover, leftoverTypes)
-	fmt.Printf("    requisições em que uma mensagem antiga mudou (cache refeito): %d\n", cacheChanged)
-	fmt.Printf("    tempo por requisição (ida, API falsa e volta): mediana %s | 95%% abaixo de %s | máximo %s\n", q(.5), q(.95), q(1))
+	fmt.Printf("    detected value left elsewhere in the request: %d occurrences in %d requests %v\n", leftovers, withLeftover, leftoverTypes)
+	fmt.Printf("    requests in which an old message changed (cache rebuilt): %d\n", cacheChanged)
+	fmt.Printf("    time per request (out, fake API and back): median %s | 95%% below %s | maximum %s\n", q(.5), q(.95), q(1))
 	return nil
 }
 
 // rePseudoShape: what has the shape of an llm-dlp pseudonym (to count what was left).
-var rePseudoShape = regexp.MustCompile(`p\.[a-z2-7]{8}@d[a-z2-7]{4}\.invalid|\bh[a-z2-7]{8}\.invalid|\b[a-z]{1,5}_[a-z2-7]{8}\b|\b(?:[A-Z]{2,12}|[a-z]{2,12}|[A-Z][a-z]{1,11})-[a-z2-7]{8}\b|[Pp]essoa [a-z2-7]{8}|PESSOA [A-Z2-7]{8}`)
+var rePseudoShape = regexp.MustCompile(`p\.[a-z2-7]{8}@d[a-z2-7]{4}\.invalid|\bh[a-z2-7]{8}\.invalid|\b[a-z]{1,5}_[a-z2-7]{8}\b|\b(?:[A-Z]{2,12}|[a-z]{2,12}|[A-Z][a-z]{1,11})-[a-z2-7]{8}\b|[Pp]erson [a-z2-7]{8}|PERSON [A-Z2-7]{8}`)
 
 // lastUse: the last tool call (tool_use) in the message contents.
 func lastUse(contentList []any) map[string]any {

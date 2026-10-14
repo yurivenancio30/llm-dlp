@@ -62,7 +62,7 @@ func Key(path string) ([]byte, error) {
 	}
 	k, err := base64.StdEncoding.DecodeString(strings.TrimSpace(string(b)))
 	if err != nil || len(k) != 32 {
-		return nil, fmt.Errorf("chave inválida em %s", path)
+		return nil, fmt.Errorf("invalid key at %s", path)
 	}
 	return k, nil
 }

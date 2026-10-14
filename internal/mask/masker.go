@@ -112,7 +112,7 @@ func NewMasker(cfg config.Config, key []byte, people *People, seenSet *Seen) (*M
 					"sensitive", "name", "quasi":
 					m.vocab.class[t] = ce.Type
 				default:
-					return nil, fmt.Errorf("campos_extras: tipo desconhecido %q", ce.Type)
+					return nil, fmt.Errorf("extra_fields: unknown type %q", ce.Type)
 				}
 			}
 		}
@@ -120,7 +120,7 @@ func NewMasker(cfg config.Config, key []byte, people *People, seenSet *Seen) (*M
 	for _, pe := range cfg.ExtraPatterns {
 		re, err := regexp.Compile(pe.Regex)
 		if err != nil {
-			return nil, fmt.Errorf("padrão extra %q: %w", pe.Label, err)
+			return nil, fmt.Errorf("extra pattern %q: %w", pe.Label, err)
 		}
 		m.extras = append(m.extras, re)
 		m.extraLabel = append(m.extraLabel, pe.Label)

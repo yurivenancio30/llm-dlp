@@ -82,7 +82,7 @@ type requiredError struct{ error }
 
 func New(cfg config.Config, m *mask.Masker, seenSet *mask.Seen, logger *log.Logger) *Proxy {
 	media := NewMedia(cfg, m)
-	media.Warning = func(msg string) { logger.Printf("AVISO %s", msg) }
+	media.Warning = func(msg string) { logger.Printf("WARNING %s", msg) }
 	return &Proxy{cfg: cfg, m: m, media: media, seenSet: seenSet, log: logger, start: time.Now(),
 		client: &http.Client{Transport: &http.Transport{Proxy: http.ProxyFromEnvironment, DisableCompression: true,
 			DialContext:       (&net.Dialer{Timeout: 15 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
@@ -110,7 +110,7 @@ func (p *Proxy) WithSwap(swap bool) *Proxy {
 
 func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if !Local(r) {
-		p.log.Printf("RECUSADO %s %s: não veio de um programa local (Host %q, Origin %q)", r.Method, cleaned(r.URL.Path),
+		p.log.Printf("REFUSED %s %s: did not come from a local program (Host %q, Origin %q)", r.Method, cleaned(r.URL.Path),
 			cleaned(r.Host), cleaned(r.Header.Get("Origin")))
 		refuseNonLocal(w)
 		return
@@ -132,7 +132,7 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			// the conversation (even masked) belongs only to whoever reads the key: use the
 			// "llm-dlp last" command
 			w.WriteHeader(http.StatusForbidden)
-			w.Write([]byte(`{"erro":"use o comando: llm-dlp last"}` + "\n"))
+			w.Write([]byte(`{"error":"use the command: llm-dlp last"}` + "\n"))
 			return
 		}
 		if b := p.lastConv.Load(); b != nil {
@@ -147,7 +147,7 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	body, err := io.ReadAll(io.LimitReader(r.Body, 512<<20))
 	if err != nil {
-		p.refuse(w, r, "não consegui ler a requisição")
+		p.refuse(w, r, "could not read the request")
 		return
 	}
 	format, upstream, uri := p.destination(r)
@@ -162,7 +162,7 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				p.refuse(w, r, err.Error())
 				return
 			}
-			p.log.Printf("AVISO %s %s: enviado sem máscara (%v)", r.Method, cleaned(r.URL.Path), err)
+			p.log.Printf("WARNING %s %s: sent unmasked (%v)", r.Method, cleaned(r.URL.Path), err)
 			unmasked = true
 		} else {
 			body, entries, batch = newOne, ents, l
@@ -180,7 +180,7 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	target := strings.TrimRight(upstream, "/") + uri
 	req, err := http.NewRequestWithContext(r.Context(), r.Method, target, bytes.NewReader(body))
 	if err != nil {
-		p.refuse(w, r, "url inválida")
+		p.refuse(w, r, "invalid url")
 		return
 	}
 	for k, vs := range r.Header {
@@ -199,8 +199,8 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if errors.As(err, &ue) {
 			err = ue.Err
 		}
-		http.Error(w, "llm-dlp: falha ao contatar a API: "+err.Error(), http.StatusBadGateway)
-		p.log.Printf("ERRO %s %s: upstream: %v", r.Method, cleaned(r.URL.Path), err)
+		http.Error(w, "llm-dlp: failed to reach the API: "+err.Error(), http.StatusBadGateway)
+		p.log.Printf("ERROR %s %s: upstream: %v", r.Method, cleaned(r.URL.Path), err)
 		return
 	}
 	if batch != nil {
@@ -252,12 +252,12 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		p.seenSet.SaveIfDirty()
 	}
 	p.m.Persist()
-	p.log.Printf("%s %s -> %d | %d substituições | %d colisões | mascarar %s | total %s%s%s%s%s%s", r.Method, cleaned(r.URL.Path), resp.StatusCode,
+	p.log.Printf("%s %s -> %d | %d replacements | %d collisions | mask %s | total %s%s%s%s%s%s", r.Method, cleaned(r.URL.Path), resp.StatusCode,
 		len(entries), tab.Conflicts, tMask.Round(time.Millisecond), time.Since(t0).Round(time.Millisecond), byType(entries),
 		collided(tab), notUndone(tab), apiError, errSuffix(err))
 }
 
-// byType: how many distinct values of each type were masked (" | tipos: cpf 2, ip 1, tabela 5"),
+// byType: how many distinct values of each type were masked (" | types: cpf 2, ip 1, table 5"),
 // from most to least frequent. Counts only: no value goes to the log.
 func byType(es []mask.Entry) string {
 	seenSet, n := map[string]bool{}, map[string]int{}
@@ -277,7 +277,7 @@ func byType(es []mask.Entry) string {
 	}
 	sort.Slice(ts, func(i, j int) bool { return n[ts[i]] > n[ts[j]] || n[ts[i]] == n[ts[j]] && ts[i] < ts[j] })
 	var b strings.Builder
-	b.WriteString(" | tipos:")
+	b.WriteString(" | types:")
 	for i, t := range ts {
 		if i > 0 {
 			b.WriteByte(',')
@@ -295,17 +295,17 @@ func notUndone(tab *mask.Table) string {
 	if len(nd) == 0 {
 		return ""
 	}
-	return fmt.Sprintf(" | NÃO DESFEITOS %d: %s", len(nd), strings.Join(nd, ", "))
+	return fmt.Sprintf(" | NOT UNDONE %d: %s", len(nd), strings.Join(nd, ", "))
 }
 
-// collided: the pseudonyms that collided (" | colididos: CPF-x, 240.1.2.x"): the form of each one
+// collided: the pseudonyms that collided (" | collided: CPF-x, 240.1.2.x"): the form of each one
 // tells the type of the data that was left without unmasking.
 func collided(tab *mask.Table) string {
 	c := tab.Collided()
 	if len(c) == 0 {
 		return ""
 	}
-	return " | colididos: " + strings.Join(c, ", ")
+	return " | collided: " + strings.Join(c, ", ")
 }
 
 // errorSummary: the type and the start of the message of an API error, as the API sent it, for the
@@ -342,15 +342,15 @@ func errorSummary(b []byte) string {
 
 func errSuffix(err error) string {
 	if err != nil {
-		return " | erro: " + err.Error()
+		return " | error: " + err.Error()
 	}
 	return ""
 }
 
 func (p *Proxy) refuse(w http.ResponseWriter, r *http.Request, reason string) {
-	p.log.Printf("RECUSADO %s %s: %s", r.Method, cleaned(r.URL.Path), reason)
+	p.log.Printf("REFUSED %s %s: %s", r.Method, cleaned(r.URL.Path), reason)
 	w.Header().Set("content-type", "application/json")
 	w.WriteHeader(http.StatusBadGateway)
 	json.NewEncoder(w).Encode(map[string]any{"type": "error", "error": map[string]string{
-		"type": "llm_dlp_error", "message": "llm-dlp: requisição bloqueada por segurança (" + reason + "). Nada foi enviado à API."}})
+		"type": "llm_dlp_error", "message": "llm-dlp: request blocked for safety (" + reason + "). Nothing was sent to the API."}})
 }
