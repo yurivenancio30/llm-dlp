@@ -111,7 +111,7 @@ func TestMeasurePublicCorpus(t *testing.T) {
 		tot += n
 	}
 	sort.Strings(ls)
-	if os.Getenv("LLM_DLP_AMOSTRA") != "" { // only in the public corpus (never in the sessions): examples per rule
+	if os.Getenv("LLM_DLP_SAMPLE") != "" { // only in the public corpus (never in the sessions): examples per rule
 		for k, vs := range c.values {
 			var xs []string
 			for v := range vs {
@@ -144,9 +144,9 @@ func publicIdentifiers(dirs []string) map[string]bool {
 }
 
 func TestMeasureRealSessions(t *testing.T) {
-	dir, corpus := os.Getenv("LLM_DLP_SESSOES"), os.Getenv("LLM_DLP_CORPUS")
+	dir, corpus := os.Getenv("LLM_DLP_SESSIONS"), os.Getenv("LLM_DLP_CORPUS")
 	if dir == "" || corpus == "" {
-		t.Skip("LLM_DLP_SESSOES e LLM_DLP_CORPUS não definidos")
+		t.Skip("LLM_DLP_SESSIONS e LLM_DLP_CORPUS não definidos")
 	}
 	pub := publicIdentifiers(strings.Split(corpus, ":"))
 	var files []string

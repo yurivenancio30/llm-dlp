@@ -6,6 +6,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"cmp"
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
@@ -42,7 +43,11 @@ func lastConv(args []string) error {
 		return err
 	}
 	// the conversation, even masked, only goes out to whoever reads the key (proxy/local.go)
-	key, err := mask.Key(config.Path("chave"))
+	kp, err := config.DataPath(config.KeyFile)
+	if err != nil {
+		return err
+	}
+	key, err := mask.Key(kp)
 	if err != nil {
 		return err
 	}
@@ -285,10 +290,12 @@ func simulate(args []string) error {
 		if err != nil {
 			return err
 		}
-		if b, err := os.ReadFile(config.Path("pessoas.json")); err == nil {
-			os.WriteFile(tmp+"/pessoas.json", b, 0o600)
+		if p, err := config.DataPath(config.PeopleFile); err != nil {
+			return err
+		} else if b, err := os.ReadFile(p); err == nil {
+			os.WriteFile(tmp+"/"+config.PeopleFile, b, 0o600)
 		}
-		ps, _ := mask.LoadPeople(tmp + "/pessoas.json")
+		ps, _ := mask.LoadPeople(tmp + "/" + config.PeopleFile)
 		m, err := mask.NewMasker(cfg, key, ps, nil)
 		if err != nil {
 			os.RemoveAll(tmp)
@@ -521,7 +528,7 @@ func simulateSession(file string, cfg config.Config, m *mask.Masker, limitN, win
 		sent := noReasoning(env.Messages)
 		reals := map[string]string{}
 		for _, t := range allTexts(msgs) {
-			if os.Getenv("LLM_DLP_DEPURAR") == "2" {
+			if debugLevel() == "2" {
 				for _, a := range m.Detect(t) {
 					if a.Type == "user" || a.Type == "name" {
 						i0 := max(0, a.Start-40)
@@ -551,7 +558,7 @@ func simulateSession(file string, cfg config.Config, m *mask.Masker, limitN, win
 		foundIt := false
 		for real, typ := range reals {
 			if strings.Contains(sent, real) {
-				if os.Getenv("LLM_DLP_DEPURAR") != "" {
+				if debugLevel() != "" {
 					i := strings.Index(sent, real)
 					a, b := max(0, i-24), min(len(sent), i+len(real)+12)
 					shape := func(t string) string {
@@ -760,3 +767,6 @@ func allTexts(msgs []any) []string {
 	}
 	return out
 }
+
+// debugLevel: LLM_DLP_DEBUG (or LLM_DLP_DEPURAR, its name up to 0.9) for simulate's detail.
+func debugLevel() string { return cmp.Or(os.Getenv("LLM_DLP_DEBUG"), os.Getenv("LLM_DLP_DEPURAR")) }

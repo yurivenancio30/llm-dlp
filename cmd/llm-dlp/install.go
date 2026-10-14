@@ -156,11 +156,15 @@ In two steps (OCR and lock) it uses sudo: your password will be asked at that ti
 			return err
 		}
 	}
-	if _, err := mask.Key(config.Path("chave")); err != nil {
+	kp, err := config.DataPath(config.KeyFile)
+	if err != nil {
+		return err
+	}
+	if _, err := mask.Key(kp); err != nil {
 		return err
 	}
 	fmt.Printf("\n      ✓ configuration: %s (internal domains: %d, protected names: %d)\n", config.Path("config.json"), len(cfg.InternalDomains), countTerms(cfg))
-	fmt.Printf("      ✓ key: %s — keep a copy in your password manager\n", config.Path("chave"))
+	fmt.Printf("      ✓ key: %s — keep a copy in your password manager\n", kp)
 
 	// 3. OCR
 	step(3, "OCR of images and PDFs", "with OCR, screenshots and PDFs have the sensitive data covered before going out. Without it, they are not sent (Claude gets a notice in their place).")

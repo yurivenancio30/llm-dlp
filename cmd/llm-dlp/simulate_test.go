@@ -46,7 +46,7 @@ func outputOf(t *testing.T, f func() error) string {
 func TestSimulateReadsSubagent(t *testing.T) {
 	t.Setenv("LLM_DLP_HOME", t.TempDir())
 	cfg := config.Default()
-	key, err := mask.Key(config.Path("chave"))
+	key, err := mask.Key(config.Path(config.KeyFile))
 	if err != nil {
 		t.Fatal(err)
 	}

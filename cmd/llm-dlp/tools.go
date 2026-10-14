@@ -89,7 +89,7 @@ func importPeople(args []string) error {
 	}
 	// what already went out to the API stays frozen (see memory_sent.go); with new names, the
 	// history is masked again, with them
-	os.Remove(config.Path("enviados.log"))
+	os.Remove(config.Path(config.SentFile))
 	fmt.Printf("%d lines read; known name variants: %d (before: %d). Nothing in plain text was written.\n",
 		lines, people.Total(), before)
 	// the proxy reads the registry on start: restart it so the new names apply right away

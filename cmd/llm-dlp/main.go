@@ -149,15 +149,21 @@ func loadAll() (config.Config, []byte, *mask.People, *mask.Seen, *mask.Masker, e
 	if err != nil {
 		return cfg, nil, nil, nil, nil, fmt.Errorf("config: %w", err)
 	}
-	key, err := mask.Key(config.Path("chave"))
+	var paths [3]string
+	for i, name := range []string{config.KeyFile, config.PeopleFile, config.SeenFile} {
+		if paths[i], err = config.DataPath(name); err != nil {
+			return cfg, nil, nil, nil, nil, err
+		}
+	}
+	key, err := mask.Key(paths[0])
 	if err != nil {
 		return cfg, nil, nil, nil, nil, err
 	}
-	people, err := mask.LoadPeople(config.Path("pessoas.json"))
+	people, err := mask.LoadPeople(paths[1])
 	if err != nil {
 		return cfg, nil, nil, nil, nil, err
 	}
-	seenSet, err := mask.LoadSeen(config.Path("vistos.json"))
+	seenSet, err := mask.LoadSeen(paths[2])
 	if err != nil {
 		return cfg, nil, nil, nil, nil, err
 	}

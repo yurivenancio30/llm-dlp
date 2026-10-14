@@ -25,17 +25,50 @@ type People struct {
 	codeCache  sync.Map // word -> is it someone's code? (RAM only)
 	nCodeCache atomic.Int64
 	disk       fileFingerprint // the file as this process left it (see Seen.disk)
-	D          struct {
-		Names  map[string]string `json:"nomes"`   // id(nome) -> pid
-		Emails map[string]string `json:"emails"`  // id(email) -> pid
-		Codes  map[string]string `json:"codigos"` // id(code) -> pid
-		// id(first name): a cheap filter to find names in any spelling ("joão silva", "JOAO SILVA")
-		// without testing every word sequence of the text
-		FirstNames map[string]bool `json:"primeiros"`
-		// lengths of the user codes: a cheap filter (only words of these lengths are checked).
-		// Empty in old registries: then every word is checked.
-		CodeLengths map[int]bool `json:"tam_codigos,omitempty"`
+	D          peopleData
+}
+
+type peopleData struct {
+	Names  map[string]string `json:"names"`  // id(name) -> pid
+	Emails map[string]string `json:"emails"` // id(email) -> pid
+	Codes  map[string]string `json:"codes"`  // id(code) -> pid
+	// id(first name): a cheap filter to find names in any spelling ("joão silva", "JOAO SILVA")
+	// without testing every word sequence of the text
+	FirstNames map[string]bool `json:"first_names"`
+	// lengths of the user codes: a cheap filter (only words of these lengths are checked).
+	// Empty in old registries: then every word is checked.
+	CodeLengths map[int]bool `json:"code_lengths,omitempty"`
+}
+
+// UnmarshalJSON also reads the field names of the registry written up to 0.9 (pessoas.json, copied
+// to people.json by config.DataPath).
+func (d *peopleData) UnmarshalJSON(b []byte) error {
+	type plain peopleData
+	if err := json.Unmarshal(b, (*plain)(d)); err != nil {
+		return err
 	}
+	var old struct {
+		Names       map[string]string `json:"nomes"`
+		Codes       map[string]string `json:"codigos"`
+		FirstNames  map[string]bool   `json:"primeiros"`
+		CodeLengths map[int]bool      `json:"tam_codigos"`
+	}
+	if err := json.Unmarshal(b, &old); err != nil {
+		return err
+	}
+	if len(d.Names) == 0 && len(old.Names) > 0 {
+		d.Names = old.Names
+	}
+	if len(d.Codes) == 0 && len(old.Codes) > 0 {
+		d.Codes = old.Codes
+	}
+	if len(d.FirstNames) == 0 && len(old.FirstNames) > 0 {
+		d.FirstNames = old.FirstNames
+	}
+	if len(d.CodeLengths) == 0 && len(old.CodeLengths) > 0 {
+		d.CodeLengths = old.CodeLengths
+	}
+	return nil
 }
 
 func LoadPeople(path string) (*People, error) {

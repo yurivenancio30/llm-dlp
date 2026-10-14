@@ -67,8 +67,8 @@ func readCorpus(p string, gz bool) ([]byte, error) {
 }
 
 func TestGeneratePublicRef(t *testing.T) {
-	if os.Getenv("LLM_DLP_GERAR_REF") == "" || os.Getenv("LLM_DLP_CORPUS") == "" {
-		t.Skip("LLM_DLP_GERAR_REF e LLM_DLP_CORPUS não definidos")
+	if os.Getenv("LLM_DLP_GEN_REF") == "" || os.Getenv("LLM_DLP_CORPUS") == "" {
+		t.Skip("LLM_DLP_GEN_REF e LLM_DLP_CORPUS não definidos")
 	}
 	dirs := strings.Split(os.Getenv("LLM_DLP_CORPUS"), ":")
 	names := map[string]map[string]bool{} // palavra -> projetos

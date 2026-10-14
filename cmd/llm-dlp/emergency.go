@@ -24,7 +24,7 @@ import (
 // without it precisely to fix llm-dlp. Emergency replaces the proxy with a pass-through WITHOUT
 // masking, for a limited time.
 //
-// Only the administrator turns it on (sudo): the state lives in dirEmergencia, which only root
+// Only the administrator turns it on (sudo): the state lives in emergencyDir, which only root
 // writes. The proxy runs as the user and only READS that file. So nothing running as your user —
 // including the agent, induced by a malicious page — can turn emergency on. (If your sudo does not
 // ask for a password, this barrier does not exist. The configuration does not have this barrier:
@@ -32,38 +32,55 @@ import (
 //
 // The pass-through does not load config/key/detectors: it works even if that is what broke.
 
-// dirEmergencia is fixed in the production binary. Tests change it via -ldflags "-X
-// main.dirEmergencia=..." (on purpose it is NOT an environment variable: the agent could restart
+// emergencyDir is fixed in the production binary. Tests change it via -ldflags "-X
+// main.emergencyDir=..." (on purpose it is NOT an environment variable: the agent could restart
 // the proxy pointing to a folder it controls).
-var dirEmergencia = "/etc/llm-dlp"
+var emergencyDir = "/etc/llm-dlp"
 
 const defaultEmergencyDuration = 30 * time.Minute
 
+// emergencyState: the deadline, also under "ate", the name versions up to 0.9 read.
 type emergencyState struct {
-	Until time.Time `json:"ate"`
+	Until time.Time `json:"until"`
+	Ate   time.Time `json:"ate"`
 }
 
-func emergencyFile() string { return filepath.Join(dirEmergencia, "emergencia.json") }
+// emergencyFiles: the state file and the one with the name up to 0.9. Emergency is written to both
+// and turned off in both: whichever version is online (during an update or after going back) sees it.
+func emergencyFiles() []string {
+	return []string{filepath.Join(emergencyDir, "emergency.json"), filepath.Join(emergencyDir, "emergencia.json")}
+}
 
 func emergencyActive() (time.Time, bool) {
-	b, err := os.ReadFile(emergencyFile())
-	if err != nil {
-		return time.Time{}, false
+	for _, f := range emergencyFiles() {
+		b, err := os.ReadFile(f)
+		if err != nil {
+			continue
+		}
+		var e emergencyState
+		if json.Unmarshal(b, &e) != nil {
+			continue
+		}
+		until := e.Until
+		if until.IsZero() {
+			until = e.Ate
+		}
+		if time.Now().Before(until) {
+			return until, true
+		}
 	}
-	var e emergencyState
-	if json.Unmarshal(b, &e) != nil || time.Now().After(e.Until) {
-		return time.Time{}, false
-	}
-	return e.Until, true
+	return time.Time{}, false
 }
 
 func emergency(args []string) error {
 	if os.Geteuid() != 0 {
 		return errors.New("emergency mode turns masking off, so only the administrator turns it on. Run: sudo llm-dlp emergency [30m|off]")
 	}
-	if len(args) > 0 && (args[0] == "off" || args[0] == "sair") {
-		if err := os.Remove(emergencyFile()); err != nil && !errors.Is(err, os.ErrNotExist) {
-			return err
+	if len(args) > 0 && (args[0] == "off" || args[0] == "sair") { // ("sair": the old name)
+		for _, f := range emergencyFiles() {
+			if err := os.Remove(f); err != nil && !errors.Is(err, os.ErrNotExist) {
+				return err
+			}
 		}
 		fmt.Println("emergency mode ended; within 2 seconds the normal proxy (with masking) is back.")
 		return nil
@@ -89,12 +106,15 @@ Type UNLOCK to continue: `, dur)
 	if strings.TrimSpace(line) != "UNLOCK" {
 		return errors.New("canceled")
 	}
-	if err := os.MkdirAll(dirEmergencia, 0o755); err != nil {
+	if err := os.MkdirAll(emergencyDir, 0o755); err != nil {
 		return err
 	}
-	b, _ := json.Marshal(emergencyState{Until: time.Now().Add(dur)})
-	if err := os.WriteFile(emergencyFile(), b, 0o644); err != nil {
-		return err
+	until := time.Now().Add(dur)
+	b, _ := json.Marshal(emergencyState{Until: until, Ate: until})
+	for _, f := range emergencyFiles() {
+		if err := os.WriteFile(f, b, 0o644); err != nil {
+			return err
+		}
 	}
 	fmt.Printf("on until %s (within 2 seconds the unmasked pass-through takes over). After that, the normal proxy comes back by itself.\n",
 		time.Now().Add(dur).Format("15:04"))

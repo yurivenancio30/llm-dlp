@@ -3561,7 +3561,7 @@ outras regras, `broker1` num `bootstrap.servers` continua nome.
 cabeçalho de cada arquivo diz de onde, quando e com que critério foi gerado:
 
 ```
-LLM_DLP_GERAR_REF=1 LLM_DLP_CORPUS=~/go/pkg/mod:/usr/lib/python3.10:/usr/share/doc:... \
+LLM_DLP_GEN_REF=1 LLM_DLP_CORPUS=~/go/pkg/mod:/usr/lib/python3.10:/usr/share/doc:... \
   go test ./internal/mask -run TestGerarRefPublica -v
 ```
 

@@ -48,7 +48,7 @@ func TestHealthRequiresProof(t *testing.T) {
 	// the real llm-dlp, with the key of the same folder, passes
 	var h http.Handler
 	cfg = onPort(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { h.ServeHTTP(w, r) }))
-	key, err := mask.Key(config.Path("chave"))
+	key, err := mask.Key(config.Path(config.KeyFile))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,9 +76,9 @@ func TestHealthRequiresProof(t *testing.T) {
 
 // Saying "I am in emergency" only counts if the file the administrator writes says the same.
 func TestHealthEmergencyOnlyWithFile(t *testing.T) {
-	before := dirEmergencia
-	dirEmergencia = t.TempDir()
-	defer func() { dirEmergencia = before }()
+	before := emergencyDir
+	emergencyDir = t.TempDir()
+	defer func() { emergencyDir = before }()
 	cfg := onPort(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]any{"ok": true, "servico": "llm-dlp", "modo": "emergencia"})
 	}))
@@ -86,7 +86,7 @@ func TestHealthEmergencyOnlyWithFile(t *testing.T) {
 		t.Fatalf("emergência sem o arquivo do administrador passou: ok=%v", ok)
 	}
 	b, _ := json.Marshal(emergencyState{Until: time.Now().Add(time.Hour)})
-	if err := os.WriteFile(filepath.Join(dirEmergencia, "emergencia.json"), b, 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(emergencyDir, "emergencia.json"), b, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if _, ok := health(cfg); !ok {

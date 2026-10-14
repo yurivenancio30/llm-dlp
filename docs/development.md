@@ -9,7 +9,7 @@ make version  # version and commit of the code
 
 # load tests (minutes): memory with 1.2 GB of text, pathological inputs, 16 conversations
 # in parallel, abandoned responses, API down, 32 MB request
-LLM_DLP_ESTRESSE=1 go test ./... -run Estresse -v -timeout 60m
+LLM_DLP_STRESS=1 go test ./... -run Stress -v -timeout 60m
 ```
 
 Versions and releasing: [versioning.md](versioning.md). How to contribute:
@@ -312,11 +312,11 @@ model.
 |---|---|---|
 | Automatic suite | Each detector, round trip, streaming, and each kind of data at every cut position of a large text | `make test` |
 | Reader variations | Each case of each reader in every spelling variation (letter case, spaces, quoting, comments, punctuation, 2–4 parts, `$ # -` and accents, several on a line, inside JSON), plus prose with SQL between backticks | `go test ./internal/mask -run Variacoes` |
-| Load and stress | Memory with 1.2 GB of text, 120 thousand learned values, conversations in parallel, API down, 32 MB request | `LLM_DLP_ESTRESSE=1 go test ./... -run Estresse` |
+| Load and stress | Memory with 1.2 GB of text, 120 thousand learned values, conversations in parallel, API down, 32 MB request | `LLM_DLP_STRESS=1 go test ./... -run Stress` |
 | Real sessions | Replays an old Claude Code session through llm-dlp, against a local fake API (nothing leaves the machine), and checks refusals, round trip (of the text and of the tool calls the model writes: what goes to a generated file or to the terminal), cache and time | `llm-dlp simulate SESSAO.jsonl` |
 | Transport matrix | Each content (catalog, connection, Snowflake config, manifest, buckets, ORM) in 15 layouts (CSV, `;`, TAB, `\|`, box, fixed width, borders, tuples, HTML, vertical, JSON, JSONL, `k=v`, loose column, `uniq -c`) and 11 transports (raw, Read, `cat -n`, `grep -n`, diff, markdown, escaped JSON, ANSI, CRLF, quotation, log): the same names masked in every cell (target 95%) and an exact round trip; the negatives have nothing masked in any cell | `go test ./internal/mask -run Matriz -v` |
 | Fuzzing | The normalization map, the round trip through the readers and the SQL scan against the regexes it replaced | `go test ./internal/mask -run '^$' -fuzz FuzzIdaVolta -fuzztime 60s` (and `FuzzNormalizar`, `FuzzVarreduraSQL`) |
-| False positives | Per rule: findings in a public corpus (third-party code and documentation) and, in real sessions, how many learned names exist in the public corpus (limit 2%). Counts only; test key and configuration | `LLM_DLP_CORPUS=dir1:dir2 go test ./internal/mask -run MedirCorpus -v` and, with `LLM_DLP_SESSOES=~/.claude/projects`, `-run MedirSessoes` |
+| False positives | Per rule: findings in a public corpus (third-party code and documentation) and, in real sessions, how many learned names exist in the public corpus (limit 2%). Counts only; test key and configuration | `LLM_DLP_CORPUS=dir1:dir2 go test ./internal/mask -run MedirCorpus -v` and, with `LLM_DLP_SESSIONS=~/.claude/projects`, `-run MedirSessoes` |
 | Real use | The actual Claude Code, in everyday scenarios (CSV, spreadsheet, secrets, log, pasted text, screenshot, SQL, web search, subagent), with fictitious data and a spy recording what reaches the API | Manual (see below) |
 
 In the real-use test, each scenario runs twice, directly and through llm-dlp, to compare.

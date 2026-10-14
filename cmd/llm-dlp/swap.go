@@ -37,11 +37,18 @@ import (
 // A version older than this one (its supervisor does not hold the port nor know SIGHUP) is swapped
 // another way: a new supervisor with --assumir waits for the port, the old one is stopped, and the
 // port is empty only for the milliseconds between one closing and the other opening.
+//
+// Protocol between versions: one version's supervisor starts and re-executes the other's binary, and
+// one version's update reads what the other's supervisor wrote. So these names stay the ones every
+// version since 0.8 knows, in Portuguese, and are not to be renamed: the commands "servir" and
+// "supervisionar", the option --assumir, the environment variables below, the files troca.estado and
+// supervisor.esperando and the "falhou: " in troca.estado (and, in service.go and the proxy, the path
+// /__llm-dlp/saude and the fields of its answer).
 
 const (
 	envPort    = "LLM_DLP_PORTA_FD"  // the proxy receives the port from the supervisor on fd 3
 	envReady   = "LLM_DLP_PRONTO_FD" // and notifies on fd 4 when it is already serving
-	envInherit = "LLM_DLP_HERANCA"   // supervisor reexecutado: "porta trava proxy drenando"
+	envInherit = "LLM_DLP_HERANCA"   // re-executed supervisor: "port lock proxy draining"
 
 	stopDeadline = 3 * time.Second  // stop: whatever can be finished in a few seconds (stop waits 5)
 	swapDeadline = 10 * time.Minute // swap: the new version is already serving; long responses finish
@@ -349,7 +356,7 @@ func swapProxy(me string, port int, lock *os.File, old *childProxy, lg *log.Logg
 		}
 	}
 	if err != nil {
-		lg.Printf("supervisor: troca desfeita: %v", err)
+		lg.Printf("supervisor: swap undone: %v", err)
 		os.WriteFile(state, []byte("falhou: "+err.Error()), 0o600)
 		return old
 	}

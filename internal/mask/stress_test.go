@@ -18,8 +18,8 @@ import (
 //
 //	LLM_DLP_STRESS=1 go test ./internal/mask -run Stress -v -timeout 60m
 func stressOnly(t *testing.T) {
-	if os.Getenv("LLM_DLP_ESTRESSE") == "" {
-		t.Skip("defina LLM_DLP_ESTRESSE=1 para rodar")
+	if os.Getenv("LLM_DLP_STRESS") == "" {
+		t.Skip("defina LLM_DLP_STRESS=1 para rodar")
 	}
 }
 

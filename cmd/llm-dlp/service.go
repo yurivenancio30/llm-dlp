@@ -44,10 +44,11 @@ func serve(args []string) error {
 	// what already went out to the API goes out the same on resends, also after this restart
 	// (cache). If the configuration or the version changed, the record starts over.
 	imp, _ := json.Marshal(cfg)
-	if err := m.UseSent(config.Path("enviados.log"), version.Complete()+"\x00"+string(imp)); err != nil {
-		lg.Printf("WARNING enviados.log: %v (the history may be rewritten in the cache once)", err)
+	if err := m.UseSent(config.Path(config.SentFile), version.Complete()+"\x00"+string(imp)); err != nil {
+		lg.Printf("WARNING %s: %v (the history may be rewritten in the cache once)", config.SentFile, err)
 	}
-	go watchEmergency(false) // if the administrator turns on emergency, it exits and the supervisor switches mode
+	os.Remove(config.Path(config.OldSentFile)) // up to 0.9; it would start over anyway
+	go watchEmergency(false)                   // if the administrator turns on emergency, it exits and the supervisor switches mode
 	px := proxy.New(cfg, m, seenSet, lg).WithKey(key).WithSwap(borrowed)
 	srv := &http.Server{Handler: px, ReadHeaderTimeout: 30 * time.Second}
 	return serveUntilSignal(srv, ln, lg, func() {
@@ -56,6 +57,9 @@ func serve(args []string) error {
 	})
 }
 
+// healthInfo: the answer of /__llm-dlp/saude. The path, the "desafio" parameter, the field names and
+// the "emergencia" mode are protocol between versions (update of one checks the health of the other,
+// see swap.go): they stay as every version since 0.8 knows them.
 type healthInfo struct {
 	OK      bool   `json:"ok"`
 	Service string `json:"servico"`
@@ -103,7 +107,11 @@ func health(cfg config.Config) (healthInfo, bool) {
 		s.WithoutProof = true
 		return s, false
 	}
-	key, err := mask.Key(config.Path("chave"))
+	kp, err := config.DataPath(config.KeyFile)
+	if err != nil {
+		return s, false
+	}
+	key, err := mask.Key(kp)
 	if err != nil || !proxy.ProofMatches(key, "saude\x00"+challenge, s.Proof) {
 		s.WithoutProof = true
 		return s, false

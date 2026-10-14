@@ -159,7 +159,7 @@ func fill(e string, n int) string {
 func TestCutsAllPositions(t *testing.T) {
 	testSizes(t, 1000, 600, 200)
 	step := 31 // sample, so the normal suite is fast; with LLM_DLP_STRESS=1, byte by byte
-	if os.Getenv("LLM_DLP_ESTRESSE") != "" {
+	if os.Getenv("LLM_DLP_STRESS") != "" {
 		step = 1
 	}
 	scanCuts(t, cutCases(), true, step, 1500, func(c cutCase, e string, pos int) string {
@@ -172,7 +172,7 @@ func TestCutsAllPositions(t *testing.T) {
 func TestCutsLooseKnownValue(t *testing.T) {
 	testSizes(t, 1000, 600, 200)
 	step := 53
-	if os.Getenv("LLM_DLP_ESTRESSE") != "" {
+	if os.Getenv("LLM_DLP_STRESS") != "" {
 		step = 3
 	}
 	// values that are remembered (those that depend on the word next to them), in the learned
@@ -204,8 +204,8 @@ func TestCutsLooseKnownValue(t *testing.T) {
 
 // With the real sizes (48 KB pieces, 8 KB margin), by sampling positions.
 func TestCutsRealSize(t *testing.T) {
-	if os.Getenv("LLM_DLP_ESTRESSE") == "" {
-		t.Skip("lento (minutos): defina LLM_DLP_ESTRESSE=1 para rodar")
+	if os.Getenv("LLM_DLP_STRESS") == "" {
+		t.Skip("lento (minutos): defina LLM_DLP_STRESS=1 para rodar")
 	}
 	step := 211
 	key4096 := "-----BEGIN RSA PRIVATE KEY-----\n" + strings.Repeat("MIIEpAIBAAKCAQEA7bq2Xk9mQ2vLp7wZt4nBc6HfG1aE5uQiOk3Jd9sLq2mXv8Rt\n", 50) + "-----END RSA PRIVATE KEY-----"
