@@ -86,7 +86,7 @@ type knownSet struct {
 	mu    sync.RWMutex
 	base  int               // how many values already left RAM (keeps the "generation" increasing)
 	reals []string          // in order of arrival; generation of the value = base + index
-	typ   map[string]string // valor exato -> tipo
+	typ   map[string]string // exact value -> type
 	seq   map[string]int    // exact value -> generation in which it was learned
 	canon map[string]string // canonical key -> type
 	// canonical key -> generation in which it was learned. It serves to redo a memoized text in

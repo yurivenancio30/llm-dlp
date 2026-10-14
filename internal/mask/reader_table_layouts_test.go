@@ -144,7 +144,7 @@ ns-financeiro    svc-conciliacao-6c8d7b9f4-k8j2m     1/1     Running   3        
 	}
 }
 
-// negativos: nada mascarado
+// negatives: nothing masked
 var tableNegatives = []struct{ name, text string }{
 	{"ls -l", `total 16
 drwxr-xr-x 2 root root 4096 Oct  5 10:11 bin

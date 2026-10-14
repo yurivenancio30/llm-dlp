@@ -61,7 +61,7 @@ var varCases = []varCase{
 	{reader: "connection", model: "urn:li:dataset:(urn:li:dataPlatform:mssql,«Q»,PROD)", parts: true, caseless: true, punct: true, several: " "},
 	// table (query result)
 	{reader: "table", model: "table_schema,table_name\n«1»,«2»\n«1»,«3»\n", spc: []string{"\t", ";", "|", " , "}, quoted: []string{`"`}, chars: varSQLNames},
-	// chave-valor
+	// key-value
 	{reader: "key-value", model: "database: «1»«c»\nschema: «2»\ntable: «3»\n", spc: varLineSpace, quoted: []string{`"`, "'"}, with: []string{"  # obs", " # obs: x"}, chars: varNames},
 	{reader: "key-value", model: "[banco]\nhost = «1»«c»\ndatabase = «2»\n", spc: varLineSpace, with: []string{" ; obs", " # obs"}, chars: []string{"srv-ped-01"}},
 	{reader: "key-value", model: "database=«1» schema=«2» table=«3»", quoted: []string{`"`, "'"}, chars: varNames},

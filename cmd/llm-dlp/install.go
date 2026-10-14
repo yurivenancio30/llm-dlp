@@ -71,8 +71,8 @@ func (e entry) confirm(msg string) bool {
 	if e.noQuestion {
 		return true
 	}
-	r := strings.ToLower(e.askIt(msg + " [s/N] "))
-	return r == "s" || r == "sim" || r == "y"
+	r := strings.ToLower(e.askIt(msg + " [y/N] "))
+	return r == "y" || r == "yes" || r == "s" || r == "sim" // s/sim: what versions up to 0.9 asked for
 }
 
 func step(n int, title, because string) {

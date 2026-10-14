@@ -17,7 +17,7 @@ import (
 // also go out masked; that breaks nothing (the return path undoes it) and is better than letting a
 // password through. Only what is clearly code or a marker stays out.
 var (
-	// chave = valor   (senha: X, DB_PASSWORD=X, "password": "X", pwd => X)
+	// key = value   (senha: X, DB_PASSWORD=X, "password": "X", pwd => X)
 	rePasswordAttr = regexp.MustCompile("(?i)(?:senha|passw(?:or)?d|pwd|secret|segredo)([\\w.\\-]*)[\"']?\\s*(?:=>|:=|=|:)\\s*[\"'`]?([^\\s\"'`,;]{4,})")
 	// sentence (a senha do sistema é X, the password is X)
 	rePasswordSentence = regexp.MustCompile("(?i)\\b(?:senha|password)\\b(?:[ \\t]+[\\p{L}_\\-]+){0,4}?[ \\t]+(?:é|eh|is|era|será)[ \\t]+[\"'`]?([^\\s\"'`,;]{6,})")

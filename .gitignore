@@ -2,8 +2,13 @@
 /dist/
 *.test
 *.out
-# nunca versionar dados locais do llm-dlp
+# never commit llm-dlp's local data (also the names up to 0.9)
+key
+people.json
+seen.json
+sent.log
 chave
 pessoas.json
 vistos.json
+enviados.log
 llm-dlp.log*

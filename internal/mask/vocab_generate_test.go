@@ -303,7 +303,7 @@ func refNamesInLine(l string, codeValue bool, fn func(v string)) {
 	}
 	ws := strings.Fields(l)
 	for i, w := range ws {
-		// --tipo valor / --tipo=valor
+		// --type value / --type=value
 		if strings.HasPrefix(w, "--") && len(w) > 3 {
 			k, v, has := strings.Cut(w[2:], "=")
 			if !has && i+1 < len(ws) {

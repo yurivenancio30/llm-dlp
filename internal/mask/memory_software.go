@@ -90,7 +90,7 @@ func softwareProofs(s string) []string {
 					name := ps[len(ps)-1]
 					add(name)
 					if len(ps) > 1 {
-						add(ps[len(ps)-2]) // org/nome (helm repo/chart, npm @org/nome, go host/org/nome)
+						add(ps[len(ps)-2]) // org/name (helm repo/chart, npm @org/name, go host/org/name)
 					}
 					if publicName(name) {
 						add(valuePieces(name)...)

@@ -258,7 +258,7 @@ func (m *Masker) class(label string) string {
 		return c.(string)
 	}
 	c := m.vocab.labelClass(label)
-	if m.nClasses.Add(1) > 20000 { // teto simples
+	if m.nClasses.Add(1) > 20000 { // simple cap
 		m.classes.Clear()
 		m.nClasses.Store(0)
 	}

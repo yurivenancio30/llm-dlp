@@ -264,7 +264,7 @@ func TestHomogeneousListNegatives(t *testing.T) {
 		"carregar(t_lanc_diario, t_saldo_mes, x_train)\n",             // function arguments
 		"t_lanc_diario\nt_saldo_mes\nresumo\npronto\n",                // without identifier shape
 		"t_lanc_diario, t_saldo_mes, relatorio_final.pdf\n",           // arquivo
-		"      12 build_cache\n       7 notas_reuniao\n       3 ok\n", // nada conhecido
+		"      12 build_cache\n       7 notas_reuniao\n       3 ok\n", // nothing known
 		"fin_contab.read_csv(arquivo)\n",                              // chamada
 	} {
 		m := newTest(t)

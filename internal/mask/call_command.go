@@ -446,7 +446,7 @@ var listingResource = map[string]string{
 // shell)
 var listingVerbs = setOf("get", "list", "ls", "ps")
 
-// listingHint: <cli> get|list|ls <tipo>, <cli> <tipo> list|ls, <cli> list-<tipo>, <cli> ps.
+// listingHint: <cli> get|list|ls <type>, <cli> <type> list|ls, <cli> list-<type>, <cli> ps.
 func listingHint(cmd string) *outputHint {
 	sgm := cmd
 	if i := strings.IndexAny(sgm, "|;&\n"); i >= 0 {
