@@ -244,6 +244,7 @@ func (m *Masker) detectBase(s string) []Finding {
 	}
 	if on("secret") {
 		m.findPasswords(s, lower, add)
+		m.findAuth(s, lower, add)
 	}
 	if on("field") {
 		m.findFields(s, add)

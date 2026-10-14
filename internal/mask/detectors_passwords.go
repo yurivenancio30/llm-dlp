@@ -31,6 +31,35 @@ var (
 
 var reFileSuffix = regexp.MustCompile(`\.\w{1,5}$`)
 
+// reCountKey: a key that holds a quantity about the password, not the password.
+var reCountKey = regexp.MustCompile(`(?i)len|size|min|max|count|attempt|tentativa|retr|expir|day|dia|age|idade|histor|digit|` +
+	`round|cost|iteration|iteracao|strength|forca|complex|polic|politica|timeout|ttl|version|versao|port|linha|line`)
+
+// numericPassword: 4 to 12 digits and nothing else (a shorter number is a line, a port, a count).
+func numericPassword(v string) bool {
+	if len(v) < 4 || len(v) > 12 {
+		return false
+	}
+	for i := 0; i < len(v); i++ {
+		if v[i] < '0' || v[i] > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+// passwordKey: the whole key around the password word (from the start of the identifier up to end).
+func passwordKey(s string, ini, end int) string {
+	for ini > 0 && (isWordByte(s[ini-1]) || s[ini-1] == '.' || s[ini-1] == '-') {
+		ini--
+	}
+	return s[ini:end]
+}
+
+func isWordByte(c byte) bool {
+	return c == '_' || c >= '0' && c <= '9' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z'
+}
+
 var notPassword = map[string]bool{"null": true, "none": true, "nil": true, "true": true, "false": true, "undefined": true,
 	"string": true, "str": true, "varchar": true, "text": true, "required": true, "optional": true}
 
@@ -65,6 +94,12 @@ func (m *Masker) findPasswords(s, lower string, add func(ini, end int, typ strin
 			ini, end := ix[len(ix)-2], ix[len(ix)-1]
 			if re == rePasswordAttr && reFileSuffix.MatchString(s[ix[2]:ix[3]]) {
 				continue // file name: "PasswordEncoder.java:123", "secrets.yaml: ..."
+			}
+			// a password of digits only ("SENHA_BANCO=4821", "pwd: 482913"), unless the key says it
+			// is a quantity of the password ("password_min_length: 8", "senha_tentativas: 3")
+			if re == rePasswordAttr && numericPassword(s[ini:ix[len(ix)-1]]) && !reCountKey.MatchString(passwordKey(s, ix[0], ix[3])) {
+				add(ini, ix[len(ix)-1], "secret")
+				continue
 			}
 			// sentence punctuation, not the password's. In a URL, no: the password goes up to the
 			// "@" (Senha!@host)
