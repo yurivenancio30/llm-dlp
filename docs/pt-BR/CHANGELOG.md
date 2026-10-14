@@ -9,6 +9,67 @@ Em cada versão: **Mascaramento** é o que passou a ser (ou deixou de ser) masca
 **Programa** é comando, instalação, configuração, desempenho e documentação; **Código** é o
 que só interessa a quem mexe no código.
 
+## [Não lançado]
+
+Mais dados passam a ser reconhecidos pelo próprio dado, cada um pela regra de quem define o
+formato (IANA e RFCs, documentação da AWS e do Kubernetes, manual do contribuinte da NF-e,
+manual do Pix do Banco Central, FEBRABAN, UPU, CNJ, IBGE, Ministério da Saúde, TSE). Testado com
+endereços inventados em IPv4, IPv6, rotas e nomes de máquina, e com documentos e frases
+inventados: o que vazava está listado abaixo.
+
+### Mascaramento
+
+- IPv4 interno também na faixa compartilhada dos provedores `100.64.0.0/10` (RFC 6598, CGNAT;
+  usada por VPNs e clusters), no nome de uma máquina (`ip-10-42-7-15.ec2.internal`, o prompt
+  `ubuntu@ip-10-42-7-15`, `10-42-7-15.default.pod.cluster.local`) e no DNS reverso
+  (`15.7.42.10.in-addr.arpa`, e a zona `/24` `7.42.10.in-addr.arpa`). O IP falso mantém o jeito
+  de escrever (hífens, ao contrário), e a mesma rede continua a mesma rede falsa.
+- IPv6 interno passa a ser mascarado sem `objects.public_ip`, como nome de servidor: local
+  único (`fd12:3456:789a:1::15`, RFC 4193), link-local com identificador de interface
+  (`fe80::1c2d:3e4f:5a6b:7c8d`, que pode vir do MAC), IPv4 interno escrito em hexadecimal
+  (`::ffff:a2a:70f`) e o nome reverso em `ip6.arpa`. Ficam `fd00::/8` numa explicação, `fe80::1`
+  e os endereços fixos da AWS (`fd00:ec2::253`, `fd00:ec2::254`).
+- Com `objects.public_ip`: o IP público no nome de uma máquina da AWS
+  (`ec2-52-14-88-21.compute-1.amazonaws.com`) e em `ip6.arpa`. A faixa de documentação da
+  RFC 9637 (`3fff::/20`) fica.
+- Chave de acesso de nota fiscal eletrônica (NF-e, NFC-e, CT-e, MDF-e), 44 dígitos com o CNPJ
+  ou CPF do emitente dentro, também em grupos de 4 e como `Id="NFe…"` no XML: só conta com UF,
+  mês, CNPJ/CPF do emitente e dígito verificador válidos. Nome do detector: `nfe`.
+- Pix copia e cola (BR Code): o código inteiro, que leva a chave Pix, o nome e a cidade de quem
+  recebe (antes só a chave era mascarada). Só conta com o CRC válido.
+- ID de recurso da AWS solto (`vpc-…`, `subnet-…`, `i-…`, `sg-…`, `eni-…` e outros), com o mesmo
+  pseudônimo que já tinha dentro de um ARN.
+- Boleto (linha digitável de 47 dígitos), conta de consumo e tributo (48 dígitos) e o código de
+  barras de 44, com os dígitos verificadores da FEBRABAN. Nome do detector: `boleto`.
+- Código de rastreio (`RR473124829BR`), com o DV da norma S10 da UPU. Nome do detector: `rastreio`.
+- Matrícula de certidão do registro civil (nascimento, casamento, óbito; 32 dígitos), pela
+  estrutura (o DV do CNJ não é publicado). Nome do detector: `certidao`.
+- Dado sensível da LGPD (art. 5º, II) no meio do texto, só o valor e só depois de uma expressão
+  que o liga a alguém: cor ou raça (`se declara parda`, `mulher negra`), religião (`é
+  evangélico`, `membro da Assembleia de Deus`), orientação sexual e identidade de gênero (`é
+  bissexual`, `identidade de gênero: mulher trans`), partido político (`filiado ao PSOL`, `vota no
+  PT`), sindicato (`sindicalizado no Sindicato dos …`), código da CID-10 depois de `CID` ou
+  `diagnóstico` (`CID F32.1, F41.0`) e template de impressão digital (ISO/IEC 19794-2 em base64).
+  Valores das listas oficiais (IBGE, Ministério da Saúde, TSE). `a tela é preta`, `a igreja
+  católica do bairro`, `o PL 2630` ficam. Nome do detector: `sensivel`.
+- Pelo nome do campo, também `identidade de gênero`, `filiação partidária`, `opinião política`,
+  `convicção religiosa`, `vida sexual`, `impressão digital`, `raça/cor`, `race`,
+  `comorbidades`.
+- RG de qualquer estado depois de `RG`, `registro geral` ou `carteira de identidade`
+  (`MG-12.345.678`, `1234567 SSP/DF`, 10 dígitos no RS): cada estado define o seu número (Lei
+  7.116/1983) e nenhum publica regra de dígito verificador, então conta pelo rótulo. Antes, só o
+  formato de São Paulo.
+
+### Programa
+
+- A linha de cada requisição no log diz também quantos valores de cada tipo foram mascarados
+  (`tipos: cpf 2, tabela 5`) e, quando acontece, os pseudônimos que chegaram ao cliente sem
+  voltar a ser o valor real (`NÃO DESFEITOS`). Só contagens e pseudônimos.
+- Comando novo `llm-dlp audit [24h|7d]`: resume o log de um período (o que foi mascarado por
+  tipo, pseudônimos que voltaram, envios sem máscara, recusas, erros da API).
+- O log troca de arquivo aos 10 MB também com o llm-dlp no ar (antes, só quando ele subia): no
+  máximo ~20 MB no disco.
+
 ## [0.9.2] - 2026-10-13
 
 Quando o llm-dlp veio da 0.7.0, o supervisor dele ficava sem `supervisor.pid`: o supervisor da

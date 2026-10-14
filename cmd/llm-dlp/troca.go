@@ -148,7 +148,7 @@ func iniciarProxy(bin string, porta int, lg *log.Logger) (*proxyFilho, *os.File,
 	}
 	defer devnull.Close()
 	saida := devnull.Fd()
-	if f, ok := lg.Writer().(*os.File); ok {
+	if f := arquivoDoLog(lg); f != nil {
 		saida = f.Fd() // o log (arquivo comum: Fd() não muda nada)
 	}
 	var env []string

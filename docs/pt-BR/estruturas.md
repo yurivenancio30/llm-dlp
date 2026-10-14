@@ -3242,7 +3242,9 @@ Código: `internal/mask/leitor_nuvem.go` (nuvem, IP público) e `leitor_endereco
 | Google Cloud | texto com `projects/`; `projects/<p>/<coleção>/<nome>` ou `projects/<p>/locations/<l>/<coleção>/<nome>` |
 | DOMINIO\usuario | texto com `\`; domínio NetBIOS (maiúsculas, dígitos, `-`; 2 a 15) antes da barra |
 | ssh/scp/sftp/rsync | o comando como palavra, e na mesma linha um argumento `usuario@host[:caminho]` |
-| IP público (opção `public_ip`) | IPv4 com 3 pontos ou IPv6 com 2+ `:` |
+| IP público (opção `public_ip`) | IPv4 com 3 pontos ou IPv6 com 2+ `:`; IPv4 com hífens no nome de uma máquina (`ec2-52-14-88-21.…`); nome reverso `…ip6.arpa` |
+| IPv6 interno (sempre) | IPv6 com 2+ `:`; nome reverso `…ip6.arpa` |
+| ID de recurso da AWS | texto com `-`; `prefixo-` + 8 ou 17 hexadecimais minúsculos, com pelo menos um dígito |
 
 ### 2. Posição → tipo de entidade
 
@@ -3260,7 +3262,9 @@ Código: `internal/mask/leitor_nuvem.go` (nuvem, IP público) e `leitor_endereco
 | Google Cloud | `topics`/`subscriptions`/`queues` → fila; `datasets` → schema; `tables` → tabela; `buckets` → bucket; demais (`instances`, `functions`, `services`...) → servico | conforme coleção | sim |
 | `DOMINIO\usuario` | usuário (o domínio fica com os outros detectores) | usuario | sim |
 | `ssh usuario@host` | usuário / host fora de domínio público e que não seja IP | usuario / servidor | sim |
-| IP público | IPv4 público ou IPv6 | servidor | sim |
+| IP público | IPv4 público ou IPv6; em `ec2-52-14-88-21.…`, o primeiro rótulo inteiro | servidor | sim |
+| IPv6 interno | local único (`fc00::/7`, RFC 4193) com Global ID diferente de zero; link-local (`fe80::/10`) com identificador de interface além dos 16 bits finais (RFC 7721: identifica a máquina); IPv4 interno em hexadecimal (`::ffff:a2a:70f`) | servidor | sim |
+| ID de recurso da AWS | `vpc-`, `subnet-`, `sg-`, `eni-`, `i-`, `vol-`, `snap-`, `rtb-`, `igw-`, `eigw-`, `nat-`, `acl-`, `vpce-`, `pcx-`, `tgw-`, `tgw-attach-`, `vgw-`, `cgw-`, `vpn-`, `dopt-`, `eipalloc-`, `eipassoc-`, `lt-`, `fl-` (prefixos dos exemplos da AWS CLI); o ID inteiro, igual ao de dentro do ARN | servico | sim |
 
 ### 3. Vocabulário público (nunca mascarar)
 
@@ -3270,7 +3274,7 @@ Código: `internal/mask/leitor_nuvem.go` (nuvem, IP público) e `leitor_endereco
 | Exemplos do Google Cloud / Azure | `my-project`, `project-id`, `my-topic`, `my-subscription`; assinatura `00000000-0000-...`; `my-resource-group` | documentação do Google Cloud e do Azure |
 | Domínios e contas do Windows | `NT AUTHORITY`, `BUILTIN`, `NT SERVICE`, `WORKGROUP`, raízes do Registro (`HKLM`, `HKCU`...); contas `SYSTEM`, `Administrator(s)`, `Guest` | Well-known SIDs (Microsoft Learn) |
 | Usuários de ssh | `root`, `git`, `ubuntu`, `ec2-user`, `admin`, `pi`... | usuários padrão de imagens |
-| IPs | `::1`, link-local, `0.0.0.0`, broadcast, multicast, faixas privadas (o detector de IP já cuida), faixas de documentação (RFC 5737: `192.0.2.0/24`, `198.51.100.0/24`, `203.0.113.0/24`; RFC 3849: `2001:db8::/32`), DNS públicos `8.8.8.8`, `8.8.4.4`, `1.1.1.1`, `1.0.0.1`, `9.9.9.9`, `208.67.222.222`, `2001:4860:4860::8888`, `2606:4700:4700::1111` | IANA Special-Purpose Address Registry |
+| IPs | `::1`, link-local, `0.0.0.0`, broadcast, multicast, faixas privadas (o detector de IP já cuida), faixas de documentação (RFC 5737: `192.0.2.0/24`, `198.51.100.0/24`, `203.0.113.0/24`; RFC 3849: `2001:db8::/32`), DNS públicos `8.8.8.8`, `8.8.4.4`, `1.1.1.1`, `1.0.0.1`, `9.9.9.9`, `208.67.222.222`, `2001:4860:4860::8888`, `2606:4700:4700::1111`; RFC 9637 (`3fff::/20`); os endereços fixos da AWS `fd00:ec2::253` (DNS) e `fd00:ec2::254` (metadados da instância); local único com Global ID zero (`fd00::/8` numa explicação) e link-local posto à mão (`fe80::1`) | IANA Special-Purpose Address Registry; documentação da AWS |
 
 ### 4. Regras de identificador
 
@@ -3282,6 +3286,8 @@ Código: `internal/mask/leitor_nuvem.go` (nuvem, IP público) e `leitor_endereco
   (`"ERRO\nfalhou"`: usuário começando por `n t r b f v a x u 0` colado a outro caractere) fica.
 - IPv4 com os três primeiros números de um dígito (`6.0.6.1`, `8.2.4.44`) é versão ou número de
   seção e fica. IPv6 precisa de 3+ `:` ou de um grupo com 3+ dígitos hexadecimais (`x[1::2]` fica).
+- ID de recurso da AWS: `ami-` e `pl-` ficam (há imagens e listas de prefixos públicas da AWS); ID
+  sem nenhum dígito entre 8 hexadecimais (`sg-deadbeef`) fica.
 
 ### 5. Exemplos antes/depois
 
@@ -3294,6 +3300,9 @@ projects/proj-exemplo-01/topics/fila-pedidos-x9         →  projects/acc_.../to
 entrou como CORPX\svc_relatorio                         →  entrou como CORPX\usr_...
 ssh -p 2222 svc_relatorio@db-exemplo-01                  →  ssh -p 2222 usr_...@host_...
 servidor em 34.120.10.5 (com ip_publico ligado)        →  servidor em HOST_...
+ec2-52-14-88-21.sa-east-1.compute.amazonaws.com (ligado) →  host_....sa-east-1.compute.amazonaws.com
+inet6 fd12:3456:789a:1::15/64                          →  inet6 host_.../64
+subnet-0f1e2d3c4b5a69788 na vpc-0a1b2c3d4e5f67890     →  svc_... na svc_...
 ```
 
 ### 6. Casos difíceis e limites

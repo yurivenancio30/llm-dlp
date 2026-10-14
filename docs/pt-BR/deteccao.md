@@ -16,10 +16,17 @@ São cinco jeitos de reconhecer um dado. Qualquer um basta.
 | Cartão | `4111 1111 1111 1111` |
 | Telefone | `(11) 98765-4321`, `+55 11 98765-4321` |
 | Endereço | `Rua das Flores, 123` |
-| IP de rede interna | `10.42.7.15`, `192.168.0.10` |
+| IP de rede interna | `10.42.7.15`, `192.168.0.10`, `100.72.5.9` (faixa compartilhada dos provedores, RFC 6598); também no nome de uma máquina (`ip-10-42-7-15.ec2.internal`, `10-42-7-15.default.pod.cluster.local`) e no DNS reverso (`15.7.42.10.in-addr.arpa`). Vira um IP falso escrito do mesmo jeito |
+| IPv6 interno | `fd12:3456:789a:1::15` (local único, RFC 4193), `fe80::1c2d:3e4f:5a6b:7c8d` (link-local com identificador de interface), `::ffff:a2a:70f` (IPv4 interno em hexadecimal), também em `…ip6.arpa`. Vira nome de servidor. Ficam `fd00::/8` escrito numa explicação, `fe80::1` e os endereços fixos da AWS (`fd00:ec2::253`, `fd00:ec2::254`) |
 | Hostname interno | `mysql.empresa.intra` (os que contêm um dos seus `internal_domains`) |
 | Conta internacional (IBAN) | `GB82 WEST 1234 5698 7654 32` |
 | Processo judicial | `0001234-56.2023.8.13.0024` |
+| Chave de acesso de nota fiscal eletrônica (NF-e, NFC-e, CT-e, MDF-e) | `3526 0911 2223 3300 0181 5500 …` (44 dígitos, com o CNPJ ou CPF do emitente dentro), também `Id="NFe3526…"` no XML |
+| Boleto e conta de consumo ou tributo | linha digitável de 47 dígitos (`10490.05505 77222.133348 …`) ou 48 (`83640000001-1 …`) e o código de barras de 44 |
+| Código de rastreio | `RR473124829BR`, `RR 473 124 829 BR` (norma S10 da UPU, usada pelos Correios) |
+| Matrícula de certidão do registro civil (nascimento, casamento, óbito) | `104539 01 55 2013 1 00012 021 0000123 12` (32 dígitos) |
+| Template de impressão digital | base64 de um registro de minúcias (ISO/IEC 19794-2, ANSI/INCITS 378: começa por `FMR\0`, `Rk1SA…`) |
+| Pix copia e cola (BR Code) | `00020126…br.gov.bcb.pix…6304XXXX`: o código inteiro (leva a chave Pix, o nome e a cidade de quem recebe) |
 | Endereço MAC | `aa:bb:cc:dd:ee:ff` |
 
 ## 2. Com a palavra por perto
@@ -29,17 +36,23 @@ Sozinhos, estes são só números, e confundiriam com IDs e datas.
 | Tipo | Exemplo |
 |---|---|
 | CPF/CNPJ sem pontuação | `cpf 52998224725` |
-| RG, CNH, PIS | `RG: 12.345.678-9`, `CNH 12345678900` |
+| RG, CNH, PIS | `RG: 12.345.678-9`, `CNH 12345678900`; o RG de qualquer estado depois de `RG`, `registro geral` ou `carteira de identidade` (`RG: MG-12.345.678`, `RG nº 1234567 SSP/DF`): cada estado define o seu número (Lei 7.116/1983) e nenhum publica regra de dígito verificador |
 | CEP | `CEP 01310-100` |
 | Agência e conta | `agência 1234-5 conta 123456-7` |
 | Chave PIX aleatória | `pix 123e4567-e89b-…` |
 | Data de nascimento | `nascimento: 12/03/1985` |
 | Título de eleitor, cartão SUS, RENAVAM | `título de eleitor 1234 5678 9012` |
 | Passaporte, placa, chassi, IMEI | `passaporte FZ123456`, `placa BRA2E19` |
+| Código da CID-10 | `CID F32.1`, `diagnóstico: F41.0`, `"cid": "Z73"` |
+| Cor ou raça, religião, orientação sexual, identidade de gênero, partido político, sindicato (dados sensíveis da LGPD) | `se declara parda`, `mulher negra`, `é evangélico`, `membro da Assembleia de Deus`, `é bissexual`, `identidade de gênero: mulher trans`, `filiado ao PSOL`, `sindicalizado no Sindicato dos …`: só o valor, e só depois de uma expressão que o liga a alguém (`a tela é preta`, `a igreja católica do bairro`, `o PL 2630` ficam). Valores das listas oficiais: IBGE (cor ou raça, religiões do Censo), Pesquisa Nacional de Saúde do IBGE e ficha do e-SUS do Ministério da Saúde (orientação sexual, identidade de gênero), dados abertos do TSE (partidos) |
 | GUID de um campo de id (um workspace, um tenant) | `workspace_id: 3fa85f64-…`, `"lakehouseId": "…"` |
 
 CPF, CNPJ, PIS, CNH, cartão, título de eleitor, cartão SUS, RENAVAM, IBAN e IMEI só contam
-se o dígito verificador for válido.
+se o dígito verificador for válido. A chave de acesso da NF-e também (e o código da UF, o mês
+e o CNPJ/CPF do emitente), e o Pix copia e cola só conta com o CRC válido. O boleto e a conta
+contam com os dígitos verificadores do leiaute da FEBRABAN, o código de rastreio com o da S10.
+A matrícula da certidão não tem DV publicado: conta pela estrutura (o serviço `55` do registro
+civil, um ano, o tipo de livro).
 
 ## 3. Pelo nome do campo
 
@@ -129,7 +142,7 @@ de cada formato estão descritas em [estruturas.md](estruturas.md). Já ligadas:
 | Terraform, Ansible, CloudFormation, ARM/Bicep, CI | Valores literais de atributos que são nomes (`name`, `bucket`, `identifier`, `*Name`…; o nome local do recurso, referências e região ficam), conta da nuvem, hosts do inventário, runners próprios. `name` de bloco aninhado só vale no bloco `metadata` (provedor do Kubernetes: `metadata { name = ... }`) |
 | Chave-valor | Em YAML, JSON, TOML, INI, `.env`, `.properties`, XML e opções `--chave valor`: o valor de uma chave cujo último pedaço indica nome de recurso (`host`, `database`, `schema`, `user`, `bucket`, `topic`, `namespace`, `service`, `repo`, `account`…). Tópico/fila com ponto (`KAFKA_TOPIC=fin.notas.emitidas`, `kafka.topic=`, `topic:`) vale quando todos os pedaços são minúsculos e nenhum é receptor ou atributo de código (`cfg.topic`), domínio público ou extensão de arquivo. Valor que é expressão de código fica |
 | Endereços e caminhos | Host interno em URL ou solto (rótulo único ou `.local`, `.internal`, `.corp`…), buckets e filas (`s3://`, `gs://`, `abfss://`, `amqp://`, `kafka://`), remotos do git (organização e repositório), pacotes internos (`go.mod`, groupId, escopo npm), usuário em `/home/usuario/` e pastas, `DOMINIO\usuario`, `ssh usuario@host` |
-| Nuvem | ARN da AWS, `/subscriptions/…` do Azure, `projects/…` do GCP: conta e recurso. IP público e IPv6 só com `objects.public_ip` ligado |
+| Nuvem | ARN da AWS, `/subscriptions/…` do Azure, `projects/…` do GCP: conta e recurso. ID de recurso da AWS solto (`vpc-…`, `subnet-…`, `i-…`, `sg-…`, `eni-…`, 8 ou 17 hexadecimais), com o mesmo pseudônimo que tem dentro do ARN. IP público (também `ec2-52-14-88-21.compute-1.amazonaws.com` e o DNS reverso) só com `objects.public_ip` ligado |
 | Código, em qualquer linguagem | O texto entre aspas ao lado de um nome que contém uma palavra de tipo (`DB_HOST = "x"`, `#define DB_NAME "x"`, `connect(host="x")`, `{ queue: 'x' }`, `'bucket' => 'x'`, `@Table(name = "x")`, `@KafkaListener(topics = "x")`, `getenv("BUCKET", "x")`, `process.env.X \|\| 'x'`), ou passado a uma função cujo nome contém a palavra de tipo (`assertQueue("x")`, `new QueueClient(c, "x")`, `createBucket("x")`, `inNamespace("x")`), também dentro de uma lista (`subscribe(List.of("x"))`). Numa chamada de conexão (`connect`, `dial`, `Redis`...), o texto seguido de um número de porta é o servidor (`connect('cache01', 6379)`). O nome da variável, da função e da classe fica |
 | Linha de comando | `-h`/`-d`/`-U`/`-S` quando o comando tem pelo menos duas delas, `-n` com um recurso ou subcomando de operação, `deploy/x`, `svc/x`, `ns/x`..., `host:/caminho` do `scp`/`rsync` |
 | Caminhos fora da pasta pessoal | Qualquer caminho absoluto com 2 ou mais níveis cujo primeiro nível (com 4 ou mais caracteres) não é diretório público do sistema nem rota web (`/dados/Relatorios/...`); `/srv`, `/opt`, `/data`, `/mnt`, `/media`, `/var/www` (cada pasta), `/var/lib`, `/var/log`, `/etc` (só pastas com cara de identificador), outras unidades (`D:\...`) e `\\servidor\compartilhamento\...`. Diretórios públicos do sistema ficam |

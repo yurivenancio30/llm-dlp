@@ -7,12 +7,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
+	"sort"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -248,8 +250,50 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		p.vistos.SalvarSeSujo()
 	}
 	p.m.Persistir()
-	p.log.Printf("%s %s -> %d | %d substituições | %d colisões | mascarar %s | total %s%s%s", r.Method, limpo(r.URL.Path), resp.StatusCode,
-		len(entradas), tab.Conflitos, tMascara.Round(time.Millisecond), time.Since(t0).Round(time.Millisecond), erroAPI, errSufixo(err))
+	p.log.Printf("%s %s -> %d | %d substituições | %d colisões | mascarar %s | total %s%s%s%s%s", r.Method, limpo(r.URL.Path), resp.StatusCode,
+		len(entradas), tab.Conflitos, tMascara.Round(time.Millisecond), time.Since(t0).Round(time.Millisecond), porTipo(entradas),
+		naoDesfeitos(tab), erroAPI, errSufixo(err))
+}
+
+// porTipo: quantos valores distintos de cada tipo foram mascarados (" | tipos: cpf 2, ip 1,
+// tabela 5"), do mais frequente ao menos. Só contagens: nenhum valor vai para o log.
+func porTipo(es []mask.Entrada) string {
+	vistos, n := map[string]bool{}, map[string]int{}
+	for _, e := range es {
+		t := strings.TrimPrefix(e.Tipo, "obj.")
+		if k := t + "\x00" + strings.ToLower(e.Real); !vistos[k] {
+			vistos[k] = true
+			n[t]++
+		}
+	}
+	if len(n) == 0 {
+		return ""
+	}
+	ts := make([]string, 0, len(n))
+	for t := range n {
+		ts = append(ts, t)
+	}
+	sort.Slice(ts, func(i, j int) bool { return n[ts[i]] > n[ts[j]] || n[ts[i]] == n[ts[j]] && ts[i] < ts[j] })
+	var b strings.Builder
+	b.WriteString(" | tipos:")
+	for i, t := range ts {
+		if i > 0 {
+			b.WriteByte(',')
+		}
+		fmt.Fprintf(&b, " %s %d", t, n[t])
+	}
+	return b.String()
+}
+
+// naoDesfeitos: os pseudônimos nossos que sobraram na resposta entregue ao cliente (o cliente,
+// e o que ele gravar em arquivo, ficaram com o pseudônimo no lugar do valor real). Pseudônimo
+// não é dado real: vai inteiro para o log, para dar para procurar onde ficou.
+func naoDesfeitos(tab *mask.Tabela) string {
+	nd := tab.NaoDesfeitos()
+	if len(nd) == 0 {
+		return ""
+	}
+	return fmt.Sprintf(" | NÃO DESFEITOS %d: %s", len(nd), strings.Join(nd, ", "))
 }
 
 // resumoDoErro: o tipo e o começo da mensagem de um erro da API, como ela mandou, para o log

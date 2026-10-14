@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"sync"
 
 	"github.com/yurivenancio30/llm-dlp/internal/config"
 	"github.com/yurivenancio30/llm-dlp/internal/mask"
@@ -38,6 +39,8 @@ Dia a dia (normalmente você não precisa de nada disto)
 
 Conferir o que é mascarado
   llm-dlp last [N]              mostra as últimas N mensagens como a API recebeu (já mascaradas)
+  llm-dlp audit [24h|7d]        resume o log do período: o que foi mascarado por tipo, pseudônimos que
+                                voltaram sem virar o valor real, envios sem máscara, recusas
   llm-dlp test < ARQ            mostra a versão mascarada de um texto
   llm-dlp test-media ARQ DIR    processa uma imagem ou PDF como o proxy e grava o resultado em DIR
   llm-dlp columns ARQ           mostra como os campos de um arquivo são entendidos
@@ -118,6 +121,8 @@ func main() {
 		err = ultima(args)
 	case "simulate":
 		err = simular(args)
+	case "audit":
+		err = auditar(args)
 	case "install":
 		err = instalar(args)
 	case "uninstall":
@@ -161,15 +166,71 @@ func carregarTudo() (config.Config, []byte, *mask.Pessoas, *mask.Vistos, *mask.M
 }
 
 func abrirLog() *log.Logger {
-	p := config.Caminho("llm-dlp.log")
-	if st, err := os.Stat(p); err == nil && st.Size() > 10<<20 {
-		os.Rename(p, p+".1")
-	}
-	f, err := os.OpenFile(p, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
-	if err != nil {
+	l := &logGirando{p: config.Caminho("llm-dlp.log")}
+	l.mu.Lock()
+	l.reabrir()
+	l.mu.Unlock()
+	if l.f == nil {
 		return log.New(os.Stderr, "", log.LstdFlags)
 	}
-	return log.New(f, "", log.LstdFlags)
+	return log.New(l, "", log.LstdFlags)
+}
+
+// maxLog: o tamanho em que o llm-dlp.log gira. Fica um só antigo (llm-dlp.log.1): no disco,
+// no máximo uns 20 MB.
+var maxLog int64 = 10 << 20
+
+// logGirando: o llm-dlp.log, que gira ao passar de maxLog a qualquer momento (antes só girava
+// quando o llm-dlp subia, e um proxy no ar por semanas fazia o arquivo crescer sem limite). Mais
+// de um processo escreve nele (supervisor e proxy): quem percebe que o outro girou reabre.
+type logGirando struct {
+	mu sync.Mutex
+	p  string
+	f  *os.File
+}
+
+func (l *logGirando) reabrir() {
+	if l.f != nil {
+		l.f.Close()
+	}
+	l.f, _ = os.OpenFile(l.p, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+}
+
+func (l *logGirando) Write(b []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	st, err := os.Stat(l.p)
+	if err == nil && st.Size()+int64(len(b)) > maxLog {
+		os.Rename(l.p, l.p+".1")
+		l.reabrir()
+	} else if fst, e := statDe(l.f); err != nil || e != nil || !os.SameFile(st, fst) {
+		l.reabrir() // outro processo girou (ou apagaram o arquivo)
+	}
+	if l.f == nil {
+		return os.Stderr.Write(b)
+	}
+	return l.f.Write(b)
+}
+
+func statDe(f *os.File) (os.FileInfo, error) {
+	if f == nil {
+		return nil, os.ErrClosed
+	}
+	return f.Stat()
+}
+
+// arquivoDoLog: o arquivo em que o log escreve agora (o supervisor o passa como saída de erro
+// do proxy, para um panic ficar registrado), ou nil.
+func arquivoDoLog(lg *log.Logger) *os.File {
+	switch w := lg.Writer().(type) {
+	case *os.File:
+		return w
+	case *logGirando:
+		w.mu.Lock()
+		defer w.mu.Unlock()
+		return w.f
+	}
+	return nil
 }
 
 func endereco(cfg config.Config) string { return "127.0.0.1:" + strconv.Itoa(cfg.Porta) }

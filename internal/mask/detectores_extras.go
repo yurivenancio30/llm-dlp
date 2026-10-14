@@ -84,6 +84,31 @@ func (m *Masker) acharExtras(s, baixo string, numLongo bool, add func(ini, fim i
 	if on("iban") {
 		acharIBAN(s, add)
 	}
+	if on("nfe") && numLongo && len(s) >= 44 {
+		acharChaveDFe(s, add)
+	}
+	if on("pix") && strings.Contains(baixo, "br.gov.bcb.pix") {
+		acharBRCode(s, add)
+	}
+	if on("boleto") && numLongo && len(s) >= 44 {
+		acharBoletos(s, add)
+	}
+	if on("rastreio") && numLongo {
+		acharRastreios(s, add)
+	}
+	if on("rg") && (strings.Contains(baixo, "rg") || strings.Contains(baixo, "r.g.") || strings.Contains(baixo, "identidade") ||
+		strings.Contains(baixo, "registro geral")) {
+		acharRGRotulo(s, add)
+	}
+	if on("certidao") && numLongo && len(s) >= 32 {
+		acharCertidoes(s, add)
+	}
+	if on("sensivel") {
+		if temCIDGatilho(baixo) {
+			acharCID(s, add)
+		}
+		acharSensiveis(s, baixo, add)
+	}
 	if !on("doc") {
 		return
 	}

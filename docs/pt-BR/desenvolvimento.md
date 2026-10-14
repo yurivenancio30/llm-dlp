@@ -89,6 +89,10 @@ dado pessoal e segredo
   detectores_formato.go     e-mail, IP, hostname, CPF, CNPJ, telefone, cartão, tokens
   detectores_senhas.go      senhas comuns
   detectores_extras.go      cabeçalho HTTP, IBAN, processo, documentos com palavra por perto
+  detectores_rede.go        IPv4 interno além da forma com pontos: faixa compartilhada, hífens, DNS reverso
+  detectores_fiscais.go     chave de acesso da NF-e, Pix copia e cola (BR Code)
+  detectores_br.go          boleto e conta, código de rastreio, matrícula de certidão, código da CID-10
+  detectores_sensiveis.go   dado sensível da LGPD no texto (listas oficiais de valores), template de digital
   detectores_validadores.go dígitos verificadores (CPF, CNPJ, título, IBAN...)
   campos_vocabulario.go     que nomes de campo guardam que dado
   campos.go                 "campo: valor", JSON, SQL INSERT, XML
@@ -119,7 +123,7 @@ nomes de recursos internos (servidor, banco, tabela, coluna, serviço, bucket...
   leitor_codigo.go          código em qualquer linguagem: o nome ao lado e a função chamada dizem o tipo
   leitor_traceback.go       traceback: o caminho da linha diz se o código é do cliente ou de terceiro
   leitor_cli.go             linha de comando
-  leitor_ip.go              IP público e IPv6 (opcional)
+  leitor_ip.go              IPv6 interno (sempre), IP público (opcional)
   leitor_termos.go          termos da empresa embutidos em identificadores
 
 o que a conversa diz

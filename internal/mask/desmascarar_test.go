@@ -183,3 +183,22 @@ func TestDominioDoEmailVolta(t *testing.T) {
 		t.Fatalf("domínio sozinho não voltou: %q", volta)
 	}
 }
+
+// Pseudônimo nosso que sobra na volta (de outra requisição, cortado, numa caixa que nenhuma
+// variante cobre) e IP da faixa falsa vão para NaoDesfeitos; texto com a mesma forma que não foi
+// gerado pelo llm-dlp, não.
+func TestNaoDesfeitos(t *testing.T) {
+	m := novoTeste(t)
+	_, outra := m.Mascarar("cpf 529.982.247-25")
+	_, esta := m.Mascarar("servidor 10.42.7.15")
+	tab := NovaTabela(esta)
+	alheio := outra[0].Pseudo
+	volta := tab.Desmascarar("o "+alheio+" no PR-features, t_abcdefgh e 245.1.2.3; "+esta[0].Pseudo, false)
+	nd := tab.NaoDesfeitos()
+	if len(nd) != 2 || nd[0] != alheio || nd[1] != "245.1.2.3" {
+		t.Errorf("não desfeitos: %q (volta %q)", nd, volta)
+	}
+	if strings.Contains(volta, esta[0].Pseudo) {
+		t.Errorf("o desta requisição não voltou: %q", volta)
+	}
+}

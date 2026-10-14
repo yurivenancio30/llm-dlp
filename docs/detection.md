@@ -20,10 +20,17 @@ keywords are recognized as well.
 | Card | `4111 1111 1111 1111` |
 | Phone | `(11) 98765-4321`, `+55 11 98765-4321` |
 | Address | `Rua das Flores, 123` |
-| Internal network IP | `10.42.7.15`, `192.168.0.10` |
+| Internal network IP | `10.42.7.15`, `192.168.0.10`, `100.72.5.9` (providers' shared range, RFC 6598); also in a machine name (`ip-10-42-7-15.ec2.internal`, `10-42-7-15.default.pod.cluster.local`) and in reverse DNS (`15.7.42.10.in-addr.arpa`). It becomes a fake IP written the same way |
+| Internal IPv6 | `fd12:3456:789a:1::15` (unique local, RFC 4193), `fe80::1c2d:3e4f:5a6b:7c8d` (link-local with an interface identifier), `::ffff:a2a:70f` (internal IPv4 in hex), also in `…ip6.arpa`. It becomes a server name. `fd00::/8` written in an explanation, `fe80::1` and the fixed AWS addresses (`fd00:ec2::253`, `fd00:ec2::254`) stay |
 | Internal hostname | `mysql.empresa.intra` (the ones containing one of your `internal_domains`) |
 | International account (IBAN) | `GB82 WEST 1234 5698 7654 32` |
 | Court case number | `0001234-56.2023.8.13.0024` |
+| Electronic invoice access key (NF-e, NFC-e, CT-e, MDF-e) | `3526 0911 2223 3300 0181 5500 …` (44 digits, with the issuer's CNPJ or CPF inside), also `Id="NFe3526…"` in the XML |
+| Bank slip (boleto) and utility/tax bill | typed line of 47 digits (`10490.05505 77222.133348 …`) or 48 (`83640000001-1 …`) and the 44-digit barcode |
+| Postal tracking code | `RR473124829BR`, `RR 473 124 829 BR` (UPU S10, used by Correios) |
+| Civil registry certificate number (birth, marriage, death) | `104539 01 55 2013 1 00012 021 0000123 12` (32 digits) |
+| Fingerprint template | base64 of a minutiae record (ISO/IEC 19794-2, ANSI/INCITS 378: starts with `FMR\0`, `Rk1SA…`) |
+| PIX copy-and-paste code (BR Code) | `00020126…br.gov.bcb.pix…6304XXXX`: the whole code (it carries the PIX key, the name and the city of who receives) |
 | MAC address | `aa:bb:cc:dd:ee:ff` |
 
 ## 2. With the word nearby
@@ -33,17 +40,23 @@ On their own these are just numbers, and would be confused with IDs and dates.
 | Type | Example |
 |---|---|
 | CPF/CNPJ without punctuation | `cpf 52998224725` |
-| RG, CNH, PIS | `RG: 12.345.678-9`, `CNH 12345678900` |
+| RG, CNH, PIS | `RG: 12.345.678-9`, `CNH 12345678900`; the RG of any state after `RG`, `registro geral` or `carteira de identidade` (`RG: MG-12.345.678`, `RG nº 1234567 SSP/DF`): each state defines its own number (Law 7.116/1983) and none publishes a check-digit rule |
 | CEP (postal code) | `CEP 01310-100` |
 | Bank branch and account | `agência 1234-5 conta 123456-7` |
 | Random PIX key | `pix 123e4567-e89b-…` |
 | Date of birth | `nascimento: 12/03/1985` |
 | Voter ID, SUS card, RENAVAM | `título de eleitor 1234 5678 9012` |
 | Passport, licence plate, chassis, IMEI | `passaporte FZ123456`, `placa BRA2E19` |
+| ICD-10 code (CID) | `CID F32.1`, `diagnóstico: F41.0`, `"cid": "Z73"` |
+| Race or colour, religion, sexual orientation, gender identity, political party, trade union (LGPD sensitive data) | `se declara parda`, `mulher negra`, `é evangélico`, `membro da Assembleia de Deus`, `é bissexual`, `identidade de gênero: mulher trans`, `filiado ao PSOL`, `sindicalizado no Sindicato dos …`: only the value, and only after an expression that ties it to someone (`a tela é preta`, `a igreja católica do bairro`, `o PL 2630` stay). Values from the official lists: IBGE (colour or race, religions of the Census), IBGE National Health Survey and the Ministry of Health e-SUS form (sexual orientation, gender identity), TSE open data (parties) |
 | GUID of an id field (a workspace, a tenant) | `workspace_id: 3fa85f64-…`, `"lakehouseId": "…"` |
 
 CPF, CNPJ, PIS, CNH, card, voter ID, SUS card, RENAVAM, IBAN and IMEI only count if the
-check digit is valid.
+check digit is valid. So does the NF-e access key (state code, month and the issuer's
+CNPJ/CPF too), and the PIX code only counts with a valid CRC. The bank slip and the bill count
+with the check digits of the FEBRABAN layout, the tracking code with the S10 one. The
+certificate number has no published check digit: it counts by its structure (the service `55`
+of the civil registry, a year, the book type).
 
 ## 3. By the field name
 
@@ -135,7 +148,7 @@ Already enabled:
 | Terraform, Ansible, CloudFormation, ARM/Bicep, CI | Literal values of attributes that are names (`name`, `bucket`, `identifier`, `*Name`…; the resource's local name, references and region stay), cloud account, inventory hosts, self-hosted runners. `name` in a nested block only counts in the `metadata` block (Kubernetes provider: `metadata { name = ... }`) |
 | Key-value | In YAML, JSON, TOML, INI, `.env`, `.properties`, XML and `--key value` options: the value of a key whose last piece indicates a resource name (`host`, `database`, `schema`, `user`, `bucket`, `topic`, `namespace`, `service`, `repo`, `account`…). A dotted topic/queue (`KAFKA_TOPIC=fin.notas.emitidas`, `kafka.topic=`, `topic:`) counts when every piece is lowercase and none is a code receiver or attribute (`cfg.topic`), a public domain or a file extension. A value that is a code expression stays |
 | Addresses and paths | Internal host in a URL or loose (single label or `.local`, `.internal`, `.corp`…), buckets and queues (`s3://`, `gs://`, `abfss://`, `amqp://`, `kafka://`), git remotes (organization and repository), internal packages (`go.mod`, groupId, npm scope), the user in `/home/user/` and folders, `DOMAIN\user`, `ssh user@host` |
-| Cloud | AWS ARN, Azure `/subscriptions/…`, GCP `projects/…`: account and resource. Public IP and IPv6 only with `objects.public_ip` on |
+| Cloud | AWS ARN, Azure `/subscriptions/…`, GCP `projects/…`: account and resource. AWS resource ID on its own (`vpc-…`, `subnet-…`, `i-…`, `sg-…`, `eni-…`, 8 or 17 hex digits), with the same pseudonym it gets inside the ARN. Public IP (also `ec2-52-14-88-21.compute-1.amazonaws.com` and reverse DNS) only with `objects.public_ip` on |
 | Code, in any language | The quoted text next to a name containing a type word (`DB_HOST = "x"`, `#define DB_NAME "x"`, `connect(host="x")`, `{ queue: 'x' }`, `'bucket' => 'x'`, `@Table(name = "x")`, `@KafkaListener(topics = "x")`, `getenv("BUCKET", "x")`, `process.env.X \|\| 'x'`), or passed to a function whose name contains the type word (`assertQueue("x")`, `new QueueClient(c, "x")`, `createBucket("x")`, `inNamespace("x")`), also inside a list (`subscribe(List.of("x"))`). In a connection call (`connect`, `dial`, `Redis`...), the text followed by a port number is the server (`connect('cache01', 6379)`). The names of the variable, the function and the class stay |
 | Command line | `-h`/`-d`/`-U`/`-S` when the command has at least two of them, `-n` with a resource or an operation subcommand, `deploy/x`, `svc/x`, `ns/x`..., `host:/path` of `scp`/`rsync` |
 | Paths outside the home folder | Any absolute path with 2 or more levels whose first level (4 or more characters) is neither a public system directory nor a web route (`/dados/Relatorios/...`); `/srv`, `/opt`, `/data`, `/mnt`, `/media`, `/var/www` (each folder), `/var/lib`, `/var/log`, `/etc` (only identifier-looking folders), other drives (`D:\...`) and `\\server\share\...`. Public system directories stay |

@@ -43,7 +43,7 @@ apareceu, confira o `config.json`.
 | `pessoas.json` | Hashes de nomes, e-mails e códigos de pessoas |
 | `vistos.json` | Hashes de valores já mascarados |
 | `enviados.log` | De cada texto já enviado: hashes, posições, tipos e pseudônimos, nunca valores |
-| `llm-dlp.log` | Uma linha por requisição: contagens e tempos, nunca valores |
+| `llm-dlp.log` | Uma linha por requisição: contagens, tempos e os pseudônimos que voltaram sem virar o valor real, nunca valores. No máximo ~20 MB |
 
 ## A porta local
 

@@ -60,7 +60,8 @@ func vocabularioPadrao() *vocabulario {
 	por("usuario", "matricula", "login", "username", "userid", "logon", "chapa", "cracha", "badge", "employeeid", "empid", "customerid")
 	por("conta", "iban", "bban")
 	por("sensivel", "religiao", "religion", "crenca", "raca", "etnia", "ethnicity", "sindicato", "sindical", "doenca", "deficiencia", "sanguineo",
-		"biometria", "biometrico", "diagnosis", "disability", "prontuario")
+		"biometria", "biometrico", "diagnosis", "disability", "prontuario", "race", "racial", "genetico", "genetica",
+		"genetic", "hiv", "sorologia", "biometric", "biometrics", "comorbidade", "comorbidades")
 	por("nome", "sobrenome", "surname", "fullname", "firstname", "lastname", "fname", "lname", "maidenname", "nickname", "apelido", "filiacao")
 	por("quase", "sexo", "genero", "gender", "idade", "age", "nacionalidade", "naturalidade", "nationality", "profissao", "ocupacao", "occupation",
 		"salario", "renda", "salary", "income", "latitude", "longitude", "lat", "lng", "lon", "escolaridade")
@@ -94,6 +95,9 @@ func (v *vocabulario) classeRotulo(rotulo string) string {
 	ts := tokensRotulo(rotulo)
 	if len(ts) == 0 || len(ts) > 5 {
 		return ""
+	}
+	if sensivelComposto(ts) {
+		return "sensivel"
 	}
 	classe, nome, pessoa, soAbrev, usuario, idCod := "", false, false, true, false, false
 	for i, t := range ts {
@@ -183,6 +187,25 @@ func (v *vocabulario) classeRotulo(rotulo string) string {
 		return "nomesolto"
 	}
 	return ""
+}
+
+// sensivelComposto: rótulos de dado sensível (LGPD, art. 5º, II) feitos de palavras que sozinhas
+// são de outra classe ou de nenhuma: "identidade de gênero" (identidade é RG), "filiação
+// partidária" e "filiação sindical" (filiação é o nome dos pais), "opinião política",
+// "convicção religiosa", "vida sexual", "impressão digital", "cor/raça".
+func sensivelComposto(ts []string) bool {
+	tem := map[string]bool{}
+	for _, t := range ts {
+		tem[t] = true
+	}
+	switch {
+	case tem["identidade"] && tem["genero"], tem["filiacao"] && (tem["partidaria"] || tem["sindical"] || tem["partido"]),
+		tem["opiniao"] && (tem["politica"] || tem["politico"]), tem["conviccao"] && (tem["religiosa"] || tem["politica"] || tem["filosofica"]),
+		tem["vida"] && tem["sexual"], tem["impressao"] && (tem["digital"] || tem["digitais"]), tem["raca"] && tem["cor"],
+		tem["partido"] && tem["politico"], tem["orientacao"] && tem["sexual"]:
+		return true
+	}
+	return false
 }
 
 // classeRotulo com o vocabulário padrão (usado nos testes).

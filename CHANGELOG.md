@@ -9,6 +9,65 @@ In each version: **Masking** is what started (or stopped) being masked; **Progra
 commands, installation, configuration, performance and documentation; **Code** is what only
 matters to whoever changes the code.
 
+## [Unreleased]
+
+More data is now recognized by the data itself, each by the rule of whoever defines the format
+(IANA and RFCs, AWS and Kubernetes documentation, the NF-e taxpayer manual, the Central Bank's
+PIX manual, FEBRABAN, UPU, CNJ, IBGE, Ministry of Health, TSE). Tested with made-up addresses
+in IPv4, IPv6, routes and hostnames, and with made-up Brazilian documents and sentences: what
+was leaking is listed below.
+
+### Masking
+
+- Internal IPv4 also in the providers' shared range `100.64.0.0/10` (RFC 6598, CGNAT; used by
+  VPNs and clusters), in a machine name (`ip-10-42-7-15.ec2.internal`, the shell prompt
+  `ubuntu@ip-10-42-7-15`, `10-42-7-15.default.pod.cluster.local`) and in reverse DNS
+  (`15.7.42.10.in-addr.arpa`, and the `/24` zone `7.42.10.in-addr.arpa`). The fake IP keeps the
+  way it was written (hyphens, reversed), and the same network stays the same fake network.
+- Internal IPv6 is masked without `objects.public_ip`, as a server name: unique local
+  (`fd12:3456:789a:1::15`, RFC 4193), link-local with an interface identifier
+  (`fe80::1c2d:3e4f:5a6b:7c8d`, which may come from the MAC), internal IPv4 written in hex
+  (`::ffff:a2a:70f`) and the reverse name in `ip6.arpa`. `fd00::/8` in an explanation,
+  `fe80::1` and the fixed AWS addresses (`fd00:ec2::253`, `fd00:ec2::254`) stay.
+- With `objects.public_ip`: the public IP in an AWS hostname (`ec2-52-14-88-21.compute-1.amazonaws.com`)
+  and in `ip6.arpa`. The RFC 9637 documentation range (`3fff::/20`) stays.
+- Electronic invoice access key (NF-e, NFC-e, CT-e, MDF-e), 44 digits with the issuer's CNPJ or
+  CPF inside, also grouped by 4 and as `Id="NFe…"` in the XML: it counts only with a valid
+  state code, month, issuer CNPJ/CPF and check digit. Detector name: `nfe`.
+- PIX copy-and-paste code (BR Code): the whole code, which carries the PIX key, the name and
+  the city of who receives (before, only the key was masked). It counts only with a valid CRC.
+- AWS resource ID on its own (`vpc-…`, `subnet-…`, `i-…`, `sg-…`, `eni-…` and others), with the
+  same pseudonym it already got inside an ARN.
+- Bank slip (boleto, 47-digit typed line), utility and tax bill (48 digits) and their 44-digit
+  barcode, with the FEBRABAN check digits. Detector name: `boleto`.
+- Postal tracking code (`RR473124829BR`), with the UPU S10 check digit. Detector name: `rastreio`.
+- Civil registry certificate number (birth, marriage, death; 32 digits), by its structure (the
+  CNJ check digit is not published). Detector name: `certidao`.
+- LGPD sensitive data (art. 5, II) in the text, only the value and only after an expression that
+  ties it to someone: race or colour (`se declara parda`, `mulher negra`), religion (`é
+  evangélico`, `membro da Assembleia de Deus`), sexual orientation and gender identity (`é
+  bissexual`, `identidade de gênero: mulher trans`), political party (`filiado ao PSOL`, `vota no
+  PT`), trade union (`sindicalizado no Sindicato dos …`), ICD-10 code after `CID` or
+  `diagnóstico` (`CID F32.1, F41.0`) and a fingerprint template (ISO/IEC 19794-2 in base64).
+  Values from official lists (IBGE, Ministry of Health, TSE). `a tela é preta`, `a igreja
+  católica do bairro`, `o PL 2630` stay. Detector name: `sensivel`.
+- By the field name, also `identidade de gênero`, `filiação partidária`, `opinião política`,
+  `convicção religiosa`, `vida sexual`, `impressão digital`, `raça/cor`, `race`,
+  `comorbidades`.
+- RG of any state after `RG`, `registro geral` or `carteira de identidade` (`MG-12.345.678`,
+  `1234567 SSP/DF`, 10 digits in RS): each state defines its number (Law 7.116/1983) and none
+  publishes a check-digit rule, so it counts by the label. Before, only the São Paulo format.
+
+### Program
+
+- The log line of each request also says how many values of each type were masked
+  (`tipos: cpf 2, tabela 5`) and, when it happens, the pseudonyms that reached the client
+  without becoming the real value again (`NÃO DESFEITOS`). Counts and pseudonyms only.
+- New command `llm-dlp audit [24h|7d]`: sums up the log of a period (what was masked by type,
+  pseudonyms that came back, requests sent without masking, refused ones, API errors).
+- The log rotates at 10 MB also while llm-dlp is running (before, only when it started): at most
+  ~20 MB on disk.
+
 ## [0.9.2] - 2026-10-13
 
 When llm-dlp came from 0.7.0, its supervisor had no `supervisor.pid`: the 0.7.0 supervisor

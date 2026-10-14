@@ -3248,7 +3248,9 @@ Code: `internal/mask/leitor_nuvem.go` (cloud, public IP) and `leitor_enderecos.g
 | Google Cloud | text with `projects/`; `projects/<p>/<collection>/<name>` or `projects/<p>/locations/<l>/<collection>/<name>` |
 | DOMAIN\user | text with `\`; NetBIOS domain (uppercase, digits, `-`; 2 to 15) before the backslash |
 | ssh/scp/sftp/rsync | the command as a word, and on the same line an argument `user@host[:path]` |
-| Public IP (option `public_ip`) | IPv4 with 3 dots or IPv6 with 2+ `:` |
+| Public IP (option `public_ip`) | IPv4 with 3 dots or IPv6 with 2+ `:`; IPv4 with hyphens in a machine name (`ec2-52-14-88-21.…`); reverse name `…ip6.arpa` |
+| Internal IPv6 (always) | IPv6 with 2+ `:`; reverse name `…ip6.arpa` |
+| AWS resource ID | text with `-`; `prefix-` + 8 or 17 lowercase hex digits, with at least one digit |
 
 ### 2. Position → entity type
 
@@ -3266,7 +3268,9 @@ Code: `internal/mask/leitor_nuvem.go` (cloud, public IP) and `leitor_enderecos.g
 | Google Cloud | `topics`/`subscriptions`/`queues` → fila; `datasets` → schema; `tables` → tabela; `buckets` → bucket; the others (`instances`, `functions`, `services`...) → servico | according to the collection | yes |
 | `DOMAIN\user` | user (the domain is left to the other detectors) | usuario | yes |
 | `ssh user@host` | user / host outside a public domain and that is not an IP | usuario / servidor | yes |
-| Public IP | public IPv4 or IPv6 | servidor (server) | yes |
+| Public IP | public IPv4 or IPv6; in `ec2-52-14-88-21.…`, the whole first label | servidor (server) | yes |
+| Internal IPv6 | unique local (`fc00::/7`, RFC 4193) with a non-zero Global ID; link-local (`fe80::/10`) with an interface identifier beyond the last 16 bits (RFC 7721: it identifies the machine); internal IPv4 in hex (`::ffff:a2a:70f`) | servidor (server) | yes |
+| AWS resource ID | `vpc-`, `subnet-`, `sg-`, `eni-`, `i-`, `vol-`, `snap-`, `rtb-`, `igw-`, `eigw-`, `nat-`, `acl-`, `vpce-`, `pcx-`, `tgw-`, `tgw-attach-`, `vgw-`, `cgw-`, `vpn-`, `dopt-`, `eipalloc-`, `eipassoc-`, `lt-`, `fl-` (prefixes in the AWS CLI examples); the whole ID, the same as inside the ARN | servico (service) | yes |
 
 ### 3. Public vocabulary (never mask)
 
@@ -3276,7 +3280,7 @@ Code: `internal/mask/leitor_nuvem.go` (cloud, public IP) and `leitor_enderecos.g
 | Google Cloud / Azure examples | `my-project`, `project-id`, `my-topic`, `my-subscription`; subscription `00000000-0000-...`; `my-resource-group` | Google Cloud and Azure documentation |
 | Windows domains and accounts | `NT AUTHORITY`, `BUILTIN`, `NT SERVICE`, `WORKGROUP`, Registry roots (`HKLM`, `HKCU`...); accounts `SYSTEM`, `Administrator(s)`, `Guest` | Well-known SIDs (Microsoft Learn) |
 | ssh users | `root`, `git`, `ubuntu`, `ec2-user`, `admin`, `pi`... | default users of images |
-| IPs | `::1`, link-local, `0.0.0.0`, broadcast, multicast, private ranges (the IP detector already handles them), documentation ranges (RFC 5737: `192.0.2.0/24`, `198.51.100.0/24`, `203.0.113.0/24`; RFC 3849: `2001:db8::/32`), public DNS `8.8.8.8`, `8.8.4.4`, `1.1.1.1`, `1.0.0.1`, `9.9.9.9`, `208.67.222.222`, `2001:4860:4860::8888`, `2606:4700:4700::1111` | IANA Special-Purpose Address Registry |
+| IPs | `::1`, link-local, `0.0.0.0`, broadcast, multicast, private ranges (the IP detector already handles them), documentation ranges (RFC 5737: `192.0.2.0/24`, `198.51.100.0/24`, `203.0.113.0/24`; RFC 3849: `2001:db8::/32`), public DNS `8.8.8.8`, `8.8.4.4`, `1.1.1.1`, `1.0.0.1`, `9.9.9.9`, `208.67.222.222`, `2001:4860:4860::8888`, `2606:4700:4700::1111`; RFC 9637 (`3fff::/20`); the fixed AWS addresses `fd00:ec2::253` (DNS) and `fd00:ec2::254` (instance metadata); unique local with a zero Global ID (`fd00::/8` in an explanation) and link-local set by hand (`fe80::1`) | IANA Special-Purpose Address Registry; AWS documentation |
 
 ### 4. Identifier rules
 
@@ -3288,6 +3292,8 @@ Code: `internal/mask/leitor_nuvem.go` (cloud, public IP) and `leitor_enderecos.g
   (`"ERRO\nfalhou"`: a user starting with `n t r b f v a x u 0` glued to another character) stays.
 - An IPv4 whose first three numbers have one digit (`6.0.6.1`, `8.2.4.44`) is a version or a section
   number and stays. An IPv6 needs 3+ `:` or a group with 3+ hexadecimal digits (`x[1::2]` stays).
+- AWS resource ID: `ami-` and `pl-` stay (there are public AWS images and prefix lists); an ID with no
+  digit among 8 hex characters (`sg-deadbeef`) stays.
 
 ### 5. Before/after examples
 
@@ -3300,6 +3306,9 @@ projects/proj-exemplo-01/topics/fila-pedidos-x9         →  projects/acc_.../to
 entrou como CORPX\svc_relatorio                         →  entrou como CORPX\usr_...
 ssh -p 2222 svc_relatorio@db-exemplo-01                  →  ssh -p 2222 usr_...@host_...
 servidor em 34.120.10.5 (with ip_publico on)           →  servidor em HOST_...
+ec2-52-14-88-21.sa-east-1.compute.amazonaws.com (on)   →  host_....sa-east-1.compute.amazonaws.com
+inet6 fd12:3456:789a:1::15/64                          →  inet6 host_.../64
+subnet-0f1e2d3c4b5a69788 in vpc-0a1b2c3d4e5f67890     →  svc_... in svc_...
 ```
 
 ### 6. Hard cases and limits

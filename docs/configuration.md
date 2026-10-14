@@ -36,14 +36,17 @@ does not go to the API.
 | `fail_closed` | Refuses what it does not know how to mask. When off, a failure while masking sends the request **unmasked** (only a warning is logged). An image or PDF that could not be verified never goes out, whatever the value of this field. Turning it off is not recommended | `true` |
 | `ocr` | `mode` (`mask`, `block` or `allow`), `language`, `max_pages` (maximum pages), paths of tesseract and poppler. With `block`, and with `mask` when the file cannot be verified (OCR missing, unreadable file), it is removed from the request and the model gets a note in its place | `mask`, `por`, 30 |
 | `objects` | Internal resource names (see [What is detected](detection.md#5-internal-resource-names-by-structure)). `enabled`; `mask` and `propagate`: maps type → `true`/`false` (types: `servidor`, `database`, `schema`, `tabela`, `coluna`, `procedure`, `indice`, `usuario`, `namespace`, `servico`, `bucket`, `fila`). E.g. `{"mask": {"coluna": false}}` leaves the columns readable | on; masks all; propagates all except `coluna` and `indice` |
-| `objects.public_ip` | Also masks public IPv4 and IPv6 as a server name (`HOST_...`). `::1`, link-local, documentation ranges and the public DNS servers (`8.8.8.8`, `1.1.1.1`, `9.9.9.9`...) stay. A private IP is always masked by the `ip` detector | off |
+| `objects.public_ip` | Also masks public IPv4 and public IPv6 as a server name (`HOST_...`), also inside an AWS public hostname (`ec2-52-14-88-21…`) and in reverse DNS. `::1`, documentation ranges and the public DNS servers (`8.8.8.8`, `1.1.1.1`, `9.9.9.9`...) stay. Internal IPs are always masked: private and shared IPv4 by the `ip` detector, unique-local and link-local IPv6 as a server name | off |
 | `port` | Local port of the proxy | 8787 |
 | `upstream` | Address of the API | `https://api.anthropic.com` |
 | `providers` | **Beta.** Other APIs served on the same port, under the path `/<name>` (see [Other clients and APIs](#other-clients-and-apis-beta)). Each one has `upstream` and `format` (`gemini`, `openai` or `anthropic`; any other value falls into the generic mode) | `gemini`, `openai` and `xai`, each with the address of its API |
 
 Names accepted in `disabled_detectors`: `segredo`, `email`, `ip`, `host`, `cpf`, `cnpj`,
 `pis`, `cnh`, `rg`, `telefone`, `cep`, `cartao`, `conta`, `pix`, `endereco`, `nascimento`,
-`nome`, `campo` (detection by the field name), `usuario`, `doc`, `iban`, `processo`, `mac`.
+`nome`, `campo` (detection by the field name), `usuario`, `doc`, `iban`, `processo`, `mac`,
+`nfe` (electronic invoice access key), `boleto` (bank slip, bill and barcode), `rastreio` (postal
+tracking code), `certidao` (civil registry certificate), `sensivel` (ICD-10 code, LGPD sensitive data
+in the text, fingerprint template).
 
 ## Other clients and APIs (beta)
 
@@ -186,6 +189,7 @@ About Copilot:
 | `sudo llm-dlp emergency [30m\|off]` | Lets Claude through unmasked for a limited time |
 | `llm-dlp import-people FILE.csv --group CODE:NAME:EMAIL` | Teaches people |
 | `llm-dlp columns FILE` | Shows how the fields of a file are understood |
+| `llm-dlp audit [24h\|7d]` | Sums up the log of the period: what was masked by type, pseudonyms that came back without becoming the real value, requests sent without masking, refused ones (see [The log](how-it-works.md#the-log)) |
 | `llm-dlp test < file` | Shows the masked version of a text |
 | `llm-dlp test-media FILE DIR` | Processes an image or PDF and writes the result to DIR |
 | `llm-dlp measure FILE.jsonl` | Time and coverage over an old Claude Code session (counts only) |

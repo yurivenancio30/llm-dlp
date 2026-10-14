@@ -43,7 +43,7 @@ nothing and the warning showed up, check `config.json`.
 | `pessoas.json` | Hashes of people's names, e-mails and codes |
 | `vistos.json` | Hashes of values already masked |
 | `enviados.log` | For each text already sent: hashes, positions, types and pseudonyms, never values |
-| `llm-dlp.log` | One line per request: counts and times, never values |
+| `llm-dlp.log` | One line per request: counts, times and the pseudonyms that came back without becoming the real value, never values. At most ~20 MB |
 
 ## The local port
 

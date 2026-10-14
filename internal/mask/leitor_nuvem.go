@@ -18,6 +18,46 @@ func acharNuvem(s string, add func(ObjAchado)) {
 	if strings.Contains(s, "projects/") {
 		acharGCP(s, add)
 	}
+	if strings.IndexByte(s, '-') >= 0 {
+		acharIDsAWS(s, add)
+	}
+}
+
+// prefixosAWS: IDs de recurso da AWS (EC2 e VPC), prefixo-hexadecimal com 8 ou 17 caracteres (o
+// formato longo, desde 2018: aws.amazon.com/blogs/compute/longer-resource-ids-in-2018-for-amazon-ec2-amazon-ebs-and-amazon-vpc).
+// Os prefixos são os dos exemplos da documentação da AWS CLI (docs.aws.amazon.com/code-library,
+// cli_2_ec2_code_examples). Ficam de fora ami- e pl-: há imagens e listas de prefixos públicas,
+// da própria AWS.
+var prefixosAWS = conj("i", "vpc", "subnet", "sg", "eni", "vol", "snap", "rtb", "igw", "eigw", "nat", "acl",
+	"vpce", "pcx", "tgw", "tgw-attach", "vgw", "cgw", "vpn", "dopt", "eipalloc", "eipassoc", "lt", "fl")
+
+// acharIDsAWS: o ID solto (vpc-0a1b2c3d4e5f67890), com o mesmo pseudônimo que tem dentro do ARN.
+func acharIDsAWS(s string, add func(ObjAchado)) {
+	solto := func(c byte) bool { return !(ehAlnum(c) || c == '_' || c == '-') }
+	for i := strings.IndexByte(s, '-'); i >= 0; {
+		j := i + 1
+		for j < len(s) && (ehDig(s[j]) || s[j] >= 'a' && s[j] <= 'f') {
+			j++
+		}
+		if n := j - i - 1; (n == 8 || n == 17) && (j == len(s) || solto(s[j])) && temDigito(s[i+1:j]) {
+			a := i
+			for a > 0 && s[a-1] >= 'a' && s[a-1] <= 'z' {
+				a--
+			}
+			pref := s[a:i]
+			if pref == "attach" && a >= 4 && s[a-4:a] == "tgw-" {
+				a, pref = a-4, "tgw-attach"
+			}
+			if prefixosAWS[pref] && (a == 0 || solto(s[a-1])) {
+				add(ObjAchado{a, j, "servico", "id-aws", true})
+			}
+		}
+		k := strings.IndexByte(s[i+1:], '-')
+		if k < 0 {
+			return
+		}
+		i += 1 + k
+	}
 }
 
 func fimRecurso(c byte) bool {

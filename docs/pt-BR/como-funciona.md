@@ -188,11 +188,11 @@ Como ler:
 
 ## O log
 
-Cada requisição gera uma linha em `~/.config/llm-dlp/llm-dlp.log`, com contagens e tempos
-(nunca valores):
+Cada requisição gera uma linha em `~/.config/llm-dlp/llm-dlp.log`, com contagens, tempos e
+pseudônimos (nunca valores):
 
 ```
-POST /v1/messages -> 200 | 245 substituições | 0 colisões | mascarar 9ms | total 2.97s
+POST /v1/messages -> 200 | 245 substituições | 0 colisões | mascarar 9ms | total 2.97s | tipos: tabela 120, servidor 31, cpf 2
 ```
 
 | Campo | Significado |
@@ -202,7 +202,28 @@ POST /v1/messages -> 200 | 245 substituições | 0 colisões | mascarar 9ms | to
 | `colisões` | Pseudônimos que valeriam para dois valores reais diferentes. Os pseudônimos são curtos, então isso é raro, mas possível, e mais comum em IPs (a sub-rede falsa tem poucas combinações). A ida continua mascarada; só a volta daquele pseudônimo não é feita, para não trocar pelo valor errado. No pior caso, você vê um pseudônimo numa resposta |
 | `mascarar` | Tempo gasto pelo llm-dlp |
 | `total` | Tempo total, dominado pela resposta do modelo |
+| `tipos` | Quantos valores diferentes de cada tipo foram mascarados nessa requisição (`cpf 2`: dois CPFs diferentes). Só contagens |
+| `NÃO DESFEITOS n: …` | Só quando acontece: pseudônimos gerados pelo llm-dlp que chegaram ao cliente na resposta sem voltar a ser o valor real (o modelo mudou ou cortou um, ou citou um de outra conversa; também um endereço da faixa falsa de IP). O que o cliente gravou em arquivo nessa resposta ficou com o pseudônimo. Os pseudônimos vão listados, para dar para procurá-los |
 | `API: tipo: mensagem` | Só quando a API responde com erro: o tipo e o começo da mensagem dela, como ela mandou (ela só recebeu pseudônimos). É o que distingue, por exemplo, um 429 de limite da conta de um 429 de requisição recusada |
 
 Uma linha `AVISO` diz por que uma imagem ou um PDF foi retirado de uma requisição.
+
+O log troca de arquivo aos 10 MB a qualquer momento, também com o llm-dlp no ar há semanas, e
+guarda um anterior (`llm-dlp.log.1`): no máximo ~20 MB no disco.
+
+`llm-dlp audit` resume o log de um período (`24h` por padrão; também `90m`, `7d`): requisições
+e erros da API, o que foi mascarado por tipo, os pseudônimos que voltaram sem virar o valor
+real, envios sem máscara e recusas. Só lê o log, que não tem valor real. No espírito do registro
+de eventos de sistemas de IA (ISO/IEC 42001, controle A.6.2.8): dá para conferir depois o que
+aconteceu sem guardar o conteúdo.
+
+```
+$ llm-dlp audit 24h
+llm-dlp: log das últimas 24h (desde 13/10 15:04)
+  requisições: 152
+  substituições: 31877; colisões (pseudônimo que ficou sem desmascarar): 0
+  mascarados por tipo (valores distintos de cada requisição, somados): tabela 9120, servidor 2210, cpf 14
+  pseudônimos que voltaram sem virar o valor real: nenhum
+  enviadas sem máscara: nenhuma
+```
 

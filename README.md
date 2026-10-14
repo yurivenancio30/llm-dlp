@@ -270,7 +270,7 @@ open the client, and from then on it also comes back by itself.
 | The image or PDF did not reach the model | OCR is missing: the model says so in its answer, and `llm-dlp status` shows the installation command. After installing, send the file again |
 | The message was blocked: "não provou ser o seu llm-dlp" (did not prove it is your llm-dlp) | A process of a version up to 0.3.0 is still running: close Claude Code and run `llm-dlp stop`. If not, another program is using the port |
 | I changed `config.json` | `llm-dlp reload` (applies it without taking llm-dlp offline) |
-| I want to see what was done on each message | `~/.config/llm-dlp/llm-dlp.log` (counts and times only, never values) |
+| I want to see what was done on each message | `llm-dlp audit` (summary of the last 24 h: what was masked by type, pseudonyms that came back without becoming the real value) or `~/.config/llm-dlp/llm-dlp.log` (counts, times and pseudonyms, never values) |
 | I want to undo everything | `llm-dlp uninstall` (and `sudo llm-dlp uninstall-lock`, if you installed the lock). Then close and open Claude Code and run `llm-dlp stop`. With a beta client, also remove its lines from `~/.bashrc` (and from `opencode.json` or `~/.codex/config.toml`) |
 
 ## More details

@@ -33,14 +33,17 @@ Anthropic, o Claude Code mostra um aviso a cada mensagem (ver
 | `fail_closed` | Recusa o que não sabe mascarar. Desligado, uma falha ao mascarar manda a requisição **sem máscara** (só fica um aviso no log). Imagem e PDF que não deu para verificar nunca saem, com qualquer valor deste campo. Não recomendado desligar | `true` |
 | `ocr` | `mode` (`mask`, `block` ou `allow`: mascarar, bloquear ou permitir), `language`, `max_pages`, caminhos do tesseract e do poppler. Em `block`, e em `mask` quando não dá para verificar o arquivo (falta o OCR, arquivo ilegível), ele é retirado da requisição e o modelo recebe um aviso no lugar | `mask`, `por`, 30 |
 | `objects` | Nomes de recursos internos (ver [O que é detectado](deteccao.md#5-nomes-de-recursos-internos-pela-estrutura)). `enabled` (ligado); `mask` (mascarar) e `propagate` (propagar): mapas tipo → `true`/`false` (tipos: `servidor`, `database`, `schema`, `tabela`, `coluna`, `procedure`, `indice`, `usuario`, `namespace`, `servico`, `bucket`, `fila`). Ex.: `{"mask": {"coluna": false}}` deixa as colunas legíveis | ligado; mascara todos; propaga todos menos `coluna` e `indice` |
-| `objects.public_ip` | Mascara também IPv4 público e IPv6 como nome de servidor (`HOST_...`). Ficam `::1`, link-local, faixas de documentação e os DNS públicos (`8.8.8.8`, `1.1.1.1`, `9.9.9.9`...). O IP privado é sempre mascarado pelo detector `ip` | desligado |
+| `objects.public_ip` | Mascara também IPv4 público e IPv6 público como nome de servidor (`HOST_...`), também dentro do nome público de uma máquina da AWS (`ec2-52-14-88-21…`) e no DNS reverso. Ficam `::1`, faixas de documentação e os DNS públicos (`8.8.8.8`, `1.1.1.1`, `9.9.9.9`...). O IP interno é sempre mascarado: IPv4 privado e compartilhado pelo detector `ip`, IPv6 local único e link-local como nome de servidor | desligado |
 | `port` | Porta local do proxy | 8787 |
 | `upstream` | Endereço da API | `https://api.anthropic.com` |
 | `providers` | **Beta.** Outras APIs atendidas na mesma porta, pelo caminho `/<nome>` (ver [Outros clientes e APIs](#outros-clientes-e-apis-beta)). Cada uma tem `upstream` e `format` (`gemini`, `openai` ou `anthropic`; outro valor cai no modo genérico) | `gemini`, `openai` e `xai`, cada um com o endereço da sua API |
 
 Nomes aceitos em `disabled_detectors`: `segredo`, `email`, `ip`, `host`, `cpf`, `cnpj`,
 `pis`, `cnh`, `rg`, `telefone`, `cep`, `cartao`, `conta`, `pix`, `endereco`, `nascimento`,
-`nome`, `campo` (detecção pelo nome do campo), `usuario`, `doc`, `iban`, `processo`, `mac`.
+`nome`, `campo` (detecção pelo nome do campo), `usuario`, `doc`, `iban`, `processo`, `mac`,
+`nfe` (chave de acesso de nota fiscal eletrônica), `boleto` (boleto, conta e código de barras),
+`rastreio` (código de rastreio), `certidao` (matrícula de certidão), `sensivel` (código da CID-10,
+dado sensível da LGPD no texto, template de impressão digital).
 
 ## Outros clientes e APIs (beta)
 
@@ -185,6 +188,7 @@ Sobre o Copilot:
 | `sudo llm-dlp emergency [30m\|off]` | Libera o Claude sem máscara por tempo limitado |
 | `llm-dlp import-people ARQ.csv --group COD:NOME:EMAIL` | Ensina pessoas |
 | `llm-dlp columns ARQ` | Mostra como os campos de um arquivo são entendidos |
+| `llm-dlp audit [24h\|7d]` | Resume o log do período: o que foi mascarado por tipo, pseudônimos que voltaram sem virar o valor real, envios sem máscara, recusas (ver [O log](como-funciona.md#o-log)) |
 | `llm-dlp test < arquivo` | Mostra a versão mascarada de um texto |
 | `llm-dlp test-media ARQ DIR` | Processa uma imagem ou PDF e grava o resultado em DIR |
 | `llm-dlp measure ARQ.jsonl` | Tempo e cobertura sobre uma sessão antiga do Claude Code (só contagens) |

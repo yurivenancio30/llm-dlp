@@ -2,21 +2,25 @@ package mask
 
 import (
 	"net/netip"
+	"regexp"
 	"strings"
 )
 
-// IP público e IPv6 (opção objetos.ip_publico, desligada por padrão).
+// IPv6 de rede interna (sempre) e IP público (opção objetos.ip_publico, desligada por padrão):
+// viram nome de servidor. O IPv4 interno é do detector "ip" (detectores_formato.go).
 
-// DNS públicos (Google, Cloudflare, Quad9, OpenDNS): aparecem em toda documentação.
+// DNS públicos (Google, Cloudflare, Quad9, OpenDNS): aparecem em toda documentação. E os
+// endereços fixos da AWS em IPv6, iguais em toda VPC: o DNS (Route 53 Resolver) e o serviço
+// de metadados da instância (docs.aws.amazon.com: AmazonDNS-concepts, instancedata-data-retrieval).
 var dnsPublicos = conj("8.8.8.8", "8.8.4.4", "1.1.1.1", "1.0.0.1", "9.9.9.9", "208.67.222.222",
-	"2001:4860:4860::8888", "2606:4700:4700::1111")
+	"2001:4860:4860::8888", "2606:4700:4700::1111", "fd00:ec2::253", "fd00:ec2::254")
 
-// faixas de documentação (RFC 5737 e RFC 3849): não são endereço real
+// faixas de documentação (RFC 5737, RFC 3849 e RFC 9637): não são endereço real
 var redesDoc = []netip.Prefix{netip.MustParsePrefix("192.0.2.0/24"), netip.MustParsePrefix("198.51.100.0/24"),
-	netip.MustParsePrefix("203.0.113.0/24"), netip.MustParsePrefix("2001:db8::/32")}
+	netip.MustParsePrefix("203.0.113.0/24"), netip.MustParsePrefix("2001:db8::/32"), netip.MustParsePrefix("3fff::/20")}
 
 func ipPublico(a netip.Addr) bool {
-	if !a.IsGlobalUnicast() || a.Is4() && (a.IsPrivate() || fakeNet.Contains(a)) || dnsPublicos[a.String()] {
+	if !a.IsGlobalUnicast() || a.Is4() && (ipInterno(a) || fakeNet.Contains(a)) || dnsPublicos[a.String()] || ipv6Interno(a) {
 		return false
 	}
 	for _, p := range redesDoc {
@@ -27,7 +31,51 @@ func ipPublico(a netip.Addr) bool {
 	return true
 }
 
+// ipv6Interno: IPv6 que identifica uma rede ou máquina interna:
+//   - endereço local único, fc00::/7 (RFC 4193), com o Global ID (40 bits, sorteado por quem
+//     cria a rede) diferente de zero: "fd00::/8" escrito numa explicação não é rede de ninguém;
+//   - link-local, fe80::/10 (RFC 4291), com o identificador de interface além dos 16 bits
+//     finais: o derivado do MAC (EUI-64, RFC 4291 apêndice A) ou sorteado (RFC 7217, RFC 8981)
+//     identifica a máquina (RFC 7721, seção 3); "fe80::1", posto à mão, não;
+//   - IPv4 interno escrito em hexadecimal dentro de IPv6 (::ffff:a2a:70f, RFC 4291 2.5.5.2).
+//     Com pontos (::ffff:10.42.7.15), o IPv4 já é do detector "ip".
+func ipv6Interno(a netip.Addr) bool {
+	if !a.Is6() || dnsPublicos[a.String()] {
+		return false
+	}
+	b := a.As16()
+	switch {
+	case a.Is4In6():
+		return ipInterno(a.Unmap())
+	case b[0]&0xfe == 0xfc:
+		return b[1]|b[2]|b[3]|b[4]|b[5] != 0
+	case a.IsLinkLocalUnicast():
+		return b[8]|b[9]|b[10]|b[11]|b[12]|b[13] != 0
+	}
+	return false
+}
+
+// acharIPInterno: o leitor sempre ligado, de IPv6 interno (também no nome reverso, ip6.arpa).
+func acharIPInterno(s string, add func(ObjAchado)) {
+	ok := func(a netip.Addr, v string) bool { return ipv6Interno(a) && !strings.Contains(v, ".") }
+	if strings.Count(s, ":") >= 2 {
+		varrerIPv6(s, func(i, k int, a netip.Addr) {
+			if ok(a, s[i:k]) {
+				add(ObjAchado{i, k, "servidor", "ip-interno", true})
+			}
+		})
+	}
+	if strings.Contains(s, "ip6.arpa") || strings.Contains(s, "IP6.ARPA") {
+		acharReversoV6(s, func(i, k int, a netip.Addr) {
+			if ipv6Interno(a) {
+				add(ObjAchado{i, k, "servidor", "ip-interno", true})
+			}
+		})
+	}
+}
+
 func acharIPPublico(s string, add func(ObjAchado)) {
+	pub := func(i, k int) { add(ObjAchado{i, k, "servidor", "ip-público", true}) }
 	if strings.Count(s, ".") >= 3 {
 		for _, ix := range reIPv4.FindAllStringIndex(s, -1) {
 			if !bordaNum(s, ix[0], ix[1]) || ix[0] > 0 && (letraD(s[ix[0]-1]) || s[ix[0]-1] == '.') {
@@ -38,13 +86,37 @@ func acharIPPublico(s string, add func(ObjAchado)) {
 				continue
 			}
 			if a, err := netip.ParseAddr(s[ix[0]:ix[1]]); err == nil && ipPublico(a) {
-				add(ObjAchado{ix[0], ix[1], "servidor", "ip-público", true})
+				pub(ix[0], ix[1])
 			}
 		}
 	}
-	if strings.Count(s, ":") < 2 {
-		return
+	// no nome de máquina: ec2-52-14-88-21.compute-1.amazonaws.com (o rótulo inteiro, com o
+	// "ec2-": só os números seriam descartados como numeração, sem dono)
+	if digHifenDig(s) {
+		acharIPHifen(s, func(pre, _, k int, a netip.Addr) {
+			if ipPublico(a) {
+				pub(pre, k)
+			}
+		})
 	}
+	if strings.Count(s, ":") >= 2 {
+		varrerIPv6(s, func(i, k int, a netip.Addr) {
+			if !a.Is4In6() && ipPublico(a) {
+				pub(i, k)
+			}
+		})
+	}
+	if strings.Contains(s, "ip6.arpa") || strings.Contains(s, "IP6.ARPA") {
+		acharReversoV6(s, func(i, k int, a netip.Addr) {
+			if ipPublico(a) {
+				pub(i, k)
+			}
+		})
+	}
+}
+
+// varrerIPv6 chama f para cada IPv6 de s (sem a zona "%eth0" e sem o "/64" depois).
+func varrerIPv6(s string, f func(i, k int, a netip.Addr)) {
 	hex := func(c byte) bool { return ehDig(c) || c >= 'a' && c <= 'f' || c >= 'A' && c <= 'F' }
 	for i := 0; i < len(s); i++ {
 		c := s[i]
@@ -73,10 +145,39 @@ func acharIPPublico(s string, add func(ObjAchado)) {
 			}
 		}
 		if dois >= 2 && (dois >= 3 || longo) {
-			if a, err := netip.ParseAddr(v); err == nil && a.Is6() && !a.Is4In6() && ipPublico(a) {
-				add(ObjAchado{i, k, "servidor", "ip-público", true})
+			if a, err := netip.ParseAddr(v); err == nil && a.Is6() {
+				f(i, k, a)
 			}
 		}
 		i = j
+	}
+}
+
+// reReversoV6: nome reverso de IPv6 (RFC 3596, 2.5): os 32 dígitos hexadecimais ao contrário,
+// separados por ponto, mais ip6.arpa.
+var reReversoV6 = regexp.MustCompile(`(?i)\b(?:[0-9a-f]\.){32}ip6\.arpa\b`)
+
+// acharReversoV6 chama f com o trecho dos dígitos (sem o ".ip6.arpa") e o endereço.
+func acharReversoV6(s string, f func(i, k int, a netip.Addr)) {
+	for _, ix := range reReversoV6.FindAllStringIndex(s, -1) {
+		if ix[0] > 0 && (ehAlnum(s[ix[0]-1]) || s[ix[0]-1] == '.' || s[ix[0]-1] == '-') {
+			continue
+		}
+		var b [16]byte
+		for n := 0; n < 32; n++ {
+			c := s[ix[0]+2*n] | 0x20
+			v := c - '0'
+			if c >= 'a' {
+				v = c - 'a' + 10
+			}
+			// o primeiro dígito do nome é o último do endereço
+			p := 31 - n
+			if p%2 == 0 {
+				b[p/2] |= v << 4
+			} else {
+				b[p/2] |= v
+			}
+		}
+		f(ix[0], ix[0]+63, netip.AddrFrom16(b))
 	}
 }

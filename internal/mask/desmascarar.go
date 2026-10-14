@@ -2,9 +2,12 @@ package mask
 
 import (
 	"encoding/json"
+	"net/netip"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
+	"sync"
 )
 
 // Desmascarar: troca os pseudônimos de volta, inclusive em resposta que chega em pedaços.
@@ -27,6 +30,49 @@ type Tabela struct {
 	ipPref map[string]string // "240.a.b" -> "10.42.7"
 	// Conflitos: pseudônimos que colidiram e por isso não serão desmascarados (para log).
 	Conflitos int
+
+	muND sync.Mutex
+	nd   []string // pseudônimos nossos que sobraram na volta (ver NaoDesfeitos)
+}
+
+// reSobra: as formas de pseudônimo, em qualquer caixa, que podem sobrar na volta: rótulo
+// ("CPF-x", "Sensivel-x"), pessoa, objeto ("t_x"), e-mail e host (.invalid) e IP falso.
+var reSobra = regexp.MustCompile(`[A-Za-z][A-Za-z:]*-[A-Za-z2-7]{8}|(?i:pessoa) [A-Za-z2-7]{8}|[A-Za-z]+_[A-Za-z2-7]{8}|[\w.+-]+\.invalid|\b2(?:4\d|5[0-5])\.\d{1,3}\.\d{1,3}\.\d{1,3}\b`)
+
+const maxNaoDesfeitos = 20
+
+// anotarSobras: os pseudônimos gerados pelo llm-dlp que ficaram em s depois de desmascarar (o
+// modelo trocou a caixa de um jeito que nenhuma variante cobre, cortou ou juntou um pseudônimo,
+// ou citou um de outra conversa). Um IP da faixa falsa também conta: nenhum dado real usa
+// 240.0.0.0/4.
+func (t *Tabela) anotarSobras(s string) {
+	if !strings.ContainsAny(s, "-_.") && !strings.Contains(s, "essoa") && !strings.Contains(s, "ESSOA") {
+		return
+	}
+	for _, v := range reSobra.FindAllString(s, -1) {
+		nosso := false
+		if a, err := netip.ParseAddr(v); err == nil {
+			nosso = fakeNet.Contains(a)
+		} else {
+			_, nosso = pseudosGerados.Load(strings.ToLower(v))
+		}
+		if !nosso {
+			continue
+		}
+		t.muND.Lock()
+		if len(t.nd) < maxNaoDesfeitos && !slices.Contains(t.nd, v) {
+			t.nd = append(t.nd, v)
+		}
+		t.muND.Unlock()
+	}
+}
+
+// NaoDesfeitos: os pseudônimos que sobraram nas respostas desmascaradas com esta tabela (até 20).
+// Pseudônimo não é dado real: pode ir para o log.
+func (t *Tabela) NaoDesfeitos() []string {
+	t.muND.Lock()
+	defer t.muND.Unlock()
+	return slices.Clone(t.nd)
 }
 
 var reIPFalso = regexp.MustCompile(`\b(2(?:4\d|5[0-5])\.\d{1,3}\.\d{1,3})\.(\d{1,3})\b`)
@@ -252,6 +298,7 @@ func (t *Tabela) Desmascarar(s string, emJSON bool) string {
 			return ip
 		})
 	}
+	t.anotarSobras(s)
 	return s
 }
 

@@ -107,6 +107,10 @@ personal data and secrets
   detectores_formato.go     e-mail, IP, hostname, CPF, CNPJ, phone, card, tokens
   detectores_senhas.go      common passwords
   detectores_extras.go      HTTP header, IBAN, court case, documents with a word nearby
+  detectores_rede.go        internal IPv4 beyond the dotted form: shared range, hyphens, reverse DNS
+  detectores_fiscais.go     NF-e access key, PIX copy-and-paste code (BR Code)
+  detectores_br.go          bank slip and bill, tracking code, certificate number, ICD-10 code
+  detectores_sensiveis.go   LGPD sensitive data in the text (official value lists), fingerprint template
   detectores_validadores.go check digits (CPF, CNPJ, voter ID, IBAN...)
   campos_vocabulario.go     which field names hold which data
   campos.go                 "field: value", JSON, SQL INSERT, XML
@@ -137,7 +141,7 @@ internal resource names (server, database, table, column, service, bucket...)
   leitor_codigo.go          code in any language: the name next to it and the called function give the type
   leitor_traceback.go       traceback: the path of the line says whether the code is the client's or third-party
   leitor_cli.go             command line
-  leitor_ip.go              public IP and IPv6 (optional)
+  leitor_ip.go              internal IPv6 (always), public IP (optional)
   leitor_termos.go          company terms embedded in identifiers
 
 what the conversation says

@@ -265,7 +265,7 @@ em diante ele também volta sozinho.
 | A imagem ou o PDF não chegou ao modelo | Falta o OCR: o modelo avisa na resposta, e o `llm-dlp status` mostra o comando de instalação. Depois de instalar, mande o arquivo de novo |
 | A mensagem foi barrada: "não provou ser o seu llm-dlp" | Um processo de uma versão até a 0.3.0 ainda está no ar: feche o Claude Code e rode `llm-dlp stop`. Se não, outro programa está usando a porta |
 | Mudei o `config.json` | `llm-dlp reload` (aplica sem tirar o llm-dlp do ar) |
-| Quero ver o que foi feito em cada mensagem | `~/.config/llm-dlp/llm-dlp.log` (só contagens e tempos, nunca valores) |
+| Quero ver o que foi feito em cada mensagem | `llm-dlp audit` (resumo das últimas 24 h: o que foi mascarado por tipo, pseudônimos que voltaram sem virar o valor real) ou `~/.config/llm-dlp/llm-dlp.log` (contagens, tempos e pseudônimos, nunca valores) |
 | Quero desfazer tudo | `llm-dlp uninstall` (e `sudo llm-dlp uninstall-lock`, se instalou a trava). Depois, feche e abra o Claude Code e rode `llm-dlp stop`. Num cliente em beta, tire também as linhas dele do `~/.bashrc` (e do `opencode.json` ou do `~/.codex/config.toml`) |
 
 ## Mais detalhes

@@ -282,11 +282,21 @@ func (m *Masker) detectarBase(s string) []Achado {
 				continue
 			}
 			a, err := netip.ParseAddr(s[ix[0]:ix[1]])
-			if err != nil || !a.IsPrivate() || fakeNet.Contains(a) {
+			if err != nil || !ipInterno(a) {
 				continue
 			}
 			add(ix[0], ix[1], "ip")
 		}
+	}
+	if on("ip") && strings.Contains(baixo, ".in-addr.arpa") {
+		acharReversoV4(s, func(ini, fim int) { add(ini, fim, "ip") })
+	}
+	if on("ip") && digHifenDig(s) {
+		acharIPHifen(s, func(_, ini, fim int, a netip.Addr) {
+			if ipInterno(a) {
+				add(ini, fim, "ip")
+			}
+		})
 	}
 	if on("host") && len(m.cfg.DominiosInternos) > 0 && m.temInterno(baixo) {
 		for _, ix := range reHost.FindAllStringIndex(s, -1) {

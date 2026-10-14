@@ -1,8 +1,6 @@
 package mask
 
 import (
-	"fmt"
-	"net/netip"
 	"regexp"
 	"sort"
 	"strings"
@@ -91,8 +89,15 @@ func remontar(s string, ts []trecho) (string, []Entrada, bool) {
 	return b.String(), entradas, true
 }
 
-// Pseudonimo devolve o pseudônimo estável de um valor real de um tipo.
+// Pseudonimo devolve o pseudônimo estável de um valor real de um tipo. Todo pseudônimo fica
+// registrado: um que sobre na volta, sem desmascarar, é com certeza nosso (ver NaoDesfeitos).
 func (m *Masker) Pseudonimo(tipo, real string) string {
+	ps := m.pseudonimo(tipo, real)
+	registrarPseudo(ps)
+	return ps
+}
+
+func (m *Masker) pseudonimo(tipo, real string) string {
 	if ehObjeto(tipo) {
 		return m.pseudoObjeto(strings.TrimPrefix(tipo, prefTipoObj), real)
 	}
@@ -128,10 +133,7 @@ func (m *Masker) Pseudonimo(tipo, real string) string {
 		}
 		return "Pessoa " + pid
 	case "ip":
-		a := netip.MustParseAddr(real).As4()
-		pref := fmt.Sprintf("%d.%d.%d", a[0], a[1], a[2])
-		h := m.p.Bits("rede24", pref, 3)
-		return fmt.Sprintf("%d.%d.%d.%d", 240|(h[0]&0x0f), h[1], h[2], a[3])
+		return m.pseudoIP(real)
 	case "host":
 		h := strings.ToLower(real)
 		papel := strings.SplitN(h, ".", 2)[0]
