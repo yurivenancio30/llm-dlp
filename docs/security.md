@@ -1,6 +1,6 @@
 # Security and limits
 
-[← back to the README](../README.md) · [Português](pt-BR/seguranca.md)
+[← back to the README](../README.md) · [Português](pt-BR/security.md)
 
 To report a vulnerability, see [SECURITY.md](../.github/SECURITY.md).
 

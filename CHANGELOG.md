@@ -151,7 +151,7 @@ Code hooks. Messages on the screen are still in Portuguese.
 - The tests of `cmd/llm-dlp` run with the home folder in a temporary directory (`TestMain`):
   `install`, `uninstall` and `update` change `~/.claude` and `~/.local/bin`, and a test can no
   longer touch the real ones.
-- `internal/config/nomes_antigos.go`: the old field names, read on load and converted in the
+- `internal/config/old_names.go`: the old field names, read on load and converted in the
   file in both directions (`MigrarArquivo`).
 - The supervisor still starts the proxy as `servir` and re-executes itself as `supervisionar`:
   after going back, an older version understands those names.
@@ -497,12 +497,12 @@ requires a structural guarantee, fail-closed: when in doubt, mask.
 
 ### Code
 
-- Generated lists in `internal/mask/dados/`; files of the `mask` package grouped by prefix
+- Generated lists in `internal/mask/data/`; files of the `mask` package grouped by prefix
   (`detectores_`, `campos_`, `leitor_`, `chamada_`, `decisor_`, `memoria_`, `vocab_`). The map
   and the table of what is stored are in [docs/development.md](docs/development.md).
-- New generated lists: `software_publico.txt` and `fornecedores.txt` (GitHub repositories
-  with 3000 stars or more), `imagens_oficiais.txt` (Docker Official Images) and
-  `palavras_dicionario.txt` (the 50 thousand most frequent words of Portuguese and English).
+- New generated lists: `public_software.txt` and `vendors.txt` (GitHub repositories
+  with 3000 stars or more), `official_images.txt` (Docker Official Images) and
+  `dictionary_words.txt` (the 50 thousand most frequent words of Portuguese and English).
 
 ### Measured
 

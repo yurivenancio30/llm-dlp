@@ -1,0 +1,21 @@
+# GERADO por TestGerarRefPublica (internal/mask/vocab_generate_test.go). Não edite à mão.
+# Tipos de dado (vocab_types.go) que também são tipo de linguagem.
+# Gerado em 2026-10-06, no material público da máquina: ~/go/pkg/mod, /usr/lib/python3.10, /usr/share/doc, /usr/lib/python3/dist-packages, ~/.local/lib/python3.10/site-packages, /usr/share/man/pt_BR, /usr/share/vim/vim82/lang, /usr/share/gnupg, /usr/lib/systemd/catalog, /usr/share/i18n/locales
+# (33711 arquivos, 500 MB, 1435 projetos distintos).
+# Critério: tipo de campo ou de variável ("\tnome    tipo") em código Go de pelo menos 5 projetos distintos. 16 tipos.
+bool
+byte
+float32
+float64
+int
+int16
+int32
+int64
+int8
+str
+string
+uint
+uint16
+uint32
+uint64
+uint8

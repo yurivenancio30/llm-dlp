@@ -106,7 +106,7 @@ máquina. `pg_dump`, `postgresql` e `5432` ficam como estão: nome público não
 > **Os clientes em beta não têm trava.** A proteção vale enquanto o endereço do cliente
 > apontar para o llm-dlp: se deixar de apontar (uma linha apagada, outro tipo de conta, outro
 > provedor), o cliente fala direto com a API, sem máscara, e nada avisa. Beta pode mudar numa
-> versão MENOR. Detalhes: [Outros clientes e APIs (beta)](configuracao.md#outros-clientes-e-apis-beta).
+> versão MENOR. Detalhes: [Outros clientes e APIs (beta)](configuration.md#outros-clientes-e-apis-beta).
 
 ## Instalação
 
@@ -196,7 +196,7 @@ recusada": nada vaza, mas não funciona).
 | Codex, assinatura do ChatGPT ou chave de API | O provedor abaixo, no `~/.codex/config.toml` |
 | opencode, chave de API do Gemini | No `opencode.json`: `{"provider": {"google": {"options": {"baseURL": "http://127.0.0.1:8787/gemini/v1beta"}}}}`, com a chave em `GOOGLE_GENERATIVE_AI_API_KEY` |
 | Copilot CLI, a sua chave | `export COPILOT_PROVIDER_BASE_URL=http://127.0.0.1:8787/openai/v1` (xAI: `.../xai/v1`), com `COPILOT_PROVIDER_API_KEY` e `COPILOT_MODEL` |
-| Copilot no VS Code, a sua chave | "Custom Endpoint", como em [Cliente por cliente](configuracao.md#cliente-por-cliente) |
+| Copilot no VS Code, a sua chave | "Custom Endpoint", como em [Cliente por cliente](configuration.md#cliente-por-cliente) |
 
 ```bash
 # ~/.bashrc: o export da tabela, e uma função por cliente (gemini, codex, opencode, copilot)
@@ -221,7 +221,7 @@ dali em diante o llm-dlp volta sozinho.
 **Confira:** mande uma mensagem e rode `llm-dlp last`. Ele tem de mostrar essa mensagem, com
 os pseudônimos; se disser *"Ainda não passou nenhuma mensagem"*, o cliente não está passando
 pelo llm-dlp. Só passa o que foi apontado: outro provedor ou outra conta fala direto com a API.
-O que foi conferido em cada cliente está em [Cliente por cliente](configuracao.md#cliente-por-cliente).
+O que foi conferido em cada cliente está em [Cliente por cliente](configuration.md#cliente-por-cliente).
 
 ### Atualizar para uma versão nova
 
@@ -234,7 +234,7 @@ lugar da que está no ar **sem tirar o llm-dlp do ar**: não precisa fechar o cl
 mensagem falha nem é cortada. Se a versão nova não subir, ele volta sozinho para a anterior. O
 comando de instalação de cima faz o mesmo quando o llm-dlp já está instalado. A sua
 configuração e a sua chave não mudam. Como funciona:
-[Atualizar o llm-dlp](configuracao.md#atualizar-o-llm-dlp).
+[Atualizar o llm-dlp](configuration.md#atualizar-o-llm-dlp).
 
 Da 0.8.0, que só conhece o nome em português, rode `llm-dlp atualizar` e depois
 `llm-dlp reload` uma vez: o update da 0.8.0 não passa o `config.json` e os ganchos do Claude
@@ -272,14 +272,14 @@ em diante ele também volta sozinho.
 
 | Documento | O que tem |
 |---|---|
-| [Como funciona](como-funciona.md) | O caminho de uma mensagem, os pseudônimos, o que é lembrado, falha fechada, imagens, desempenho e quanto usa da máquina |
-| [O que é detectado](deteccao.md) | Os jeitos de reconhecer um dado e como ensinar pessoas e nomes de campo da sua empresa |
-| [Configuração e comandos](configuracao.md) | Todos os campos do `config.json` e todos os comandos |
-| [Segurança e limites](seguranca.md) | O que protege, o que não protege e o que passa sem máscara |
-| [Política](politica.md) | Os quatro níveis de informação, o que o llm-dlp faz com cada um, as referências (LGPD, MITRE ATT&CK, CWE, NIST) e o limite declarado sobre código e regras de negócio |
-| [Para desenvolvedores](desenvolvimento.md) | Mapa do código, o que fica guardado em memória e em disco, como acoplar outra API de LLM, como acrescentar um detector, como foi testado |
-| [Estruturas](estruturas.md) | A pesquisa por trás das regras de estrutura: onde ficam os nomes de recursos internos em cada formato, e as regras de quando um nome é público |
-| [Versões e lançamentos](versoes.md) | O que cada número da versão significa, o que vem numa release e como lançar uma |
+| [Como funciona](how-it-works.md) | O caminho de uma mensagem, os pseudônimos, o que é lembrado, falha fechada, imagens, desempenho e quanto usa da máquina |
+| [O que é detectado](detection.md) | Os jeitos de reconhecer um dado e como ensinar pessoas e nomes de campo da sua empresa |
+| [Configuração e comandos](configuration.md) | Todos os campos do `config.json` e todos os comandos |
+| [Segurança e limites](security.md) | O que protege, o que não protege e o que passa sem máscara |
+| [Política](policy.md) | Os quatro níveis de informação, o que o llm-dlp faz com cada um, as referências (LGPD, MITRE ATT&CK, CWE, NIST) e o limite declarado sobre código e regras de negócio |
+| [Para desenvolvedores](development.md) | Mapa do código, o que fica guardado em memória e em disco, como acoplar outra API de LLM, como acrescentar um detector, como foi testado |
+| [Estruturas](structures.md) | A pesquisa por trás das regras de estrutura: onde ficam os nomes de recursos internos em cada formato, e as regras de quando um nome é público |
+| [Versões e lançamentos](versioning.md) | O que cada número da versão significa, o que vem numa release e como lançar uma |
 | [Mudanças](CHANGELOG.md) | O que mudou em cada versão |
 | [Como contribuir](CONTRIBUTING.md) · [Política de segurança](SECURITY.md) | Como contribuir e como relatar uma vulnerabilidade |
 
@@ -287,7 +287,7 @@ em diante ele também volta sozinho.
 
 MIT. Ver [LICENSE](../../LICENSE).
 
-Os arquivos de dados `internal/mask/dados/palavras_comuns.txt` e `palavras_dicionario.txt` são
+Os arquivos de dados `internal/mask/data/common_words.txt` e `dictionary_words.txt` são
 adaptações das listas de frequência do [FrequencyWords](https://github.com/hermitdave/FrequencyWords),
 de Hermit Dave (dados do OpenSubtitles 2018), distribuídas sob
 [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/); origem e critério no cabeçalho

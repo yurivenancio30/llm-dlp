@@ -3,7 +3,7 @@
 [English](../../CHANGELOG.md)
 
 O que mudou em cada versão do llm-dlp. As versões seguem `MAIOR.MENOR.CORREÇÃO`; o que cada
-número significa aqui está em [versoes.md](versoes.md). A mais nova vem primeiro.
+número significa aqui está em [versioning.md](versioning.md). A mais nova vem primeiro.
 
 Em cada versão: **Mascaramento** é o que passou a ser (ou deixou de ser) mascarado;
 **Programa** é comando, instalação, configuração, desempenho e documentação; **Código** é o
@@ -153,7 +153,7 @@ ganchos do Claude Code. As mensagens na tela continuam em português.
 - Os testes de `cmd/llm-dlp` rodam com a pasta pessoal num diretório temporário (`TestMain`):
   `install`, `uninstall` e `update` mexem no `~/.claude` e no `~/.local/bin`, e um teste não
   consegue mais tocar nos de verdade.
-- `internal/config/nomes_antigos.go`: os nomes antigos dos campos, lidos ao carregar e
+- `internal/config/old_names.go`: os nomes antigos dos campos, lidos ao carregar e
   convertidos no arquivo nos dois sentidos (`MigrarArquivo`).
 - O supervisor continua subindo o proxy como `servir` e se reexecutando como `supervisionar`:
   depois de voltar, uma versão anterior entende esses nomes.
@@ -339,7 +339,7 @@ essa correção da máscara muda. Depois de atualizar, feche o Claude Code e rod
 Outros clientes e APIs, **em beta**: a API do Gemini e o formato Chat Completions da OpenAI,
 para o Gemini CLI, o opencode e o GitHub Copilot com a sua chave. O Claude Code segue o único
 cliente estável, e nada muda no que é mascarado para ele. Os clientes em beta são apontados à
-mão e não têm trava: leia [Outros clientes e APIs (beta)](configuracao.md#outros-clientes-e-apis-beta)
+mão e não têm trava: leia [Outros clientes e APIs (beta)](configuration.md#outros-clientes-e-apis-beta)
 antes de usá-los. Depois de atualizar, feche o Claude Code e rode `llm-dlp parar`.
 
 ### Programa
@@ -352,7 +352,7 @@ antes de usá-los. Depois de atualizar, feche o Claude Code e rode `llm-dlp para
   desmascarada também em streaming. Campo novo na configuração: `provedores`; outras APIs
   podem ser acrescentadas ali (sem leitor próprio, todo texto é mascarado). Conferido com o
   Gemini CLI e o opencode rodando, e o `llm-dlp ultima` mostra também a conversa do Gemini.
-  Ver [configuracao.md](configuracao.md#outros-clientes-e-apis-beta).
+  Ver [configuration.md](configuration.md#outros-clientes-e-apis-beta).
 - **Formato da OpenAI, Chat Completions (beta).** A requisição cujo caminho termina em
   `/chat/completions` passa a ser lida como as outras (instruções, ferramentas, texto,
   chamadas e resultados de ferramenta, imagens), e a resposta é desmascarada, também em
@@ -495,18 +495,18 @@ garantia de estrutura, de falha fechada: na dúvida, mascara.
 ### Programa
 
 - Versão e mudanças organizadas: `llm-dlp versao`, este arquivo, binários prontos em cada
-  release e `make release` (ver [versoes.md](versoes.md)).
+  release e `make release` (ver [versioning.md](versioning.md)).
 - Estimativa de uso de CPU, memória e disco em
-  [como-funciona.md](como-funciona.md#quanto-usa-da-máquina).
+  [how-it-works.md](how-it-works.md#quanto-usa-da-máquina).
 
 ### Código
 
-- Listas geradas em `internal/mask/dados/`; arquivos do pacote `mask` agrupados por prefixo
+- Listas geradas em `internal/mask/data/`; arquivos do pacote `mask` agrupados por prefixo
   (`detectores_`, `campos_`, `leitor_`, `chamada_`, `decisor_`, `memoria_`, `vocab_`). O mapa e
-  a tabela do que fica guardado estão em [desenvolvimento.md](desenvolvimento.md).
-- Listas novas, geradas: `software_publico.txt` e `fornecedores.txt` (repositórios do GitHub
-  com 3000 estrelas ou mais), `imagens_oficiais.txt` (Imagens Oficiais do Docker) e
-  `palavras_dicionario.txt` (50 mil palavras mais frequentes de português e inglês).
+  a tabela do que fica guardado estão em [development.md](development.md).
+- Listas novas, geradas: `public_software.txt` e `vendors.txt` (repositórios do GitHub
+  com 3000 estrelas ou mais), `official_images.txt` (Imagens Oficiais do Docker) e
+  `dictionary_words.txt` (50 mil palavras mais frequentes de português e inglês).
 
 ### Medido
 

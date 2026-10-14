@@ -1,6 +1,6 @@
 # What is detected
 
-[← back to the README](../README.md) · [Português](pt-BR/deteccao.md)
+[← back to the README](../README.md) · [Português](pt-BR/detection.md)
 
 There are five ways to recognize a piece of data. Any one of them is enough.
 

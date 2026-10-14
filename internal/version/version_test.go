@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// A versão é escrita em dois lugares que uma pessoa lê (versao.go e CHANGELOG.md): têm de dizer
+// A versão é escrita em dois lugares que uma pessoa lê (version.go e CHANGELOG.md): têm de dizer
 // o mesmo, e a versão tem de ter uma seção no CHANGELOG antes de ser lançada.
 func TestVersionMatchesChangelog(t *testing.T) {
 	if !regexp.MustCompile(`^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$`).MatchString(Version) {
@@ -21,6 +21,6 @@ func TestVersionMatchesChangelog(t *testing.T) {
 		t.Fatal("CHANGELOG.md sem nenhuma seção de versão (## [X.Y.Z] - AAAA-MM-DD)")
 	}
 	if string(m[1]) != Version {
-		t.Fatalf("versao.go diz %s e a primeira versão do CHANGELOG.md é %s", Version, m[1])
+		t.Fatalf("version.go diz %s e a primeira versão do CHANGELOG.md é %s", Version, m[1])
 	}
 }

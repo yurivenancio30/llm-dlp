@@ -24,7 +24,7 @@ gofmt -l cmd internal   # não pode mostrar nada
 ```
 
 O mapa do código, o que cada família de arquivos faz e como o projeto foi testado estão em
-[desenvolvimento.md](desenvolvimento.md).
+[development.md](development.md).
 
 ## A regra para mudanças de mascaramento
 
@@ -34,8 +34,8 @@ Vazar é pior do que mascarar a mais: **na dúvida, mascara**.
   que tem de ficar, fica).
 - Uma regra que **deixa um nome em claro** precisa de uma garantia de estrutura de que o nome
   é público (nunca "parece público"), tem de falhar fechada e precisa de um caso em
-  `internal/mask/casos_publicos_test.go`. As regras que foram tentadas e recusadas, e por
-  quê, estão em "Público só com prova", em [estruturas.md](estruturas.md).
+  `internal/mask/public_cases_test.go`. As regras que foram tentadas e recusadas, e por
+  quê, estão em "Público só com prova", em [structures.md](structures.md).
 - Compare o antes e o depois nos mesmos textos: o que a versão anterior mascarava e a sua
   deixa em claro é o que mais importa.
 - Se a mudança custa tempo, rode os benchmarks (`go test ./internal/mask -bench Frio`).
@@ -88,7 +88,7 @@ docs: explain what each field of the log means
 ## Lançamentos
 
 As versões seguem `MAIOR.MENOR.CORREÇÃO`. O que cada número significa e os passos de um
-lançamento estão em [versoes.md](versoes.md).
+lançamento estão em [versioning.md](versioning.md).
 
 ## Segurança
 

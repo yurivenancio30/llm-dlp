@@ -1,11 +1,11 @@
 # For developers
 
-[← back to the README](../README.md) · [Português](pt-BR/desenvolvimento.md)
+[← back to the README](../README.md) · [Português](pt-BR/development.md)
 
 ```bash
 make build   # static binary at bin/llm-dlp
 make test    # go vet and all the tests
-make versao  # version and commit of the code
+make version  # version and commit of the code
 
 # load tests (minutes): memory with 1.2 GB of text, pathological inputs, 16 conversations
 # in parallel, abandoned responses, API down, 32 MB request
@@ -39,13 +39,13 @@ you will meet most often:
 cmd/llm-dlp/            the command-line program
 internal/proxy/         the server that sits between Claude Code and the API
 internal/mask/          detection and replacement with pseudonyms (depends on no API)
-internal/mask/dados/    lists embedded in the binary (almost all generated)
+internal/mask/data/    lists embedded in the binary (almost all generated)
 internal/config/        reading of config.json (and of the field names before 0.9.0)
 internal/ocr/           reading of text in images and PDFs (tesseract, poppler)
-internal/versao/        the version number and the commit
+internal/version/       the version number and the commit
 install.sh              installer: downloads the release binary and runs the setup
 .goreleaser.yaml        how the release archives are built
-scripts/                release.sh and notas-da-versao.sh (used by make release)
+scripts/                release.sh and release-notes.sh (used by make release)
 .github/workflows/      tests on every push (ci.yml) and release publishing (release.yml)
 docs/                   this documentation, in English
 docs/pt-BR/             the same documentation, in Portuguese (README.md included)
@@ -59,20 +59,20 @@ CHANGELOG.md            what changed in each version
 ```
 cmd/llm-dlp/
   main.go               entry point, list of commands and their names before 0.9.0
-  servico.go            serve, supervise, ensure, check, status, stop
-  troca.go              the supervisor: holds the port and lends it to the proxy; swap on SIGHUP
-  atualizar.go          update (download, checksum, swap, going back) and reload
-  instalar.go           install, uninstall, the lock and the hooks
-  conferir.go           simulate: replays an old session against a fake API
-  ferramentas.go        import-people, test, test-media, measure, columns
-  emergencia.go         emergency mode (requires sudo)
+  service.go            serve, supervise, ensure, check, status, stop
+  swap.go              the supervisor: holds the port and lends it to the proxy; swap on SIGHUP
+  update.go          update (download, checksum, swap, going back) and reload
+  install.go           install, uninstall, the lock and the hooks
+  inspect.go           simulate: replays an old session against a fake API
+  tools.go        import-people, test, test-media, measure, columns
+  emergency.go         emergency mode (requires sudo)
 
 internal/proxy/
   proxy.go              receives the request, forwards it, returns the response
-  requisicao.go         outbound: masks the request body (with the hint of the command of each result)
-  resposta.go           inbound: unmasks the response (streaming or whole)
-  anterioridade.go      what the model wrote before any data is public
-  midia.go              images and PDFs (OCR and black bars)
+  request.go         outbound: masks the request body (with the hint of the command of each result)
+  response.go           inbound: unmasks the response (streaming or whole)
+  priority.go      what the model wrote before any data is public
+  media.go              images and PDFs (OCR and black bars)
 ```
 
 ### internal/mask
@@ -95,91 +95,91 @@ functions). It is organized by the **file name prefix**: each family does one th
 ```
 main path
   masker.go                 the Masker type and its construction
-  mascarar.go               Mascarar: the entry point, with the result cache; Lote freezes what went out
-  detectar.go               Detectar: gathers the detectors; large text goes in pieces
-  normalizacao.go           strips the transport (line number, grep, diff, ANSI, box, escaped JSON)
-  pseudonimos.go            replaces the findings with pseudonyms
-  desmascarar.go            swaps back, including in a response that arrives in chunks
-  chave.go                  the secret key and the identifiers derived from it
-  pessoas.go                registry of people (names, e-mails, codes), as hashes only
+  mask.go               Mascarar: the entry point, with the result cache; Lote freezes what went out
+  detect.go               Detectar: gathers the detectors; large text goes in pieces
+  normalization.go           strips the transport (line number, grep, diff, ANSI, box, escaped JSON)
+  pseudonyms.go            replaces the findings with pseudonyms
+  unmask.go            swaps back, including in a response that arrives in chunks
+  key.go                  the secret key and the identifiers derived from it
+  people.go                registry of people (names, e-mails, codes), as hashes only
 
 personal data and secrets
-  detectores_formato.go     e-mail, IP, hostname, CPF, CNPJ, phone, card, tokens
-  detectores_senhas.go      common passwords
-  detectores_extras.go      HTTP header, IBAN, court case, documents with a word nearby
-  detectores_rede.go        internal IPv4 beyond the dotted form: shared range, hyphens, reverse DNS
-  detectores_fiscais.go     NF-e access key, PIX copy-and-paste code (BR Code)
-  detectores_br.go          bank slip and bill, tracking code, certificate number, ICD-10 code
-  detectores_sensiveis.go   LGPD sensitive data in the text (official value lists), fingerprint template
-  detectores_validadores.go check digits (CPF, CNPJ, voter ID, IBAN...)
-  campos_vocabulario.go     which field names hold which data
-  campos.go                 "field: value", JSON, SQL INSERT, XML
-  campos_tabelas.go         CSV, markdown, terminal, spreadsheet
+  detectors_format.go     e-mail, IP, hostname, CPF, CNPJ, phone, card, tokens
+  detectors_passwords.go      common passwords
+  detectors_extra.go      HTTP header, IBAN, court case, documents with a word nearby
+  detectors_network.go        internal IPv4 beyond the dotted form: shared range, hyphens, reverse DNS
+  detectors_fiscal.go     NF-e access key, PIX copy-and-paste code (BR Code)
+  detectors_br.go          bank slip and bill, tracking code, certificate number, ICD-10 code
+  detectors_sensitive.go   LGPD sensitive data in the text (official value lists), fingerprint template
+  detectors_validators.go check digits (CPF, CNPJ, voter ID, IBAN...)
+  fields_vocabulary.go     which field names hold which data
+  fields.go                 "field: value", JSON, SQL INSERT, XML
+  fields_tables.go         CSV, markdown, terminal, spreadsheet
 
 internal resource names (server, database, table, column, service, bucket...)
-  objetos.go                types, pseudonym, guarded learning
-  objetos_listas.go         homogeneous lists and qualified name with a known part (after the readers)
-  leitores.go               registry of all the readers (fixed and from the configuration)
-  leitor_sql.go             SQL and DDL, errors that quote objects
-  leitor_sql_freios.go      SQL quoted in prose and in a code comment is not a statement
-  leitor_tabela.go          tables in any layout (CSV, fixed width, box, tuples, HTML, vertical)
-  leitor_saida_cli.go       table of kubectl get, docker ps, helm list
-  leitor_esquema.go         name + data type (dtypes, printSchema, Arrow, protobuf)
-  leitor_conexao.go         connection strings, database URIs, DSN, tnsnames, URNs, dbt, Airflow
-  leitor_conexao_freios.go  model name in the database URI and in tnsnames
-  leitor_yaml.go            YAML/JSON engine by path and the dispatcher of the families
-  leitor_kubernetes.go      Kubernetes, Helm, images, service DNS, env as a list
-  leitor_iac.go             Terraform/HCL, Bicep, ARM, CloudFormation
-  leitor_ansible.go         Ansible inventory
-  leitor_ci.go              CI pipelines and Jenkinsfile
-  leitor_chave_valor.go     generic key-value (YAML, JSON, INI, .env, .properties, XML, --option)
-  leitor_enderecos.go       internal hosts, storage and queues, git, network user, home folder
-  leitor_caminhos.go        paths outside the home folder, other drives, UNC
-  leitor_nuvem.go           AWS ARN, Azure IDs, GCP resources, cloud URLs
-  leitor_nuvem_hosts.go     managed service hosts (RDS, Redshift, S3, Azure)
-  leitor_pacotes.go         go.mod, Maven/Gradle groupId, npm scope
-  leitor_codigo.go          code in any language: the name next to it and the called function give the type
-  leitor_traceback.go       traceback: the path of the line says whether the code is the client's or third-party
-  leitor_cli.go             command line
-  leitor_ip.go              internal IPv6 (always), public IP (optional)
-  leitor_termos.go          company terms embedded in identifiers
+  objects.go                types, pseudonym, guarded learning
+  objects_lists.go         homogeneous lists and qualified name with a known part (after the readers)
+  readers.go               registry of all the readers (fixed and from the configuration)
+  reader_sql.go             SQL and DDL, errors that quote objects
+  reader_sql_brakes.go      SQL quoted in prose and in a code comment is not a statement
+  reader_table.go          tables in any layout (CSV, fixed width, box, tuples, HTML, vertical)
+  reader_cli_output.go       table of kubectl get, docker ps, helm list
+  reader_schema.go         name + data type (dtypes, printSchema, Arrow, protobuf)
+  reader_connection.go         connection strings, database URIs, DSN, tnsnames, URNs, dbt, Airflow
+  reader_connection_brakes.go  model name in the database URI and in tnsnames
+  reader_yaml.go            YAML/JSON engine by path and the dispatcher of the families
+  reader_kubernetes.go      Kubernetes, Helm, images, service DNS, env as a list
+  reader_iac.go             Terraform/HCL, Bicep, ARM, CloudFormation
+  reader_ansible.go         Ansible inventory
+  reader_ci.go              CI pipelines and Jenkinsfile
+  reader_key_value.go     generic key-value (YAML, JSON, INI, .env, .properties, XML, --option)
+  reader_addresses.go       internal hosts, storage and queues, git, network user, home folder
+  reader_paths.go        paths outside the home folder, other drives, UNC
+  reader_cloud.go           AWS ARN, Azure IDs, GCP resources, cloud URLs
+  reader_cloud_hosts.go     managed service hosts (RDS, Redshift, S3, Azure)
+  reader_packages.go         go.mod, Maven/Gradle groupId, npm scope
+  reader_code.go          code in any language: the name next to it and the called function give the type
+  reader_traceback.go       traceback: the path of the line says whether the code is the client's or third-party
+  reader_cli.go             command line
+  reader_ip.go              internal IPv6 (always), public IP (optional)
+  reader_terms.go          company terms embedded in identifiers
 
 what the conversation says
-  chamada.go                what the proxy knows about a tool call (request, arguments, echo)
-  chamada_comando.go        the command says what the output is (SELECT, cut, listing)
-  chamada_decisor.go        provenance and identity in command output
-  decisao.go                names decided per text, deciders, record of who wrote what
-  decisor_lexico.go         lexical rule for code and configuration
+  call.go                what the proxy knows about a tool call (request, arguments, echo)
+  call_command.go        the command says what the output is (SELECT, cut, listing)
+  call_decider.go        provenance and identity in command output
+  decision.go                names decided per text, deciders, record of who wrote what
+  lexical_decider.go         lexical rule for code and configuration
 
 memory
-  memoria_conhecidos.go     values already masked, recognized later anywhere (RAM)
-  memoria_vistos.go         the same values on disk, as hashes only
-  memoria_enviados.go       what each text already sent carried (to go out identical in resends)
-  memoria_conversa.go       names decided in the texts of a request hold for the others
-  memoria_conversa_freios.go  where the conversation memory does not replace (program, comment, prose)
-  memoria_rastreamento.go   a name is decided where it enters and holds everywhere
-  memoria_software.go       public software with proof, and shadowing
+  memory_known.go     values already masked, recognized later anywhere (RAM)
+  memory_seen.go         the same values on disk, as hashes only
+  memory_sent.go       what each text already sent carried (to go out identical in resends)
+  memory_conversation.go       names decided in the texts of a request hold for the others
+  memory_conversation_brakes.go  where the conversation memory does not replace (program, comment, prose)
+  memory_tracing.go   a name is decided where it enters and holds everywhere
+  memory_software.go       public software with proof, and shadowing
 
 vocabulary
   vocab_dev.go              type words, internal suffixes, public names, value with no owner
-  vocab_tipos.go            data types of the languages (SQL, pandas, Arrow, Spark...)
-  vocab_palavras.go         common words and dictionary (reads dados/palavras_*.txt)
-  vocab_gerado.go           reads the other lists in dados/
+  vocab_types.go            data types of the languages (SQL, pandas, Arrow, Spark...)
+  vocab_words.go         common words and dictionary (reads dados/palavras_*.txt)
+  vocab_generated.go           reads the other lists in dados/
 ```
 
-### internal/mask/dados
+### internal/mask/data
 
 | File | What it is | Where it comes from |
 |---|---|---|
-| `palavras_comuns.txt` | The 20 thousand most frequent words of pt and en | FrequencyWords (CC BY-SA 4.0) |
-| `palavras_dicionario.txt` | The 50 thousand most frequent, minus the common ones | Generated: `TestGerarDicionario` |
-| `ref_publica.txt` | Words frequent as a resource name in public material | Generated: `TestGerarRefPublica` |
-| `tipos_linguagem.txt` | Data types that public Go code uses as a field type | Generated: `TestGerarRefPublica` |
-| `imagens_oficiais.txt` | Docker Official Images | Generated: `TestGerarRefPublica` (from `docker-library/docs`) |
-| `software_publico.txt`, `fornecedores.txt` | Name and owner of the GitHub repositories with 3000 stars or more | Generated: `TestGerarSoftwarePublico` |
+| `common_words.txt` | The 20 thousand most frequent words of pt and en | FrequencyWords (CC BY-SA 4.0) |
+| `dictionary_words.txt` | The 50 thousand most frequent, minus the common ones | Generated: `TestGerarDicionario` |
+| `public_ref.txt` | Words frequent as a resource name in public material | Generated: `TestGerarRefPublica` |
+| `language_types.txt` | Data types that public Go code uses as a field type | Generated: `TestGerarRefPublica` |
+| `official_images.txt` | Docker Official Images | Generated: `TestGerarRefPublica` (from `docker-library/docs`) |
+| `public_software.txt`, `vendors.txt` | Name and owner of the GitHub repositories with 3000 stars or more | Generated: `TestGerarSoftwarePublico` |
 | `vocab_sql.txt` | SQL reserved words and system objects | Written by hand, with the sources |
 
-The generators are in `vocab_gerar_test.go` and only run with the environment variables
+The generators are in `vocab_generate_test.go` and only run with the environment variables
 described there (see [Derived public reference](structures.md#derived-public-reference)). An
 outdated list never lets anything through: it only fails to recognize a public name, which
 stays masked.
@@ -187,20 +187,20 @@ stays masked.
 ### Tests
 
 The tests live next to the code, ending in `_test.go` (it is the Go convention, and it is
-what allows testing internal functions). The test of a file has the same name (`campos.go`
-and `campos_test.go`). The ones that span several files:
+what allows testing internal functions). The test of a file has the same name (`fields.go`
+and `fields_test.go`). The ones that span several files:
 
 | File | What it checks |
 |---|---|
-| `casos_publicos_test.go` | Real formats taken from public repositories, with invented names: what must go and what must stay. Every rule that leaves a name in the clear has a case here |
+| `public_cases_test.go` | Real formats taken from public repositories, with invented names: what must go and what must stay. Every rule that leaves a name in the clear has a case here |
 | `leitores_*_test.go` | The readers by area (data, DevOps, development, code) |
-| `variacoes_test.go`, `regras_gerais_test.go` | Each case in every spelling variation; rules that hold for all the readers |
-| `matriz_test.go`, `matriz_transporte_test.go` | The same content in every layout and transport |
-| `negativos_test.go`, `freios_referencia_test.go` | What must not be masked |
-| `fuzz_test.go`, `leitores_fuzz_test.go` | Fuzzing of the normalization and of the round trip |
-| `benchmark_test.go`, `estresse_test.go` | Time and load |
-| `medicao_test.go` | Measurements on a public corpus and on real sessions (counts only; see below) |
-| `ajuda_test.go` | Test helper functions |
+| `variations_test.go`, `general_rules_test.go` | Each case in every spelling variation; rules that hold for all the readers |
+| `matrix_test.go`, `matrix_transport_test.go` | The same content in every layout and transport |
+| `negatives_test.go`, `brakes_reference_test.go` | What must not be masked |
+| `fuzz_test.go`, `readers_fuzz_test.go` | Fuzzing of the normalization and of the round trip |
+| `benchmark_test.go`, `stress_test.go` | Time and load |
+| `measurement_test.go` | Measurements on a public corpus and on real sessions (counts only; see below) |
+| `helpers_test.go` | Test helper functions |
 
 ## What is stored
 
@@ -209,18 +209,18 @@ disk: there you only find hashes, positions and pseudonyms.
 
 | What | What it is for | Where | How long it lasts | Cap |
 |---|---|---|---|---|
-| Result cache (`memo`, `mascarar.go`) | Not examining again the text that was already examined (the whole conversation is resent with every message) | RAM | Until it fills up | 64 MB of text, in two generations |
-| Sent (`memoria_enviados.go`) | The text that already went out goes out the same in resends (the API cache depends on it) | RAM and `enviados.log` | Until the configuration or the version changes | 64 MB in RAM; 400 thousand texts on disk |
-| Known (`memoria_conhecidos.go`) | A value masked with a hint next to it is recognized later without the hint | RAM (real value) | While llm-dlp is running | 50 thousand values (the older half is dropped) |
-| Seen (`memoria_vistos.go`) | The known values, so they hold after a restart | `vistos.json` (hash only) | 90 days without use, for a resource name | 500 thousand values and 500 thousand names |
-| People (`pessoas.go`) | Registered names, e-mails and codes | `pessoas.json` (hash only) | Until you import again | Whatever you import |
-| Conversation memory (`memoria_conversa.go`) | A name decided in one text holds in the other texts of the same request | RAM | One request (recomputed for each one) | The texts of the request |
-| Who wrote it (`escritos`, `decisao.go`) | Knowing what the model wrote, so it is not treated as data | RAM | Until it fills up | 20 thousand texts, in two generations |
-| Weak evidence (`fracos`, `objetos.go`) | A name seen by a weak rule only holds with a second one | RAM | While llm-dlp is running | 200 thousand names |
-| Proven software and shadowing (`memoria_software.go`) | Not spreading the default name of a public software through the conversation | RAM | While llm-dlp is running | The software list (measured: 3 names after 60 thousand texts) |
-| Label class (`classes`, `campos_vocabulario.go`) | Not classifying the same field name again | RAM | Until it fills up | 20 thousand labels |
-| Precedence (`internal/proxy/anterioridade.go`) | What the model wrote before any data is public | RAM | One request | The conversation |
-| Pseudonym → real table (`desmascarar.go`) | Undoing the replacement in the response | RAM | One request | The conversation |
+| Result cache (`memo`, `mask.go`) | Not examining again the text that was already examined (the whole conversation is resent with every message) | RAM | Until it fills up | 64 MB of text, in two generations |
+| Sent (`memory_sent.go`) | The text that already went out goes out the same in resends (the API cache depends on it) | RAM and `enviados.log` | Until the configuration or the version changes | 64 MB in RAM; 400 thousand texts on disk |
+| Known (`memory_known.go`) | A value masked with a hint next to it is recognized later without the hint | RAM (real value) | While llm-dlp is running | 50 thousand values (the older half is dropped) |
+| Seen (`memory_seen.go`) | The known values, so they hold after a restart | `vistos.json` (hash only) | 90 days without use, for a resource name | 500 thousand values and 500 thousand names |
+| People (`people.go`) | Registered names, e-mails and codes | `pessoas.json` (hash only) | Until you import again | Whatever you import |
+| Conversation memory (`memory_conversation.go`) | A name decided in one text holds in the other texts of the same request | RAM | One request (recomputed for each one) | The texts of the request |
+| Who wrote it (`escritos`, `decision.go`) | Knowing what the model wrote, so it is not treated as data | RAM | Until it fills up | 20 thousand texts, in two generations |
+| Weak evidence (`fracos`, `objects.go`) | A name seen by a weak rule only holds with a second one | RAM | While llm-dlp is running | 200 thousand names |
+| Proven software and shadowing (`memory_software.go`) | Not spreading the default name of a public software through the conversation | RAM | While llm-dlp is running | The software list (measured: 3 names after 60 thousand texts) |
+| Label class (`classes`, `fields_vocabulary.go`) | Not classifying the same field name again | RAM | Until it fills up | 20 thousand labels |
+| Precedence (`internal/proxy/priority.go`) | What the model wrote before any data is public | RAM | One request | The conversation |
+| Pseudonym → real table (`unmask.go`) | Undoing the replacement in the response | RAM | One request | The conversation |
 
 What this costs in practice is in
 [How much of the machine it uses](how-it-works.md#how-much-of-the-machine-it-uses).
@@ -229,22 +229,22 @@ What this costs in practice is in
 
 ```
 proxy.ServeHTTP                      receives the request
- ├ mascararCorpo (requisicao.go)     1st pass: gathers the texts and masks them ahead (Aquecer),
+ ├ mascararCorpo (request.go)     1st pass: gathers the texts and masks them ahead (Aquecer),
  │                                   so every value learned in the request already holds when
  │                                   the request is assembled
  │                                   2nd pass: calls Lote.Mascarar on each text, in order
- │  └ Lote.Mascarar (mascarar.go)    did it already go out at this point of the conversation
+ │  └ Lote.Mascarar (mask.go)    did it already go out at this point of the conversation
  │                                   (memory or enviados.log)? it goes out the same. The position
  │                                   is the hash of the block (everything before it and the block
  │                                   itself) plus the order of the text in it
  │                                   is it in memory and still valid? return it. otherwise:
- │     ├ Detectar (detectar.go)      runs the detectors and gathers the findings
+ │     ├ Detectar (detect.go)      runs the detectors and gathers the findings
  │     │  ├ detectores_*.go          format, passwords, extras
  │     │  ├ campos*.go               field name
- │     │  └ memoria_conhecidos.go    values already seen
- │     └ aplicar (pseudonimos.go)    replaces each finding with the pseudonym
+ │     │  └ memory_known.go    values already seen
+ │     └ aplicar (pseudonyms.go)    replaces each finding with the pseudonym
  ├ sends to the API and freezes the texts (Lote.Congelar)
- └ desmascararSSE (resposta.go)      swaps the pseudonyms back, chunk by chunk
+ └ desmascararSSE (response.go)      swaps the pseudonyms back, chunk by chunk
 ```
 
 ## Plugging in another LLM API
@@ -257,7 +257,7 @@ request did not get a masker of its own, it is **seen in the Anthropic shape** (
 `ponteOpenAI`, `ponteResponses`) and goes through the same path, so the conversation memory,
 the command hints, the freezing and the images work the same; only the way back
 (`voltaGemini`, `voltaOpenAI`, `voltaResponses`) is written for the format. The code of a
-format only runs for requests on its own path, and `isolamento_test.go` checks that a Claude
+format only runs for requests on its own path, and `isolation_test.go` checks that a Claude
 Code request goes out byte for byte the same with or without it. The destination is chosen
 by the path (`Proxy.destino`, with the `providers` of the configuration).
 
@@ -267,33 +267,33 @@ the most recent example to follow):
 | Part | Today, with no reader | What to do |
 |---|---|---|
 | Address | Any API can be served under `/<name>`, with a provider in `providers` (`format` and `upstream`) | For a provider that comes built in, add it to `config.ProvedoresPadrao`. If the format is recognized by the path (like `/chat/completions` and `/responses`), add it to `Proxy.destino` |
-| Outbound (request) | Generic mode: **every text in the JSON is masked**. It is safe, but masks even fields that did not need it | Write `ponteX(v any) (map[string]any, func(), bool)` in a file of its own: a view of the request in the Anthropic shape (`system`, `messages`, `tools`) whose texts are written back to the original JSON by the returned function. Register it in the map of `mascararCorpo` (`requisicao.go`). Fields that may never change go to `chavesIntocaveisPonte` |
+| Outbound (request) | Generic mode: **every text in the JSON is masked**. It is safe, but masks even fields that did not need it | Write `ponteX(v any) (map[string]any, func(), bool)` in a file of its own: a view of the request in the Anthropic shape (`system`, `messages`, `tools`) whose texts are written back to the original JSON by the returned function. Register it in the map of `mascararCorpo` (`request.go`). Fields that may never change go to `chavesIntocaveisPonte` |
 | Images and PDFs | In the generic mode they do not go through OCR | In the bridge, show them as `image` and `document` blocks, as `ponteGemini` does |
 | Inbound without streaming | The `text`, `content` and `input` fields of the JSON are unmasked | Write `desmascararXJSON` and choose it by `format` in `proxy.go` |
 | Inbound with streaming | **It is not unmasked**: you would see the pseudonyms. Nothing leaks | Write `desmascararSSEX`, with a `voltaX` that passes each text through its own `mask.Fluxo` (it takes care of a pseudonym split between two chunks), and choose it by `format` in `proxy.go` |
-| `llm-dlp last` | Does not show the conversation | Add the `format` to the list that keeps the last request (`proxy.go`) and read its messages in `mensagensDaUltima` (`cmd/llm-dlp/conferir.go`) |
-| Isolation | — | Add the format to `isolamento_test.go`: malformed requests and responses, and a Claude Code request that stays the same |
+| `llm-dlp last` | Does not show the conversation | Add the `format` to the list that keeps the last request (`proxy.go`) and read its messages in `mensagensDaUltima` (`cmd/llm-dlp/inspect.go`) |
+| Isolation | — | Add the format to `isolation_test.go`: malformed requests and responses, and a Claude Code request that stays the same |
 
 The `mask` package depends on no API format: it receives text and returns text. All the work
 for a new API stays in `internal/proxy`.
 
 What to test when plugging one in: nothing real reaches the API, the response comes back
 exactly real, and the old messages arrive identical from one request to the next (the cache
-depends on it). The proxy's `estresse_test.go` makes these three checks and serves as a
+depends on it). The proxy's `stress_test.go` makes these three checks and serves as a
 model.
 
 ## Adding a detector
 
 1. Write the function in one of the `detectores_*.go` files (or in a new file). It receives
    the text and calls `add(start, end, "type")` for each span found.
-2. Call it in `detectarBase` (`detectores_formato.go`), behind a cheap test that avoids
+2. Call it in `detectarBase` (`detectors_format.go`), behind a cheap test that avoids
    running on text that does not have the "ingredient" (a keyword, a character).
 3. The pseudonym comes out as `TYPE-identifier`. For another format, add a case in
-   `Pseudonimo` (`pseudonimos.go`).
+   `Pseudonimo` (`pseudonyms.go`).
 4. If the value must be remembered after being masked once, add the type to `contextuais`
-   (`memoria_conhecidos.go`).
-5. Tests: one case that catches and one that does not in `detectores_test.go`, and the case
-   in `casosDeCorte` (`detectar_test.go`), which checks the data at every cut position of a
+   (`memory_known.go`).
+5. Tests: one case that catches and one that does not in `detectors_test.go`, and the case
+   in `casosDeCorte` (`detect_test.go`), which checks the data at every cut position of a
    large text.
 6. Run `go test ./...` and the benchmarks (`go test ./internal/mask -bench Frio`) to see
    whether it got heavier.
@@ -303,7 +303,7 @@ model.
    others.
 8. Never search for the beginning or the end of the line without a limit at every occurrence
    (`strings.LastIndexByte(s[:i], '\n')`): on a long single line (minified JSON) that becomes
-   quadratic. Use `inicioLinhaJ`/`fimLinhaJ` (`memoria_conhecidos.go`, 1000-character
+   quadratic. Use `inicioLinhaJ`/`fimLinhaJ` (`memory_known.go`, 1000-character
    window). `TestLinhaLongaLinear` and the `-bench Linha` benchmarks check it.
 
 ## How it was tested

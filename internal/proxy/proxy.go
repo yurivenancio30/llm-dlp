@@ -102,7 +102,7 @@ func (p *Proxy) WithKey(key []byte) *Proxy {
 }
 
 // WithSwap: a saúde diz que este proxy está num supervisor que segura a porta e o troca sem
-// fechá-la (cmd/llm-dlp/troca.go); é o que o atualizar pergunta antes de pedir a troca.
+// fechá-la (cmd/llm-dlp/swap.go); é o que o atualizar pergunta antes de pedir a troca.
 func (p *Proxy) WithSwap(swap bool) *Proxy {
 	p.swap = swap
 	return p

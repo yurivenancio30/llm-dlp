@@ -2,12 +2,12 @@
 // compilação pelo Makefile). "llm-dlp version" e /__llm-dlp/saude mostram os dois.
 package version
 
-// Version: a versão do llm-dlp, no formato MAIOR.MENOR.CORREÇÃO (ver docs/pt-BR/versoes.md). É a única
+// Version: a versão do llm-dlp, no formato MAIOR.MENOR.CORREÇÃO (ver docs/pt-BR/versioning.md). É a única
 // fonte: a tag do git (v0.2.0) e a primeira seção do CHANGELOG.md têm de dizer o mesmo, e
 // TestVersionMatchesChangelog confere.
 const Version = "0.9.2"
 
-// Commit: preenchido por -ldflags "-X .../internal/versao.Commit=abc1234" (o Makefile faz).
+// Commit: preenchido por -ldflags "-X .../internal/version.Commit=abc1234" (o Makefile faz).
 // "-mod" no fim: compilado com mudanças não commitadas.
 var Commit = "desconhecido"
 

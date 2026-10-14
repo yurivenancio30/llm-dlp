@@ -1,6 +1,6 @@
 # Versions and releases
 
-[← back to the README](../README.md) · [Português](pt-BR/versoes.md)
+[← back to the README](../README.md) · [Português](pt-BR/versioning.md)
 
 ## How to find out the version
 
@@ -49,12 +49,12 @@ and a `SHA256SUMS` file.
 
 ## How to release a version
 
-The number lives in a single place, `internal/versao/versao.go`. The git tag and the
+The number lives in a single place, `internal/version/version.go`. The git tag and the
 CHANGELOG must say the same, and a test (`TestVersaoBateComOChangelog`) and `make release`
 check it.
 
 1. On the `main` branch, with everything committed, choose the number from the table above.
-2. Edit `internal/versao/versao.go` and add the version's section at the top of
+2. Edit `internal/version/version.go` and add the version's section at the top of
    `CHANGELOG.md` and of `docs/pt-BR/CHANGELOG.md` (`## [X.Y.Z] - YYYY-MM-DD`). Commit
    (`chore(release): X.Y.Z`).
 3. Run `make release`. It checks the branch, the version and the CHANGELOG, runs the tests
@@ -65,7 +65,7 @@ check it.
 
 | Command | What it does |
 |---|---|
-| `make versao` | Shows the version and the commit of the code |
+| `make version` | Shows the version and the commit of the code |
 | `make test` | `go vet` and all the tests |
 | `make build` | Builds `bin/llm-dlp` for your machine |
 | `make dist` | Rehearses the release on your machine, without publishing: archives and `checksums.txt` in `dist/` (needs [GoReleaser](https://goreleaser.com/install/)) |

@@ -1,6 +1,6 @@
 # How it works
 
-[← back to the README](../README.md) · [Português](pt-BR/como-funciona.md)
+[← back to the README](../README.md) · [Português](pt-BR/how-it-works.md)
 
 ## The path of a message
 

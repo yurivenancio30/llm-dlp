@@ -1,6 +1,6 @@
 # Structures: where object names live in each format
 
-[← back to the README](../README.md) · [Português](pt-BR/estruturas.md)
+[← back to the README](../README.md) · [Português](pt-BR/structures.md)
 
 This document is the basis of llm-dlp's **structure readers**: the rules that recognize, by
 the grammar of each format, where there is a server, database, schema, table, column,
@@ -42,7 +42,7 @@ A single format, for every family:
 
 - **ID:** 8 lowercase base32 characters, the same length as the other llm-dlp pseudonyms,
   taken from `HMAC-SHA256(llm-dlp key, "objeto" ‖ type ‖ normalized name)`
-  (`internal/mask/chave.go`).
+  (`internal/mask/key.go`).
 - **Stable:** the same name of the same type gives the same pseudonym in any conversation and
   after a restart (it only depends on the key). It is never "per session" and never a
   counter.
@@ -815,7 +815,7 @@ the URN), otherwise the model loses the link between the texts.
 
 ### 8. Storage and queues: what is implemented (the `endereço` reader)
 
-Code: `internal/mask/leitor_enderecos.go` (`urlEm`). Database URIs stay with the `conexão`
+Code: `internal/mask/reader_addresses.go` (`urlEm`). Database URIs stay with the `conexão`
 reader; these are the storage and queue ones:
 
 | Scheme | Position | Entity | Strong? |
@@ -838,7 +838,7 @@ kafka://broker-01:9092/fila-pedidos-x9  →  kafka://host_...:9092/top_...
 
 ## Tabular data
 
-**How it is implemented** (`leitor_tabela.go`): the table is recognized by its shape. Separator
+**How it is implemented** (`reader_table.go`): the table is recognized by its shape. Separator
 `,` `;` TAB or `|` with the same count outside quotes in the header and in the next line (CSV
 according to RFC 4180: the URN with commas between quotes is a single cell); a dash line (with or
 without borders, `+---+`, `|===|`, double `||`); columns aligned by spaces without a dash line
@@ -1067,20 +1067,20 @@ and markdown without visual alignment do not need to be realigned (only the cell
 
 ## JSON, YAML, TOML, INI, .env, .properties, XML and schema languages
 
-**Schemas: name + data type** (`leitor_esquema.go`, a new reader: no other one reads this
+**Schemas: name + data type** (`reader_schema.go`, a new reader: no other one reads this
 shape). Where a name comes with a data type, the name is a column: `name    type` per line (2+
 lines, or 1 with the footer `dtype: object`), decided by the type and not by the indentation (see
 [Guards](#guards)), `Index(['a', 'b'], dtype='object')`,
 ` |-- name: string` (printSchema), `name: int64` at the start of the line (2+ lines: a code
 annotation is indented and does not count), `string name = 1;` (protobuf) and a `name | type` table with data
 types in the `type` column. The vocabulary is only that of data types (SQL, pandas/numpy, Arrow,
-Polars, Spark, Avro, Protobuf, R: `vocab_tipos.go`). In YAML/JSON, `name` counts by its container
+Polars, Spark, Avro, Protobuf, R: `vocab_types.go`). In YAML/JSON, `name` counts by its container
 (the YAML/JSON engine, `acharNomePorContexto`): under `columns`/`fields` it is a column (dbt
 `schema.yml`, Avro), under `tables`/`models`/`seeds`/`views` it is a table, under `sources`/`datasets`
 it is a schema, and under a key that is a type word (`table`, `dataset`, `database`...) it is of that
 type; `owner` is a user; a qualified value (`db.schema.table`) is split into its parts.
 
-**Key → value in any syntax** (the key-value reader, `leitor_chave_valor.go`, and the code
+**Key → value in any syntax** (the key-value reader, `reader_key_value.go`, and the code
 reader, extended). The type word is recognized in any spelling: the key name is
 split into pieces (camelCase, snake_case, kebab, dots) and also glued to `name`/`path`
 (`dbname`, `rolename`, `warehousename`, `accountname`, `fieldPath`); new type words:
@@ -1316,7 +1316,7 @@ Avro: `"namespace": "vendas_x.pedidos"` → `"DB_dqrsyg6b.SCH_3wl5qkpz"`, `"name
 
 ### 8. What is implemented (the `chave-valor` reader)
 
-Code: `internal/mask/leitor_chave_valor.go`. A single reader, without a parser for each format: it finds the
+Code: `internal/mask/reader_key_value.go`. A single reader, without a parser for each format: it finds the
 separator (`:` or `=`), the key before it and the value after it. It works for YAML, JSON, TOML, INI,
 .env, .properties, an XML attribute (`host="x"`), an XML element without attributes (`<host>x</host>`) and
 a long command-line option (`--host x`, `--host=x`).
@@ -2513,7 +2513,7 @@ SELECT * FROM vendas_demo.pedidos_x9 WHERE pedido_id = 1;   → SELECT * FROM DB
 
 ## Transport formats (diff, grep, line numbering, logs, markdown, heredoc)
 
-**How it is implemented** (`normalizacao.go`): a layer before all the readers strips the
+**How it is implemented** (`normalization.go`): a layer before all the readers strips the
 transport and maps each position of the clean text back to the original. It strips: the line number
 of the reading tool (`   12→`) and of `cat -n`/`nl`; the `grep -n` prefix (`file:12:`,
 `12:`, context `file-12-`, separator `--`), only when most lines have it; diff/patch
@@ -2732,8 +2732,8 @@ With no official source read (marked [VERIFY]): the `N<tab>` format of Read (che
 Script and shell output has no fixed format. Four generic mechanisms apply, none per
 tool (the tool names below are examples of where the shape appears):
 
-**1. The command says what the output is** (`chamada_comando.go`; the proxy links the `tool_use` to the `tool_result`
-of the same id in `requisicao.go`, `dicasDosComandos`). The tool input (the shell
+**1. The command says what the output is** (`call_command.go`; the proxy links the `tool_use` to the `tool_result`
+of the same id in `request.go`, `dicasDosComandos`). The tool input (the shell
 `command`, or the strings of the input, without the description) becomes a *hint* with the type of the columns of the
 output, which goes along with the text in the key of the result memory. The hint is only evidence for the
 table reader (`classificarTabelaD`, in hint mode: only the columns the header does not type) and
@@ -2767,7 +2767,7 @@ without a scheme `host:port/database` (EZConnect and connection messages) in the
 a line that talks about a connection (`conect`, `connect`, `conex`), with `como|as <user>` right after;
 without a user, a public host with a database that does not look like a name (`localhost:8080/api`) does not count.
 
-**3. Homogeneous list** (`objetos_listas.go`, runs after the readers, because it depends on what is already
+**3. Homogeneous list** (`objects_lists.go`, runs after the readers, because it depends on what is already
 known): in a loose column (one item per line, with a `- `/`* ` marker), in count + value
 (`sort | uniq -c`, `value_counts`), in a decorated loop line (`== t_x ==`, `--- t_x`, `## t_x`,
 grouped by the decoration) or in a comma-separated list (with or without quotes and brackets:
@@ -3135,7 +3135,7 @@ pipeline {                                         pipeline {
 Central idea: the name of the organization, of the repository, of the internal package and of the user who owns a
 folder appears in fixed positions of public formats (git remote, `go.mod`, `pom.xml`,
 `package.json`, home path). The position gives the type; public hosts and prefixes stay.
-Code: `internal/mask/leitor_enderecos.go` (git, paths) and `leitor_nuvem.go` (packages).
+Code: `internal/mask/reader_addresses.go` (git, paths) and `reader_cloud.go` (packages).
 
 ### 1. Detection signals
 
@@ -3221,7 +3221,7 @@ https://github.com/org-exemplo/repo-demo/issues/1   (stays: outside a git contex
 **Snowflake** (the same generic rules, plus the shapes of the product). Account: keys
 `account`/`account_id`/`accountname` in any syntax (key-value and named argument); the
 host `<account>.snowflakecomputing.com` (the account, without the region) and `app.snowflake.com/<org>/<account>/`
-(`leitor_nuvem.go`); afterwards, loose in the text, by propagation. A role (`role`, `rolename`,
+(`reader_cloud.go`); afterwards, loose in the text, by propagation. A role (`role`, `rolename`,
 `SNOWFLAKE_ROLE`) is a user; in SQL, the name after `ROLE` or `USER` (`USE ROLE`, `GRANT ... TO
 ROLE`, `REVOKE ... FROM ROLE`, `GRANT ROLE x TO USER y`, `CREATE/ALTER/DROP ROLE`) is a user.
 A warehouse is a service: key `warehouse`, `USE WAREHOUSE x`, `WAREHOUSE = x`, `CREATE/ALTER
@@ -3236,7 +3236,7 @@ URN with parts padded with spaces (`db2,ABCD    .TABELA`) is read without the sp
 Central idea: cloud resource identifiers have a published grammar (ARN, Azure
 Resource Manager ID, Google Cloud resource name); a network user has two fixed shapes
 (`DOMAIN\user`, `user@host` after ssh/scp). The grammar gives the type of each piece.
-Code: `internal/mask/leitor_nuvem.go` (cloud, public IP) and `leitor_enderecos.go`
+Code: `internal/mask/reader_cloud.go` (cloud, public IP) and `reader_addresses.go`
 (network user).
 
 ### 1. Detection signals
@@ -3334,7 +3334,7 @@ subnet-0f1e2d3c4b5a69788 in vpc-0a1b2c3d4e5f67890     →  svc_... in svc_...
 
 ## Variations every reader accepts (section G)
 
-`variacoes_test.go` generates, for each case of each reader, the variations below (one dimension at
+`variations_test.go` generates, for each case of each reader, the variations below (one dimension at
 a time) and checks that every name is masked and no word of the template is masked needlessly:
 letter case (UPPERCASE, lowercase, Capitalized and, in SQL, aLtErNaTiNg), spaces, tabs and line breaks between
 tokens, quoting (`"` `'` `` ` `` `[ ]`), comments in the middle (`--`, `/* */`, `#`, `//`, `;`),
@@ -3390,7 +3390,7 @@ or uniqueness. The only vocabulary is the closed grammar of the enumeration and 
 `GET /x`), the types of `EntObjeto`, the public vocabularies that already existed and the public
 reference derived by measurement (below).
 
-### The pieces (decisao.go)
+### The pieces (decision.go)
 
 - **Decision:** a name decided in a text, with the name, the type and the rule that decided it
   (`Decisao{Nome, Ent, Regra, Generica}`). The object names found by the readers enter
@@ -3419,7 +3419,7 @@ request. Applying the memory is a step after the memo and does not change the me
 - **It ends by itself.** Nothing is stored per conversation outside the memo: the memory is recomputed
   from the pieces of the request itself. In a new conversation, without the inventory in the history, the
   common word goes back to being just a word.
-- **It does not rewrite the past.** What was already sent stays frozen (`memoria_enviados.go`): the
+- **It does not rewrite the past.** What was already sent stays frozen (`memory_sent.go`): the
   new decisions hold only for text that has not gone out yet. An old text that brought the word
   in the clear stays the same, so the API's prompt cache stays valid.
 - **Claude Code's text is prose.** The system prompt and the tool definitions are sent before
@@ -3428,13 +3428,13 @@ request. Applying the memory is a step after the memo and does not change the me
   replaced the word inside the `x-anthropic-billing-header` header, and the API started
   answering 429 to every message of that conversation. In these texts a common word that
   arrives through the memory stays a word (as in prose), and Claude Code's header and identity
-  sentence go through untouched, proven by their exact shape (`proxy/requisicao.go`).
+  sentence go through untouched, proven by their exact shape (`proxy/request.go`).
 - **It applies to** the user's messages and the command outputs. It does not apply to
   thinking blocks (untouched in both directions) nor to the assistant's text (see *Who wrote it*).
 - **A generic word does not enter.** A word of the derived public reference (`default`,
   `public`, `api`...) decided in an inventory is masked there, but does not enter the memory
   (`Decisao.Generica`): propagating `default` to the whole conversation would mask half of the text.
-- **Where it holds back** (`memoria_conversa_freios.go`): a word that is in the program of the
+- **Where it holds back** (`memory_conversation_brakes.go`): a word that is in the program of the
   tool call, a word inside a code comment, a column or index name in prose, a common word in
   prose and a common word in another file read. In **data** (a command output, a file read; not
   the user's message, not the assistant's text) a resource name (table, schema, database,
@@ -3460,7 +3460,7 @@ spans it translated from a pseudonym. When the block comes back:
   word, not because it knows the namespace).
 
 Without a record (the proxy restarted, another process answered) the previous behavior applies. The
-record stays in RAM with a cap; if it is persisted, it is in the style of `memoria_enviados.go` (pseudonyms
+record stays in RAM with a cap; if it is persisted, it is in the style of `memory_sent.go` (pseudonyms
 and HMAC only).
 
 ### Provenance rule
@@ -3530,7 +3530,7 @@ or when the pandas footer `dtype: object` comes. A type that is also a language 
 (`string`, `int`, `bool`, `uint64`, `float64`...) does not decide alone, because a Go struct
 writes `name    type` the same way; and a type with the shape of code (`*T`, `[]T`,
 `strings.Builder`, `map[K]V`) is never a schema type. Which types are "also language types" is not
-written by hand: it is measured in public Go code (`tipos_linguagem.txt`, below). Limit: an
+written by hand: it is measured in public Go code (`language_types.txt`, below). Limit: an
 indented block with only `int64` and `float64`, without a footer, is not read as a schema (it is the same as a
 struct).
 
@@ -3540,7 +3540,7 @@ a code comment that talks about the code (`// Use x.Errors`, `# delete FROM line
 `// Insert into hash table`), a common keyword in the middle of a sentence (`you can use x`,
 `would never call f(), so`, `Call data.encode(...) but`), an uppercase word in the middle of another
 uppercase sentence (`0x3B -> CUSTOMER USE THREE`) and a struct field named after a keyword
-(`Use    uint32`, `call    ast.CallExpr`). The guards (`leitor_sql_freios.go`) are about shape:
+(`Use    uint32`, `call    ast.CallExpr`). The guards (`reader_sql_brakes.go`) are about shape:
 
 - in a code comment (`#`, `//`, `/*`, `*`, and the comment at the end of the line), only
   the statement that opens the comment counts, outside uppercase only with an identifier-looking target, and
@@ -3555,13 +3555,13 @@ uppercase sentence (`0x3B -> CUSTOMER USE THREE`) and a struct field named after
 `conexão/uri` learned all had the same shape: a type or attribute word followed by a
 number or glued to another one (`host1`, `user2`, `db01`, `dbName`): an example name, not a resource
 name. In the database URI and in tnsnames, a value of at most two pieces, all of the
-vocabulary that already exists, with or without a number at the end, is not masked (`leitor_conexao_freios.go`). In the
+vocabulary that already exists, with or without a number at the end, is not masked (`reader_connection_brakes.go`). In the
 other rules, `broker1` in a `bootstrap.servers` is still a name.
 
 ### Derived public reference
 
-`ref_publica.txt` and `tipos_linguagem.txt` are **generated** by `TestGerarRefPublica`
-(`vocab_gerar_test.go`) from the public material of the machine (the directories of
+`public_ref.txt` and `language_types.txt` are **generated** by `TestGerarRefPublica`
+(`vocab_generate_test.go`) from the public material of the machine (the directories of
 `LLM_DLP_CORPUS`: Go modules, Python libraries, `/usr/share/doc`), never written by hand. The
 header of each file says from where, when and with which criterion it was generated:
 
@@ -3570,7 +3570,7 @@ LLM_DLP_GERAR_REF=1 LLM_DLP_CORPUS=~/go/pkg/mod:/usr/lib/python3.10:/usr/share/d
   go test ./internal/mask -run TestGerarRefPublica -v
 ```
 
-- **ref_publica.txt:** a word in a name position in at least 8 distinct projects. Name
+- **public_ref.txt:** a word in a name position in at least 8 distinct projects. Name
   position, by the grammar: the value of a type key (`entChave`) or `name` in YAML, JSON, TOML,
   INI, .env and a named argument (in code, only a text literal); a `--type` option; the name after
   `FROM`/`JOIN`/`INTO`/`UPDATE`/`TABLE`/`SCHEMA`/`DATABASE` (in lowercase, only a qualified
@@ -3578,13 +3578,13 @@ LLM_DLP_GERAR_REF=1 LLM_DLP_CORPUS=~/go/pkg/mod:/usr/lib/python3.10:/usr/share/d
   Go module (up to the `@`) or the first directory below the root of the corpus. A name that only one
   project uses never enters, and an internal company name does not appear in distinct public
   projects. In the current generation: 977 projects, 367 MB, 289 words.
-- **tipos_linguagem.txt:** a type of the data type vocabulary that appears as a field or
+- **language_types.txt:** a type of the data type vocabulary that appears as a field or
   variable type (`\tname    type`) in Go code of at least 5 distinct projects (16 types).
 
-- **imagens_oficiais.txt:** the Docker Official Images (`redis`, `postgres`, `nginx`...): the
+- **official_images.txt:** the Docker Official Images (`redis`, `postgres`, `nginx`...): the
   folders of the public repository `docker-library/docs` that have `content.md` and `metadata.json`
   (one per image). Generated along with the others, when that repository is in the corpus.
-- **software_publico.txt and fornecedores.txt:** name and owner of each public GitHub repository
+- **public_software.txt and vendors.txt:** name and owner of each public GitHub repository
   with at least 3000 stars (`TestGerarSoftwarePublico`, with `LLM_DLP_GITHUB_TOP` pointing
   to the JSONL list `{"r": "owner/name", "s": stars}`). The list comes from the API search,
   sliced by star range because each query returns at most 1000
@@ -3613,7 +3613,7 @@ secrets of the battery and the names of the labelled set that must be masked. Wh
 - **Container image:** the path of an image from Docker Hub or from a multi-user public registry
   (`ghcr.io`, `quay.io`, `public.ecr.aws`) stays in the clear only with proof: without an
   organization, a Docker Official Image; with an organization, the two keys: the organization is
-  public (reference or `fornecedores.txt`) **and** the name is public software (whole, or each
+  public (reference or `vendors.txt`) **and** the name is public software (whole, or each
   piece is software, a word of the reference, a role, a type or a version, with at least one piece of
   software: `clickhouse/clickhouse-server`, `quay.io/prometheus/statsd-exporter`). Outside that,
   the organization and the name are the owner's (`vendashx/api-cobranca`, `grafana/billing-vendashx`,
@@ -3631,7 +3631,7 @@ secrets of the battery and the names of the labelled set that must be masked. Wh
   identity column (`dags` → `dag_id`, `projects` → `project_id`). Listing only: below
   `$ cat x.csv`, `$ python relatorio.py` or SQL in the command (`psql -c "select ..."`),
   the header is the owner's and is still a column.
-- **Software proof** (`memoria_software.go`): DataHub's database is called `datahub`, Airflow's
+- **Software proof** (`memory_software.go`): DataHub's database is called `datahub`, Airflow's
   `airflow`; decided in a DSN, the default name of the software was spread through the whole
   conversation, including where it is the tool. The conversation memory does not spread the word when the
   conversation itself ties it to an external package, the way a compiler resolves a name: installed
@@ -3640,9 +3640,9 @@ secrets of the battery and the names of the labelled set that must be masked. Wh
   image rule) or executed as a program (`airflow dags list`, `python -m dagster`; the
   proxy passes the command of each shell call). Where a reader decides it (the DSN itself), it
   stays masked. Locks, all fail-closed:
-  - second key: the word is the name of public software (`software_publico.txt` or a Docker
+  - second key: the word is the name of public software (`public_software.txt` or a Docker
     Official Image); an old list only stops proving;
-  - a real word never gets the proof (`palavras_comuns.txt` and `palavras_dicionario.txt`, the
+  - a real word never gets the proof (`common_words.txt` and `dictionary_words.txt`, the
     50000 most frequent words of pt and en): it is what a client codename usually is, and
     an internal package with that name is imported the same way. Measured: of the popular
     repositories with a typical codename (`polaris`, `kraken`, `nexus`, `pulsar`, `zephyr`…),
@@ -3658,7 +3658,7 @@ secrets of the battery and the names of the labelled set that must be masked. Wh
   software and the project) and do not change text already sent (freezing). The two sets only
   store a name that is in the software list: the size is limited by the list, not by what
   goes through the conversation (measured: 60000 texts all different, 3 and 0 entries).
-- **Origin by path** (`leitor_traceback.go`): the path of a file says whose
+- **Origin by path** (`reader_traceback.go`): the path of a file says whose
   code it is, the way a compiler's include paths separate the system header from the
   project header. Being in a dependency folder is not enough, because the client's internal
   package is installed and downloaded into the same folders. It is third-party code:
@@ -3698,7 +3698,7 @@ Limit: in a translation catalog, the translated label of a type key (`"url_schem
 of a Russian client would require letting a value in a non-Latin script through, which is the leak that
 non-Latin script support came to close; the over-masking stays.
 
-Rejected rules, so they do not come back (each one has a case in `casos_publicos_test.go`):
+Rejected rules, so they do not come back (each one has a case in `public_cases_test.go`):
 
 | Rule | Why it leaks |
 |---|---|

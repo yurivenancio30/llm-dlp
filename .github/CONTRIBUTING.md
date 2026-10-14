@@ -34,7 +34,7 @@ A leak is worse than masking too much: **when in doubt, mask**.
   must stay stays).
 - A rule that **leaves a name in the clear** needs a structural guarantee that the name is
   public (never "it looks public"), must fail closed, and needs a case in
-  `internal/mask/casos_publicos_test.go`. The rules that were tried and rejected, and why,
+  `internal/mask/public_cases_test.go`. The rules that were tried and rejected, and why,
   are listed under "Public only with proof" in [docs/structures.md](../docs/structures.md).
 - Compare before and after on the same texts: what the previous version masked and yours
   leaves in the clear is what matters most.

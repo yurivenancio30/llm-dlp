@@ -1,6 +1,6 @@
 # Policy: what llm-dlp protects and why
 
-[← back to the README](../README.md) · [Português](pt-BR/politica.md)
+[← back to the README](../README.md) · [Português](pt-BR/policy.md)
 
 This document tells whoever uses llm-dlp what kinds of information exist in a conversation
 with Claude Code, what llm-dlp does with each kind and which legal and technical references

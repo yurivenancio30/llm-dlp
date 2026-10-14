@@ -292,7 +292,7 @@ open the client, and from then on it also comes back by itself.
 
 MIT. See [LICENSE](LICENSE).
 
-The data files `internal/mask/dados/palavras_comuns.txt` and `palavras_dicionario.txt` are
+The data files `internal/mask/data/common_words.txt` and `dictionary_words.txt` are
 adaptations of the frequency lists of
 [FrequencyWords](https://github.com/hermitdave/FrequencyWords), by Hermit Dave (OpenSubtitles
 2018 data), distributed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/);

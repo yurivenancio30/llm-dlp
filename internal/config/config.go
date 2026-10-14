@@ -80,7 +80,7 @@ type Config struct {
 	ToolsWithoutUnmask []string `json:"tools_never_unmasked"`
 
 	// Names de recursos internos (servidor, banco, schema, tabela, coluna...), reconhecidos
-	// pela estrutura do conteúdo. Ver docs/pt-BR/configuracao.md.
+	// pela estrutura do conteúdo. Ver docs/pt-BR/configuration.md.
 	Objects Objects `json:"objects"`
 }
 

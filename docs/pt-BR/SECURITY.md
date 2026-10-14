@@ -35,7 +35,7 @@ reproduzir um problema de detecção.
 
 ## O que já é conhecido
 
-Os limites descritos em [seguranca.md](seguranca.md#limites-conhecidos) (por exemplo, um nome
+Os limites descritos em [security.md](security.md#limites-conhecidos) (por exemplo, um nome
 que só aparece em texto corrido, ou um programa rodado pelo agente que leva o dado para fora)
 são comportamento documentado. Ideias para reduzi-los são bem-vindas como issues comuns, com
 dados inventados.

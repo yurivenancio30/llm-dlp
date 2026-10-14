@@ -18,7 +18,7 @@ import (
 )
 
 // Masker: o objeto que mascara. Este arquivo tem os tipos e a construção; cada etapa está
-// num arquivo próprio (ver o mapa do código em docs/pt-BR/desenvolvimento.md).
+// num arquivo próprio (ver o mapa do código em docs/pt-BR/development.md).
 
 // Finding é um trecho sensível encontrado num texto.
 type Finding struct {
@@ -37,7 +37,7 @@ type result struct {
 	gen      int // quantos "valores conhecidos" existiam quando foi calculado
 	// noLearn: calculado sem aprender (conteúdo da internet)
 	noLearn bool
-	// decididos: os nomes decididos neste texto (ver decisao.go). Só em RAM.
+	// decididos: os nomes decididos neste texto (ver decision.go). Só em RAM.
 	decidedSet []Decision
 }
 
@@ -45,36 +45,36 @@ type result struct {
 //
 // Os campos vêm em três grupos: o que é fixo depois da construção (configuração e regras), o
 // que o Masker lembra (cada memória com o seu teto; a tabela completa está em
-// docs/pt-BR/desenvolvimento.md, "O que fica guardado") e os caches.
+// docs/pt-BR/development.md, "O que fica guardado") e os caches.
 type Masker struct {
 	// ---- fixo depois da construção ----
 	cfg        config.Config
 	p          *Pseudo
 	keyB64     string
 	leaks      *detect.Detector // gitleaks: tokens e segredos com formato próprio
-	readers    []Reader         // leitores de estrutura (leitores.go)
-	vocab      *vocabulary      // nomes de campo (campos_vocabulario.go)
+	readers    []Reader         // leitores de estrutura (readers.go)
+	vocab      *vocabulary      // nomes de campo (fields_vocabulary.go)
 	extras     []*regexp.Regexp // padrões da configuração
 	extraLabel []string
 	terms      *regexp.Regexp // termos cadastrados (sempre vencem)
 	termLabel  map[string]string
 
 	// ---- o que o Masker lembra ----
-	people     *People         // pessoas cadastradas, só hash, em disco (pessoas.go)
-	known      *knownSet       // valores já mascarados, em RAM (memoria_conhecidos.go)
-	seenSet    *Seen           // os mesmos valores, só hash, em disco (memoria_vistos.go)
-	sentSet    *Sent           // o que cada texto já enviado levou, em disco (memoria_enviados.go)
-	writtenSet writtenRegistry // o que o modelo escreveu, para saber quem escreveu (decisao.go)
-	weakSet    weakSet         // evidência fraca de nome: vale com duas regras (objetos.go)
-	soft       sync.Map        // software público com prova estrutural (memoria_software.go)
+	people     *People         // pessoas cadastradas, só hash, em disco (people.go)
+	known      *knownSet       // valores já mascarados, em RAM (memory_known.go)
+	seenSet    *Seen           // os mesmos valores, só hash, em disco (memory_seen.go)
+	sentSet    *Sent           // o que cada texto já enviado levou, em disco (memory_sent.go)
+	writtenSet writtenRegistry // o que o modelo escreveu, para saber quem escreveu (decision.go)
+	weakSet    weakSet         // evidência fraca de nome: vale com duas regras (objects.go)
+	soft       sync.Map        // software público com prova estrutural (memory_software.go)
 	localSoft  sync.Map        // nomes definidos no projeto: anulam a prova (sombreamento)
 
 	// ---- caches (só evitam refazer trabalho) ----
-	classes  sync.Map // rótulo de campo -> classe (campos_vocabulario.go)
+	classes  sync.Map // rótulo de campo -> classe (fields_vocabulary.go)
 	nClasses atomic.Int64
 
 	mu    sync.Mutex
-	memo  map[[32]byte]result // texto -> resultado (mascarar.go); duas gerações
+	memo  map[[32]byte]result // texto -> resultado (mask.go); duas gerações
 	stale map[[32]byte]result // geração anterior do memo
 	bytes int
 	// o que já saiu, por posição na conversa (ver Batch); duas gerações, como o memo. É a cópia
@@ -95,7 +95,7 @@ func NewMasker(cfg config.Config, key []byte, people *People, seenSet *Seen) (*M
 	m := &Masker{cfg: cfg, p: NewPseudo(key), leaks: d, people: people, seenSet: seenSet, known: newKnown(),
 		memo: map[[32]byte]result{}, frz: map[Position]result{}, termLabel: map[string]string{},
 		keyB64: base64.StdEncoding.EncodeToString(key), readers: readersOf(cfg)}
-	// o leitor de traceback consulta o sombreamento deste Masker (memoria_software.go)
+	// o leitor de traceback consulta o sombreamento deste Masker (memory_software.go)
 	m.readers = append(m.readers, Reader{Name: "traceback", Find: m.findTraceback, Public: publicDev})
 	// vocabulário dos nomes de campo: o padrão mais o que o usuário acrescentou
 	m.vocab = defaultVocabulary()

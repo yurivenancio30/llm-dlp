@@ -1,6 +1,6 @@
 # Configuration and commands
 
-[← back to the README](../README.md) · [Português](pt-BR/configuracao.md)
+[← back to the README](../README.md) · [Português](pt-BR/configuration.md)
 
 The field names of `config.json` and the command names are in Portuguese; the tables below
 say what each one is for.
@@ -236,7 +236,7 @@ The same holds when the proxy goes down: the port stays open with the supervisor
 requests wait in the queue until the next proxy (about a second), instead of being refused.
 
 The installation command (`curl ... | sh`) does the same when llm-dlp is already installed in
-`~/.local/bin`. Building from source, `make instalar` installs the binary and runs
+`~/.local/bin`. Building from source, `make install` installs the binary and runs
 `llm-dlp reload`, which does steps 3 to 5 with the installed binary (it is also what
 applies a change in `config.json`).
 
