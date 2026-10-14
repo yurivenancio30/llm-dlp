@@ -14,7 +14,8 @@ converts the file back, since an older version would ignore the new names.
 
 Up to 0.9 the names of detectors and types were in Portuguese too (`segredo`, `tabela`...), in
 `disabled_detectors`, `optional_detectors`, `extra_fields` and `objects`. They are still read, and
-`llm-dlp update` rewrites them with the names below (and back, when going to an older version).
+`llm-dlp reload` rewrites them with the names below, as does `llm-dlp update` from 0.10 on (and
+back, when going to an older version).
 The identifier in each pseudonym does not change; only the label of the personal data types is
 now in English (`TELEFONE-6x6fjtkg` becomes `PHONE-6x6fjtkg`, `Pessoa …` becomes `Person …`).
 
@@ -251,6 +252,10 @@ from 0.7.0, the old supervisor erased `supervisor.pid` as it exited: without tha
 up to 0.9.1 did not find the supervisor, cut the answer in progress and left the supervisor on
 0.8.0. From 0.9.2 on, llm-dlp finds the supervisor by its lock, and the `reload` puts it on the
 installed binary. The installation command does all of it at once.
+
+**From 0.9.x**: `llm-dlp update` is enough. That update is done by the 0.9 code, which does not
+know the English detector and type names: `config.json` keeps the Portuguese ones, which still
+work, and `llm-dlp reload` once rewrites them. The installation command does it at once.
 
 **From 0.7.0 or older** (no update command): run the installation command once. In those
 versions the proxy holds the port itself: the new supervisor takes the port the moment the old

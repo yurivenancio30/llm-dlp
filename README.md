@@ -247,6 +247,9 @@ hooks to the English names (the old ones keep working), and if llm-dlp came from
 supervisor stays on 0.8.0 until then. On 0.9.0 or 0.9.1, the same with `llm-dlp update`. The
 installation command above does all of it at once.
 
+From 0.9.x, `llm-dlp update` is enough. `config.json` keeps the detector and type names
+in Portuguese, which still work; `llm-dlp reload` once rewrites them in English.
+
 From 0.7.0 or older, which cannot update themselves, run the installation command above
 once, between messages: those versions cannot hand over the port, and an answer that is being
 written is cut (Claude Code repeats it). From then on, updates cut nothing.

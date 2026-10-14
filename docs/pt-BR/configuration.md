@@ -14,8 +14,8 @@ o anterior em `config.json.bak-DATA`). Voltar para uma versão anterior com
 
 Até a 0.9 os nomes de detectores e tipos também eram em português (`segredo`, `tabela`...), em
 `disabled_detectors`, `optional_detectors`, `extra_fields` e `objects`. Eles continuam sendo
-lidos, e o `llm-dlp update` regrava com os nomes abaixo (e de volta, ao ir para uma versão
-anterior). O identificador de cada pseudônimo não muda; só o rótulo dos tipos de dado pessoal passou para
+lidos, e o `llm-dlp reload` os regrava com os nomes abaixo, assim como o `llm-dlp update` da
+0.10 em diante (e de volta, ao ir para uma versão anterior). O identificador de cada pseudônimo não muda; só o rótulo dos tipos de dado pessoal passou para
 o inglês (`TELEFONE-6x6fjtkg` vira `PHONE-6x6fjtkg`, `Pessoa …` vira `Person …`).
 
 Enquanto a configuração tirar proteção (`fail_closed` desligado, `ocr.mode` em
@@ -252,6 +252,10 @@ quando o llm-dlp veio da 0.7.0, o supervisor antigo apagou o `supervisor.pid` ao
 arquivo, as atualizações até a 0.9.1 não achavam o supervisor, cortavam a resposta em andamento
 e deixavam o supervisor na 0.8.0. Da 0.9.2 em diante, o llm-dlp acha o supervisor pela trava
 dele, e o `reload` o põe no binário instalado. O comando de instalação faz tudo de uma vez.
+
+**Da 0.9.x**: basta o `llm-dlp update`. Essa atualização é feita pelo código da 0.9, que não
+conhece os nomes de detector e de tipo em inglês: o `config.json` fica com os em português, que
+continuam valendo, e um `llm-dlp reload` os regrava. O comando de instalação faz isso de uma vez.
 
 **Da 0.7.0 ou anterior** (sem comando de atualizar): rode o comando de instalação uma vez.
 Nessas versões o próprio proxy segura a porta: o supervisor novo pega a porta no instante em

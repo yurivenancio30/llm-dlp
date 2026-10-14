@@ -82,7 +82,8 @@ também.
   linhas do log (`substituições` → `replacements`, `RECUSADO` → `REFUSED`...), as mensagens e a
   palavra que o `sudo llm-dlp emergency` pede (`LIBERAR` → `UNLOCK`).
 - Os nomes antigos continuam funcionando. Um `config.json` com os nomes de tipo antigos é lido
-  como está, e o `llm-dlp update` o regrava (e de volta, ao ir para uma versão anterior). A
+  como está, e o `llm-dlp reload` o regrava (o comando de instalação também, e o `llm-dlp update`
+  da 0.10 em diante; ao voltar para uma versão anterior, ele é convertido de volta). A
   primeira subida copia `chave`, `pessoas.json` e `vistos.json` para os nomes novos e deixa os
   antigos para uma versão anterior. O `llm-dlp audit` lê as linhas do log das duas versões. Com
   os rótulos novos, a primeira mensagem de cada conversa regrava o cache uma vez, como depois de

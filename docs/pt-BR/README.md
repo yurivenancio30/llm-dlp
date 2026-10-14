@@ -242,6 +242,9 @@ Code para os nomes em inglês (os antigos continuam funcionando), e, se o llm-dl
 o supervisor dele fica na 0.8.0 até lá. Na 0.9.0 ou 0.9.1, o mesmo com `llm-dlp update`. O
 comando de instalação de cima faz tudo de uma vez.
 
+Da 0.9.x, basta o `llm-dlp update`. O `config.json` fica com os nomes de detector e de tipo
+em português, que continuam valendo; um `llm-dlp reload` os regrava em inglês.
+
 Da 0.7.0 ou anterior, que não sabem se atualizar, rode o comando de instalação de cima
 uma vez, entre uma mensagem e outra: essas versões não sabem passar a porta, e uma resposta que
 estiver sendo escrita é cortada (o Claude Code repete). Daí em diante, atualizar não corta nada.

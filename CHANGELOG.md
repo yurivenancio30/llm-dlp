@@ -79,7 +79,8 @@ in the text are the same, and so is the identifier of each pseudonym.
   log lines (`substituições` → `replacements`, `RECUSADO` → `REFUSED`...), the messages, and the
   word `sudo llm-dlp emergency` asks for (`LIBERAR` → `UNLOCK`).
 - The old names keep working. A `config.json` with the old type names is read as it is, and
-  `llm-dlp update` rewrites it (and back, when going to an older version). The first start copies
+  `llm-dlp reload` rewrites it (so does the installation command, and `llm-dlp update` from 0.10
+  on; going back to an older version, it is converted back). The first start copies
   `chave`, `pessoas.json` and `vistos.json` to the new names and leaves the old ones for an older
   version. `llm-dlp audit` reads the log lines of both versions. With the new labels, the first
   message of each conversation rewrites the cache once, as after any update.
