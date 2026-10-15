@@ -48,7 +48,7 @@ cmd/llm-dlp/            the command-line program
 internal/proxy/         the server that sits between Claude Code and the API
 internal/mask/          detection and replacement with pseudonyms (depends on no API)
 internal/mask/data/     lists embedded in the binary (almost all generated)
-internal/config/        reading of config.json (and of the names before 0.10.0) and the data file names
+internal/config/        reading of config.json (and of the names before 0.10.0), writing of some of its fields, and the data file names
 internal/ocr/           reading of text in images and PDFs (tesseract, poppler)
 internal/version/       the version number and the commit
 install.sh              installer: downloads the release binary and runs the setup
@@ -115,6 +115,7 @@ main path
 personal data and secrets
   detectors_format.go      e-mail, IP, hostname, CPF, CNPJ, phone, card, tokens
   detectors_passwords.go   common passwords
+  detectors_auth.go        PIN, CVV, one-time and recovery codes, BIP-39 recovery phrase (data/bip39_*.txt)
   detectors_extra.go       HTTP header, IBAN, court case, documents with a word nearby
   detectors_network.go     internal IPv4 beyond the dotted form: shared range, hyphens, reverse DNS
   detectors_fiscal.go      NF-e access key, PIX copy-and-paste code (BR Code)
