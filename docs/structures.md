@@ -815,7 +815,7 @@ the URN), otherwise the model loses the link between the texts.
 
 ### 8. Storage and queues: what is implemented (the `address` reader)
 
-Code: `internal/mask/reader_addresses.go` (`urlIn`). Database URIs stay with the `conexão`
+Code: `internal/mask/reader_addresses.go` (`urlIn`). Database URIs stay with the `connection`
 reader; these are the storage and queue ones:
 
 | Scheme | Position | Entity | Strong? |
@@ -3551,8 +3551,8 @@ uppercase sentence (`0x3B -> CUSTOMER USE THREE`) and a struct field named after
 - an uppercase statement does not start right after another uppercase word that is not of the
   SQL vocabulary (`EXPLAIN SELECT` still counts).
 
-**Template connection.** In the real sessions, the public values that `conexão/tnsnames` and
-`conexão/uri` learned all had the same shape: a type or attribute word followed by a
+**Template connection.** In the real sessions, the public values that `connection/tnsnames` and
+`connection/uri` learned all had the same shape: a type or attribute word followed by a
 number or glued to another one (`host1`, `user2`, `db01`, `dbName`): an example name, not a resource
 name. In the database URI and in tnsnames, a value of at most two pieces, all of the
 vocabulary that already exists, with or without a number at the end, is not masked (`reader_connection_brakes.go`). In the

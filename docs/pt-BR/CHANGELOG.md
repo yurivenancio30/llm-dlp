@@ -51,6 +51,11 @@ antigas recebem as regras novas do Claude Code ao atualizar.
   checagem de saúde (`llm-dlp status`) diz `requests` e `online_since`.
 - O resumo do `simulate` volta a classificar a recusa por imagem ou PDF que não deu para
   verificar (ele procurava o texto em português).
+- O `llm-dlp install` sem terminal (rodado por um script ou por um agente) fazia perguntas que
+  ninguém respondia e terminava sem aplicar nada: agora diz para rodar num terminal ou com
+  `--yes`, que aceita todos os passos menos os que precisam de `sudo` (agora no `llm-dlp help`).
+- Documentação: os campos do `ocr` (`strict_pdf`, os caminhos dos programas, `env`), os arquivos
+  de `cmd/llm-dlp` e `internal/proxy`, e nomes de leitor ainda em português no `structures.md`.
 
 ### Código
 

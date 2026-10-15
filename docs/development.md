@@ -71,7 +71,8 @@ cmd/llm-dlp/
   swap.go       the supervisor: holds the port and lends it to the proxy; swap on SIGHUP
   update.go     update (download, checksum, swap, going back) and reload
   install.go    install, uninstall, the lock and the hooks
-  inspect.go    simulate: replays an old session against a fake API
+  inspect.go    last (what the API received) and simulate (replays an old session against a fake API)
+  audit.go      audit: the summary of the log over a period
   tools.go      import-people, test, test-media, measure, columns
   emergency.go  emergency mode (requires sudo)
 
@@ -81,6 +82,9 @@ internal/proxy/
   response.go  inbound: unmasks the response (streaming or whole)
   priority.go  what the model wrote before any data is public
   media.go     images and PDFs (OCR and black bars)
+  local.go     who can talk to the local port (DNS rebinding, other users)
+  gemini.go, openai.go, responses.go
+               the Gemini, Chat Completions and Responses formats, seen in the Anthropic shape
 ```
 
 ### internal/mask

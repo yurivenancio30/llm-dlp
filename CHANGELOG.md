@@ -49,6 +49,11 @@ Claude Code rules on update.
   status`) says `requests` and `online_since`.
 - The `simulate` summary classifies again a refusal for an image or PDF that could not be
   checked (it looked for the Portuguese text).
+- `llm-dlp install` without a terminal (run by a script or an agent) stopped asking questions
+  nobody answered and ending with nothing applied: it now says to run it in a terminal or with
+  `--yes`, which accepts every step except those that need `sudo` (now in `llm-dlp help`).
+- Documentation: the `ocr` fields (`strict_pdf`, the program paths, `env`), the files of
+  `cmd/llm-dlp` and `internal/proxy`, and reader names still in Portuguese in `structures.md`.
 
 ### Code
 

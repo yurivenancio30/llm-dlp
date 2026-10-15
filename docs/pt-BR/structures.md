@@ -810,7 +810,7 @@ URN), senão o modelo perde a ligação entre os textos.
 ### 8. Armazenamento e filas: o que está implementado (leitor `address`)
 
 Código: `internal/mask/reader_addresses.go` (`urlIn`). As URIs de banco continuam com o leitor
-`conexão`; estas são as de armazenamento e de fila:
+`connection`; estas são as de armazenamento e de fila:
 
 | Esquema | Posição | Entidade | Forte? |
 |---|---|---|---|
@@ -3546,8 +3546,8 @@ frase em maiúsculas (`0x3B -> CUSTOMER USE THREE`) e campo de struct com nome d
 - instrução em maiúsculas não começa logo depois de outra palavra em maiúsculas que não é do
   vocabulário do SQL (`EXPLAIN SELECT` continua valendo).
 
-**Conexão de modelo.** Nas sessões reais, os valores públicos que `conexão/tnsnames` e
-`conexão/uri` aprendiam tinham todos a mesma forma: palavra de tipo ou de atributo seguida de
+**Conexão de modelo.** Nas sessões reais, os valores públicos que `connection/tnsnames` e
+`connection/uri` aprendiam tinham todos a mesma forma: palavra de tipo ou de atributo seguida de
 número ou colada a outra (`host1`, `user2`, `db01`, `dbName`): nome de exemplo, não de
 recurso. Na URI de banco e no tnsnames, um valor de no máximo dois pedaços, todos do
 vocabulário que já existe, com ou sem número no fim, não é mascarado (`reader_connection_brakes.go`). Nas
