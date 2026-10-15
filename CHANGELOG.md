@@ -54,6 +54,8 @@ Claude Code rules on update.
 
 - `detectors_auth.go`, with the BIP-39 lists in `internal/mask/data/` (MIT License, origin in
   the header). `config.SetFields` writes some fields of `config.json` keeping the rest.
+- `TestPseudonymGolden` no longer depends on the day it runs (the seen-values file keeps the
+  date; from 2026-10-15 on, the 0.10.0 test failed).
 
 ## [0.10.0] - 2026-10-14
 

@@ -3,6 +3,7 @@ package mask
 import (
 	"encoding/json"
 	"os"
+	"regexp"
 	"sort"
 	"strings"
 	"testing"
@@ -82,7 +83,8 @@ func TestPseudonymGolden(t *testing.T) {
 	b, _ := os.ReadFile(dir + "/v.json")
 	json.Unmarshal(b, &seen)
 	for k, v := range seen {
-		add("visto", k, toJSON(v))
+		// the first and the last day seen are today's: the golden keeps only the rest
+		add("visto", k, reSeenDays.ReplaceAllString(toJSON(v), "|DAY|DAY"))
 	}
 	ps.SaveNow()
 	b, _ = os.ReadFile(dir + "/p.json")
@@ -122,6 +124,8 @@ func TestPseudonymGolden(t *testing.T) {
 		}
 	}
 }
+
+var reSeenDays = regexp.MustCompile(`\|\d+\|\d+`)
 
 func toJSON(v any) string {
 	b, _ := json.Marshal(v)

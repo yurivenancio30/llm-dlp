@@ -56,6 +56,8 @@ antigas recebem as regras novas do Claude Code ao atualizar.
 
 - `detectors_auth.go`, com as listas da BIP-39 em `internal/mask/data/` (licença MIT, origem no
   cabeçalho). `config.SetFields` grava alguns campos do `config.json` mantendo o resto.
+- O `TestPseudonymGolden` não depende mais do dia em que roda (o arquivo de valores vistos guarda
+  a data; a partir de 2026-10-15, o teste da 0.10.0 falhava).
 
 ## [0.10.0] - 2026-10-14
 
