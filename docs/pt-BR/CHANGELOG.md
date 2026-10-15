@@ -9,6 +9,15 @@ Em cada versão: **Mascaramento** é o que passou a ser (ou deixou de ser) masca
 **Programa** é comando, instalação, configuração, desempenho e documentação; **Código** é o
 que só interessa a quem mexe no código.
 
+## [Não lançado]
+
+### Mascaramento
+
+- Uma instrução SQL sem `;` num item de lista não leva mais os itens seguintes: as palavras deles
+  (`10. minha carteira`, `11. cpf`) eram mascaradas como colunas. O próximo item (`10. `, `- `,
+  `• `) termina a instrução. Em 40 MB de código público, sumiram 416 achados em listas de
+  changelog e README, e nenhum apareceu.
+
 ## [0.11.0] - 2026-10-14
 
 Passam a ser mascarados os dados de autenticação, que a Resolução CD/ANPD nº 15/2024 (art. 5º,

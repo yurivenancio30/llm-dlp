@@ -62,7 +62,10 @@ var (
 	// line that is no longer SQL (surrounding code): the statement stops there
 	reNotSQL = regexp.MustCompile(`^\s*(?:def |class |func |return\b|if\s*\(|for\s*\(|import |from \S+ import|package |\}|\)\s*$|#|//|print\(|echo |cd |\$ ` +
 		// Python: commands that do not exist in SQL and "if x:" / "while x:" at the end of the line
-		`|(?:raise|assert|yield|await|elif|except|async)\b|(?:else|try|finally)\s*:|(?:if|while)\s[^\n]*:\s*(?:\n|$))`)
+		`|(?:raise|assert|yield|await|elif|except|async)\b|(?:else|try|finally)\s*:|(?:if|while)\s[^\n]*:\s*(?:\n|$)` +
+		// the next item of a list ("10. ", "- ", "• "): a statement without ";" in one item does not
+		// take the next ones. Not "* " (SELECT with * on the next line) nor "1) " (closes an expression)
+		`|\d{1,3}\.[ \t]+\S|[-•][ \t]+[^\s\-])`)
 	// assignment to an object attribute at the start of the line (self.cur.x = ...,
 	// mock.y.return_value = ...): surrounding code, unless inside a SET list (see setList)
 	reAttrAssign = regexp.MustCompile(`^\s*(?:(?:self|this|cls|mock\w*|\w+_mock)\.[\w.]+\s*=[^=]|\w+(?:\.\w+){2,}\s*=[^=])`)

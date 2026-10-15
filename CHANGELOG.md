@@ -9,6 +9,15 @@ In each version: **Masking** is what started (or stopped) being masked; **Progra
 commands, installation, configuration, performance and documentation; **Code** is what only
 matters to whoever changes the code.
 
+## [Unreleased]
+
+### Masking
+
+- A SQL statement without `;` in one item of a list no longer takes the next items: their words
+  (`10. minha carteira`, `11. cpf`) were masked as columns. The next item (`10. `, `- `, `• `)
+  ends the statement. In 40 MB of public code, 416 findings in changelog and README lists went
+  away and none appeared.
+
 ## [0.11.0] - 2026-10-14
 
 Authentication data, which Resolução CD/ANPD nº 15/2024 (art. 5º, IV) lists among the data that

@@ -3534,6 +3534,13 @@ written by hand: it is measured in public Go code (`language_types.txt`, below).
 indented block with only `int64` and `float64`, without a footer, is not read as a schema (it is the same as a
 struct).
 
+**A statement does not take the next item of a list.** A statement without `;` in one item of a
+list (`9. run SELECT id FROM t`) went on into the next items until the blank line, and their words
+became columns (`10. my wallet`, `11. cpf`). The next item (`10. `, `- `, `• ` at the start of the
+line) now ends the statement, like a line of surrounding code; not `* ` (`SELECT` with `*` on the
+next line) nor `1) ` (closes an expression). In 40 MB of public code, 416 findings went away, all
+of them words in changelog and README lists (`https`, `github`, `handle`); none appeared.
+
 **SQL quoted in prose and in a comment.** The SQL reader marked 746 findings in 40 MB of
 public code. From the samples, almost all came from three shapes, none of them SQL:
 a code comment that talks about the code (`// Use x.Errors`, `# delete FROM line`,

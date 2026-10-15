@@ -3529,6 +3529,14 @@ está escrito à mão: é medido no código Go público (`language_types.txt`, a
 bloco recuado só com `int64` e `float64`, sem rodapé, não é lido como esquema (é igual a um
 struct).
 
+**Uma instrução não leva o próximo item de uma lista.** Uma instrução sem `;` num item de uma
+lista (`9. rode SELECT id FROM t`) seguia pelos itens seguintes até a linha em branco, e as
+palavras deles viravam colunas (`10. minha carteira`, `11. cpf`). O próximo item (`10. `, `- `,
+`• ` no começo da linha) agora termina a instrução, como uma linha do código em volta; não `* `
+(`SELECT` com `*` na linha de baixo) nem `1) ` (fecha uma expressão). Em 40 MB de código público,
+sumiram 416 achados, todos palavras de listas de changelog e README (`https`, `github`, `handle`);
+nenhum apareceu.
+
 **SQL citado em prosa e em comentário.** O leitor de SQL marcava 746 achados em 40 MB de
 código público. Pelas amostras, quase todos vinham de três formas, nenhuma delas SQL:
 comentário de código que fala do código (`// Use x.Errors`, `# delete FROM line`,
