@@ -11,7 +11,7 @@ São cinco jeitos de reconhecer um dado. Qualquer um basta.
 | Tokens e chaves de API | `ghp_k3Jd9s…`, também dentro de base64 (regras do [gitleaks](https://github.com/gitleaks/gitleaks)) |
 | Senhas | `DB_PASSWORD=…`, `senha: …`, "a senha é …", `mysql://usuario:senha@host`, `mysql -pSENHA` |
 | Códigos de autenticação | `senha: 4821` (só dígitos), `PIN: 4821`, `CVV: 123`, `código de verificação: 482913`, `OTP: 482913`, códigos de recuperação, a resposta de uma pergunta de segurança. Dado de autenticação é uma das categorias da Resolução CD/ANPD nº 15/2024 (art. 5º, IV); CVV e PIN são os "dados de autenticação sensíveis" do PCI DSS; o código de uso único tem de 6 a 8 dígitos (RFC 4226 e 6238). São números como outros quaisquer, então só valem ao lado do rótulo |
-| Frase de recuperação de carteira | 12 a 24 palavras da lista BIP-39 (inglês ou português) cujo dígito verificador confere, também sem rótulo. Depois de um rótulo (`frase de recuperação:`, `seed phrase:`), qualquer valor |
+| Frase de recuperação de carteira | 12 a 24 palavras da lista BIP-39 (inglês ou português) cujo dígito verificador confere, também sem rótulo. Depois de um rótulo (`frase de recuperação:`, `seed phrase:`), qualquer valor até o fim da frase |
 | Credencial em cabeçalho HTTP | `Authorization: Basic …`, `Authorization: Bearer …`, `Cookie: sessionid=…` |
 | E-mail | `joao.silva@empresa.com.br` (menos os que você liberar) |
 | CPF e CNPJ com pontuação | `529.982.247-25`, `11.222.333/0001-81`, `12.ABC.345/01DE-35` (CNPJ novo, com letras) |

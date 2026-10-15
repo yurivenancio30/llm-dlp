@@ -15,7 +15,7 @@ keywords are recognized as well.
 | Tokens and API keys | `ghp_k3Jd9s…`, also inside base64 ([gitleaks](https://github.com/gitleaks/gitleaks) rules) |
 | Passwords | `DB_PASSWORD=…`, `senha: …`, "a senha é …", `mysql://usuario:senha@host`, `mysql -pSENHA` |
 | Authentication codes | `senha: 4821` (digits only), `PIN: 4821`, `CVV: 123`, `código de verificação: 482913`, `OTP: 482913`, recovery codes, the answer to a security question. Authentication data is one of the categories of Resolução CD/ANPD nº 15/2024 (art. 5º, IV); CVV and PIN are the "sensitive authentication data" of PCI DSS; one-time codes have 6 to 8 digits (RFC 4226 and 6238). They are numbers like any other, so they count only next to their label |
-| Wallet recovery phrase | 12 to 24 words of the BIP-39 list (English or Portuguese) whose checksum matches, also without a label. After a label (`seed phrase:`, `frase de recuperação:`), any value |
+| Wallet recovery phrase | 12 to 24 words of the BIP-39 list (English or Portuguese) whose checksum matches, also without a label. After a label (`seed phrase:`, `frase de recuperação:`), any value up to the end of the sentence |
 | Credential in an HTTP header | `Authorization: Basic …`, `Authorization: Bearer …`, `Cookie: sessionid=…` |
 | E-mail | `joao.silva@empresa.com.br` (except the ones you allow) |
 | CPF and CNPJ with punctuation | `529.982.247-25`, `11.222.333/0001-81`, `12.ABC.345/01DE-35` (new CNPJ, with letters) |

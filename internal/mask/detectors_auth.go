@@ -31,13 +31,14 @@ var (
 	// "token: 482913": a bare token label counts only with a separator and the size of a one-time code
 	reAuthToken = regexp.MustCompile(`(?i)(?:^|[^\pL\pN_.\-])token[ \t]*[:=][ \t]*["']?(\d{6,8})(?:[^\pL\pN\-]|$)`)
 	// recovery or backup codes: each code after the label
-	reRecoveryCodes = regexp.MustCompile(`(?i)\b(?:c[oó]digos?\s+de\s+(?:recupera[cç][aã]o|backup|reserva|emerg[eê]ncia)|recovery\s+codes?|backup\s+codes?)\b[^\n:=]{0,20}[:=][ \t]*([^\n]+)`)
+	reRecoveryCodes = regexp.MustCompile(`(?i)\b(?:c[oó]digos?\s+de\s+(?:recupera[cç][aã]o|backup|reserva|emerg[eê]ncia)|recovery\s+codes?|backup\s+codes?)\b[^\n:=]{0,20}[:=][ \t]*([^\n;|]+)`)
 	reRecoveryCode  = regexp.MustCompile(`[\pL\pN][\pL\pN\-]{3,}`)
-	// answer to a security question, and a recovery phrase given after its label
+	// answer to a security question, and a recovery phrase given after its label (up to the end of
+	// the line, a ";" or a "|"; the end of the sentence is cut in findAuth)
 	reSecretAnswer = regexp.MustCompile(`(?i)\b(?:resposta\s+(?:secreta|de\s+seguran[cç]a|[aà]\s+pergunta\s+(?:secreta|de\s+seguran[cç]a))|` +
 		`security\s+answer|secret\s+answer|answer\s+to\s+(?:the\s+)?security\s+question|` +
 		`frase\s+(?:de\s+recupera[cç][aã]o|semente|secreta|mnem[oô]nica)|palavras\s+(?:de\s+recupera[cç][aã]o|secretas)|` +
-		`(?:secret\s+)?recovery\s+phrase|seed\s+phrase|seed\s+words|mnemonic(?:\s+phrase)?)\b[ \t]*[:=][ \t]*["'\x60]?([^\n]+)`)
+		`(?:secret\s+)?recovery\s+phrase|seed\s+phrase|seed\s+words|mnemonic(?:\s+phrase)?)\b[ \t]*[:=][ \t]*["'\x60]?([^\n;|]+)`)
 )
 
 // authDigits: how many digits the value may have, by label. A card security code (CVV, CVC, CSC,
@@ -88,6 +89,9 @@ func (m *Masker) findAuth(s, lower string, add func(ini, end int, typ string)) {
 	if containsAny(lower, "resposta", "answer", "frase", "palavras", "phrase", "seed", "mnem") {
 		for _, ix := range reSecretAnswer.FindAllStringSubmatchIndex(s, -1) {
 			ini, end := ix[2], ix[3]
+			if i := strings.Index(s[ini:end], ". "); i >= 0 {
+				end = ini + i
+			}
 			for end > ini && strings.ContainsRune(" \t\r.,;!?\"'`", rune(s[end-1])) {
 				end--
 			}

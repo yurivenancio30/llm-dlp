@@ -91,6 +91,17 @@ func TestAuthData(t *testing.T) {
 			t.Errorf("authentication data went through: %q -> %q", text, out)
 		}
 	}
+	// the value after a label ends at the end of the sentence, a ";" or a "|": what comes next stays
+	for _, c := range []struct{ text, gone, keep string }{
+		{"frase de recuperação: gato mesa sol; SELECT id FROM t", "mesa", "; SELECT id FROM"},
+		{"resposta secreta: Rex. Depois rodei o deploy", "Rex", ". Depois rodei o deploy"},
+		{"seed phrase: gato mesa sol | status ok", "mesa", "| status ok"},
+		{"recovery codes: 9f3k-2m8x; build ok", "9f3k", "; build ok"},
+	} {
+		if out, _ := newTest(t).Mask(c.text); strings.Contains(out, c.gone) || !strings.Contains(out, c.keep) {
+			t.Errorf("value after the label cut wrong: %q -> %q", c.text, out)
+		}
+	}
 	clean := []string{
 		"password_min_length: 8",
 		"PASSWORD_MAX_LENGTH=1024",
