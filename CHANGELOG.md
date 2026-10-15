@@ -9,7 +9,7 @@ In each version: **Masking** is what started (or stopped) being masked; **Progra
 commands, installation, configuration, performance and documentation; **Code** is what only
 matters to whoever changes the code.
 
-## [Unreleased]
+## [0.11.1] - 2026-10-14
 
 ### Masking
 

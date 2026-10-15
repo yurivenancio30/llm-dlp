@@ -9,7 +9,7 @@ Em cada versão: **Mascaramento** é o que passou a ser (ou deixou de ser) masca
 **Programa** é comando, instalação, configuração, desempenho e documentação; **Código** é o
 que só interessa a quem mexe no código.
 
-## [Não lançado]
+## [0.11.1] - 2026-10-14
 
 ### Mascaramento
 
