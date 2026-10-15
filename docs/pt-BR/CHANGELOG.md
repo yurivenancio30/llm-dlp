@@ -29,7 +29,7 @@ antigas recebem as regras novas do Claude Code ao atualizar.
 - Frase de recuperação de carteira (BIP-39): 12 a 24 palavras da lista oficial, em inglês ou em
   português, cujo dígito verificador confere, também sem rótulo e também numerada
   (`1. legal 2. winner…`). Depois de um rótulo (`frase de recuperação:`, `seed phrase:`),
-  qualquer valor.
+  qualquer valor até o fim da frase.
 
 ### Programa
 
@@ -38,7 +38,9 @@ antigas recebem as regras novas do Claude Code ao atualizar.
   as gravava, então uma instalação antiga não tinha `Bash(*.config/llm-dlp*)` (ler ou mudar a
   configuração por comando) nem `Bash(*llm-dlp emergency*)`. Para a trava, que precisa de
   `sudo`, eles dizem o que falta e oferecem acrescentar; o `install` faz o mesmo, e o
-  `llm-dlp status` avisa enquanto faltar alguma regra.
+  `llm-dlp status` avisa enquanto faltar alguma regra. Vindo da 0.10.0 ou anterior, rode
+  `llm-dlp reload` uma vez depois do update: o update roda o código da versão que estava
+  instalada.
 - O `llm-dlp install`, rodado de novo, grava num `config.json` que já existe só o que foi
   respondido (domínios internos, nomes protegidos), mantém o resto do arquivo como estava e
   guarda o anterior como `config.json.bak-DATA`. Antes, ele regravava o arquivo inteiro a partir

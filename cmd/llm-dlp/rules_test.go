@@ -72,3 +72,18 @@ func TestLockMissingRules(t *testing.T) {
 		t.Errorf("after install-lock: %v", m)
 	}
 }
+
+// /dev/null is a character device, but nobody answers there: no question, only the command.
+func TestStdinTerminalDevNull(t *testing.T) {
+	f, err := os.Open(os.DevNull)
+	if err != nil {
+		t.Skip(err)
+	}
+	defer f.Close()
+	old := os.Stdin
+	os.Stdin = f
+	defer func() { os.Stdin = old }()
+	if stdinTerminal() {
+		t.Error("stdin from /dev/null taken as a terminal")
+	}
+}

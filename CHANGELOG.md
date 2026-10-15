@@ -27,7 +27,8 @@ Claude Code rules on update.
   one-time codes have 6 to 8 digits (RFC 4226 and 6238). Detector name: `secret`.
 - A wallet recovery phrase (BIP-39): 12 to 24 words of the official list, in English or
   Portuguese, whose checksum matches, also without a label and also numbered
-  (`1. legal 2. winner…`). After a label (`seed phrase:`, `frase de recuperação:`), any value.
+  (`1. legal 2. winner…`). After a label (`seed phrase:`, `frase de recuperação:`), any value up
+  to the end of the sentence.
 
 ### Program
 
@@ -36,7 +37,8 @@ Claude Code rules on update.
   them, so an older installation lacked `Bash(*.config/llm-dlp*)` (reading or changing the
   configuration by a command) and `Bash(*llm-dlp emergency*)`. For the lock, which needs `sudo`,
   they say what is missing and offer to add it; `install` does the same, and `llm-dlp status`
-  warns while a rule is missing.
+  warns while a rule is missing. Coming from 0.10.0 or older, run `llm-dlp reload` once after
+  the update: the update runs the code of the version that was installed.
 - `llm-dlp install`, run again, writes into an existing `config.json` only what was answered
   (internal domains, protected names), keeps the rest of the file as it was and saves the
   previous one as `config.json.bak-DATE`. Before, it rewrote the whole file from what it knew,

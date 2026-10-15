@@ -87,6 +87,17 @@ func withSudo(args ...string) error {
 	return c.Run()
 }
 
+// stdinTerminal: whether a person can answer on stdin. /dev/null is a character device too (the
+// stdin of a hook or of a command run by an agent), so it does not count.
+func stdinTerminal() bool {
+	st, err := os.Stdin.Stat()
+	if err != nil || st.Mode()&os.ModeCharDevice == 0 {
+		return false
+	}
+	null, err := os.Stat(os.DevNull)
+	return err != nil || !os.SameFile(st, null)
+}
+
 // install does everything, explaining each step. It can be run again without breaking anything.
 func install(args []string) error {
 	in := entry{r: bufio.NewReader(os.Stdin)}
@@ -744,8 +755,7 @@ func offerLockUpdate(bin string) {
 		return
 	}
 	fmt.Printf("! the lock (%s) lacks rules of this version: %s\n", lockFile, strings.Join(missing, ", "))
-	if st, err := os.Stdin.Stat(); err == nil && st.Mode()&os.ModeCharDevice != 0 &&
-		(entry{r: bufio.NewReader(os.Stdin)}).confirm("  Add them now? (asks for the sudo password)") {
+	if stdinTerminal() && (entry{r: bufio.NewReader(os.Stdin)}).confirm("  Add them now? (asks for the sudo password)") {
 		if err := withSudo(bin, "install-lock"); err == nil {
 			return
 		}

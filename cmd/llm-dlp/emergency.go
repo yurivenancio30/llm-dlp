@@ -93,7 +93,7 @@ func emergency(args []string) error {
 		}
 		dur = d
 	}
-	if st, err := os.Stdin.Stat(); err != nil || st.Mode()&os.ModeCharDevice == 0 {
+	if !stdinTerminal() {
 		return errors.New("run it in a terminal (the confirmation is typed)")
 	}
 	fmt.Printf(`
