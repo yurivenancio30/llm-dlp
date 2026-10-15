@@ -9,7 +9,7 @@ In each version: **Masking** is what started (or stopped) being masked; **Progra
 commands, installation, configuration, performance and documentation; **Code** is what only
 matters to whoever changes the code.
 
-## [Unreleased]
+## [0.11.0] - 2026-10-14
 
 Authentication data, which Resolução CD/ANPD nº 15/2024 (art. 5º, IV) lists among the data that
 make a security incident a relevant risk, is now masked. Older installations get the newer

@@ -9,7 +9,7 @@ Em cada versão: **Mascaramento** é o que passou a ser (ou deixou de ser) masca
 **Programa** é comando, instalação, configuração, desempenho e documentação; **Código** é o
 que só interessa a quem mexe no código.
 
-## [Não lançado]
+## [0.11.0] - 2026-10-14
 
 Passam a ser mascarados os dados de autenticação, que a Resolução CD/ANPD nº 15/2024 (art. 5º,
 IV) lista entre os dados que tornam um incidente de segurança um risco relevante. Instalações

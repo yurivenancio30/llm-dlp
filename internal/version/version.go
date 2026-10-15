@@ -5,7 +5,7 @@ package version
 // Version: the llm-dlp version, in the MAJOR.MINOR.PATCH format (see docs/versioning.md). It is the
 // only source: the git tag (v0.2.0) and the first section of CHANGELOG.md must say the same, and
 // TestVersionMatchesChangelog checks it.
-const Version = "0.10.0"
+const Version = "0.11.0"
 
 // Commit: filled by -ldflags "-X .../internal/version.Commit=abc1234" (the Makefile does it).
 // "-mod" at the end: built with uncommitted changes.
