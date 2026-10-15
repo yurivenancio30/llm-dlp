@@ -175,7 +175,9 @@ git clone https://github.com/yurivenancio30/llm-dlp.git && cd llm-dlp && make bu
 | 5. Lock | Makes Claude Code refuse to work outside llm-dlp | **Yes if you use Claude Code** (and the `sudo` password); skipped otherwise |
 
 At the end it shows a summary. ✓ is done, ✗ is missing (run `llm-dlp install` again: it
-skips what is already done), and – is what you chose not to set up.
+skips what is already done), and – is what you chose not to set up. Without a terminal (a
+script), run `llm-dlp install --yes`: it accepts every step without asking, except those that
+need `sudo`.
 
 ### 2. Connect your client
 

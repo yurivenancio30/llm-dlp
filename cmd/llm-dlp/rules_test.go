@@ -87,3 +87,21 @@ func TestStdinTerminalDevNull(t *testing.T) {
 		t.Error("stdin from /dev/null taken as a terminal")
 	}
 }
+
+// install without a terminal and without --yes stops before any step, saying how to run it.
+func TestInstallWithoutTerminal(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("as root install refuses earlier")
+	}
+	f, err := os.Open(os.DevNull)
+	if err != nil {
+		t.Skip(err)
+	}
+	defer f.Close()
+	old := os.Stdin
+	os.Stdin = f
+	defer func() { os.Stdin = old }()
+	if err := install(nil); err == nil || !strings.Contains(err.Error(), "--yes") {
+		t.Errorf("install without a terminal: %v", err)
+	}
+}

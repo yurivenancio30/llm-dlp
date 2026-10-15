@@ -170,7 +170,9 @@ O `install` pergunta o que precisa, em 5 passos (responda `y` para sim, `n` para
 | 5. Trava | Faz o Claude Code se recusar a funcionar fora do llm-dlp | **Sim, se você usa o Claude Code** (e a senha do `sudo`); pulado nos outros casos |
 
 No fim, ele mostra um resumo. ✓ é feito, ✗ é o que falta (rode `llm-dlp install` de novo:
-ele pula o que já está pronto) e – é o que você escolheu não configurar.
+ele pula o que já está pronto) e – é o que você escolheu não configurar. Sem terminal (num
+script), rode `llm-dlp install --yes`: ele aceita todos os passos sem perguntar, menos os que
+precisam de `sudo`.
 
 ### 2. Ligue o seu cliente
 

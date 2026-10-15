@@ -19,7 +19,8 @@ const help = `llm-dlp %s — masks sensitive data between you and the LLM (Claud
 Usage: llm-dlp COMMAND [arguments]
 
 Install and update
-  llm-dlp install               installs and configures everything, explaining each step (can run again)
+  llm-dlp install [--yes]       installs and configures everything, explaining each step (can run again;
+                                --yes accepts every step without asking, except those that need sudo)
   sudo llm-dlp install-lock     (recommended) Claude Code only works going through llm-dlp
   llm-dlp uninstall             undoes the Claude Code configuration
   sudo llm-dlp uninstall-lock   removes the lock

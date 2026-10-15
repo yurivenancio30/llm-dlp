@@ -109,6 +109,10 @@ func install(args []string) error {
 	if os.Geteuid() == 0 {
 		return errors.New("run it without sudo (the installation is your user's; the only step with sudo is the lock, at the end)")
 	}
+	if !in.noQuestion && !stdinTerminal() {
+		// without a terminal every question would be answered "no" and nothing would be applied
+		return errors.New("run it in a terminal (it asks before each step), or with --yes to accept every step")
+	}
 	home, _ := os.UserHomeDir()
 	fmt.Println(`llm-dlp installation. There are 5 steps; it asks what it needs and shows what will change.
 In two steps (OCR and lock) it uses sudo: your password will be asked at that time.`)
