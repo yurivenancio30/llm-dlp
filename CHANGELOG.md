@@ -9,7 +9,7 @@ In each version: **Masking** is what started (or stopped) being masked; **Progra
 commands, installation, configuration, performance and documentation; **Code** is what only
 matters to whoever changes the code.
 
-## [Unreleased]
+## [0.12.0] - 2026-10-15
 
 Fewer common words masked as names: the structure readers only read a name where the structure
 is the one they read. Measured on a real session of 19,078 blocks: 1,356 findings went away and

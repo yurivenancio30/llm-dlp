@@ -9,7 +9,7 @@ Em cada versão: **Mascaramento** é o que passou a ser (ou deixou de ser) masca
 **Programa** é comando, instalação, configuração, desempenho e documentação; **Código** é o
 que só interessa a quem mexe no código.
 
-## [Não lançado]
+## [0.12.0] - 2026-10-15
 
 Menos palavras comuns mascaradas como nome: os leitores de estrutura só leem um nome onde a
 estrutura é a que eles leem. Medido numa sessão real de 19.078 blocos: sumiram 1.356 achados, e
