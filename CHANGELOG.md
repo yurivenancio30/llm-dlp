@@ -9,6 +9,42 @@ In each version: **Masking** is what started (or stopped) being masked; **Progra
 commands, installation, configuration, performance and documentation; **Code** is what only
 matters to whoever changes the code.
 
+## [Unreleased]
+
+Fewer common words masked as names: the structure readers only read a name where the structure
+is the one they read. Measured on a real session of 19,078 blocks: 1,356 findings went away and
+105 real names that used to go out are now masked.
+
+### Masking
+
+- A list of labels is not a list of names: in `"colunas": ["Elemento", "O que se mediu",
+  "Veredito"]`, a sentence among the items makes it a report header, and only an
+  identifier-shaped item is still masked. A field that names itself (`"Tabelas": "tabelas"`,
+  `"usuarios": "Usuários"`) is not a resource, in code as in configuration.
+- A call (`f("a", "b")`) is not a row of a result.
+- A table with a separator ends at the first line without it (`--`, the title of the next table);
+  the next table's header is not its data. A quoted cell across lines (RFC 4180) does not end it.
+- In a Windows path, the word after a folder with a space in the name (`Power BI\Banco de Dados`)
+  is masked as a folder, not as a `DOMAIN\user`.
+- `CREATE TABLE` in a sentence is not DDL: after the name must come what the dialects put there,
+  and the first item in the parentheses must be a column or a constraint. The `FROM` of a function
+  (`EXTRACT(EPOCH FROM x)`) is not a table. What comes after a system schema
+  (`information_schema.EVENTS`, `SNOWFLAKE.ACCOUNT_USAGE.X`) is the system's; the database before
+  it is still masked. The public SQL vocabulary gained the columns of `pg_stat_*_tables`,
+  `pg_extension`, MySQL's `INFORMATION_SCHEMA.TABLES`, the size functions and the parts of
+  `EXTRACT`, from the official pages.
+- A dotted name whose root is the root of a template variable in the same text
+  (`{{analise.veredito}}`) is a path in the program's data, not schema.table.
+- Two real names were only masked by accident (a table merged with the previous one) and go out
+  now; a customer or system name cited in prose is for `terms`. Names learned by mistake before
+  stay in the seen-values file: they are still masked while they keep appearing (each time
+  renews them) and stop after 90 days without appearing.
+
+### Code
+
+- `structure_shapes_test.go`: each rule with its other side (the real name next to it is still
+  masked); every "stays" case fails on 0.11.1.
+
 ## [0.11.1] - 2026-10-14
 
 ### Masking

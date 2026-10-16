@@ -9,6 +9,44 @@ Em cada versão: **Mascaramento** é o que passou a ser (ou deixou de ser) masca
 **Programa** é comando, instalação, configuração, desempenho e documentação; **Código** é o
 que só interessa a quem mexe no código.
 
+## [Não lançado]
+
+Menos palavras comuns mascaradas como nome: os leitores de estrutura só leem um nome onde a
+estrutura é a que eles leem. Medido numa sessão real de 19.078 blocos: sumiram 1.356 achados, e
+105 nomes reais que saíam passaram a ser mascarados.
+
+### Mascaramento
+
+- Uma lista de rótulos não é uma lista de nomes: em `"colunas": ["Elemento", "O que se mediu",
+  "Veredito"]`, uma frase entre os itens faz dela o cabeçalho de um relatório, e só um item com
+  forma de identificador continua mascarado. Um campo que dá nome a si mesmo
+  (`"Tabelas": "tabelas"`, `"usuarios": "Usuários"`) não é recurso, no código como na
+  configuração.
+- Uma chamada (`f("a", "b")`) não é uma linha de resultado.
+- Uma tabela com separador termina na primeira linha sem ele (`--`, o título da tabela seguinte);
+  o cabeçalho da tabela seguinte não é dado dela. Uma célula entre aspas que passa de uma linha
+  (RFC 4180) não termina a tabela.
+- Num caminho do Windows, a palavra depois de uma pasta com espaço no nome
+  (`Power BI\Banco de Dados`) é mascarada como pasta, não como `DOMÍNIO\usuário`.
+- `CREATE TABLE` numa frase não é DDL: depois do nome tem de vir o que os dialetos põem ali, e o
+  primeiro item dos parênteses tem de ser uma coluna ou uma restrição. O `FROM` de uma função
+  (`EXTRACT(EPOCH FROM x)`) não é tabela. O que vem depois de um schema do sistema
+  (`information_schema.EVENTS`, `SNOWFLAKE.ACCOUNT_USAGE.X`) é do sistema; o banco antes dele
+  continua mascarado. O vocabulário público de SQL ganhou as colunas de `pg_stat_*_tables`,
+  `pg_extension`, do `INFORMATION_SCHEMA.TABLES` do MySQL, as funções de tamanho e as partes do
+  `EXTRACT`, tiradas das páginas oficiais.
+- Um nome com pontos cuja raiz é a raiz de uma variável de template no mesmo texto
+  (`{{analise.veredito}}`) é um caminho nos dados do programa, não schema.tabela.
+- Dois nomes reais só eram mascarados por acaso (uma tabela emendada na anterior) e agora saem;
+  nome de cliente ou de sistema citado em prosa é para `terms`. Os nomes aprendidos por engano
+  antes ficam no arquivo de vistos: continuam mascarados enquanto seguem aparecendo (cada vez
+  renova a data) e param depois de 90 dias sem aparecer.
+
+### Código
+
+- `structure_shapes_test.go`: cada regra com o outro lado (o nome real ao lado continua
+  mascarado); todo caso de "fica" falha na 0.11.1.
+
 ## [0.11.1] - 2026-10-14
 
 ### Mascaramento

@@ -374,7 +374,7 @@ func kvIn(s string, p int, add func(ObjFinding)) {
 		}
 	}
 	val := s[va:vb]
-	if strings.EqualFold(val, key) || typeWords[strings.ToLower(val)] {
+	if sameWord(val, key) || typeWords[strings.ToLower(val)] {
 		return
 	}
 	if !quotes && !dashOrDigit(val) && !(cli && identifierShape(val) && !uppercaseOnly(val)) {
@@ -456,12 +456,16 @@ func yamlList(s string, v int, ent string, add func(ObjFinding)) {
 	}
 }
 
-// inlineList: [a, b] or ["a", "b"] on one line: each item is of the key's type.
+// inlineList: [a, b] or ["a", "b"] on one line: each item is of the key's type. A list with a
+// sentence among the items ("colunas": ["Elemento", "O que se mediu", "Veredito"]) is a list of
+// labels (the header of a report): there a loose word is a label, and only an item shaped like an
+// identifier (tb_pedido, vendasPrd) still counts as a name.
 func inlineList(s string, v int, ent string, add func(ObjFinding)) {
 	f := strings.IndexByte(s[v:min(len(s), v+2000)], ']')
 	if f < 0 || strings.ContainsAny(s[v+1:v+f], "\n[{(") {
 		return
 	}
+	labels := sentenceItem(s[v+1 : v+f])
 	i := v + 1
 	for i < v+f {
 		for i < v+f && (s[i] == ' ' || s[i] == ',') {
@@ -484,10 +488,41 @@ func inlineList(s string, v int, ent string, add func(ObjFinding)) {
 				b--
 			}
 		}
-		if b > a {
+		if b > a && (!labels || identifierShape(s[a:b])) {
 			markValue(s, a, b, ent, "key-value", true, add)
 		}
 	}
+}
+
+// sentenceItem: some item of the list body (between the brackets) has a space between two words.
+func sentenceItem(body string) bool {
+	for _, it := range strings.Split(body, ",") {
+		it = strings.Trim(strings.TrimSpace(it), `"'\`)
+		if i := strings.IndexAny(it, " \t"); i > 0 && i < len(it)-1 {
+			return true
+		}
+	}
+	return false
+}
+
+// sameWord: the value is the key's own name, in any case and with or without accents ("Tabelas":
+// "tabelas", "usuarios": "Usuários"): a field that names itself (a label, a column map), not a
+// resource.
+func sameWord(v, key string) bool {
+	if strings.EqualFold(v, key) {
+		return true
+	}
+	for i := 0; i < len(v); i++ {
+		if v[i] >= 0x80 {
+			return NormName(v) == NormName(key)
+		}
+	}
+	for i := 0; i < len(key); i++ {
+		if key[i] >= 0x80 {
+			return NormName(v) == NormName(key)
+		}
+	}
+	return false
 }
 
 // pairsInLine: how many space-separated "key=value" (no space around the "=") there are on the line

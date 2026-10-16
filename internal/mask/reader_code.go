@@ -248,7 +248,9 @@ func findCodeName(s string, add func(ObjFinding)) {
 				ent, strong = entFunc(f), true
 			}
 		}
-		if ent == "" {
+		// the value is the name's own word ({"Tabelas": "tabelas"}, "usuarios": "Usuários"): a field
+		// naming itself, as in the key-value reader
+		if ent == "" || sameWord(s[a:b], name) {
 			continue
 		}
 		markValue(s, a, b, ent, "code-name", strong && markedValue(s[a:b]), add)

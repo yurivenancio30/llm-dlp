@@ -368,6 +368,12 @@ SELECT * FROM SCH_mvrhafae.T_cszwa3ri@HOST_z2l74vie;
 - https://cloud.google.com/bigquery/docs/reference/standard-sql/lexical
 - https://spark.apache.org/docs/latest/sql-ref-identifier.html
 - https://spark.apache.org/docs/latest/sql-ref-ansi-compliance.html
+- https://www.postgresql.org/docs/current/monitoring-stats.html (pg_stat_all_tables, pg_stat_all_indexes)
+- https://www.postgresql.org/docs/current/catalog-pg-extension.html
+- https://www.postgresql.org/docs/current/functions-admin.html (Database Object Size Functions)
+- https://www.postgresql.org/docs/current/functions-datetime.html (EXTRACT, date_part)
+- https://dev.mysql.com/doc/refman/8.4/en/information-schema-tables-table.html
+- https://docs.snowflake.com/en/sql-reference/functions-date-time (Supported date and time parts)
 
 Conferidos nesta pesquisa: as páginas de T-SQL reserved, Snowflake reserved e identifiers, PostgreSQL Apêndice C, MySQL keywords, Oracle object names, Db2 reserved, Spark identifiers e BigQuery lexical (esta por busca no domínio oficial). Os demais links e as contagens marcadas "aprox." (funções, `V$RESERVED_WORDS`, `pg_get_keywords`) vêm do conhecimento da documentação e não foram abertos agora `[VERIFICAR]`.
 
@@ -3536,6 +3542,54 @@ palavras deles viravam colunas (`10. minha carteira`, `11. cpf`). O próximo ite
 (`SELECT` com `*` na linha de baixo) nem `1) ` (fecha uma expressão). Em 40 MB de código público,
 sumiram 416 achados, todos palavras de listas de changelog e README (`https`, `github`, `handle`);
 nenhum apareceu.
+
+**Uma lista de rótulos não é uma lista de nomes.** Numa lista sob uma chave de tipo (`"colunas":
+["Elemento", "O que se mediu", "Veredito"]`), uma frase entre os itens faz dela o cabeçalho de um
+relatório: ali uma palavra solta (`Veredito`, `Tema`) é rótulo e fica, e só um item com forma de
+identificador (`tb_pedido`) continua sendo nome (a lista YAML já parava numa frase). Um campo que
+dá nome a si mesmo (`"Tabelas": "tabelas"`, `"usuarios": "Usuários"`, com ou sem acento) não é
+recurso, no código (`code-name`) como já não era na configuração (`key-value`).
+
+**Uma chamada não é uma tupla.** `f("a", "b")` e `txt.replace("a", "b")` são os argumentos de uma
+chamada, não uma linha de resultado: o leitor de tuplas pula o parêntese logo depois de um nome
+(menos `VALUES (` e `IN (`).
+
+**Uma tabela termina onde termina a forma dela.** Numa tabela com separador (`|`, `,`, `;`, TAB),
+uma linha sem o separador (`--`, o título da tabela seguinte) termina a tabela, e o cabeçalho da
+tabela seguinte não é dado dela. Uma célula entre aspas que continua na linha de baixo (RFC 4180)
+não termina a tabela.
+
+**Uma pasta não é um DOMÍNIO\usuário.** Em `...\Power BI\Banco de Dados\x.xlsx`, a palavra antes
+da `\` fecha o nome de uma pasta de um caminho do Windows: dela até a `\` anterior só há
+caracteres que um nome de pasta aceita (o Windows reserva `< > : " / | ? *`) e essa `\` não fecha
+outro `DOMÍNIO\usuário` (`CORP\ana CORP\joao`). A palavra depois dela é a pasta seguinte, e é
+mascarada como pasta.
+
+**A gramática do CREATE TABLE e das funções.** `CREATE TABLE x` só vale se o que vem depois do
+nome é o que os dialetos põem ali (a lista de colunas, `AS`, `SELECT`, `LIKE`, `CLONE`, `USING`,
+`PARTITION BY`..., as opções do Teradata depois de uma vírgula, `;`, o fim da linha) e o primeiro
+item dos parênteses é uma coluna ou uma restrição da tabela: `CREATE TABLE lidos (recorte: os 12
+mais frequentes)` é uma frase que cita o comando. O `FROM` dentro dos parênteses de uma função
+(`EXTRACT(EPOCH FROM x)`, `SUBSTRING(s FROM 2)`) é argumento, não a origem da consulta (uma
+subconsulta continua sendo). O que vem depois de um schema do sistema (`information_schema.EVENTS`,
+`sys.objects`, `SNOWFLAKE.ACCOUNT_USAGE.X`) é do sistema; o banco antes dele
+(`meubanco.information_schema.tables`) continua mascarado. O vocabulário ganhou as colunas de
+`pg_stat_*_tables`, `pg_extension`, do `INFORMATION_SCHEMA.TABLES` do MySQL e as partes do
+`EXTRACT` (links em [SQL e DDL](#7-links-usados)).
+
+**Um caminho nos dados do programa.** Um nome com pontos cuja raiz é, no mesmo texto, a raiz de uma
+variável de template (`{{analise.veredito}}`) é um caminho nos dados do programa: ali `tabela
+analise.confronto` não é schema.tabela.
+
+Medido numa sessão real de 19.078 blocos (um diagnóstico de dados feito por um framework Python que
+escreve relatórios): sumiram 1.356 achados (295 valores: rótulos de relatório, as chaves do próprio
+framework, views do catálogo, pedaços de expressões regulares) e apareceram 105 (colunas e schemas
+reais que uma tabela emendada na anterior deixava sair). Dois nomes reais só eram mascarados por
+esse acaso e agora saem: o nome de um sistema citado numa tabela de relatório e o nome de uma
+camada. Nome de cliente citado num relatório é para `terms`. Limite: uma lista de nomes com
+pontos, um por linha, tem a mesma forma quando traz `schema.tabela` ou caminhos dos dados de um
+programa (`ingestao.stages`); o leitor continua lendo a lista, porque não ler deixava sair nomes
+reais.
 
 **SQL citado em prosa e em comentário.** O leitor de SQL marcava 746 achados em 40 MB de
 código público. Pelas amostras, quase todos vinham de três formas, nenhuma delas SQL:

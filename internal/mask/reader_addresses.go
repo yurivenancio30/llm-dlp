@@ -567,7 +567,15 @@ func findDomainUser(s string, add func(ObjFinding)) {
 				// user
 				escape = escape || strings.IndexByte("ntr", v[0]) >= 0 && len(v) > 1 && v[1] >= 'A' && v[1] <= 'Z'
 				if len(v) >= 2 && !escape && (b == len(s) || s[b] != '\\' && s[b] != '/') && !publicDev(v) {
-					add(ObjFinding{u, b, "user", "network-user", true})
+					if insideWinPath(s, a) {
+						// "...\Power BI\Banco de Dados": the folder after a folder whose name has a
+						// space (where the path readers stop), not a user
+						if folderOutside(v, false) {
+							add(ObjFinding{u, b, "folder", "path", false})
+						}
+					} else {
+						add(ObjFinding{u, b, "user", "network-user", true})
+					}
 				}
 			}
 		}
@@ -577,6 +585,39 @@ func findDomainUser(s string, add func(ObjFinding)) {
 		}
 		i += 1 + j
 	}
+}
+
+// insideWinPath: the word that starts at s[a] (the candidate domain) ends a folder name of a
+// Windows path ("...\Power BI\Banco de Dados", "C:\Users\x\OneDrive - Empresa SA\Arquivos"), and
+// what comes after the "\" is the next folder, not a user: from it
+// back to the previous "\" there are only characters a folder name accepts (Windows reserves
+// < > : " / | ? * in names: learn.microsoft.com/windows/win32/fileio/naming-a-file), and that "\" does
+// not close another DOMAIN\user ("CORP\ana CORP\joao"). Up to 260 characters back (MAX_PATH, the
+// same page).
+func insideWinPath(s string, a int) bool {
+	k := a - 1
+	for k >= 0 && s[k] != '\\' {
+		if a-k > 260 {
+			return false
+		}
+		switch s[k] {
+		case '<', '>', ':', '"', '/', '|', '?', '*', '\n', '\r', '\t', '\'', '`':
+			return false
+		}
+		k--
+	}
+	if k < 0 {
+		return false
+	}
+	for k > 0 && s[k-1] == '\\' { // escaped: "\\"
+		k--
+	}
+	d := k
+	for d > 0 && (s[d-1] >= 'A' && s[d-1] <= 'Z' || isDig(s[d-1]) || s[d-1] == '-') {
+		d--
+	}
+	otherUser := k-d >= 2 && k-d <= 15 && (d == 0 || strings.IndexByte(" \t\n\"'(=:,>[", s[d-1]) >= 0)
+	return !otherUser
 }
 
 // ssh|scp|sftp|rsync [-options] user@host[:path]

@@ -405,13 +405,66 @@ func (m *Masker) runReader(l Reader, s string, learn bool, add func(ini, end int
 }
 
 // ctxText: what applies to the whole text, measured once before the readers: the public software it
-// runs as an image (textSoftware).
+// runs as an image (textSoftware) and the roots of its template variables (templateRoots).
 type ctxText struct {
 	software map[string]bool
+	roots    map[string]bool
 }
 
 func textContext(s string) ctxText {
-	return ctxText{software: textSoftware(s)}
+	return ctxText{software: textSoftware(s), roots: templateRoots(s)}
+}
+
+// templateRoots: the first part of each dotted name inside a template expression of s
+// ("{{analise.veredito}}", "{{ fatos.inventario.total|contar }}", "{{ params.table }}"). The text
+// itself shows that the root is a variable of the program: a dotted name with that root elsewhere
+// in the same text ("tabela analise.confronto", "de": "fatos.linhagem.cadeias") is a path in the
+// program's data, not database.schema.table.
+func templateRoots(s string) map[string]bool {
+	var out map[string]bool
+	for i := strings.Index(s, "{{"); i >= 0; {
+		e := strings.Index(s[i+2:min(len(s), i+2+300)], "}}")
+		if e < 0 {
+			e = min(len(s), i+2+300) - (i + 2)
+		}
+		in := s[i+2 : i+2+e]
+		for k := 0; k < len(in); k++ {
+			if !(letterD(in[k]) || in[k] == '_') || k > 0 && (isAlnum(in[k-1]) || in[k-1] == '_' || in[k-1] == '.') {
+				continue
+			}
+			j := k
+			for j < len(in) && (isAlnum(in[j]) || in[j] == '_') {
+				j++
+			}
+			if j+1 < len(in) && in[j] == '.' && (letterD(in[j+1]) || in[j+1] == '_') {
+				if out == nil {
+					out = map[string]bool{}
+				}
+				out[in[k:j]] = true
+			}
+			k = j
+		}
+		n := strings.Index(s[i+2:], "{{")
+		if n < 0 {
+			break
+		}
+		i += 2 + n
+	}
+	return out
+}
+
+// templatePath: the dotted name around s[a:b] starts with a root of the text's template variables.
+func templatePath(s string, a, b int, roots map[string]bool) bool {
+	ident := func(c byte) bool { return isAlnum(c) || c == '_' || c == '.' }
+	for a > 0 && ident(s[a-1]) {
+		a--
+	}
+	for b < len(s) && ident(s[b]) {
+		b++
+	}
+	tok := strings.Trim(s[a:b], ".")
+	d := strings.IndexByte(tok, '.')
+	return d > 0 && roots[tok[:d]]
 }
 
 // applyFinding: a finding of reader l, with the common brakes. ct: the text context.
@@ -422,6 +475,9 @@ func (m *Masker) applyFinding(l Reader, s string, ct ctxText, o ObjFinding, lear
 	v := s[o.Start:o.End]
 	if isPseudoObj(v) || (l.Public != nil && l.Public(strings.Trim(v, "[]\"`"))) || vocabularyFinding(l, o, strings.Trim(v, "[]\"`'"), ct.software) {
 		return
+	}
+	if len(ct.roots) > 0 && entSQL[o.Ent] && o.Ent != "server" && templatePath(s, o.Start, o.End, ct.roots) {
+		return // a path in the program's data (see templateRoots)
 	}
 	add(o.Start, o.End, objTypePrefix+o.Ent)
 	if learn {

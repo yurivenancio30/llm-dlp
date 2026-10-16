@@ -209,6 +209,7 @@ permite testar funções internas). O teste de um arquivo tem o mesmo nome (`fie
 | `public_cases_test.go` | Formatos reais tirados de repositórios públicos, com nomes inventados: o que tem de sair e o que tem de ficar. Toda regra que deixa um nome em claro tem um caso aqui |
 | `readers_*_test.go` | Os leitores por área (dados, DevOps, desenvolvimento, código) |
 | `variations_test.go`, `general_rules_test.go` | Cada caso em todas as variações de escrita; regras que valem para todos os leitores |
+| `structure_shapes_test.go` | Um leitor só lê um nome onde a estrutura é a que ele lê (rótulos, chamadas, o fim de uma tabela, CREATE TABLE numa frase, uma pasta de um caminho); cada caso com o nome real ao lado ainda mascarado |
 | `matrix_test.go`, `matrix_transport_test.go` | O mesmo conteúdo em todos os desenhos e transportes |
 | `negatives_test.go`, `brakes_reference_test.go` | O que não pode ser mascarado |
 | `fuzz_test.go`, `readers_fuzz_test.go` | Fuzz da normalização e da ida e volta |

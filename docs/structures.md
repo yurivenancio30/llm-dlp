@@ -374,6 +374,12 @@ SELECT * FROM SCH_mvrhafae.T_cszwa3ri@HOST_z2l74vie;
 - https://cloud.google.com/bigquery/docs/reference/standard-sql/lexical
 - https://spark.apache.org/docs/latest/sql-ref-identifier.html
 - https://spark.apache.org/docs/latest/sql-ref-ansi-compliance.html
+- https://www.postgresql.org/docs/current/monitoring-stats.html (pg_stat_all_tables, pg_stat_all_indexes)
+- https://www.postgresql.org/docs/current/catalog-pg-extension.html
+- https://www.postgresql.org/docs/current/functions-admin.html (Database Object Size Functions)
+- https://www.postgresql.org/docs/current/functions-datetime.html (EXTRACT, date_part)
+- https://dev.mysql.com/doc/refman/8.4/en/information-schema-tables-table.html
+- https://docs.snowflake.com/en/sql-reference/functions-date-time (Supported date and time parts)
 
 Checked in this research: the pages of T-SQL reserved, Snowflake reserved and identifiers, PostgreSQL Appendix C, MySQL keywords, Oracle object names, Db2 reserved, Spark identifiers and BigQuery lexical (this one by searching the official domain). The other links and the counts marked "approx." (functions, `V$RESERVED_WORDS`, `pg_get_keywords`) come from knowledge of the documentation and were not opened now `[VERIFY]`.
 
@@ -3540,6 +3546,52 @@ became columns (`10. my wallet`, `11. cpf`). The next item (`10. `, `- `, `• `
 line) now ends the statement, like a line of surrounding code; not `* ` (`SELECT` with `*` on the
 next line) nor `1) ` (closes an expression). In 40 MB of public code, 416 findings went away, all
 of them words in changelog and README lists (`https`, `github`, `handle`); none appeared.
+
+**A list of labels is not a list of names.** In a list under a type key (`"colunas": ["Elemento",
+"O que se mediu", "Veredito"]`), a sentence among the items makes it the header of a report: there
+a loose word (`Veredito`, `Tema`) is a label and stays, and only an identifier-shaped item
+(`tb_pedido`) is still a name (the YAML list already stopped at a sentence). A field that names
+itself (`"Tabelas": "tabelas"`, `"usuarios": "Usuários"`, with or without accents) is not a
+resource, in code (`code-name`) as it already was in configuration (`key-value`).
+
+**A call is not a tuple.** `f("a", "b")` and `txt.replace("a", "b")` are the arguments of a call,
+not a row of a result: the tuple reader skips a parenthesis right after a name (except `VALUES (`
+and `IN (`).
+
+**A table ends where its shape ends.** In a table with a separator (`|`, `,`, `;`, TAB), a line
+without the separator (`--`, the title of the next table) ends it, and the header of the next
+table is not its data. A quoted cell that continues on the next line (RFC 4180) does not end it.
+
+**A folder is not a DOMAIN\user.** In `...\Power BI\Banco de Dados\x.xlsx`, the word before the
+`\` closes a folder name of a Windows path: from it back to the previous `\` there are only
+characters a folder name accepts (Windows reserves `< > : " / | ? *`) and that `\` does not close
+another `DOMAIN\user` (`CORP\ana CORP\joao`). The word after it is the next folder, and is masked
+as a folder.
+
+**The grammar of CREATE TABLE and of the functions.** `CREATE TABLE x` only counts if what comes
+after the name is what the dialects put there (the column list, `AS`, `SELECT`, `LIKE`, `CLONE`,
+`USING`, `PARTITION BY`..., Teradata's options after a comma, `;`, the end of the line) and the
+first item in the parentheses is a column or a table constraint: `CREATE TABLE lidos (recorte: os
+12 mais frequentes)` is a sentence citing the command. The `FROM` inside the parentheses of a
+function (`EXTRACT(EPOCH FROM x)`, `SUBSTRING(s FROM 2)`) is an argument, not the source of the
+query (a subquery still is). What comes after a system schema (`information_schema.EVENTS`,
+`sys.objects`, `SNOWFLAKE.ACCOUNT_USAGE.X`) is the system's; the database before it
+(`mydb.information_schema.tables`) is still masked. The vocabulary gained the columns of
+`pg_stat_*_tables`, `pg_extension`, MySQL's `INFORMATION_SCHEMA.TABLES` and the parts of `EXTRACT`
+(links in [SQL and DDL](#7-links-used)).
+
+**A path in the program's data.** A dotted name whose root is, in the same text, the root of a
+template variable (`{{analise.veredito}}`) is a path in the program's data: `tabela
+analise.confronto` there is not schema.table.
+
+Measured on a real session of 19,078 blocks (a data assessment run by a Python framework that writes
+reports): 1,356 findings went away (295 values: report labels, the framework's own keys, catalog
+views, pieces of regular expressions) and 105 appeared (real columns and schemas that a table
+merged with the previous one used to let out). Two real names were masked only by that accident
+and go out now: a system name cited in a report table and the name of a layer. A customer name cited in
+a report is for `terms`. Limit: a list of dotted names, one per line, has the same shape whether
+it holds `schema.table` or paths of a program's data (`ingestao.stages`); the reader keeps reading
+it, because not reading it let real names out.
 
 **SQL quoted in prose and in a comment.** The SQL reader marked 746 findings in 40 MB of
 public code. From the samples, almost all came from three shapes, none of them SQL:

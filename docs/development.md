@@ -209,6 +209,7 @@ and `fields_test.go`). The ones that span several files:
 | `public_cases_test.go` | Real formats taken from public repositories, with invented names: what must go and what must stay. Every rule that leaves a name in the clear has a case here |
 | `readers_*_test.go` | The readers by area (data, DevOps, development, code) |
 | `variations_test.go`, `general_rules_test.go` | Each case in every spelling variation; rules that hold for all the readers |
+| `structure_shapes_test.go` | A reader only reads a name where the structure is the one it reads (labels, calls, the end of a table, CREATE TABLE in a sentence, a folder of a path); each case with the real name next to it still masked |
 | `matrix_test.go`, `matrix_transport_test.go` | The same content in every layout and transport |
 | `negatives_test.go`, `brakes_reference_test.go` | What must not be masked |
 | `fuzz_test.go`, `readers_fuzz_test.go` | Fuzzing of the normalization and of the round trip |

@@ -43,6 +43,18 @@ sysobjects syscolumns sysindexes sysusers sysdatabases objects all_objects all_c
 all_tables all_tab_columns all_views all_indexes all_constraints all_cons_columns all_users all_synonyms all_procedures all_source user_tables user_tab_columns user_views user_indexes user_objects user_source dba_tables dba_tab_columns dba_users dba_objects dba_views v$session v$database v$instance owner tablespace_name num_rows last_analyzed column_id data_length data_precision data_scale nullable
 tabschema tabname colname colno typename indschema indname
 query_history login_history access_history warehouse_metering_history storage_usage database_storage_usage_history task_history copy_history load_history functions procedures stages pipes query_id query_text query_type user_name role_name warehouse_name warehouse_size database_name start_time end_time total_elapsed_time execution_status error_code error_message bytes_scanned rows_produced compilation_time execution_time credits_used
+# PostgreSQL statistics views pg_stat_all_tables / pg_stat_user_tables / pg_stat_all_indexes
+# (postgresql.org/docs/current/monitoring-stats.html), pg_extension (catalog-pg-extension.html) and
+# the size functions (functions-admin.html, Database Object Size Functions)
+pg_stat_all_tables pg_stat_sys_tables pg_stat_xact_user_tables pg_statio_all_tables pg_statio_user_tables pg_stat_all_indexes pg_stat_user_indexes relid indexrelid indexrelname seq_scan last_seq_scan seq_tup_read idx_scan last_idx_scan idx_tup_read idx_tup_fetch n_tup_ins n_tup_upd n_tup_del n_tup_hot_upd n_tup_newpage_upd n_live_tup n_dead_tup n_mod_since_analyze n_ins_since_vacuum last_vacuum last_autovacuum last_analyze last_autoanalyze vacuum_count autovacuum_count analyze_count autoanalyze_count total_vacuum_time total_autovacuum_time total_analyze_time total_autoanalyze_time
+pg_extension oid extname extowner extnamespace extrelocatable extversion extconfig extcondition
+pg_size_pretty pg_size_bytes pg_total_relation_size pg_relation_size pg_table_size pg_indexes_size pg_database_size pg_column_size pg_column_compression pg_column_toast_chunk_id pg_tablespace_size
+# MySQL INFORMATION_SCHEMA.TABLES (dev.mysql.com/doc/refman/8.4/en/information-schema-tables-table.html): the columns not above
+max_data_length data_free auto_increment check_time table_collation checksum create_options
+# date and time parts of EXTRACT / DATE_PART (postgresql.org/docs/current/functions-datetime.html, EXTRACT;
+# docs.snowflake.com/en/sql-reference/functions-date-time, Supported date and time parts): the ones not above
+century decade millennium dow doy isodow isoyear julian epoch microseconds milliseconds nanosecond timezone_hour timezone_minute dayofyear weekofyear yearofweek dayofweekiso weekiso yearofweekiso
+dayofmonth weekday dayofweek_iso weekday_iso dow_iso week_iso weekofyeariso weekofyear_iso yearday millisecond microsecond nanoseconds epoch_second epoch_seconds epoch_millisecond epoch_milliseconds epoch_microsecond epoch_microseconds epoch_nanosecond epoch_nanoseconds
 # encodings, collations and hash functions (public names of the DBMSs)
 utf8 utf8mb3 utf8mb4 utf16 utf32 ucs2 latin1 latin2 ascii sql_ascii win1250 win1252 euc_jp euc_kr gbk big5 sjis koi8r iso_8859_1 c.utf-8 en_us.utf-8 pt_br.utf-8 utf8mb4_general_ci utf8mb4_unicode_ci utf8mb4_0900_ai_ci utf8_general_ci latin1_swedish_ci latin1_general_ci sql_latin1_general_cp1_ci_as latin1_general_ci_as icu libc md5 sha1 sha2 sha224 sha256 sha384 sha512 crc32 base64 hex
 # Snowflake: DDL parameters (warehouse, stage, task, pipe, integration)

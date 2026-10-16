@@ -376,6 +376,7 @@ func findTablesD(s string, d *outputHint, add func(ObjFinding)) {
 		// the data lines
 		var rows [][]cell
 		k := data
+		openQuote := false // CSV: a quoted cell that continues on the next line (RFC 4180)
 		for ; k < len(lines); k++ {
 			l := lines[k]
 			line := s[l.a:l.b]
@@ -384,6 +385,15 @@ func findTablesD(s string, d *outputHint, add func(ObjFinding)) {
 			}
 			if reSeparator.MatchString(line) {
 				continue
+			}
+			// a line without the separator is not a line of this table ("--" or a title between two
+			// tables): the table ends there, and the header of the next one is not its data. Unless
+			// it is the continuation of a quoted cell (an error message across lines in a CSV)
+			if sep != 0 && !openQuote && countOutside(line, sep) == 0 {
+				break
+			}
+			if sep != '|' && strings.Count(line, `"`)%2 == 1 {
+				openQuote = !openQuote
 			}
 			if fixedOnes != nil {
 				vs, ok := alignFixed(s, l, fixedOnes, h.a)
@@ -667,7 +677,7 @@ func tuplesIn(s string) [][]cell {
 	var out [][]cell
 	for i := 0; i < len(s); i++ {
 		c := s[i]
-		if c != '(' && c != '[' {
+		if c != '(' && c != '[' || c == '(' && callParen(s, i) {
 			continue
 		}
 		closes := byte(')')
@@ -727,6 +737,20 @@ func tuplesIn(s string) [][]cell {
 		}
 	}
 	return out
+}
+
+// callParen: the "(" at s[i] opens the arguments of a call (ev("a", "b"), txt.replace("a", "b")),
+// not a tuple: it comes right after a name that is not a SQL word followed by a list (VALUES, IN).
+func callParen(s string, i int) bool {
+	if i == 0 || !(isAlnum(s[i-1]) || s[i-1] == '_') {
+		return false
+	}
+	a := i
+	for a > 0 && (isAlnum(s[a-1]) || s[a-1] == '_') {
+		a--
+	}
+	w := strings.ToUpper(s[a:i])
+	return w != "VALUES" && w != "IN"
 }
 
 func findTuples(s string, d *outputHint, add func(ObjFinding)) {

@@ -365,7 +365,7 @@ func findSQL(s string, add func(ObjFinding)) {
 		if k := sqlProseStart(shape); k >= 0 {
 			end, body, shape = i+k, body[:k], shape[:k]
 		}
-		if !reSQLShape.MatchString(shape) && !(upperCase && reDDLGenerico.MatchString(shape)) {
+		if !reSQLShape.MatchString(shape) && !(upperCase && reDDLGenerico.MatchString(shape)) || kw == "CREATE" && !createTableGrammar(shape) {
 			return
 		}
 		if !upperCase && !statementOutsideProse(s, i, shape, kw, prose) {
@@ -514,7 +514,13 @@ func sqlStatement(s string, base int, body, kw string, strong bool, add func(Obj
 			return
 		}
 		var vs [][2]int
-		for _, p := range sqlParts(lit, a, b) {
+		ps := sqlParts(lit, a, b)
+		if k := systemSchemaAt(lit, ps); k >= 0 {
+			// information_schema.EVENTS, mydb.sys.objects: the object is the system's; what comes
+			// before the system schema is the database (and the server)
+			ps, lastPos = ps[:k], "database"
+		}
+		for _, p := range ps {
 			if v := strings.Trim(lit[p[0]:p[1]], "[]\"`"); len(v) > 1 && !publicSQL(v) {
 				vs = append(vs, p)
 			}
@@ -553,6 +559,9 @@ func sqlStatement(s string, base int, body, kw string, strong bool, add func(Obj
 			continue
 		}
 		for _, m := range p.re.FindAllStringSubmatchIndex(lit, -1) {
+			if p.ent == "table" && strings.EqualFold(lit[m[0]:min(len(lit), m[0]+4)], "FROM") && fromInsideCall(lit, m[0]) {
+				continue // EXTRACT(EPOCH FROM x): x is an argument (a column), not a table
+			}
 			markWhich(m[2], m[3], p.ent)
 			if p.ent == "table" { // FROM a, b, c
 				for k := m[3]; ; {
@@ -573,9 +582,10 @@ func sqlStatement(s string, base int, body, kw string, strong bool, add func(Obj
 	}
 	for _, q := range sqlQualsIn(lit) {
 		ps := sqlParts(lit, q[0], q[1])
+		sys := systemSchemaAt(lit, ps)
 		for k, p := range ps {
 			a, b := p[0], p[1]
-			if b <= a || isCTE(a, b) {
+			if b <= a || isCTE(a, b) || sys >= 0 && k > sys {
 				continue
 			}
 			v := lit[a:b]
