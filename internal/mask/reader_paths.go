@@ -57,6 +57,36 @@ func pathPieceEnd(s string, a int) int {
 	return b
 }
 
+// fileName: the last piece of a path is a file when what comes after its last dot has the shape of
+// an extension: 1 to 5 lowercase letters or digits (x.tf, main.py, dump.sql.gz, v1.2.3), up to 4
+// uppercase (IMG_01.JPG), or a known one. "HX.AWS.PRD.Carga" and "app.Settings" are names with dots
+// (a folder of "cd ~/HX.AWS.PRD.Carga").
+func fileName(v string) bool {
+	v = strings.TrimRight(v, ".") // full stop of the sentence ("lendo /srv/x/saida.csv.")
+	if strings.Trim(v, "0123456789.") == "" {
+		return true // a number ("35."), not a name
+	}
+	d := strings.LastIndexByte(v, '.')
+	if d <= 0 || d == len(v)-1 {
+		return false
+	}
+	ext := v[d+1:]
+	// "x.pt-BR", and the context line of grep -C ("relatorio.md-texto da linha")
+	if h := strings.IndexByte(ext, '-'); h > 0 {
+		ext = ext[:h]
+	}
+	if fileExtensions[strings.ToLower(ext)] {
+		return true
+	}
+	lower, upper := len(ext) <= 5, len(ext) <= 4
+	for i := 0; i < len(ext); i++ {
+		c := ext[i]
+		lower = lower && (c >= 'a' && c <= 'z' || isDig(c))
+		upper = upper && (c >= 'A' && c <= 'Z' || isDig(c))
+	}
+	return lower || upper
+}
+
 // folderName: a path piece that may be a name (see pathPieceEnd).
 func folderName(v string) bool {
 	return v != "" && (isAlnum(v[0]) || utf8Letter(v, 0) > 0) && pathPieceEnd(v, 0) == len(v)
@@ -90,8 +120,14 @@ func pathPieces(s string, a int, sep byte, strict bool, add func(ObjFinding)) {
 		}
 		prev = v
 		dir := b < len(s) && s[b] == sep
-		if !dir && strings.IndexByte(v, '.') > 0 {
+		if !dir && fileName(v) {
 			return // arquivo
+		}
+		if !dir {
+			if b = a + len(strings.TrimRight(v, ".")); b == a {
+				return
+			}
+			v = s[a:b] // the full stop of the sentence stays
 		}
 		if folderOutside(v, strict) {
 			add(ObjFinding{a, b, "folder", "path", false})
@@ -198,8 +234,11 @@ func slashPathPieces(s string, a int, add func(ObjFinding)) {
 			return // "\\u00e9", "\\x0a": string escape, not a folder
 		}
 		dir := b < len(s) && s[b] == '\\'
-		if !dir && strings.IndexByte(v, '.') > 0 {
+		if !dir && fileName(v) {
 			return
+		}
+		if !dir {
+			v = strings.TrimRight(v, ".") // the full stop of the sentence stays
 		}
 		if folderOutside(v, false) {
 			add(ObjFinding{a, a + len(v), "folder", "path", false})

@@ -3331,6 +3331,8 @@ subnet-0f1e2d3c4b5a69788 na vpc-0a1b2c3d4e5f67890     →  svc_... na svc_...
 - NetBIOS — nomes de domínio: https://learn.microsoft.com/troubleshoot/windows-server/active-directory/naming-conventions-for-computer-domain-site-ou
 - IANA — IPv4 e IPv6 Special-Purpose Address Registry: https://www.iana.org/assignments/iana-ipv4-special-registry/ ; https://www.iana.org/assignments/iana-ipv6-special-registry/
 - RFC 5737 (IPv4 de documentação): https://www.rfc-editor.org/rfc/rfc5737 ; RFC 3849 (IPv6): https://www.rfc-editor.org/rfc/rfc3849
+- AWS — tipos de nome de host de instância EC2 (`ip-10-24-34-0.us-west-2.compute.internal`): https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/hostname-types.html
+- AWS — endpoint de cluster EKS (`aws eks describe-cluster`): https://docs.aws.amazon.com/cli/latest/reference/eks/describe-cluster.html
 
 ## Variações que todo leitor aceita (seção G)
 
@@ -3590,6 +3592,50 @@ camada. Nome de cliente citado num relatório é para `terms`. Limite: uma lista
 pontos, um por linha, tem a mesma forma quando traz `schema.tabela` ou caminhos dos dados de um
 programa (`ingestao.stages`); o leitor continua lendo a lista, porque não ler deixava sair nomes
 reais.
+
+**Um registro de conexão escrito por uma pessoa.** Um bloco de linhas `Rótulo: valor` (entre linhas
+em branco) com um rótulo de servidor e um rótulo de porta com número de porta é a string de conexão
+de uma pessoa: `Host: SRVSQL`, `Porta: 1433`, `DataBase:` com `DWVENDAS` e `ESTOQUE` recuados
+embaixo. Nele, o valor de um rótulo de conexão (host, server, servidor, database, banco, schema,
+user, usuário) é o recurso mesmo quando é uma palavra solta, como em `host=srv port=1433 dbname=dw`;
+vários valores na linha (` / `, `, `) e as linhas recuadas embaixo de um rótulo vazio são itens do
+tipo do rótulo. Sem a porta, `Server: nginx` e `Host: localhost` continuam rótulos de prosa ou
+cabeçalhos.
+
+**Um caminho na pasta pessoal.** `~/x` é a pasta pessoal de quem roda o comando, lida como
+`/home/<usuário>/x`. A última parte de um caminho só é arquivo quando o que vem depois do último
+ponto tem forma de extensão (1 a 5 letras minúsculas ou algarismos, até 4 maiúsculas, ou uma
+conhecida): `cd ~/HX.AWS.PRD.Carga` é uma pasta com pontos no nome, e `main.tf`, `v1.2.3`,
+`guia.pt-BR` e a linha de contexto do `grep -C` (`relatorio.md-texto`) continuam arquivos.
+
+**O endpoint de um cluster EKS e o nome privado de uma instância EC2.** Em
+`<id>.yl4.<região>.eks.amazonaws.com` o primeiro rótulo é o do cluster, como nos hosts do RDS e do
+Redshift. O IP privado dentro de `ip-10-24-34-0.<região>.compute.internal` (e `.ec2.internal`) é
+mascarado também quando o nome está grudado em outro (`pod-x-ip-10-24-34-0.us-east-2.compute.internal-abc12`):
+o domínio interno da AWS logo depois dos números diz que é o endereço da instância (links em
+[Recursos de nuvem e usuários de rede](#recursos-de-nuvem-e-usuários-de-rede)).
+
+**Os filtros de uma receita de ingestão e as tags.** Embaixo de uma chave `<tipo>_pattern` de uma
+receita do DataHub (`database_pattern`, `schema_pattern`, `table_pattern`: `AllowDenyPattern`,
+https://docs.datahub.com/docs/generated/ingestion/sources/mssql), as listas `allow` e `deny` trazem
+expressões regulares de nomes daquele tipo, e a documentação ancora o casamento exato com `^...$`:
+um literal ancorado é o nome (`"^DWVENDAS$"`; `'^DW\.dbo\..*'` é um banco e o schema dele), em
+YAML, JSON ou dentro de um comando. Uma regex com alternativas (`^(dev|test)_.*`) ou só com o começo
+(`^stg.*`) não é nome e fica. O nome de uma tag (`urn:li:tag:<nome>`) é mascarado, a menos que seja
+feito de palavras do dicionário (`Legacy`, `dados_pessoais`); é evidência fraca, então não toma o
+tipo de um nome que outro leitor aprende. A tag do Snowflake (`urn:li:tag:<banco>.<schema>.<tag>:<valor>`)
+fica com os leitores de nome qualificado.
+
+Medido numa sessão real de 15.306 blocos (a atualização de um DataHub de produção): apareceram 789
+achados (os servidores e bancos de um inventário escrito numa mensagem, no próprio inventário, nos
+filtros das receitas e em tags; uma pasta pessoal com pontos no nome; os endpoints de 2 clusters) e
+nenhum sumiu; na sessão do diagnóstico de dados acima, apareceram 15 (pastas) e nenhum sumiu.
+Limite: um nome solto (sem `_`, algarismo ou caixa mista) é mascarado onde uma estrutura diz que é
+recurso, mas não é propagado para o resto da conversa
+([Freios da propagação](#freios-da-propagação)): das 856 vezes em que os nomes daquele inventário
+apareceram fora dele, 317 agora são mascaradas e 539 continuam saindo (citados em prosa, numa
+tabela, numa lista de filtros do Python sem a chave, num `grep -n` que mostra só as linhas dos
+itens).
 
 **SQL citado em prosa e em comentário.** O leitor de SQL marcava 746 achados em 40 MB de
 código público. Pelas amostras, quase todos vinham de três formas, nenhuma delas SQL:

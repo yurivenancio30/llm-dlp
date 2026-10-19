@@ -141,6 +141,8 @@ nomes de recursos internos (servidor, banco, tabela, coluna, serviço, bucket...
   reader_schema.go             nome + tipo de dado (dtypes, printSchema, Arrow, protobuf)
   reader_connection.go         strings de conexão, URIs de banco, DSN, tnsnames, URNs, dbt, Airflow
   reader_connection_brakes.go  nome de modelo na URI de banco e no tnsnames
+  reader_connection_record.go  registro de conexão escrito por uma pessoa (Host:, Porta:, DataBase:)
+  reader_allow_deny.go         filtros de uma receita do DataHub (database_pattern: allow: ["^x$"])
   reader_yaml.go               motor de YAML/JSON por caminho e o despachante das famílias
   reader_kubernetes.go         Kubernetes, Helm, imagens, DNS de serviço, env em lista
   reader_iac.go                Terraform/HCL, Bicep, ARM, CloudFormation
@@ -210,6 +212,7 @@ permite testar funções internas). O teste de um arquivo tem o mesmo nome (`fie
 | `readers_*_test.go` | Os leitores por área (dados, DevOps, desenvolvimento, código) |
 | `variations_test.go`, `general_rules_test.go` | Cada caso em todas as variações de escrita; regras que valem para todos os leitores |
 | `structure_shapes_test.go` | Um leitor só lê um nome onde a estrutura é a que ele lê (rótulos, chamadas, o fim de uma tabela, CREATE TABLE numa frase, uma pasta de um caminho); cada caso com o nome real ao lado ainda mascarado |
+| `resource_labels_test.go` | Um nome solto onde uma estrutura diz que é recurso (um registro de conexão escrito por uma pessoa, os filtros de uma receita do DataHub, uma tag, uma pasta pessoal com pontos, um endpoint EKS, o IP privado dentro de um nome EC2); cada caso com a palavra pública ao lado ainda em claro |
 | `matrix_test.go`, `matrix_transport_test.go` | O mesmo conteúdo em todos os desenhos e transportes |
 | `negatives_test.go`, `brakes_reference_test.go` | O que não pode ser mascarado |
 | `fuzz_test.go`, `readers_fuzz_test.go` | Fuzz da normalização e da ida e volta |

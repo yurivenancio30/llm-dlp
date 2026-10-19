@@ -10,13 +10,15 @@ import "strings"
 //	dw-vendas.abc123.sa-east-1.redshift.amazonaws.com       Redshift cluster
 //	<bucket>.s3[.<region>|-<region>].amazonaws.com          S3 bucket (virtual address)
 //	<account>.dkr.ecr.<region>.amazonaws.com                AWS account in the ECR registry
+//	<id>.yl4.<region>.eks.amazonaws.com                     API endpoint of an EKS cluster
 //	<name>.database.windows.net, <name>.vault.azure.net ... Azure resource
 //	dbc-xxxx.cloud.databricks.com, adb-N.N.azuredatabricks.net  Databricks workspace
 //	<bucket>.storage.googleapis.com, <project>.appspot.com  Google Cloud
 //
 // (https://docs.aws.amazon.com/general/latest/gr/rande.html,
 // https://learn.microsoft.com/azure/azure-resource-manager/management/azure-services-resource-providers,
-// https://docs.databricks.com/workspace/workspace-details.html)
+// https://docs.databricks.com/workspace/workspace-details.html,
+// https://docs.aws.amazon.com/cli/latest/reference/eks/describe-cluster.html)
 
 // host suffix -> type of the client label (the first label of the host)
 var cloudHosts = []struct{ suf, ent string }{
@@ -26,6 +28,7 @@ var cloudHosts = []struct{ suf, ent string }{
 	{".cache.amazonaws.com", "server"},
 	{".es.amazonaws.com", "server"},
 	{".elb.amazonaws.com", "server"},
+	{".eks.amazonaws.com", "server"},
 	{".execute-api.", "service"}, // <id>.execute-api.<region>.amazonaws.com
 	{".database.windows.net", "server"},
 	{".database.azure.com", "server"}, // <name>.postgres|mysql.database.azure.com

@@ -35,6 +35,7 @@ var (
 	reURNDashboard = regexp.MustCompile(`urn:li:(?:chart|dashboard):\([\w-]+,([\w.\-]+)\)`)
 	reURNField     = regexp.MustCompile(`urn:li:schemaField:\(urn:li:dataset:\([^()]*\),([\w.\-\[\]=]+)\)`)
 	reURNApp       = regexp.MustCompile(`urn:li:application:([\w.\-]+)`) // the client's application (system)
+	reURNTag       = regexp.MustCompile(`urn:li:tag:([\w\-]+)`)          // a tag: a word ("Legacy") stays
 	reDbtRef       = regexp.MustCompile(`\{\{[^}]*?\bref\(\s*['"]([\w.\-]+)['"](?:\s*,\s*['"]([\w.\-]+)['"])?\s*\)`)
 	reDbtSource    = regexp.MustCompile(`\{\{[^}]*?\bsource\(\s*['"]([\w.\-]+)['"]\s*,\s*['"]([\w.\-]+)['"]\s*\)`)
 	reConnID       = regexp.MustCompile(`\b\w*conn_id\s*=\s*['"]([\w.\-]+)['"]`)
@@ -229,6 +230,21 @@ func findConnections(s string, add func(ObjFinding)) {
 				}
 			}
 		}
+		// a tag is weak evidence: it masks in place and does not teach, so it does not take the type
+		// of a name that another reader learns (the tag named after a database)
+		for _, m := range reURNTag.FindAllStringSubmatchIndex(s, -1) {
+			// the Snowflake tag is qualified (urn:li:tag:db.schema.tag:valor): left to the qualified
+			// name reader
+			if m[3] < len(s) && (s[m[3]] == '.' || s[m[3]] == ':') {
+				continue
+			}
+			if v := s[m[2]:m[3]]; !publicDev(v) && !publicSQL(v) && !madeOfWords(v) {
+				add(ObjFinding{m[2], m[3], "service", "urn-tag", false})
+			}
+		}
+	}
+	if strings.Contains(s, "_pattern") {
+		findAllowDeny(s, add) // reader_allow_deny.go
 	}
 	if strings.Contains(s, "{{") {
 		for _, m := range reDbtRef.FindAllStringSubmatchIndex(s, -1) {
@@ -253,6 +269,25 @@ func findConnections(s string, add func(ObjFinding)) {
 			}
 		}
 	}
+	if strings.Contains(s, "ort") || strings.Contains(s, "ORT") {
+		findConnectionRecords(s, add) // reader_connection_record.go
+	}
+}
+
+// madeOfWords: every piece of the name (by . _ - : and camelCase) is a dictionary word: a label
+// ("dados_pessoais", "Legacy", "TierGold"), not the name of a resource.
+func madeOfWords(v string) bool {
+	var ps [16][2]int
+	n, ok := keyPieces(v, &ps)
+	if !ok || n == 0 {
+		return false
+	}
+	for _, p := range ps[:n] {
+		if !dictionaryWord(v[p[0]:p[1]]) {
+			return false
+		}
+	}
+	return true
 }
 
 // uriProperty: the key at s[k] comes right after ; ? or & of a database URI on the same line

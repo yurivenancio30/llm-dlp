@@ -3337,6 +3337,8 @@ subnet-0f1e2d3c4b5a69788 in vpc-0a1b2c3d4e5f67890     →  svc_... in svc_...
 - NetBIOS — domain names: https://learn.microsoft.com/troubleshoot/windows-server/active-directory/naming-conventions-for-computer-domain-site-ou
 - IANA — IPv4 and IPv6 Special-Purpose Address Registry: https://www.iana.org/assignments/iana-ipv4-special-registry/ ; https://www.iana.org/assignments/iana-ipv6-special-registry/
 - RFC 5737 (documentation IPv4): https://www.rfc-editor.org/rfc/rfc5737 ; RFC 3849 (IPv6): https://www.rfc-editor.org/rfc/rfc3849
+- AWS — EC2 instance hostname types (`ip-10-24-34-0.us-west-2.compute.internal`): https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/hostname-types.html
+- AWS — EKS cluster endpoint (`aws eks describe-cluster`): https://docs.aws.amazon.com/cli/latest/reference/eks/describe-cluster.html
 
 ## Variations every reader accepts (section G)
 
@@ -3592,6 +3594,48 @@ and go out now: a system name cited in a report table and the name of a layer. A
 a report is for `terms`. Limit: a list of dotted names, one per line, has the same shape whether
 it holds `schema.table` or paths of a program's data (`ingestao.stages`); the reader keeps reading
 it, because not reading it let real names out.
+
+**A connection record written by a person.** A block of `Label: value` lines (between blank
+lines) with a server label and a port label holding a port number is a person's connection string:
+`Host: SRVSQL`, `Porta: 1433`, `DataBase:` with `DWVENDAS` and `ESTOQUE` indented under it. In it,
+the value of a connection label (host, server, servidor, database, banco, schema, user, usuário) is
+the resource even when it is one plain word, as in `host=srv port=1433 dbname=dw`; several values
+on the line (` / `, `, `) and the lines indented under an empty label are items of the label's
+type. Without the port, `Server: nginx` and `Host: localhost` stay prose labels or headers.
+
+**A path in the home folder.** `~/x` is the home folder of whoever runs the command, read like
+`/home/<user>/x`. The last piece of a path is a file only when what comes after its last dot has the
+shape of an extension (1 to 5 lowercase letters or digits, up to 4 uppercase, or a known one):
+`cd ~/HX.AWS.PRD.Carga` is a folder with dots in its name, while `main.tf`, `v1.2.3`, `guia.pt-BR`
+and the context line of `grep -C` (`relatorio.md-texto`) stay files.
+
+**The endpoint of an EKS cluster and the private name of an EC2 instance.** In
+`<id>.yl4.<region>.eks.amazonaws.com` the first label is the cluster's, as in the RDS and Redshift
+hosts. The private IP inside `ip-10-24-34-0.<region>.compute.internal` (and `.ec2.internal`) is
+masked also when the name is glued to another one (`pod-x-ip-10-24-34-0.us-east-2.compute.internal-abc12`):
+the AWS internal domain right after the numbers says it is the instance's address (links in
+[Cloud resources and network users](#cloud-resources-and-network-users)).
+
+**The filters of an ingestion recipe and the tags.** Under a `<type>_pattern` key of a DataHub
+recipe (`database_pattern`, `schema_pattern`, `table_pattern`: `AllowDenyPattern`,
+https://docs.datahub.com/docs/generated/ingestion/sources/mssql), the `allow` and `deny` lists hold
+regular expressions of names of that type, and the documentation anchors an exact match with
+`^...$`: an anchored literal is the name (`"^DWVENDAS$"`; `'^DW\.dbo\..*'` is a database and its
+schema), in YAML, JSON or inside a command. A regex with alternatives (`^(dev|test)_.*`) or only a
+start (`^stg.*`) is not a name and stays. The name of a tag (`urn:li:tag:<name>`) is masked unless it
+is made of dictionary words (`Legacy`, `dados_pessoais`); it is weak evidence, so it does not take the
+type of a name another reader learns. The Snowflake tag (`urn:li:tag:<db>.<schema>.<tag>:<value>`)
+is left to the readers of qualified names.
+
+Measured on a real session of 15,306 blocks (the update of a production DataHub): 789 findings
+appeared (the servers and databases of an inventory written in a message, in the inventory itself,
+in the filters of the recipes and in tags; a home folder with dots in its name; the endpoints of 2
+clusters) and none went away; on the data assessment session above, 15 appeared (folders) and none
+went away. Limit: a plain name (no `_`, digit or mixed case) is masked where a structure says it is
+a resource, but it is not propagated to the rest of the conversation
+([Propagation guards](#propagation-guards)): of the 856 times the names of that inventory appeared
+outside it, 317 are masked now and 539 still go out (cited in prose, in a table, in a Python list of
+filters without the key, in a `grep -n` that shows only the lines of the items).
 
 **SQL quoted in prose and in a comment.** The SQL reader marked 746 findings in 40 MB of
 public code. From the samples, almost all came from three shapes, none of them SQL:

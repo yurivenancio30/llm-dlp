@@ -456,6 +456,17 @@ func findPaths(s string, add func(ObjFinding)) {
 			i += 1 + j
 		}
 	}
+	// ~/x: the home folder of whoever runs the command, the same as /home/<user>/x
+	for i := strings.Index(s, "~/"); i >= 0; {
+		if pathStart(s, i) {
+			homePieces(s, i+1, add)
+		}
+		j := strings.Index(s[i+2:], "~/")
+		if j < 0 {
+			break
+		}
+		i += 2 + j
+	}
 }
 
 func pathSep(c byte) bool { return c == '/' || c == '\\' }
@@ -480,8 +491,13 @@ func pathIn(s string, u int, add func(ObjFinding)) {
 	if !publicDev(name) && len(name) >= 2 {
 		add(ObjFinding{u, e, "user", "path", true})
 	}
+	homePieces(s, e, add)
+}
+
+// homePieces: the folders of the home folder from s[a] (the separator after the user, or after "~").
+func homePieces(s string, a int, add func(ObjFinding)) {
 	prev := ""
-	for n, a := 0, e; n < 8 && a < len(s) && pathSep(s[a]); n++ {
+	for n := 0; n < 8 && a < len(s) && pathSep(s[a]); n++ {
 		for a < len(s) && pathSep(s[a]) {
 			a++
 		}
@@ -498,8 +514,14 @@ func pathIn(s string, u int, add func(ObjFinding)) {
 		}
 		prev = v
 		dir := b < len(s) && pathSep(s[b])
-		if !dir && strings.IndexByte(v, '.') >= 0 {
+		if !dir && fileName(v) {
 			return // arquivo
+		}
+		if !dir {
+			if b = a + len(strings.TrimRight(v, ".")); b == a {
+				return
+			}
+			v = s[a:b] // the full stop of the sentence stays
 		}
 		if v[0] != '.' && identifierShape(v) && !publicFolder(v) && !publicDev(v) {
 			add(ObjFinding{a, b, "folder", "path", false})

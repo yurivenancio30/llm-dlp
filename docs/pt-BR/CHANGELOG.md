@@ -9,6 +9,34 @@ Em cada versão: **Mascaramento** é o que passou a ser (ou deixou de ser) masca
 **Programa** é comando, instalação, configuração, desempenho e documentação; **Código** é o
 que só interessa a quem mexe no código.
 
+## [Não lançado]
+
+### Mascaramento
+
+- Um registro de conexão escrito por uma pessoa (um inventário, um chamado): um bloco de linhas
+  `Rótulo: valor` com um servidor e um número de porta (`Host: SRVSQL`, `Porta: 1433`,
+  `DataBase:` com os bancos recuados embaixo). Os valores dos rótulos de conexão são mascarados
+  mesmo quando são uma palavra solta; vários valores numa linha (`A / B`) e a lista recuada
+  também. Sem a porta, `Server: nginx` fica.
+- `~/x` é lido como `/home/<usuário>/x`, e a última parte de um caminho só é arquivo quando termina
+  numa extensão: `cd ~/HX.AWS.PRD.Carga` é pasta, `main.tf` e `v1.2.3` continuam arquivos.
+- O ID do endpoint de um cluster EKS (`<id>.yl4.<região>.eks.amazonaws.com`), e o IP privado
+  dentro de um nome EC2 também quando está grudado em outro nome
+  (`pod-x-ip-10-24-34-0.us-east-2.compute.internal-abc12`).
+- Os filtros de uma receita de ingestão do DataHub: nas listas `allow`/`deny` de
+  `database_pattern`, `schema_pattern`, `table_pattern`..., um literal ancorado (`"^DWVENDAS$"`,
+  `'^DW\.dbo\..*'`) é o nome. Uma regex com alternativas (`^(dev|test)_.*`) fica.
+- O nome de uma tag (`urn:li:tag:<nome>`), a menos que seja feito de palavras do dicionário
+  (`Legacy`, `dados_pessoais`).
+- Medido numa sessão real de 15.306 blocos: apareceram 789 achados e nenhum sumiu. Limite: esses
+  nomes soltos não são propagados para o resto da conversa; citados em prosa ou numa tabela,
+  continuam saindo (539 das 856 vezes em que os nomes daquele inventário apareceram fora dele).
+
+### Código
+
+- `reader_connection_record.go`, `reader_allow_deny.go` e `resource_labels_test.go`; `fileName`
+  (`reader_paths.go`) decide o que é arquivo nos três leitores de caminho.
+
 ## [0.12.0] - 2026-10-15
 
 Menos palavras comuns mascaradas como nome: os leitores de estrutura só leem um nome onde a

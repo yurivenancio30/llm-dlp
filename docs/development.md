@@ -141,6 +141,8 @@ internal resource names (server, database, table, column, service, bucket...)
   reader_schema.go             name + data type (dtypes, printSchema, Arrow, protobuf)
   reader_connection.go         connection strings, database URIs, DSN, tnsnames, URNs, dbt, Airflow
   reader_connection_brakes.go  model name in the database URI and in tnsnames
+  reader_connection_record.go  connection record written by a person (Host:, Porta:, DataBase:)
+  reader_allow_deny.go         filters of a DataHub recipe (database_pattern: allow: ["^x$"])
   reader_yaml.go               YAML/JSON engine by path and the dispatcher of the families
   reader_kubernetes.go         Kubernetes, Helm, images, service DNS, env as a list
   reader_iac.go                Terraform/HCL, Bicep, ARM, CloudFormation
@@ -210,6 +212,7 @@ and `fields_test.go`). The ones that span several files:
 | `readers_*_test.go` | The readers by area (data, DevOps, development, code) |
 | `variations_test.go`, `general_rules_test.go` | Each case in every spelling variation; rules that hold for all the readers |
 | `structure_shapes_test.go` | A reader only reads a name where the structure is the one it reads (labels, calls, the end of a table, CREATE TABLE in a sentence, a folder of a path); each case with the real name next to it still masked |
+| `resource_labels_test.go` | A plain name where a structure says it is a resource (a connection record written by a person, the filters of a DataHub recipe, a tag, a home folder with dots, an EKS endpoint, the private IP inside an EC2 name); each case with the public word next to it still in the clear |
 | `matrix_test.go`, `matrix_transport_test.go` | The same content in every layout and transport |
 | `negatives_test.go`, `brakes_reference_test.go` | What must not be masked |
 | `fuzz_test.go`, `readers_fuzz_test.go` | Fuzzing of the normalization and of the round trip |

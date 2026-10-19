@@ -21,6 +21,10 @@ func internalIP(a netip.Addr) bool {
 	return a.Is4() && (a.IsPrivate() || sharedNetwork.Contains(a)) && !fakeNet.Contains(a)
 }
 
+// reAWSInternal: the private DNS domain of an EC2 instance after the "ip-" name: ".ec2.internal"
+// (us-east-1) or ".<region>.compute.internal" (https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/hostname-types.html)
+var reAWSInternal = regexp.MustCompile(`^\.(?:ec2|[a-z]{2}(?:-[a-z]+)+-\d\.compute)\.internal\b`)
+
 // digitHyphenDigit: cheap prefilter of findHyphenIP (a digit, a hyphen, a digit).
 func digitHyphenDigit(s string) bool {
 	for i := strings.IndexByte(s, '-'); i >= 0; {
@@ -85,7 +89,9 @@ func findHyphenIP(s string, f func(pre, ini, end int, a netip.Addr)) {
 		case i >= 4 && strings.EqualFold(s[i-4:i], "ec2-"):
 			ini = i - 4
 		}
-		if ini > 0 && glued(s[ini-1]) {
+		// glued to the name before it ("pod-x-ip-10-42-7-15.us-east-1.compute.internal-abc12"): only
+		// with the AWS internal domain right after the numbers
+		if ini > 0 && glued(s[ini-1]) && !(ini == i-3 && s[ini-1] == '-' && reAWSInternal.MatchString(s[j:min(len(s), j+40)])) {
 			continue
 		}
 		if ini == i && !(j+1 < len(s) && s[j] == '.' && letterD(s[j+1])) {

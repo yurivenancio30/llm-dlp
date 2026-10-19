@@ -9,6 +9,34 @@ In each version: **Masking** is what started (or stopped) being masked; **Progra
 commands, installation, configuration, performance and documentation; **Code** is what only
 matters to whoever changes the code.
 
+## [Unreleased]
+
+### Masking
+
+- A connection record written by a person (an inventory, a ticket): a block of `Label: value`
+  lines with a server and a port number (`Host: SRVSQL`, `Porta: 1433`, `DataBase:` with the
+  databases indented under it). The values of its connection labels are masked even when they are
+  a single plain word; several values on a line (`A / B`) and the indented list too. Without the
+  port, `Server: nginx` stays.
+- `~/x` is read like `/home/<user>/x`, and the last piece of a path is a file only when it ends in
+  an extension: `cd ~/HX.AWS.PRD.Carga` is a folder, `main.tf` and `v1.2.3` stay files.
+- The ID of an EKS cluster endpoint (`<id>.yl4.<region>.eks.amazonaws.com`), and the private IP
+  inside an EC2 name also when it is glued to another name
+  (`pod-x-ip-10-24-34-0.us-east-2.compute.internal-abc12`).
+- The filters of a DataHub ingestion recipe: in the `allow`/`deny` lists of `database_pattern`,
+  `schema_pattern`, `table_pattern`..., an anchored literal (`"^DWVENDAS$"`, `'^DW\.dbo\..*'`) is
+  the name. A regex with alternatives (`^(dev|test)_.*`) stays.
+- The name of a tag (`urn:li:tag:<name>`), unless it is made of dictionary words (`Legacy`,
+  `dados_pessoais`).
+- Measured on a real session of 15,306 blocks: 789 findings appeared and none went away. Limit:
+  those plain names are not propagated to the rest of the conversation; cited in prose or in a
+  table they still go out (539 of the 856 times the names of that inventory appeared outside it).
+
+### Code
+
+- `reader_connection_record.go`, `reader_allow_deny.go` and `resource_labels_test.go`; `fileName`
+  (`reader_paths.go`) decides what is a file in the three path readers.
+
 ## [0.12.0] - 2026-10-15
 
 Fewer common words masked as names: the structure readers only read a name where the structure
