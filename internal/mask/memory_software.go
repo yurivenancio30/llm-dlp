@@ -14,8 +14,10 @@ import (
 // The proof comes from the conversation itself, the way a compiler resolves a name: the word is
 // tied to an external package when it is installed (pip/npm/brew/helm/go get... install), imported
 // (import datahub, from datahub.x import, require('x'), import "github.com/org/x"), run as a public
-// image (the two keys of publicPath) or executed as a program (RecordCommand). With the proof, the
-// memory does not spread the word; where a reader decides it (the DSN itself), it stays masked.
+// image (the two keys of publicPath) or executed as a program (RecordCommand). With the proof,
+// neither the conversation memory nor the accumulated one (RAM and seen.json, findKnown) spreads the
+// word; where a reader decides it (the DSN itself), it stays masked. After a restart, the proofs of a
+// text that already went out are recorded when it is read back from sent.log (frozen).
 //
 // Two keys, fail closed: besides the structural proof, the word has to be the name of a public
 // software (public_software.txt or a Docker Official Image). A real dictionary word

@@ -332,11 +332,16 @@ func (m *Masker) findKnown(s string, longNum bool, add0 func(ini, end int, typ s
 				return // type turned off after being learned
 			}
 			// the accumulated knowledge (RAM, vistos.json) follows the tracing rules: a common word
-			// does not spread through it and public vocabulary is never applied (a name learned
-			// wrongly before does not come back in every text; see memory_tracing.go)
-			if v := s[ini:end]; !identifierShape(v) || publicGeneral(v) {
+			// does not spread through it, public vocabulary is never applied and neither is a public
+			// software with proof (a name learned wrongly before does not come back in every text;
+			// see memory_tracing.go and memory_software.go)
+			if v := s[ini:end]; !identifierShape(v) || publicGeneral(v) || m.provenSoftware(v) {
 				return
 			}
+		}
+		// a learned domain only counts whole: "acme.io" is not the end of "acme.io.br"
+		if typ == "domain" && end+1 < len(s) && s[end] == '.' && isAlnum(s[end+1]) {
+			return
 		}
 		add0(ini, end, typ)
 	}
@@ -467,6 +472,10 @@ func (m *Masker) findKnown(s string, longNum bool, add0 func(ini, end int, typ s
 
 // learnIt records a contextual value in RAM and (hash only) on disk.
 func (m *Masker) learnIt(typ, real string) {
+	if typ == "email" {
+		m.learnEmail(real) // the organization's domain and the person's name (memory_email.go)
+		return
+	}
 	if typ == "name" {
 		// A name found by the field label ("NOM_CLIENTE"): the person enters the registry, as in
 		// import-people, and starts being recognized anywhere and in any spelling.

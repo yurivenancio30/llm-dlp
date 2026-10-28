@@ -156,6 +156,15 @@ func (m *Masker) frozen(kc Position, s string) (result, bool) {
 	if !valid {
 		return r, false
 	}
+	// after a restart, what the text taught is in RAM no more, and a text that already went out is
+	// not detected again: the software proofs (memory_software.go) and what its e-mails teach
+	// (memory_email.go) are recorded now, once per position
+	m.recordSoftware(s)
+	for _, e := range entries {
+		if e.Type == "email" {
+			m.learnEmail(e.Real)
+		}
+	}
 	r = result{text: text, entries: entries, snippets: ts}
 	m.mu.Lock()
 	m.storeFrozen(kc, r)

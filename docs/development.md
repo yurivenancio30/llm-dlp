@@ -175,6 +175,7 @@ memory
   memory_conversation_brakes.go  where the conversation memory does not replace (program, comment, prose)
   memory_tracing.go              a name is decided where it enters and holds everywhere
   memory_software.go             public software with proof, and shadowing
+  memory_email.go                what a masked e-mail teaches: the organization's domain and the person's name
 
 vocabulary
   vocab_dev.go        type words, internal suffixes, public names, value with no owner
@@ -212,6 +213,7 @@ and `fields_test.go`). The ones that span several files:
 | `readers_*_test.go` | The readers by area (data, DevOps, development, code) |
 | `variations_test.go`, `general_rules_test.go` | Each case in every spelling variation; rules that hold for all the readers |
 | `structure_shapes_test.go` | A reader only reads a name where the structure is the one it reads (labels, calls, the end of a table, CREATE TABLE in a sentence, a folder of a path); each case with the real name next to it still masked |
+| `taught_names_test.go` | What a masked e-mail teaches (the domain alone, in any case; `first.last` as a person, with the same identifier), the user and the host of a bash prompt, the project folder under the home; and what is not the customer's: a public software with proof the accumulated memory no longer applies, a Python built-in exception; also after a restart. Each case with the public side still in the clear (`gmail.com`, `support.team`, `root`, `my-scripts`) |
 | `resource_labels_test.go` | A plain name where a structure says it is a resource (a connection record written by a person, the filters of a DataHub recipe, a tag, a home folder with dots, an EKS endpoint, the private IP inside an EC2 name); each case with the public word next to it still in the clear |
 | `matrix_test.go`, `matrix_transport_test.go` | The same content in every layout and transport |
 | `negatives_test.go`, `brakes_reference_test.go` | What must not be masked |

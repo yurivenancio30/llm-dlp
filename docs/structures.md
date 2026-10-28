@@ -3153,6 +3153,7 @@ Code: `internal/mask/reader_addresses.go` (git, paths) and `reader_cloud.go` (pa
 | groupId | `<groupId>...</groupId>` (Maven) or `group = '...'` / `group "..."` at the start of the line (Gradle) |
 | npm scope | `"name": "@scope/package"` (package.json) |
 | User path | `/home/<u>/`, `/Users/<u>/`, `C:\Users\<u>\` (also `C:\\Users\\` escaped in JSON) |
+| Bash prompt | a line that starts with `user@host:~/x$` (the Debian and Ubuntu default) |
 
 ### 2. Position → entity type
 
@@ -3166,7 +3167,9 @@ Code: `internal/mask/reader_addresses.go` (git, paths) and `reader_cloud.go` (pa
 | groupId | the pieces after the reversed TLD (`br.com.`, `com.`) | pacote (package) | yes |
 | package.json | `@scope` / `package` | organizacao / pacote | yes |
 | home path | the piece after `home`/`Users` | usuario | yes |
-| home path | the following folders that look like identifiers (not the final file) | pasta (`DIR_`) | no |
+| home path | the first folder under the home, not made of dictionary words (`~/MB.Vendas.API`) | pasta (`DIR_`) | yes |
+| home path | the other folders that look like identifiers (not the final file) | pasta (`DIR_`) | no |
+| bash prompt | the user and the host of `user@host:~/x$` (a public user, `root`, `ubuntu`, stays) | usuario / servidor | yes |
 
 Outside those contexts, an ordinary github.com or gitlab.com URL is **not** masked (it appears in
 all public documentation). Measured on 2 MB of `.md` from Go modules: 6 names in a git context.
@@ -3637,6 +3640,47 @@ a resource, but it is not propagated to the rest of the conversation
 outside it, 317 are masked now and 539 still go out (cited in prose, in a table, in a Python list of
 filters without the key, in a `grep -n` that shows only the lines of the items).
 
+**What a masked e-mail teaches.** An address says two things about the text around it. Its domain
+is the organization's: `ana.souza@acme.io` masked and `tenant_id = "acme.io"` two lines below in the
+clear tell the model the same thing. The domain is learned and masked wherever it appears, whole
+(`acme.io.br` is another domain) and in any case (a DNS name is case-insensitive, RFC 4343), with
+the pseudonym it already has after the `@` (`d<id>.invalid`), so the model still sees they are the
+same. The domains of personal mail accounts stay, as each provider documents them: Google
+(`gmail.com`, `googlemail.com`: support.google.com/mail/answer/10313), Microsoft (`outlook.com`,
+`hotmail.com`, `live.com`, `msn.com`: support.microsoft.com, "Do you support Hotmail, MSN, and
+Live?") and Apple (`icloud.com`, `me.com`, `mac.com`: support.apple.com/118230); so do the domains
+of a vendor or of a public reference (`yahoo.com`, `github.com`). And a local part `first.last` is
+the person's name: `Ana Souza` in a `git log`, a commit or an approval list is the same person. It
+enters the people registry tied to the address (as `import-people` does, only as hashes), and the
+name and the e-mail get the same identifier. A role mailbox (RFC 2142: `support`, `info`,
+`security`...; `no.reply`), the acronym of an area (`bi.vendas`, `rh.vagas`) and a piece of the development
+vocabulary (`data.team`) are not a person,
+and a name or an address already in the registry keeps its identifier. Limit: a provider without an
+official page we could cite (UOL, BOL, Terra) is not on the list, so its domain is masked alone too.
+
+**A terminal prompt pasted in a message.** A line that starts with the default bash prompt of Debian
+and Ubuntu (`PS1='\u@\h:\w\$ '`: user, host and working directory; Bash manual, "Controlling the
+Prompt"), with or without the `(venv) ` of a virtual environment, has the user (the default
+`NAME_REGEX` of `adduser`) and the machine. Both are masked and learned; a public user (`root`,
+`ubuntu`, `ec2-user`) stays, and the EC2 name with the private IP (`ip-10-1-2-3`) is left to the IP
+detector, which keeps its shape. The folder is read like any `~/` path.
+
+**The project folder right under the home.** The first folder under `~/` or `/home/<user>/` is where
+a repository is cloned and a project is created. A name there that is not made of dictionary words
+(`~/MB.Vendas.API`, `~/acme-etl`) is that project's and is learned, so it is masked also when an
+answer cites it alone ("clone it next to `MB.Vendas.API`"). One made of words (`~/my-scripts`), one
+cut at an accented letter and the folders below stay weak evidence, masked only in the path.
+
+Measured against 0.13.0 on three real sessions. In the review of a Streamlit repository (327 blocks):
+the organization's domain (4 times, in both cases), the 3 people of a `git log` (5), the user of the
+terminal prompt (in 8 blocks) and a project folder cited alone. In the update of a production DataHub
+(18,282 blocks): 631 occurrences of 64 people's names (62 of them written in the text as a name), the
+domains of 3 organizations (13), the prompt user (148 blocks) and 10 project folders; 1,778 findings
+went away: the default name of a public software with proof (`DataHub`, `neo4j`) that the accumulated
+memory reapplied, 8 `RuntimeError` and 3 first names now masked inside the full name. In a data
+assessment (19,078 blocks): 2 domains (358 times; 344 are the domain of whoever uses llm-dlp, whose
+e-mail is masked). Nothing else went away.
+
 **SQL quoted in prose and in a comment.** The SQL reader marked 746 findings in 40 MB of
 public code. From the samples, almost all came from three shapes, none of them SQL:
 a code comment that talks about the code (`// Use x.Errors`, `# delete FROM line`,
@@ -3757,6 +3801,12 @@ secrets of the battery and the names of the labelled set that must be masked. Wh
     `site-packages`) is the owner's and cancels the proof; matching too much only blocks;
   - a registered term always wins.
 
+  The accumulated memory (RAM and `seen.json`: a name learned once is searched for in every
+  text) follows the proof too: it does not apply a public software with proof either (`DataHub`,
+  learned once from a catalog table, was masked in every later sentence of the session). After a
+  restart, a text that already went out is not detected again (freezing): the proofs in it, and
+  what its e-mails teach, are recorded when it is read back from `sent.log`.
+
   The proof and the shadowing stay in RAM, hold for any conversation (they are facts about the
   software and the project) and do not change text already sent (freezing). The two sets only
   store a name that is in the software list: the size is limited by the list, not by what
@@ -3777,7 +3827,8 @@ secrets of the battery and the names of the labelled set that must be masked. Wh
   Three uses, with two levels of strictness:
   - **traceback**: the line that points to third-party code stays; the one that points
     elsewhere is the client's, and the function, the module, the identifiers of the code line and the value
-    quoted in the final error (`KeyError: 'COD_APOLICE_HX'`) are its names. Python, Java/Kotlin/
+    quoted in the final error (`KeyError: 'COD_APOLICE_HX'`) are its names (a Python built-in exception, `raise RuntimeError(...)`, is the language and stays:
+    docs.python.org/3/library/exceptions.html). Python, Java/Kotlin/
     Scala (package, class, method and file; `br.com.<company>.<system>` including in
     lowercase), JavaScript and Go (function, receiver and the package `github.com/<company>/<system>`,
     with the folder of the same name on the path line). Here the criterion of the table applies as it is:

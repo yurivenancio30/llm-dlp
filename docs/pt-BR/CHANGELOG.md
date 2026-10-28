@@ -9,6 +9,35 @@ Em cada versão: **Mascaramento** é o que passou a ser (ou deixou de ser) masca
 **Programa** é comando, instalação, configuração, desempenho e documentação; **Código** é o
 que só interessa a quem mexe no código.
 
+## [Unreleased]
+
+### Mascaramento
+
+- O que um e-mail mascarado ensina. O domínio dele é da organização: é mascarado também sozinho
+  (`tenant_id = "acme.io"`, `ACME.IO`), inteiro e em qualquer caixa, com o pseudônimo que ele já
+  tem depois do `@`. Ficam os domínios de e-mail pessoal (`gmail.com`, `outlook.com`,
+  `icloud.com`...), de fornecedores e de referências públicas, e o que não está sob um TLD real
+  (`\n@pytest.fixture`, `x@main.py` em código escapado).
+- Uma parte local `nome.sobrenome` é o nome da pessoa: `Ana Souza` num `git log` ou numa lista de
+  aprovadores é mascarado como se a pessoa tivesse sido importada, com o mesmo identificador do
+  e-mail. Caixa de função (`support.team`, `no.reply`) ou de área (`bi.vendas`) não é pessoa.
+- O usuário e o host de um prompt do bash colado numa mensagem (`usuario@host:~/x$`); usuário
+  público (`root`, `ubuntu`) fica.
+- A pasta de projeto logo abaixo do home (`~/MB.Vendas.API`), quando não é feita de palavras do
+  dicionário, é aprendida: é mascarada também onde é citada sozinha.
+- Deixou de ser mascarado: o nome padrão de software público com prova (`DataHub`, `neo4j`) onde
+  só a memória acumulada (RAM e `seen.json`) o aplicava; exceção nativa do Python
+  (`raise RuntimeError(...)`) num quadro do cliente de um traceback.
+- Medido em três sessões reais: apareceram 631 ocorrências dos nomes de 64 pessoas, os domínios de
+  5 organizações e o usuário do prompt do terminal; sumiram 1.778 achados (os nomes de software
+  público acima, `RuntimeError` e primeiros nomes agora mascarados dentro do nome completo).
+  Detalhes em [structures.md](structures.md#freios).
+
+### Código
+
+- `memory_email.go` e `taught_names_test.go`. Um texto que já saiu, lido de volta do `sent.log`
+  depois de um reinício, registra as provas de software e o que os e-mails dele ensinam.
+
 ## [0.13.0] - 2026-10-19
 
 ### Mascaramento

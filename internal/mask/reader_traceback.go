@@ -232,10 +232,27 @@ func publicJavaPackage(pkg string) bool {
 var javaDomains = setOf("com", "br", "org", "net", "io", "gov", "edu", "co", "me", "dev", "app", "uk", "de", "fr", "es", "pt", "ar", "mx", "cl")
 
 // clientName: a customer code identifier worth masking (looks like an identifier, outside the
-// public vocabulary and the special __x__ names).
+// public vocabulary, the Python built-in exceptions and the special __x__ names).
 func clientName(v string) bool {
-	return identifierShape(v) && !strings.HasPrefix(v, "__") && !publicDev(v) && !publicSQL(v)
+	return identifierShape(v) && !strings.HasPrefix(v, "__") && !publicDev(v) && !publicSQL(v) && !pythonExceptions[v]
 }
+
+// pythonExceptions: the built-in exceptions of Python 3.13 (docs.python.org/3/library/exceptions.html,
+// class hierarchy), with the aliases of OSError. "raise RuntimeError(...)" in a customer frame is the
+// language, not the customer.
+var pythonExceptions = setOf("BaseException", "BaseExceptionGroup", "GeneratorExit", "KeyboardInterrupt", "SystemExit",
+	"Exception", "ArithmeticError", "FloatingPointError", "OverflowError", "ZeroDivisionError", "AssertionError",
+	"AttributeError", "BufferError", "EOFError", "ExceptionGroup", "ImportError", "ModuleNotFoundError", "LookupError",
+	"IndexError", "KeyError", "MemoryError", "NameError", "UnboundLocalError", "OSError", "BlockingIOError",
+	"ChildProcessError", "ConnectionError", "BrokenPipeError", "ConnectionAbortedError", "ConnectionRefusedError",
+	"ConnectionResetError", "FileExistsError", "FileNotFoundError", "InterruptedError", "IsADirectoryError",
+	"NotADirectoryError", "PermissionError", "ProcessLookupError", "TimeoutError", "ReferenceError", "RuntimeError",
+	"NotImplementedError", "PythonFinalizationError", "RecursionError", "StopAsyncIteration", "StopIteration",
+	"SyntaxError", "IndentationError", "TabError", "SystemError", "TypeError", "ValueError", "UnicodeError",
+	"UnicodeDecodeError", "UnicodeEncodeError", "UnicodeTranslateError", "Warning", "BytesWarning",
+	"DeprecationWarning", "EncodingWarning", "FutureWarning", "ImportWarning", "PendingDeprecationWarning",
+	"ResourceWarning", "RuntimeWarning", "SyntaxWarning", "UnicodeWarning", "UserWarning",
+	"EnvironmentError", "IOError", "WindowsError")
 
 func (m *Masker) findTraceback(s string, add func(ObjFinding)) {
 	if !strings.Contains(s, "Traceback") && !strings.Contains(s, "\tat ") && !strings.Contains(s, "    at ") &&

@@ -23,6 +23,7 @@ result for each text. Only what is new is examined.
 | Real value | What the API sees |
 |---|---|
 | `joao.silva@empresa.com.br` | `p.mxvotcyt@didl3.invalid` |
+| `empresa.com.br` alone, once an e-mail of it was masked | `didl3.invalid` (the same pseudonym it has after the `@`) |
 | `Joao Carlos Silva` / `JOAO CARLOS SILVA` | `Person mxvotcyt` / `PERSON MXVOTCYT` (same identifier as the e-mail, if it is the same person; the case follows the name, and each spelling comes back as it was) |
 | `B123456` (João's user code) | `USER-mxvotcyt` (`user-mxvotcyt` for `b123456`: as with a name, the case follows the value) |
 | `10.42.7.15` | `250.153.31.15` (the same subnet becomes the same fake subnet) |

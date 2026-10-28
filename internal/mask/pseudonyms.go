@@ -132,6 +132,9 @@ func (m *Masker) pseudonym(typ, real string) string {
 			return "person " + pid
 		}
 		return "Person " + pid
+	case "domain":
+		// the same pseudonym the domain has after the "@" of its e-mails (see memory_email.go)
+		return "d" + m.p.ID("dominio", strings.ToLower(real))[:4] + ".invalid"
 	case "ip":
 		return m.pseudoIP(real)
 	case "host":

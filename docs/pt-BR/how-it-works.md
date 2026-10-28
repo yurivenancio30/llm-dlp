@@ -23,6 +23,7 @@ resultado de cada texto. Só o que é novo é examinado.
 | Valor real | O que a API vê |
 |---|---|
 | `joao.silva@empresa.com.br` | `p.mxvotcyt@didl3.invalid` |
+| `empresa.com.br` sozinho, depois que um e-mail dele foi mascarado | `didl3.invalid` (o mesmo pseudônimo que ele tem depois do `@`) |
 | `Joao Carlos Silva` / `JOAO CARLOS SILVA` | `Person mxvotcyt` / `PERSON MXVOTCYT` (mesmo identificador do e-mail, se for a mesma pessoa; a caixa segue a do nome, e cada grafia volta como estava) |
 | `B123456` (código do João) | `USER-mxvotcyt` (`user-mxvotcyt` para `b123456`: como no nome, a caixa segue a do valor) |
 | `10.42.7.15` | `250.153.31.15` (mesma sub-rede vira a mesma sub-rede falsa) |

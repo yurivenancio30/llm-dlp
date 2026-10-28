@@ -9,6 +9,35 @@ In each version: **Masking** is what started (or stopped) being masked; **Progra
 commands, installation, configuration, performance and documentation; **Code** is what only
 matters to whoever changes the code.
 
+## [Unreleased]
+
+### Masking
+
+- What a masked e-mail teaches. Its domain is the organization's: it is masked also alone
+  (`tenant_id = "acme.io"`, `ACME.IO`), whole and in any case, with the pseudonym it already has
+  after the `@`. The domains of personal mail (`gmail.com`, `outlook.com`, `icloud.com`...), of
+  vendors and of public references stay, and so does what is not under a real TLD
+  (`\n@pytest.fixture`, `x@main.py` in escaped code).
+- A local part `first.last` is the person's name: `Ana Souza` in a `git log` or an approval list is
+  masked as if the person had been imported, with the same identifier as the e-mail. A role mailbox
+  (`support.team`, `no.reply`) or an area (`bi.vendas`) is not a person.
+- The user and the host of a bash prompt pasted in a message (`user@host:~/x$`); a public user
+  (`root`, `ubuntu`) stays.
+- The project folder right under the home (`~/MB.Vendas.API`), when it is not made of dictionary
+  words, is learned: it is masked also where it is cited alone.
+- Stopped being masked: the default name of a public software with proof (`DataHub`, `neo4j`)
+  where only the accumulated memory (RAM and `seen.json`) applied it; a Python built-in exception
+  (`raise RuntimeError(...)`) in a customer frame of a traceback.
+- Measured on three real sessions: 631 occurrences of 64 people's names, the domains of 5
+  organizations and the user of the terminal prompt appeared; 1,778 findings went away (the public
+  software names above, `RuntimeError`, and first names now masked inside the full name). Details in
+  [docs/structures.md](docs/structures.md#guards).
+
+### Code
+
+- `memory_email.go` and `taught_names_test.go`. A text that already went out, read back from
+  `sent.log` after a restart, records its software proofs and what its e-mails teach.
+
 ## [0.13.0] - 2026-10-19
 
 ### Masking

@@ -175,6 +175,7 @@ memória
   memory_conversation_brakes.go  onde a memória da conversa não troca (programa, comentário, prosa)
   memory_tracing.go              o nome é decidido onde entra e vale em todo lugar
   memory_software.go             software público com prova e sombreamento
+  memory_email.go                o que um e-mail mascarado ensina: o domínio da organização e o nome da pessoa
 
 vocabulário
   vocab_dev.go        palavras de tipo, sufixos internos, nomes públicos, valor sem dono
@@ -212,6 +213,7 @@ permite testar funções internas). O teste de um arquivo tem o mesmo nome (`fie
 | `readers_*_test.go` | Os leitores por área (dados, DevOps, desenvolvimento, código) |
 | `variations_test.go`, `general_rules_test.go` | Cada caso em todas as variações de escrita; regras que valem para todos os leitores |
 | `structure_shapes_test.go` | Um leitor só lê um nome onde a estrutura é a que ele lê (rótulos, chamadas, o fim de uma tabela, CREATE TABLE numa frase, uma pasta de um caminho); cada caso com o nome real ao lado ainda mascarado |
+| `taught_names_test.go` | O que um e-mail mascarado ensina (o domínio sozinho, em qualquer caixa; `nome.sobrenome` como pessoa, com o mesmo identificador), o usuário e o host de um prompt do bash, a pasta de projeto do home; e o que não é do cliente: software público com prova que a memória acumulada não aplica mais, exceção nativa do Python; também depois de um reinício. Cada caso com o lado público ainda em claro (`gmail.com`, `support.team`, `root`, `my-scripts`) |
 | `resource_labels_test.go` | Um nome solto onde uma estrutura diz que é recurso (um registro de conexão escrito por uma pessoa, os filtros de uma receita do DataHub, uma tag, uma pasta pessoal com pontos, um endpoint EKS, o IP privado dentro de um nome EC2); cada caso com a palavra pública ao lado ainda em claro |
 | `matrix_test.go`, `matrix_transport_test.go` | O mesmo conteúdo em todos os desenhos e transportes |
 | `negatives_test.go`, `brakes_reference_test.go` | O que não pode ser mascarado |

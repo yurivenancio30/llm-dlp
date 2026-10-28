@@ -3147,6 +3147,7 @@ Código: `internal/mask/reader_addresses.go` (git, caminhos) e `reader_cloud.go`
 | groupId | `<groupId>...</groupId>` (Maven) ou `group = '...'` / `group "..."` no começo da linha (Gradle) |
 | Escopo npm | `"name": "@escopo/pacote"` (package.json) |
 | Caminho de usuário | `/home/<u>/`, `/Users/<u>/`, `C:\Users\<u>\` (também `C:\\Users\\` escapado em JSON) |
+| Prompt do bash | uma linha que começa com `usuario@host:~/x$` (o padrão do Debian e do Ubuntu) |
 
 ### 2. Posição → tipo de entidade
 
@@ -3160,7 +3161,9 @@ Código: `internal/mask/reader_addresses.go` (git, caminhos) e `reader_cloud.go`
 | groupId | pedaços depois do TLD invertido (`br.com.`, `com.`) | pacote | sim |
 | package.json | `@escopo` / `pacote` | organizacao / pacote | sim |
 | caminho de home | o pedaço depois de `home`/`Users` | usuario | sim |
-| caminho de home | pastas seguintes com cara de identificador (não o arquivo final) | pasta (`DIR_`) | não |
+| caminho de home | a primeira pasta do home, não feita de palavras do dicionário (`~/MB.Vendas.API`) | pasta (`DIR_`) | sim |
+| caminho de home | as outras pastas com cara de identificador (não o arquivo final) | pasta (`DIR_`) | não |
+| prompt do bash | o usuário e o host de `usuario@host:~/x$` (usuário público, `root`, `ubuntu`, fica) | usuario / servidor | sim |
 
 Fora desses contextos, uma URL comum do github.com ou gitlab.com **não** é mascarada (aparece em
 toda documentação pública). Medido em 2 MB de `.md` de módulos Go: 6 nomes em contexto de git.
@@ -3637,6 +3640,47 @@ apareceram fora dele, 317 agora são mascaradas e 539 continuam saindo (citados 
 tabela, numa lista de filtros do Python sem a chave, num `grep -n` que mostra só as linhas dos
 itens).
 
+**O que um e-mail mascarado ensina.** Um endereço diz duas coisas sobre o texto em volta. O domínio é
+da organização: `ana.souza@acme.io` mascarado e `tenant_id = "acme.io"` duas linhas abaixo em claro
+dizem a mesma coisa ao modelo. O domínio é aprendido e mascarado onde aparecer, inteiro (`acme.io.br`
+é outro domínio) e em qualquer caixa (nome DNS não diferencia maiúsculas, RFC 4343), com o pseudônimo
+que ele já tem depois do `@` (`d<id>.invalid`), para o modelo continuar vendo que são o mesmo. Ficam
+os domínios de conta pessoal de e-mail, como cada provedor os documenta: Google (`gmail.com`,
+`googlemail.com`: support.google.com/mail/answer/10313), Microsoft (`outlook.com`, `hotmail.com`,
+`live.com`, `msn.com`: support.microsoft.com, "Do you support Hotmail, MSN, and Live?") e Apple
+(`icloud.com`, `me.com`, `mac.com`: support.apple.com/118230); e os de um fornecedor ou de uma
+referência pública (`yahoo.com`, `github.com`). E uma parte local `nome.sobrenome` é o nome da pessoa:
+`Ana Souza` num `git log`, num commit ou numa lista de aprovadores é a mesma pessoa. Ela entra no
+cadastro de pessoas ligada ao endereço (como no `import-people`, só como hash), e o nome e o e-mail
+ganham o mesmo identificador. Caixa de função (RFC 2142: `support`, `info`, `security`...; `no.reply`),
+sigla de uma área (`bi.vendas`, `rh.vagas`) e pedaço do vocabulário de desenvolvimento (`data.team`)
+não são pessoa, e um nome ou endereço que já
+está no cadastro mantém o identificador. Limite: provedor sem página oficial que pudéssemos citar
+(UOL, BOL, Terra) não está na lista, então o domínio dele também é mascarado sozinho.
+
+**Um prompt de terminal colado numa mensagem.** Uma linha que começa com o prompt padrão do bash do
+Debian e do Ubuntu (`PS1='\u@\h:\w\$ '`: usuário, host e pasta atual; manual do Bash, "Controlling
+the Prompt"), com ou sem o `(venv) ` de um ambiente virtual, tem o usuário (o `NAME_REGEX` padrão do
+`adduser`) e a máquina. Os dois são mascarados e aprendidos; usuário público (`root`, `ubuntu`,
+`ec2-user`) fica, e o nome EC2 com o IP privado (`ip-10-1-2-3`) fica com o detector de IP, que mantém
+o formato. A pasta é lida como qualquer caminho `~/`.
+
+**A pasta de projeto logo abaixo do home.** A primeira pasta de `~/` ou `/home/<usuario>/` é onde se
+clona um repositório e se cria um projeto. Um nome ali que não é feito de palavras do dicionário
+(`~/MB.Vendas.API`, `~/acme-etl`) é desse projeto e é aprendido, então é mascarado também quando uma
+resposta o cita sozinho ("clone ao lado do `MB.Vendas.API`"). Um feito de palavras (`~/meus-scripts`),
+um cortado numa letra acentuada e as pastas de baixo continuam pista fraca, mascarados só no caminho.
+
+Medido contra a 0.13.0 em três sessões reais. Na revisão de um repositório Streamlit (327 blocos): o
+domínio da organização (4 vezes, nas duas caixas), as 3 pessoas de um `git log` (5), o usuário do
+prompt do terminal (em 8 blocos) e uma pasta de projeto citada sozinha. Na atualização de um DataHub
+de produção (18.282 blocos): 631 ocorrências dos nomes de 64 pessoas (62 delas escritas no texto como
+nome), os domínios de 3 organizações (13), o usuário do prompt (148 blocos) e 10 pastas de projeto;
+sumiram 1.778 achados: o nome padrão de software público com prova (`DataHub`, `neo4j`) que a memória
+acumulada reaplicava, 8 `RuntimeError` e 3 primeiros nomes agora mascarados dentro do nome completo.
+Num diagnóstico de dados (19.078 blocos): 2 domínios (358 vezes; 344 são o domínio de quem usa o
+llm-dlp, cujo e-mail é mascarado). Nada mais sumiu.
+
 **SQL citado em prosa e em comentário.** O leitor de SQL marcava 746 achados em 40 MB de
 código público. Pelas amostras, quase todos vinham de três formas, nenhuma delas SQL:
 comentário de código que fala do código (`// Use x.Errors`, `# delete FROM line`,
@@ -3757,6 +3801,12 @@ segredos da bateria e os nomes do gabarito que devem ser mascarados. Na dúvida,
     `site-packages`) é do dono e anula a prova; casar a mais só bloqueia;
   - termo cadastrado sempre vence.
 
+  A memória acumulada (RAM e `seen.json`: um nome aprendido uma vez é procurado em todo texto)
+  também segue a prova: não aplica software público com prova (`DataHub`, aprendido uma vez numa
+  tabela de catálogo, era mascarado em toda frase seguinte da sessão). Depois de um reinício, um
+  texto que já saiu não é detectado de novo (congelamento): as provas dele, e o que os e-mails dele
+  ensinam, são registrados quando ele é lido de volta do `sent.log`.
+
   A prova e o sombreamento ficam em RAM, valem para qualquer conversa (são fatos sobre o
   software e o projeto) e não mudam texto já enviado (congelamento). Os dois conjuntos só
   guardam nome que está na lista de software: o tamanho é limitado pela lista, não pelo que
@@ -3777,7 +3827,8 @@ segredos da bateria e os nomes do gabarito que devem ser mascarados. Na dúvida,
   Três usos, com dois níveis de exigência:
   - **traceback**: a linha que aponta para código de terceiro fica; a que aponta para outro
     lugar é do cliente, e a função, o módulo, os identificadores da linha de código e o valor
-    citado no erro final (`KeyError: 'COD_APOLICE_HX'`) são nomes dele. Python, Java/Kotlin/
+    citado no erro final (`KeyError: 'COD_APOLICE_HX'`) são nomes dele (uma exceção nativa do Python, `raise RuntimeError(...)`, é a linguagem e fica:
+    docs.python.org/3/library/exceptions.html). Python, Java/Kotlin/
     Scala (pacote, classe, método e arquivo; `br.com.<empresa>.<sistema>` inclusive em
     minúsculas), JavaScript e Go (função, receptor e o pacote `github.com/<empresa>/<sistema>`,
     com a pasta de mesmo nome na linha do caminho). Aqui vale o critério da tabela como está:

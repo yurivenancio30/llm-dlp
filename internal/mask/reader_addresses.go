@@ -1,6 +1,9 @@
 package mask
 
-import "strings"
+import (
+	"regexp"
+	"strings"
+)
 
 // Addresses (see docs/structures.md): internal host, storage and queues in URLs, git remote, home
 // folder (/home/u, C:\Users\u) and network user (DOMAIN\user). At the start, the domain rules the
@@ -524,7 +527,12 @@ func homePieces(s string, a int, add func(ObjFinding)) {
 			v = s[a:b] // the full stop of the sentence stays
 		}
 		if v[0] != '.' && identifierShape(v) && !publicFolder(v) && !publicDev(v) {
-			add(ObjFinding{a, b, "folder", "path", false})
+			// the folder right under the home is where a repository is cloned and a project is
+			// created: a name that is not made of dictionary words (MB.Vendas.API, acme-etl) is that
+			// project's, and is learned; "my-scripts" and the folders below stay weak. Only the whole
+			// name: one cut at an accented letter ("acme-gestão" read up to "acme-gest") is a piece
+			whole := (b == len(s) || s[b] < 0x80) && !strings.HasSuffix(v, "-")
+			add(ObjFinding{a, b, "folder", "path", n == 0 && whole && !madeOfWords(v)})
 		}
 		if !dir {
 			return
@@ -539,6 +547,9 @@ func findNetworkUsers(s string, add func(ObjFinding)) {
 	if strings.IndexByte(s, '\\') >= 0 {
 		findDomainUser(s, add)
 	}
+	if strings.IndexByte(s, '@') >= 0 && (strings.Contains(s, ":~") || strings.Contains(s, ":/")) {
+		findShellPrompts(s, add)
+	}
 	for _, cmd := range []string{"ssh ", "scp ", "sftp ", "rsync "} {
 		for i := strings.Index(s, cmd); i >= 0; {
 			if i == 0 || strings.IndexByte(" \t\n\"'`$(|;&", s[i-1]) >= 0 {
@@ -549,6 +560,30 @@ func findNetworkUsers(s string, add func(ObjFinding)) {
 				break
 			}
 			i += 1 + j
+		}
+	}
+}
+
+// reShellPrompt: the default bash prompt of Debian and Ubuntu, PS1='\u@\h:\w\$ ' (/etc/skel/.bashrc;
+// \u is the user, \h the host and \w the working directory: Bash manual, "Controlling the Prompt"),
+// at the start of a line pasted from a terminal, with the "(venv) " a Python virtual environment
+// puts before it. The user follows the default NAME_REGEX of adduser, ^[a-z][-a-z0-9_]*$
+// (adduser.conf(5)), up to the 32 characters of useradd(8).
+var reShellPrompt = regexp.MustCompile(`(?m)^(?:\([\w.-]{1,40}\) )?([a-z][-a-z0-9_]{0,31})@([A-Za-z0-9][A-Za-z0-9.-]{0,62}):[~/][^\s$#]*[$#](?: |$)`)
+
+// findShellPrompts: the user and the host of a bash prompt (the folder is read by findPaths, like any
+// ~/ path). A public user (root, ubuntu, ec2-user) stays, as in /home/<user>; the EC2 host name with
+// the private IP (ip-10-1-2-3) is left to the IP detector, which keeps its shape.
+func findShellPrompts(s string, add func(ObjFinding)) {
+	for _, ix := range reShellPrompt.FindAllStringSubmatchIndex(s, -1) {
+		if v := s[ix[2]:ix[3]]; len(v) >= 2 && !publicDev(v) {
+			add(ObjFinding{ix[2], ix[3], "user", "prompt", true})
+		}
+		h := s[ix[4]:ix[5]]
+		first, _, _ := strings.Cut(h, ".")
+		ec2 := strings.HasPrefix(first, "ip-") && strings.Count(first, "-") == 4 && isSimpleIPv4(strings.ReplaceAll(first[3:], "-", "."))
+		if !ec2 && !isSimpleIPv4(h) && !publicDev(h) && !publicDomain(h) {
+			addHost(s, ix[4], ix[5], "prompt", true, add)
 		}
 	}
 }
