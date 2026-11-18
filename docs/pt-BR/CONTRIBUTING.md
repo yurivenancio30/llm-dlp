@@ -92,4 +92,4 @@ lançamento estão em [versioning.md](versioning.md).
 
 ## Segurança
 
-Para relatar uma vulnerabilidade, não abra uma issue pública: veja [SECURITY.md](SECURITY.md).
+Para relatar uma vulnerabilidade, não abra uma issue pública: veja [security-policy.md](security-policy.md).
