@@ -124,7 +124,7 @@ complete: see [Teaching llm-dlp](detection.md#teaching-llm-dlp).
 
 | How it became known | What holds from then on |
 |---|---|
-| You imported the person (`import-people`) | Their name, e-mail and code are recognized anywhere and in any spelling ("João Silva", "JOAO SILVA") |
+| You imported the person (`import-people`) | Their name, e-mail and code are recognized anywhere and in any spelling ("João Silva", "JOAO SILVA"), also inside quotes (`'João Silva'` in SQL) and before `'s` or a hyphen |
 | The value was already masked once by ways 2 or 3 | It is recognized later on its own, without the word or the field next to it |
 | An e-mail was masked | Its domain, anywhere and in any case (except personal mail and public organizations: `gmail.com`, `github.com`); and, if the address is `first.last@`, the person's name, as if imported |
 | You listed it in `terms` or `extra_patterns` | Always masked |

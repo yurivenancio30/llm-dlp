@@ -9,6 +9,19 @@ In each version: **Masking** is what started (or stopped) being masked; **Progra
 commands, installation, configuration, performance and documentation; **Code** is what only
 matters to whoever changes the code.
 
+## [Unreleased]
+
+### Masking
+
+- The name of an imported person was never masked when glued to a `'` or a `-` that is not part
+  of it: the quote that closes a string (`VALUES (1, 'Ana Souza')` in SQL, `'Ana Souza'` in
+  Python), the English possessive (`Ana Souza's`), a suffix (`Ana Souza-SP`). The last word is now
+  tried whole first (`Ana-Maria`, `D'Ávila`) and then cut at each `'` or `-` from the right.
+  Measured against 0.14.0 on four real sessions (22,087, 6,647, 1,402 and 778 blocks): 246
+  occurrences of people's names appeared (19, 6, 0 and 4 different names). 8 findings changed
+  type, all now inside a longer name (a configured term and a two-word name inside a three-word
+  one); nothing went out in the clear.
+
 ## [0.14.0] - 2026-10-28
 
 ### Masking

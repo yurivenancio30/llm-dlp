@@ -51,6 +51,35 @@ func TestDetects(t *testing.T) {
 	}
 }
 
+// A registered name glued to a ' or a - that is not part of it: the quote that closes a string in SQL
+// or Python, the English possessive, a suffix. A compound name with them stays whole.
+func TestNameNextToQuoteOrHyphen(t *testing.T) {
+	m := newTest(t)
+	m.people.Import(m.p, "Ana-Maria Lopes", "", "")
+	m.people.Import(m.p, "Bruno D'Ávila", "", "")
+	cases := []struct{ text, real string }{
+		{"INSERT INTO t VALUES (1, 'João Silva', 'x')", "João Silva"},
+		{"COMMENT = 'steward: Ana Paula Souza';", "Ana Paula Souza"},
+		{"nome = 'JOAO CARLOS SILVA'", "JOAO CARLOS SILVA"},
+		{"Ana Paula Souza's team", "Ana Paula Souza"},
+		{"falar com João Carlos Silva-SP hoje", "João Carlos Silva"},
+		{"('Ana-Maria Lopes', 1)", "Ana-Maria Lopes"},
+		{"Bruno D'Ávila's report", "Bruno D'Ávila"},
+		{"'Bruno D'Ávila''", "Bruno D'Ávila"},
+	}
+	for _, c := range cases {
+		foundIt := false
+		for _, a := range m.Detect(c.text) {
+			if a.Type == "name" && a.Real == c.real {
+				foundIt = true
+			}
+		}
+		if !foundIt {
+			t.Errorf("did not detect name %q in %q; findings: %+v", c.real, c.text, m.Detect(c.text))
+		}
+	}
+}
+
 func TestDoesNotDetect(t *testing.T) {
 	m := newTest(t)
 	cleanedOnes := []string{

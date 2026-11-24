@@ -119,7 +119,7 @@ completa: veja [Ensinar o llm-dlp](detection.md#ensinar-o-llm-dlp).
 
 | Como ficou conhecido | O que passa a valer |
 |---|---|
-| Você importou a pessoa (`import-people`) | O nome, o e-mail e o código dela são reconhecidos em qualquer lugar e em qualquer grafia ("João Silva", "JOAO SILVA") |
+| Você importou a pessoa (`import-people`) | O nome, o e-mail e o código dela são reconhecidos em qualquer lugar e em qualquer grafia ("João Silva", "JOAO SILVA"), também entre aspas (`'João Silva'` em SQL) e antes de `'s` ou de hífen |
 | O valor já foi mascarado uma vez pelos jeitos 2 ou 3 | É reconhecido depois sozinho, sem a palavra ou o campo ao lado |
 | Um e-mail foi mascarado | O domínio dele, em qualquer lugar e em qualquer caixa (menos e-mail pessoal e organização pública: `gmail.com`, `github.com`); e, se o endereço é `nome.sobrenome@`, o nome da pessoa, como se fosse importada |
 | Você listou em `terms` ou `extra_patterns` | Sempre mascarado |

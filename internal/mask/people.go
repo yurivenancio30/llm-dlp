@@ -372,9 +372,14 @@ func (ps *People) FindNames(s string, p *Pseudo) []Finding {
 			if !ok {
 				continue
 			}
-			if ps.PID(p, "name", NormName(s[ws[i].ini:ws[j].end])) != "" {
-				out = append(out, Finding{ws[i].ini, ws[j].end, "name", s[ws[i].ini:ws[j].end]})
-				foundIt = n
+			// the whole last word first ("Ana-Maria"), then cut at each ' or - from the right: the
+			// quote that closes a string ('Ana Souza' in SQL), "Souza's", "D'Ávila's", "Silva-SP"
+			for end := ws[j].end; end > ws[j].ini; end = ws[j].ini + strings.LastIndexAny(s[ws[j].ini:end], "'-") {
+				if ps.PID(p, "name", NormName(s[ws[i].ini:end])) != "" {
+					out = append(out, Finding{ws[i].ini, end, "name", s[ws[i].ini:end]})
+					foundIt = n
+					break
+				}
 			}
 		}
 		if foundIt > 0 {

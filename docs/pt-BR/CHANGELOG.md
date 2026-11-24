@@ -9,6 +9,19 @@ Em cada versão: **Mascaramento** é o que passou a ser (ou deixou de ser) masca
 **Programa** é comando, instalação, configuração, desempenho e documentação; **Código** é o
 que só interessa a quem mexe no código.
 
+## [Unreleased]
+
+### Mascaramento
+
+- O nome de uma pessoa importada nunca era mascarado quando vinha colado num `'` ou num `-` que
+  não faz parte dele: a aspa que fecha um texto (`VALUES (1, 'Ana Souza')` em SQL, `'Ana Souza'`
+  em Python), o possessivo do inglês (`Ana Souza's`), um sufixo (`Ana Souza-SP`). Agora a última
+  palavra é tentada primeiro inteira (`Ana-Maria`, `D'Ávila`) e depois cortada em cada `'` ou `-`,
+  da direita para a esquerda. Medido contra a 0.14.0 em quatro sessões reais (22.087, 6.647,
+  1.402 e 778 blocos): apareceram 246 ocorrências de nomes de pessoas (19, 6, 0 e 4 nomes
+  diferentes). 8 achados mudaram de tipo, todos agora dentro de um nome maior (um termo
+  configurado e um nome de duas palavras dentro de um de três); nada passou a sair em claro.
+
 ## [0.14.0] - 2026-10-28
 
 ### Mascaramento
