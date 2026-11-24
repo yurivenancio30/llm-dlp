@@ -197,7 +197,7 @@ type Batch struct {
 	currentProv   map[string]bool            // decided with proof in the text being assembled itself
 	writing       bool                       // assembling assistant text (receives all the contagion)
 	prose         bool                       // assembling message text, from the user or the response (vocab_words.go)
-	publicSet     map[string]bool            // priority: the model wrote it before any data
+	publicSet     map[string]bool            // priority: the model wrote it before any data, or a declared tool
 }
 
 func (m *Masker) NewBatch() *Batch {

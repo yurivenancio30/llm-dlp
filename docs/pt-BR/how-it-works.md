@@ -98,7 +98,7 @@ OCR; o detalhe do erro fica no log. Depois de instalar, é só mandar o arquivo 
 
 O system e as definições das ferramentas são escritos pelo Claude Code, mas podem levar dado
 seu (a pasta de trabalho, o `CLAUDE.md`, a descrição de uma ferramenta de MCP). São mascarados
-como o resto, com duas diferenças:
+como o resto, com três diferenças:
 
 - A palavra comum que a conversa aprendeu como nome (uma tabela `billing`) fica como palavra
   nesses textos, como na prosa das mensagens. Onde ela é o nome (no dado, num comando), é
@@ -108,6 +108,11 @@ como o resto, com duas diferenças:
   livre) e a frase de identidade (só quando é, inteira, uma das frases públicas dele). Com
   uma palavra trocada neles, a API deixa de reconhecer o Claude Code e responde 429 a toda
   mensagem daquela conversa.
+- O nome de uma ferramenta que o pedido declara (`WebSearch`, uma ferramenta de MCP) nunca é
+  mascarado nesse pedido, mesmo que a memória o tenha aprendido um dia como nome seu: ele já
+  vai em claro na lista de ferramentas. O bloco com que a busca de ferramentas diz qual
+  ferramenta carregar (`tool_reference`) também passa intacto. Com um pseudônimo nele, a API
+  recusa o pedido (`Tool reference '…' not found`).
 
 ## Ferramentas que vão para a internet
 

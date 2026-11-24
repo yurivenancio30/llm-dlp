@@ -99,7 +99,7 @@ again. `llm-dlp status` warns when OCR is missing.
 
 The system prompt and the tool definitions are written by Claude Code, but they can carry
 your data (the working folder, `CLAUDE.md`, the description of an MCP tool). They are masked
-like everything else, with two differences:
+like everything else, with three differences:
 
 - A common word that the conversation learned as a name (a `billing` table) stays a word in
   these texts, as in the prose of the messages. Where it is the name (in the data, in a
@@ -109,6 +109,11 @@ like everything else, with two differences:
   no free text) and the identity sentence (only when it is, whole, one of its public
   sentences). With one word replaced in them, the API stops recognizing Claude Code and
   answers 429 to every message of that conversation.
+- The name of a tool the request declares (`WebSearch`, an MCP tool) is never masked in that
+  request, even if the memory once learned it as a name of yours: it already goes in the
+  clear in the tool list. The block with which the tool search says which tool to load
+  (`tool_reference`) also goes through untouched. With a pseudonym in it, the API refuses the
+  request (`Tool reference '…' not found`).
 
 ## Tools that go out to the internet
 

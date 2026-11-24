@@ -21,6 +21,16 @@ matters to whoever changes the code.
   occurrences of people's names appeared (19, 6, 0 and 4 different names). 8 findings changed
   type, all now inside a longer name (a configured term and a two-word name inside a three-word
   one); nothing went out in the clear.
+- The name of a tool the request declares (`WebSearch`, an MCP tool) is no longer masked in that
+  request, even when the memory once learned it as a name by mistake: it already goes in the clear
+  in the tool list. The `tool_reference` block (which tool the tool search loads) goes through
+  untouched: with the name masked in it, the API refused the request
+  (`Tool reference 'Db_…' not found`), as seen 4 times in a real session.
+
+### Code
+
+- `declaredTools` (proxy) adds the declared tool names to the request's public words (priority).
+  Tests: `TestNameNextToQuoteOrHyphen`, `tool_names_test.go`.
 
 ## [0.14.0] - 2026-10-28
 

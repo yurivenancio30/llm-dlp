@@ -21,6 +21,16 @@ que só interessa a quem mexe no código.
   1.402 e 778 blocos): apareceram 246 ocorrências de nomes de pessoas (19, 6, 0 e 4 nomes
   diferentes). 8 achados mudaram de tipo, todos agora dentro de um nome maior (um termo
   configurado e um nome de duas palavras dentro de um de três); nada passou a sair em claro.
+- O nome de uma ferramenta que o pedido declara (`WebSearch`, uma ferramenta de MCP) deixou de
+  ser mascarado nesse pedido, mesmo que a memória o tenha aprendido um dia como nome por engano:
+  ele já vai em claro na lista de ferramentas. O bloco `tool_reference` (qual ferramenta a busca
+  de ferramentas carrega) passa intacto: com o nome mascarado nele, a API recusava o pedido
+  (`Tool reference 'Db_…' not found`), como aconteceu 4 vezes numa sessão real.
+
+### Código
+
+- `declaredTools` (proxy) põe os nomes das ferramentas declaradas nas palavras públicas do pedido
+  (prioridade). Testes: `TestNameNextToQuoteOrHyphen`, `tool_names_test.go`.
 
 ## [0.14.0] - 2026-10-28
 

@@ -57,7 +57,14 @@ func (p *Proxy) maskBody(format, typ string, body []byte) ([]byte, []mask.Entry,
 	batch.Warm(col.items)
 	if anthropic {
 		// priority (priority.go), with what each tool output decided (already in the memo)
-		batch.UsePublic(modelPublics(v, p.m, batch.DecidedByText(col.items)))
+		pub := modelPublics(v, p.m, batch.DecidedByText(col.items))
+		for _, n := range declaredTools(v) {
+			if pub == nil {
+				pub = map[string]bool{}
+			}
+			pub[strings.ToLower(n)] = true
+		}
+		batch.UsePublic(pub)
 	}
 	// conversation memory: the names decided in all texts apply to the texts not yet sent (see
 	// mask/memory_conversation.go)
@@ -670,6 +677,24 @@ func (w walker) anthropicRequest(v any) any {
 	return req
 }
 
+// declaredTools: the names of the tools the request declares. They go in the clear in the tools list,
+// so in this request they are never a client name (like the model's words, priority.go): the memory
+// that learned one as an object by mistake ("WebSearch" as a database) does not change it in a text
+// nor in the tool search.
+func declaredTools(req any) []string {
+	r, _ := req.(map[string]any)
+	ts, _ := r["tools"].([]any)
+	var out []string
+	for _, t := range ts {
+		if tm, ok := t.(map[string]any); ok {
+			if n, _ := tm["name"].(string); n != "" {
+				out = append(out, n)
+			}
+		}
+	}
+	return out
+}
+
 // content: string or list of blocks.
 func (w walker) content(v any) any {
 	switch c := v.(type) {
@@ -713,6 +738,10 @@ func (w walker) block(b map[string]any) map[string]any {
 	case "server_tool_use", "web_search_tool_result", "web_fetch_tool_result", "code_execution_tool_result",
 		"container_upload", "mcp_tool_use", "mcp_tool_result":
 		return b // generated on the API side
+	case "tool_reference":
+		// which tool to load (the result of a tool search): the name already goes in the clear in the
+		// tools list, and the API refuses a reference to a tool it does not know
+		return b
 	case "text":
 		if s, ok := b["text"].(string); ok {
 			w.prose = w.message || w.client
@@ -786,7 +815,7 @@ func (w walker) generic(v any) any {
 			x[i] = w.generic(x[i])
 		}
 	case map[string]any:
-		if t, _ := x["type"].(string); t == "thinking" || t == "redacted_thinking" || t == "image" {
+		if t, _ := x["type"].(string); t == "thinking" || t == "redacted_thinking" || t == "image" || t == "tool_reference" {
 			return x
 		}
 		for _, k := range keys(x) {

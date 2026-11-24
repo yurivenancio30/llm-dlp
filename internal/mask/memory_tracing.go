@@ -351,7 +351,8 @@ const SystemSource = "sistema"
 func SystemTarget(cmd string) bool { return systemTarget(cmd) }
 
 // UsePublic: the words (lowercase) the model wrote before data brought them in this conversation
-// (priority, in the proxy). They are its knowledge: no path marks them here.
+// (priority, in the proxy), and the names of the tools the request declares. They are its
+// knowledge: no path marks them here.
 func (l *Batch) UsePublic(p map[string]bool) { l.publicSet = p }
 
 // fromModel: v is model knowledge in this conversation (and does not contain a registered term: the
