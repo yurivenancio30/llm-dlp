@@ -27,6 +27,13 @@ que só interessa a quem mexe no código.
   de ferramentas carrega) passa intacto: com o nome mascarado nele, a API recusava o pedido
   (`Tool reference 'Db_…' not found`), como aconteceu 4 vezes numa sessão real.
 
+### Programa
+
+- Licença: desta versão em diante, o llm-dlp está sob a
+  [PolyForm Shield 1.0.0](../../LICENSE) (era MIT). O uso grátis continua, também dentro de
+  empresa; vender ou oferecer um produto que concorra com ele não é permitido. As versões até a
+  0.14.0 continuam com a MIT. Resumo no [README](README.md#licença).
+
 ### Código
 
 - `declaredTools` (proxy) põe os nomes das ferramentas declaradas nas palavras públicas do pedido

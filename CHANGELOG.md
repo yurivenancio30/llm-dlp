@@ -27,6 +27,13 @@ matters to whoever changes the code.
   untouched: with the name masked in it, the API refused the request
   (`Tool reference 'Db_…' not found`), as seen 4 times in a real session.
 
+### Program
+
+- License: from this version on, llm-dlp is under the
+  [PolyForm Shield 1.0.0](LICENSE) (it was MIT). Free use stays, also inside a company; selling it
+  or providing a product that competes with it is not allowed. Versions up to 0.14.0 keep the MIT
+  license. Summary in the [README](README.md#license).
+
 ### Code
 
 - `declaredTools` (proxy) adds the declared tool names to the request's public words (priority).

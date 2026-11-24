@@ -2,7 +2,7 @@
 
 [![ci](https://github.com/yurivenancio30/llm-dlp/actions/workflows/ci.yml/badge.svg)](https://github.com/yurivenancio30/llm-dlp/actions/workflows/ci.yml)
 [![release](https://img.shields.io/github/v/release/yurivenancio30/llm-dlp)](https://github.com/yurivenancio30/llm-dlp/releases/latest)
-[![license](https://img.shields.io/github/license/yurivenancio30/llm-dlp)](LICENSE)
+[![license](https://img.shields.io/badge/license-PolyForm%20Shield%201.0.0-blue)](LICENSE)
 
 **English** · [Português](docs/pt-BR/README.md)
 
@@ -295,9 +295,20 @@ open the client, and from then on it also comes back by itself.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+[PolyForm Shield 1.0.0](LICENSE), from version 0.15.0 on. In short (what holds is the text of
+the license):
 
-The data files `internal/mask/data/common_words.txt` and `dictionary_words.txt` are
+- You may use llm-dlp for free, for yourself or inside your company, change it and share it.
+- You may not sell it nor provide a product that competes with it, even for free: a paid copy in a
+  marketplace, a hosted version, a fork marketed as a replacement.
+
+It is source-available, not open source in the OSI sense. Versions up to 0.14.0 keep the MIT
+license they were released with.
+
+The data files that come from elsewhere keep the license of their source, noted in the header
+of each file: the BIP-39 word lists (`internal/mask/data/bip39_*.txt`) come from
+[bitcoin/bips](https://github.com/bitcoin/bips/tree/master/bip-0039), and
+`internal/mask/data/common_words.txt` and `dictionary_words.txt` are
 adaptations of the frequency lists of
 [FrequencyWords](https://github.com/hermitdave/FrequencyWords), by Hermit Dave (OpenSubtitles
 2018 data), distributed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/);
