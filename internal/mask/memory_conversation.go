@@ -252,6 +252,9 @@ func (l *Batch) withMemory(s string, r result, hint string) result {
 	f := filterOf(hint)
 	f.output = !l.prose && !l.writing
 	extra := l.mem.scanF(s, r.snippets, f)
+	for _, x := range extra {
+		trace("memory", "conversation", x.Type, s, x.Start, x.End, "proposed")
+	}
 	if !l.writing && fileSource(l.currentSource) {
 		// a column proven in one source does not contaminate ANOTHER file read (the file's
 		// vocabulary is its own: "status" in app.js is not the column of schema.sql); the

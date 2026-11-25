@@ -469,16 +469,31 @@ func templatePath(s string, a, b int, roots map[string]bool) bool {
 
 // applyFinding: a finding of reader l, with the common brakes. ct: the text context.
 func (m *Masker) applyFinding(l Reader, s string, ct ctxText, o ObjFinding, learn bool, add func(ini, end int, typ string)) {
-	if o.Start < 0 || o.End > len(s) || o.End <= o.Start || !m.objMask(o.Ent) {
+	if o.Start < 0 || o.End > len(s) || o.End <= o.Start {
+		return
+	}
+	src := "reader " + l.Name
+	if !m.objMask(o.Ent) {
+		trace(src, o.Rule, o.Ent, s, o.Start, o.End, "type off")
 		return
 	}
 	v := s[o.Start:o.End]
-	if isPseudoObj(v) || (l.Public != nil && l.Public(strings.Trim(v, "[]\"`"))) || vocabularyFinding(l, o, strings.Trim(v, "[]\"`'"), ct.software) {
+	switch {
+	case isPseudoObj(v):
+		trace(src, o.Rule, o.Ent, s, o.Start, o.End, "already a pseudonym")
+		return
+	case l.Public != nil && l.Public(strings.Trim(v, "[]\"`")):
+		trace(src, o.Rule, o.Ent, s, o.Start, o.End, "public for the reader")
+		return
+	case vocabularyFinding(l, o, strings.Trim(v, "[]\"`'"), ct.software):
+		trace(src, o.Rule, o.Ent, s, o.Start, o.End, "public vocabulary")
 		return
 	}
 	if len(ct.roots) > 0 && entSQL[o.Ent] && o.Ent != "server" && templatePath(s, o.Start, o.End, ct.roots) {
+		trace(src, o.Rule, o.Ent, s, o.Start, o.End, "template path")
 		return // a path in the program's data (see templateRoots)
 	}
+	trace(src, o.Rule, o.Ent, s, o.Start, o.End, "masked")
 	add(o.Start, o.End, objTypePrefix+o.Ent)
 	if learn {
 		m.learnObj(o, v, l.Public)

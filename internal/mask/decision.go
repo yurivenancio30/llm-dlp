@@ -54,15 +54,19 @@ func (c *TextCtx) Decide(ini, end int, ent, rule string) {
 		return
 	}
 	if c.m != nil && !c.m.objMask(ent) {
+		trace("decider", rule, ent, c.S, ini, end, "type off")
 		return
 	}
 	if !wholeValue(c.S, ini, end) || publicSystem(unquoted(c.S[ini:end])) {
+		trace("decider", rule, ent, c.S, ini, end, "piece or system vocabulary")
 		return // a piece of an expression, or system vocabulary (see memory_tracing.go)
 	}
 	v := c.S[ini:end]
 	if isPseudoObj(v) {
+		trace("decider", rule, ent, c.S, ini, end, "already a pseudonym")
 		return
 	}
+	trace("decider", rule, ent, c.S, ini, end, "masked")
 	c.out = append(c.out, Finding{ini, end, objTypePrefix + ent, v})
 	c.dec = append(c.dec, Decision{Name: unquoted(v), Ent: ent, Rule: rule, Generic: isGeneric(v)})
 }

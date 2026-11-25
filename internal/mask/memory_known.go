@@ -329,6 +329,7 @@ func (m *Masker) findKnown(s string, longNum bool, add0 func(ini, end int, typ s
 	add := func(ini, end int, typ string) {
 		if isObject(typ) {
 			if !m.objPropagates(strings.TrimPrefix(typ, objTypePrefix)) {
+				trace("memory", "accumulated", typ, s, ini, end, "type off")
 				return // type turned off after being learned
 			}
 			// the accumulated knowledge (RAM, vistos.json) follows the tracing rules: a common word
@@ -336,6 +337,7 @@ func (m *Masker) findKnown(s string, longNum bool, add0 func(ini, end int, typ s
 			// software with proof (a name learned wrongly before does not come back in every text;
 			// see memory_tracing.go and memory_software.go)
 			if v := s[ini:end]; !identifierShape(v) || publicGeneral(v) || m.provenSoftware(v) {
+				trace("memory", "accumulated", typ, s, ini, end, "common word, public or proven software")
 				return
 			}
 		}
@@ -343,6 +345,7 @@ func (m *Masker) findKnown(s string, longNum bool, add0 func(ini, end int, typ s
 		if typ == "domain" && end+1 < len(s) && s[end] == '.' && isAlnum(s[end+1]) {
 			return
 		}
+		trace("memory", "accumulated", typ, s, ini, end, "masked")
 		add0(ini, end, typ)
 	}
 	m.findKnownObjects(s, add)
