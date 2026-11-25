@@ -15,7 +15,7 @@ Uma linha por ideia: o que foi visto e ainda não foi feito. Nada aqui é promes
 
 ## Mascarar menos (hoje sobra)
 
-- `pacote@versão` (`lodash@4.17.21`, `testify@v1.8.4`) sai como e-mail. Antes de liberar, conferir que o nome do pacote do cliente continua coberto por outro leitor.
+- `pacote@versão` (`lodash@4.17.21`, `testify@v1.8.4`) sai como e-mail. Antes de liberar, conferir que o nome do pacote do cliente continua coberto por outro leitor. Mantido como e-mail de propósito (decidido em 2026-11-25): um TLD nunca é todo numérico (RFC 3696), mas liberar mandaria um pacote interno (`faturamento-interno@1.4.2`) em claro, e a forma do pip (`pip install vendas-client==2.1.0`) já sai em claro hoje: nome de pacote interno precisa de regra própria antes.
 - Dependência instalada com nome de palavra de dicionário (`pandas`, `requests`): as pastas do caminho seguem a regra comum. Uma lista dos pacotes mais baixados do PyPI e do npm daria a segunda chave sem depender do dicionário.
 - Rótulo traduzido de chave de tipo num catálogo em outra escrita (`"User": "Użytkownik"`).
 - DataHub: padrões `allow`/`deny` de `table_pattern`/`schema_pattern` (regex) nas receitas de ingestão; mascarar só os trechos literais que são nome inteiro, sem quebrar a regex.

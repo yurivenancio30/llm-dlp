@@ -15,7 +15,7 @@ One line per idea: what was seen and has not been done yet. Nothing here is a pr
 
 ## Mask less (too much today)
 
-- `package@version` (`lodash@4.17.21`, `testify@v1.8.4`) goes out as an e-mail. Before letting it through, check that the client's package name is still covered by another reader.
+- `package@version` (`lodash@4.17.21`, `testify@v1.8.4`) goes out as an e-mail. Before letting it through, check that the client's package name is still covered by another reader. Kept as an e-mail on purpose (decided 2026-11-25): a top-level domain is never all-numeric (RFC 3696), but letting it through would send a private package (`faturamento-interno@1.4.2`) in the clear, and pip's form (`pip install vendas-client==2.1.0`) already goes in the clear today: private package names need their own rule first.
 - An installed dependency named after a dictionary word (`pandas`, `requests`): the folders of the path follow the ordinary rule. A list of the most downloaded PyPI and npm packages would give the second key without depending on the dictionary.
 - A translated label of a type key in a catalog in another script (`"User": "Użytkownik"`).
 - DataHub: `allow`/`deny` patterns of `table_pattern`/`schema_pattern` (regex) in ingestion recipes; mask only the literal spans that are a whole name, without breaking the regex.

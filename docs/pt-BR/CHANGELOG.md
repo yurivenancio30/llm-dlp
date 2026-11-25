@@ -9,6 +9,50 @@ Em cada versão: **Mascaramento** é o que passou a ser (ou deixou de ser) masca
 **Programa** é comando, instalação, configuração, desempenho e documentação; **Código** é o
 que só interessa a quem mexe no código.
 
+## [Não lançado]
+
+### Mascaramento
+
+- Uma tabela sem linha separadora debaixo da primeira linha (`CHAVE | preenchido`, uma por linha,
+  de um script de checagem) tomava a primeira linha como cabeçalho, e o cabeçalho tipava a coluna
+  inteira: toda chave abaixo virava conta de nuvem. Agora a primeira linha só é cabeçalho se não
+  se parece com as de baixo, pelo voto do `csv.Sniffer.has_header` do Python: cada coluna cujas
+  células têm o mesmo tipo (número, ou a mesma forma de caracteres) vota contra o cabeçalho
+  quando a célula da primeira linha também tem esse tipo. Empate mantém o cabeçalho, como antes.
+- O nome da própria coluna repetido debaixo dela não é mais valor da coluna. Duas linhas de saída
+  do grep com a mesma lista de variáveis (`["X_ACCOUNT", "X_USER", "X_DATABASE"]`) faziam da
+  primeira o cabeçalho, e cada nome de baixo era mascarado com o tipo do próprio sufixo (usuário,
+  banco) e aprendido: dali em diante, era mascarado em todo texto.
+- SQL, pelo papel que a gramática dá a cada nome:
+  - O `IDENTIFIER('db.sch.t')` do Snowflake vale pelo nome onde um nome cabe (`FROM`,
+    `INSERT INTO`, `CREATE TABLE`, `USE`): o nome entre aspas é mascarado com o tipo da posição.
+    Antes, o próprio `IDENTIFIER` virava tabela e o nome real saía em claro. `IDENTIFIER($var)` é
+    variável de sessão e fica.
+  - As palavras entre `CREATE`/`ALTER`/`DROP [OR REPLACE]` e o nome são o tipo do objeto, nunca
+    coluna: `CREATE OR REPLACE SECRET x` e `CREATE TAG x` mascaravam `SECRET` e `TAG`.
+  - `USE DATABASE x` dá a `x` o tipo banco (virava coluna).
+  - O nome antes de `=>` é parâmetro na notação nomeada (`CALL p(TABELA => 'x')`), um rótulo:
+    `TABELA` e `TAG` viravam coluna, e a memória da conversa os levava a todo outro texto dela.
+- Uma palavra que nomeia um tipo de objeto, as próprias palavras de tipo do projeto (`tabela`,
+  `schema`, `coluna`, `banco`...), é rótulo e nunca nome de um, em todo leitor, decisor e memória:
+  decidida como nome uma vez (`TABELA => 'x'`, um cabeçalho tomado por valor), a memória da
+  conversa a levava a todo texto, até para dentro de comentário SQL. Dentro de um caminho ela
+  continua sendo o nome da própria pasta (`Banco de Dados`). `IDENTIFIER` entrou no vocabulário
+  público de SQL (Snowflake, "Literals and variables as identifiers"): escrito em minúsculas numa
+  frase, virava coluna e depois todo `IDENTIFIER(...)` da conversa.
+
+### Programa
+
+- A linha de log de cada requisição diz, só quando acontece, quantos valores foram mascarados num
+  lugar e estão inteiros em claro em outro texto novo da mesma requisição (`in the clear
+  elsewhere`), e quantas palavras do dicionário foram mascaradas como nome (`common words
+  masked`). `llm-dlp audit` soma os dois. Só contagens por tipo, nunca valores.
+
+### Código
+
+- Rastro das decisões (`internal/mask/trace.go`): cada candidato que um leitor, um decisor ou uma
+  memória propôs, com regra, tipo, posição e o freio que o descartou. Desligado fora dos testes.
+
 ## [0.15.0] - 2026-11-24
 
 ### Mascaramento

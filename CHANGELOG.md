@@ -9,6 +9,51 @@ In each version: **Masking** is what started (or stopped) being masked; **Progra
 commands, installation, configuration, performance and documentation; **Code** is what only
 matters to whoever changes the code.
 
+## [Unreleased]
+
+### Masking
+
+- A table without a separator line under its first line (`KEY | filled`, one per line, from a
+  check script) took its first line as the header, and the header typed the whole column: every
+  key below became a cloud account. The first line is now a header only if it does not look like
+  the lines below it, by the vote of Python's `csv.Sniffer.has_header`: each column whose cells
+  share a type (a number, or the same shape of characters) votes against the header when the
+  first line's cell has that type too. A tie keeps the header, as before.
+- A column's own name repeated under it is no longer a value of the column. Two lines of grep
+  output with the same list of variables (`["X_ACCOUNT", "X_USER", "X_DATABASE"]`) made the first
+  one the header, and each name below was masked with the type of its own suffix (a user, a
+  database) and learned: from then on, it was masked in every text.
+- SQL, by the role the grammar gives each name:
+  - Snowflake `IDENTIFIER('db.sch.t')` stands for the name wherever a name stands (`FROM`,
+    `INSERT INTO`, `CREATE TABLE`, `USE`): the name inside the quotes is masked with the type of
+    the position. Before, `IDENTIFIER` itself became a table and the real name went in the clear.
+    `IDENTIFIER($var)` is a session variable and stays.
+  - The words between `CREATE`/`ALTER`/`DROP [OR REPLACE]` and the name are the object's type,
+    never a column: `CREATE OR REPLACE SECRET x` and `CREATE TAG x` masked `SECRET` and `TAG`.
+  - `USE DATABASE x` types `x` as a database (it became a column).
+  - The name before `=>` is a parameter in named notation (`CALL p(TABELA => 'x')`), a label:
+    `TABELA` and `TAG` became columns, and the conversation memory carried them to every other
+    text of the conversation.
+- A word that names a kind of object, the project's own type words (`tabela`, `schema`,
+  `coluna`, `banco`...), is a label and never the name of one, in every reader, decider and
+  memory: decided as a name once (`TABELA => 'x'`, a header taken for a value), the conversation
+  memory carried it to every text, even into SQL comments. Inside a path it is still the folder's
+  own name (`Banco de Dados`). `IDENTIFIER` entered the public SQL vocabulary (Snowflake,
+  "Literals and variables as identifiers"): written in lowercase in a sentence, it became a column
+  and then every `IDENTIFIER(...)` of the conversation.
+
+### Program
+
+- The log line of each request says, only when it happens, how many values were masked in one
+  place and are whole in the clear in another new text of the same request
+  (`in the clear elsewhere`), and how many dictionary words were masked as names
+  (`common words masked`). `llm-dlp audit` adds both up. Counts by type only, never values.
+
+### Code
+
+- Trace of the decisions (`internal/mask/trace.go`): each candidate a reader, a decider or a
+  memory proposed, with rule, type, position and the brake that dropped it. Off outside tests.
+
 ## [0.15.0] - 2026-11-24
 
 ### Masking
