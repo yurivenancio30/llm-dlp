@@ -431,7 +431,7 @@ ou **prefixo de erro**. Avaliar o bloco inteiro (linhas consecutivas), não a li
 Pegadinhas: (a) em MySQL `SHOW TABLES` o **nome do database está dentro do cabeçalho**
 (`Tables_in_vendas_demo`) — mascarar o sufixo e manter `Tables_in_`. (b) `Name` é genérico: em `\dt`
 é tabela, em `\dn` é schema, em `\l` é database, em `DESCRIBE` sqlplus é coluna — decidir pelo **título**
-ou pelo conjunto de cabeçalhos vizinhos. (c) O valor de `data_type`, `Type`, `kind`, `table_type` **nunca** é nome.
+ou pelo conjunto de cabeçalhos vizinhos. (c) O valor de `data_type`, `Type`, `kind`, `table_type` **nunca** é nome. (d) Sem linha separadora debaixo, a primeira linha só é cabeçalho se não se parece com as de baixo: cada coluna cujas células têm o mesmo tipo (número, ou a mesma forma de caracteres) vota contra quando a primeira célula também tem esse tipo, como no [`csv.Sniffer.has_header`](https://github.com/python/cpython/blob/v3.13.0/Lib/csv.py) (empate mantém o cabeçalho). `CHAVE | preenchido` repetido é uma lista, não uma tabela com cabeçalho `CHAVE`.
 
 **Trechos de mensagem de erro** (o grupo entre aspas é o nome):
 

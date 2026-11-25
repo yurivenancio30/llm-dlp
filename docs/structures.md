@@ -437,7 +437,7 @@ or an **error prefix**. Evaluate the whole block (consecutive lines), not the lo
 Gotchas: (a) in MySQL `SHOW TABLES` the **database name is inside the header**
 (`Tables_in_vendas_demo`) — mask the suffix and keep `Tables_in_`. (b) `Name` is generic: in `\dt`
 it is a table, in `\dn` a schema, in `\l` a database, in sqlplus `DESCRIBE` a column — decide by the **title**
-or by the set of neighbouring headers. (c) The value of `data_type`, `Type`, `kind`, `table_type` is **never** a name.
+or by the set of neighbouring headers. (c) The value of `data_type`, `Type`, `kind`, `table_type` is **never** a name. (d) Without a separator line under it, the first line is a header only if it does not look like the lines below: each column whose cells share a type (a number, or the same shape of characters) votes against it when the first cell has that type too, as in [`csv.Sniffer.has_header`](https://github.com/python/cpython/blob/v3.13.0/Lib/csv.py) (a tie keeps the header). `KEY | filled` repeated is a list, not a table with the header `KEY`.
 
 **Spans of an error message** (the group between quotes is the name):
 

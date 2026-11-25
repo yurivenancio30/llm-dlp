@@ -2,7 +2,9 @@ package mask
 
 import (
 	"regexp"
+	"strconv"
 	"strings"
+	"unicode"
 )
 
 // Table reader (see docs/structures.md, sections Database client output and Tabular data). The
@@ -408,6 +410,12 @@ func findTablesD(s string, d *outputHint, add func(ObjFinding)) {
 		if fixedOnes != nil && len(rows) == 0 {
 			continue
 		}
+		// no separator line under the first line: it is only a header if it does not look like the
+		// lines below it (a headerless "KEY | filled" list would type its column by its first key)
+		if data == i+1 && headerVote(s, cs, rows) < 0 {
+			i = k - 1
+			continue
+		}
 		noHdr := fixedOnes != nil && len(rows) < 2
 		var dv *outputHint
 		if d == nil {
@@ -539,6 +547,11 @@ func classifyTableD(s string, cs []cell, rows [][]cell, title string, noHdr, str
 			v := s[c.a:c.b]
 			if len(v) < 2 || !reIdentCell.MatchString(v) || strings.EqualFold(v, "null") || strings.EqualFold(v, "none") ||
 				isDataType(v) || strings.Trim(v, ".-") == "" {
+				continue
+			}
+			// the column's own name below it is the header repeated (two lines of grep with the same
+			// list of variables, a header printed again), not a value of the column
+			if col < len(cs) && strings.EqualFold(v, s[cs[col].a:cs[col].b]) {
 				continue
 			}
 			addCellParts(s, c.a, c.b, e, add)
@@ -833,4 +846,89 @@ func findHTMLTable(s string, d *outputHint, add func(ObjFinding)) {
 		rows = append(rows, cs)
 	}
 	closeIt()
+}
+
+// headerVote: whether the first line of a table without a separator line is a header, by the vote
+// of CPython's csv.Sniffer.has_header (Lib/csv.py): each column whose cells have the same type in
+// the lines below (up to 20) votes -1 if the first line's cell has that type too and +1 if not; a
+// column without a common type does not vote. The type is "number" or the shape of the cell
+// (classes of character and their lengths: "preenchido" a{10}, "SP" A{2}), stricter than CPython's
+// length alone so that "uf" over "SP" still votes for a header. Unlike CPython, a tie (0) keeps the
+// header: only a first line that looks like the data below it stops being one.
+func headerVote(s string, cs []cell, rows [][]cell) int {
+	n := min(len(rows), 20)
+	if n < 2 {
+		return 0
+	}
+	vote := 0
+	for j, h := range cs {
+		kind, ok := "", true
+		for _, r := range rows[:n] {
+			if j >= len(r) || r[j].a < 0 { // missing or empty cell ({-1,-1}, alignFixed)
+				ok = false
+				break
+			}
+			k := cellKind(s[r[j].a:r[j].b])
+			if kind == "" {
+				kind = k
+			} else if k != kind {
+				ok = false
+				break
+			}
+		}
+		if !ok || kind == "" {
+			continue
+		}
+		if cellKind(s[h.a:h.b]) == kind {
+			vote--
+		} else {
+			vote++
+		}
+	}
+	return vote
+}
+
+// cellKind: "#" for a number, else the shape of the cell ("A2a3_9" for "AB_cde_1": runs of
+// upper, lower and digit with their lengths, other characters as they are).
+func cellKind(v string) string {
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return ""
+	}
+	if _, err := strconv.ParseFloat(strings.ReplaceAll(v, ",", "."), 64); err == nil {
+		return "#"
+	}
+	var b strings.Builder
+	prev, n := byte(0), 0
+	flush := func() {
+		if n > 0 {
+			b.WriteByte(prev)
+			b.WriteString(strconv.Itoa(n))
+		}
+		n = 0
+	}
+	for _, r := range v {
+		c := byte(0)
+		switch {
+		case r >= '0' && r <= '9':
+			c = '9'
+		case unicode.IsUpper(r):
+			c = 'A'
+		case unicode.IsLetter(r):
+			c = 'a'
+		}
+		if c == 0 {
+			flush()
+			prev = 0
+			b.WriteRune(r)
+			continue
+		}
+		if c != prev {
+			flush()
+			prev = c
+		}
+		n++
+	}
+	flush()
+	return b.String()
 }
