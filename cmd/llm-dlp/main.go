@@ -35,6 +35,8 @@ Day to day (usually you need none of this)
                                 message
   llm-dlp import-people FILE.csv --group CODE:NAME:EMAIL [--name-separator /]
                                 teaches people's names and e-mails (stored only as hashes)
+  llm-dlp forget VALUE...       stops applying everywhere a value llm-dlp learned by mistake (where the structure
+                                shows it is a name, it is still masked; what already went out stays as it went)
   sudo llm-dlp emergency [30m|off]
                                 if llm-dlp breaks: lets Claude through UNMASKED for a limited time
 
@@ -110,6 +112,8 @@ func main() {
 		err = stop()
 	case "import-people":
 		err = importPeople(args)
+	case "forget":
+		err = forget(args)
 	case "test":
 		err = test()
 	case "test-media":

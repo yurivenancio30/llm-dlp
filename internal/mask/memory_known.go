@@ -496,6 +496,9 @@ func (m *Masker) learnIt(typ, real string) {
 	if (typ == "user" || typ == "doc") && (len(real) < 5 || !hasDigit(real)) {
 		return
 	}
+	if m.seenSet != nil && m.seenSet.Forgotten(m.p.ID("visto", canonicalKey(typ, real))) {
+		return // forgotten (llm-dlp forget)
+	}
 	if m.known.learnIt(typ, real) && m.seenSet != nil {
 		if typ == "secret" {
 			m.seenSet.MarkSize(len(real))

@@ -97,6 +97,9 @@ func LoadSeen(path string) (*Seen, error) {
 		v.ids = map[string]string{} // old format (list): start over; the values are learned again
 	}
 	for id, t := range v.ids {
+		if t == forgotten { // tombstone (memory_forget.go): counts for nothing
+			continue
+		}
 		t = currentType(t)
 		v.ids[id] = t
 		v.tally(id, t)
@@ -134,6 +137,15 @@ func (v *Seen) mergeFromDisk() {
 		return
 	}
 	for id, t := range other {
+		if t == forgotten { // forgotten by another process (llm-dlp forget): it stays forgotten here
+			if cur, ok := v.ids[id]; !ok || cur != forgotten {
+				if ok {
+					v.untally(cur)
+				}
+				v.ids[id], v.dirty = forgotten, true
+			}
+			continue
+		}
 		if _, ok := v.ids[id]; !ok {
 			t = currentType(t)
 			v.ids[id] = t
@@ -148,6 +160,9 @@ func (v *Seen) Type(id string) (string, bool) {
 	v.mu.RLock()
 	defer v.mu.RUnlock()
 	t, ok := v.ids[id]
+	if t == forgotten {
+		return "", false
+	}
 	return t, ok
 }
 

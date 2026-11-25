@@ -70,6 +70,28 @@ Claude escreve nessas ferramentas) é mascarado onde aparece, mas nada dele é l
 página de documentação com uma senha de exemplo numa URL não faz essa palavra virar segredo
 em todo lugar.
 
+### Esquecer um valor
+
+Um valor aprendido por engano (um nome de variável tomado por usuário, uma palavra tomada por
+tabela) é mascarado em todo texto dali em diante. `llm-dlp forget VALOR...` para isso:
+
+```
+$ llm-dlp forget SNOWFLAKE_USER SNOWFLAKE_ACCOUNT
+2 learned entries forgotten (2 values given). They are no longer applied by the memory nor learned again;
+where the structure shows they are names, they are still masked. What already went out stays as it went.
+proxy restarted.
+```
+
+- No disco só há o hash, então o valor é calculado de novo em cada tipo com que pode ter sido
+  aprendido, e cada entrada encontrada vira uma marca de "esquecido": não é mais aplicada nem
+  aprendida de novo, também quando outro processo do llm-dlp grava o arquivo depois.
+- Só o espalhar vai embora: onde a própria estrutura mostra que o valor é nome (uma coluna sob
+  `DB_USER`, o alvo de um `FROM`), ele continua mascarado ali.
+- O que já saiu continua congelado (o `sent.log` é mantido): o cache da API não é reescrito. Na
+  mesma conversa, uma mensagem antiga pode mostrar o pseudônimo e uma nova, o valor.
+- O proxy reinicia para soltar o que guarda na memória. Os valores que você digita ficam no
+  histórico do seu shell.
+
 ## Falha fechada
 
 | Situação | O que acontece |

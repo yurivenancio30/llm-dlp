@@ -309,3 +309,35 @@ func columns(args []string) error {
 	}
 	return nil
 }
+
+// forget: values learned by mistake stop being applied by the accumulated memory (see
+// internal/mask/memory_forget.go). What already went out stays frozen: the API cache is kept.
+func forget(args []string) error {
+	if len(args) == 0 {
+		return errors.New("give the values to forget: llm-dlp forget VALUE [VALUE...]")
+	}
+	cfg, _, _, seenSet, m, err := loadAll()
+	if err != nil {
+		return err
+	}
+	n := m.Forget(args)
+	if n == 0 {
+		fmt.Println("none of these values was learned: nothing changed.")
+		return nil
+	}
+	if err := seenSet.SaveNow(); err != nil {
+		return err
+	}
+	fmt.Printf("%d learned entries forgotten (%d values given). They are no longer applied by the memory nor learned again;\n"+
+		"where the structure shows they are names, they are still masked. What already went out stays as it went.\n", n, len(args))
+	// the proxy keeps what it learned in RAM: restart it so the forgetting applies right away
+	if healthy(cfg) {
+		if err := stop(); err == nil {
+			if err := ensure(); err != nil {
+				return fmt.Errorf("forgotten, but the proxy did not come back: %w", err)
+			}
+			fmt.Println("proxy restarted.")
+		}
+	}
+	return nil
+}

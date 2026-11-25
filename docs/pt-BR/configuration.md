@@ -195,6 +195,7 @@ Sobre o Copilot:
 | `llm-dlp stop` | Para o proxy (ele volta na próxima mensagem). Para atualizar ou aplicar a configuração, use `update` ou `reload`, que não deixam a porta vazia |
 | `sudo llm-dlp emergency [30m\|off]` | Libera o Claude sem máscara por tempo limitado |
 | `llm-dlp import-people ARQ.csv --group COD:NOME:EMAIL` | Ensina pessoas |
+| `llm-dlp forget VALOR...` | Para de aplicar em todo lugar um valor que o llm-dlp aprendeu por engano (ver [Esquecer um valor](how-it-works.md#esquecer-um-valor)) |
 | `llm-dlp columns ARQ` | Mostra como os campos de um arquivo são entendidos |
 | `llm-dlp audit [24h\|7d]` | Resume o log do período: o que foi mascarado por tipo, pseudônimos que voltaram sem virar o valor real, envios sem máscara, recusas (ver [O log](how-it-works.md#o-log)) |
 | `llm-dlp test < arquivo` | Mostra a versão mascarada de um texto |

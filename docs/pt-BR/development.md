@@ -73,7 +73,7 @@ cmd/llm-dlp/
   install.go    install, uninstall, a trava e os ganchos
   inspect.go    last (o que a API recebeu) e simulate (reproduz uma sessão antiga contra uma API falsa)
   audit.go      audit: o resumo do log num período
-  tools.go      import-people, test, test-media, measure, columns
+  tools.go      import-people, forget, test, test-media, measure, columns
   emergency.go  modo emergência (exige sudo)
 
 internal/proxy/

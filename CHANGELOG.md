@@ -48,6 +48,10 @@ matters to whoever changes the code.
   place and are whole in the clear in another new text of the same request
   (`in the clear elsewhere`), and how many dictionary words were masked as names
   (`common words masked`). `llm-dlp audit` adds both up. Counts by type only, never values.
+- `llm-dlp forget VALUE...`: a value learned by mistake stops being applied everywhere and is not
+  learned again; where the structure shows it is a name, it is still masked. What already went out
+  stays frozen, so the API cache is kept (see
+  [Forgetting a value](docs/how-it-works.md#forgetting-a-value)).
 
 ### Code
 

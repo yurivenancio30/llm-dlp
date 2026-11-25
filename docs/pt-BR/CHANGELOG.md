@@ -47,6 +47,10 @@ que só interessa a quem mexe no código.
   lugar e estão inteiros em claro em outro texto novo da mesma requisição (`in the clear
   elsewhere`), e quantas palavras do dicionário foram mascaradas como nome (`common words
   masked`). `llm-dlp audit` soma os dois. Só contagens por tipo, nunca valores.
+- `llm-dlp forget VALOR...`: um valor aprendido por engano deixa de ser aplicado em todo lugar e
+  não é aprendido de novo; onde a estrutura mostra que é nome, continua mascarado. O que já saiu
+  continua congelado, então o cache da API é mantido (ver
+  [Esquecer um valor](how-it-works.md#esquecer-um-valor)).
 
 ### Código
 

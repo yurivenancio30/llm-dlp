@@ -260,6 +260,9 @@ func (m *Masker) learnObj(o ObjFinding, real string, public func(string) bool) {
 	if !o.Strong && !m.weakSet.markIt(canonObj(o.Ent, v), o.Rule) {
 		return // weak evidence: masks in place, but does not teach
 	}
+	if m.seenSet != nil && m.seenSet.Forgotten(m.objID(canonObj(o.Ent, v))) {
+		return // forgotten (llm-dlp forget): masked here, not learned again
+	}
 	m.known.learnIt(objTypePrefix+o.Ent, v)
 	if m.seenSet != nil {
 		m.seenSet.MarkObj(m.objID(canonObj(o.Ent, v)), o.Ent, today())

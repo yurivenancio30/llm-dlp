@@ -193,6 +193,7 @@ About Copilot:
 | `llm-dlp stop` | Stops the proxy (it comes back on the next message). To update or apply the configuration, use `update` or `reload`, which do not leave the port empty |
 | `sudo llm-dlp emergency [30m\|off]` | Lets Claude through unmasked for a limited time |
 | `llm-dlp import-people FILE.csv --group CODE:NAME:EMAIL` | Teaches people |
+| `llm-dlp forget VALUE...` | Stops applying everywhere a value llm-dlp learned by mistake (see [Forgetting a value](how-it-works.md#forgetting-a-value)) |
 | `llm-dlp columns FILE` | Shows how the fields of a file are understood |
 | `llm-dlp audit [24h\|7d]` | Sums up the log of the period: what was masked by type, pseudonyms that came back without becoming the real value, requests sent without masking, refused ones (see [The log](how-it-works.md#the-log)) |
 | `llm-dlp test < file` | Shows the masked version of a text |

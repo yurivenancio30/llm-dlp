@@ -71,6 +71,28 @@ once).
 remembered: a documentation page with an example password in a URL does not turn that word
 into a secret everywhere.
 
+### Forgetting a value
+
+A value learned by mistake (a variable name taken for a user, a word taken for a table) is
+masked in every text afterwards. `llm-dlp forget VALUE...` stops that:
+
+```
+$ llm-dlp forget SNOWFLAKE_USER SNOWFLAKE_ACCOUNT
+2 learned entries forgotten (2 values given). They are no longer applied by the memory nor learned again;
+where the structure shows they are names, they are still masked. What already went out stays as it went.
+proxy restarted.
+```
+
+- On disk there is only the hash, so the value is hashed again under every type it could have
+  been learned with, and each entry found becomes a mark of "forgotten": it is no longer applied
+  and is not learned again, also when another llm-dlp process writes the file later.
+- Only the spreading goes away: where the structure itself shows the value is a name (a column
+  under `DB_USER`, the target of a `FROM`), it is still masked there.
+- What already went out stays frozen (`sent.log` is kept): the API cache is not rewritten. In the
+  same conversation, an old message may show the pseudonym and a new one the value.
+- The proxy restarts so that what it keeps in memory is dropped. The values you type stay in your
+  shell history.
+
 ## Fail-closed
 
 | Situation | What happens |

@@ -73,7 +73,7 @@ cmd/llm-dlp/
   install.go    install, uninstall, the lock and the hooks
   inspect.go    last (what the API received) and simulate (replays an old session against a fake API)
   audit.go      audit: the summary of the log over a period
-  tools.go      import-people, test, test-media, measure, columns
+  tools.go      import-people, forget, test, test-media, measure, columns
   emergency.go  emergency mode (requires sudo)
 
 internal/proxy/
