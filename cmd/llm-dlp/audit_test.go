@@ -63,6 +63,30 @@ func TestLogSummary(t *testing.T) {
 	}
 }
 
+// The consistency counters of each request (mask.Check) add up in the audit; without them, the audit
+// says "none".
+func TestLogSummaryConsistency(t *testing.T) {
+	now := time.Now()
+	h := func(d time.Duration) string { return now.Add(-d).Format("2006/01/02 15:04:05") + " " }
+	r := newSummary(now.Add(-24 * time.Hour))
+	r.readIt(strings.NewReader(strings.Join([]string{
+		h(time.Hour) + "POST /v1/messages -> 200 | 4 replacements | 0 collisions | mask 1ms | total 2s | types: table 3, database 1 | in the clear elsewhere: table 2, database 1 | common words masked: table 1",
+		h(time.Hour) + "POST /v1/messages -> 200 | 1 replacements | 0 collisions | mask 1ms | total 2s | types: table 1 | in the clear elsewhere: table 1",
+	}, "\n")))
+	if r.inClear["table"] != 3 || r.inClear["database"] != 1 || r.commons["table"] != 1 || r.types["table"] != 4 {
+		t.Fatalf("summary: %+v", r)
+	}
+	txt := r.text("24h")
+	for _, wants := range []string{"in the clear in another of the same request: table 3, database 1", "dictionary words masked as names: table 1"} {
+		if !strings.Contains(txt, wants) {
+			t.Errorf("%q missing in:\n%s", wants, txt)
+		}
+	}
+	if txt := newSummary(now).text("24h"); !strings.Contains(txt, "in the clear in another of the same request: none") {
+		t.Errorf("without counters:\n%s", txt)
+	}
+}
+
 // The log rotates when it passes the maximum size, also with the process running, and whoever
 // writes after another process rotated it goes on in the new file.
 func TestLogRotates(t *testing.T) {

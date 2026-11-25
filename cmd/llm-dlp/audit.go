@@ -26,6 +26,8 @@ var (
 	reLogNotUndone = regexp.MustCompile(` \| (?:NOT UNDONE|NÃO DESFEITOS) \d+: ([^|]+)`)
 	reLogCol       = regexp.MustCompile(` \| (?:collided|colididos): ([^|]+)`)
 	reLogAPI       = regexp.MustCompile(` \| API: ([\w.-]+)`)
+	reLogInClear   = regexp.MustCompile(` \| in the clear elsewhere: ([^|]+)`)
+	reLogCommons   = regexp.MustCompile(` \| common words masked: ([^|]+)`)
 )
 
 type logSummary struct {
@@ -35,6 +37,7 @@ type logSummary struct {
 	status                   map[string]int // HTTP status other than 2xx
 	apiErrors                map[string]int
 	types                    map[string]int
+	inClear, commons         map[string]int // consistency of each request (mask.Check)
 	ndResponses              int
 	pseudosNotUndone         []string
 	unmasked, errs, refusedN int
@@ -43,7 +46,7 @@ type logSummary struct {
 
 func newSummary(since time.Time) *logSummary {
 	return &logSummary{since: since, status: map[string]int{}, apiErrors: map[string]int{}, types: map[string]int{},
-		refusalReasons: map[string]int{}}
+		inClear: map[string]int{}, commons: map[string]int{}, refusalReasons: map[string]int{}}
 }
 
 // read adds the lines of the period to the summary (the lines start with "2006/01/02 15:04:05 ", in
@@ -93,13 +96,13 @@ func (r *logSummary) readIt(in io.Reader) {
 			r.apiErrors[strings.TrimSuffix(a[1], ":")]++
 		}
 		if tp := reLogTypes.FindStringSubmatch(msg); tp != nil {
-			for _, pair := range strings.Split(tp[1], ",") {
-				f := strings.Fields(pair)
-				if len(f) == 2 {
-					k, _ := strconv.Atoi(f[1])
-					r.types[config.NewTypeName(f[0])] += k // a log up to 0.9 has the old names
-				}
-			}
+			addPairs(r.types, tp[1])
+		}
+		if tp := reLogInClear.FindStringSubmatch(msg); tp != nil {
+			addPairs(r.inClear, tp[1])
+		}
+		if tp := reLogCommons.FindStringSubmatch(msg); tp != nil {
+			addPairs(r.commons, tp[1])
 		}
 		if nd := reLogNotUndone.FindStringSubmatch(msg); nd != nil {
 			r.ndResponses++
@@ -107,6 +110,17 @@ func (r *logSummary) readIt(in io.Reader) {
 		}
 		if c := reLogCol.FindStringSubmatch(msg); c != nil {
 			r.collided = joinList(r.collided, c[1])
+		}
+	}
+}
+
+// addPairs adds the "type n, type n" pairs of a log line to m.
+func addPairs(m map[string]int, list string) {
+	for _, pair := range strings.Split(list, ",") {
+		f := strings.Fields(pair)
+		if len(f) == 2 {
+			k, _ := strconv.Atoi(f[1])
+			m[config.NewTypeName(f[0])] += k // a log up to 0.9 has the old names
 		}
 	}
 }
@@ -161,6 +175,16 @@ func (r *logSummary) text(period string) string {
 	}
 	if len(r.types) > 0 {
 		fmt.Fprintf(&b, "  masked by type (distinct values of each request, added up): %s\n", counts(r.types))
+	}
+	// what the log can see of its own mistakes (mask/consistency.go)
+	if len(r.inClear) == 0 {
+		b.WriteString("  masked in one place and in the clear in another of the same request: none\n")
+	} else {
+		fmt.Fprintf(&b, "  WARNING: masked in one place and in the clear in another of the same request: %s\n", counts(r.inClear))
+		b.WriteString("    (a reader let through a value another one masked: the model sees the pseudonym and the real value)\n")
+	}
+	if len(r.commons) > 0 {
+		fmt.Fprintf(&b, "  dictionary words masked as names: %s (a rise is the sign of masking too much)\n", counts(r.commons))
 	}
 	if r.ndResponses == 0 {
 		b.WriteString("  pseudonyms that came back without turning into the real value: none\n")

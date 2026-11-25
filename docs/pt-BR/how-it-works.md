@@ -209,6 +209,8 @@ POST /v1/messages -> 200 | 245 replacements | 0 collisions | mask 9ms | total 2.
 | `mask` | Tempo gasto pelo llm-dlp |
 | `total` | Tempo total, dominado pela resposta do modelo |
 | `types` | Quantos valores diferentes de cada tipo foram mascarados nessa requisição (`cpf 2`: dois CPFs diferentes). Só contagens |
+| `in the clear elsewhere: …` | Só quando acontece: valores mascarados num lugar da requisição que também estão, inteiros, em claro em outro texto novo dela (um leitor mascarou numa tabela e outro deixou passar numa linha de log). O modelo vê o pseudônimo e o valor real lado a lado. Só contagens por tipo |
+| `common words masked: …` | Só quando acontece: nomes mascarados nessa requisição que são palavra do dicionário (`lista`, `tabela`). Só contagens por tipo; uma alta é o sinal de mascarar demais |
 | `collided: …` | Só quando acontece: os pseudônimos que colidiram (`240.1.2.x` é uma rede /24 falsa inteira). A forma de cada um diz o tipo do dado. Duas grafias da mesma pessoa importada (nome completo e primeiro + último nome) dividem o pseudônimo e não são colisão |
 | `NOT UNDONE n: …` | Só quando acontece: pseudônimos gerados pelo llm-dlp que chegaram ao cliente na resposta sem voltar a ser o valor real (o modelo mudou ou cortou um, ou citou um de outra conversa; também um endereço da faixa falsa de IP). O que o cliente gravou em arquivo nessa resposta ficou com o pseudônimo. Os pseudônimos vão listados, para dar para procurá-los |
 | `API: type: message` | Só quando a API responde com erro: o tipo e o começo da mensagem dela, como ela mandou (ela só recebeu pseudônimos). É o que distingue, por exemplo, um 429 de limite da conta de um 429 de requisição recusada |
@@ -222,7 +224,8 @@ Até a 0.9 as linhas eram em português (`substituições`, `RECUSADO`, `AVISO`.
 lê os dois formatos, então um período que pega a atualização sai somado.
 
 `llm-dlp audit` resume o log de um período (`24h` por padrão; também `90m`, `7d`): requisições
-e erros da API, o que foi mascarado por tipo, os pseudônimos que voltaram sem virar o valor
+e erros da API, o que foi mascarado por tipo, valores mascarados num lugar e em claro em outro da
+mesma requisição, palavras do dicionário mascaradas como nome, os pseudônimos que voltaram sem virar o valor
 real, envios sem máscara e recusas. Só lê o log, que não tem valor real. No espírito do registro
 de eventos de sistemas de IA (ISO/IEC 42001, controle A.6.2.8): dá para conferir depois o que
 aconteceu sem guardar o conteúdo.
@@ -233,6 +236,7 @@ llm-dlp: log of the last 24h (since 13/10 15:04)
   requests: 152 (status HTTP: 200 152)
   replacements: 31877; collisions (pseudonym left masked): 0
   masked by type (distinct values of each request, added up): table 9120, server 2210, cpf 14
+  masked in one place and in the clear in another of the same request: none
   pseudonyms that came back without turning into the real value: none
   sent unmasked: none
 ```

@@ -188,6 +188,7 @@ func (m *Masker) storeFrozen(kc Position, r result) {
 type Batch struct {
 	m       *Masker
 	outputs map[Position]result // what went out at each position
+	data    map[Position]bool   // the new texts that are data, not the assistant's (consistency.go)
 	mem     *memory             // the conversation memory (see memory_conversation.go); nil = empty
 	pre     map[Position]result // the memo result of each new text, already looked up in Memory
 	// tracing (see memory_tracing.go)
@@ -201,7 +202,7 @@ type Batch struct {
 }
 
 func (m *Masker) NewBatch() *Batch {
-	return &Batch{m: m, outputs: map[Position]result{}, pre: map[Position]result{}}
+	return &Batch{m: m, outputs: map[Position]result{}, data: map[Position]bool{}, pre: map[Position]result{}}
 }
 
 // BatchItem: a text of the request, where it is and whether it came from the internet.
@@ -238,6 +239,7 @@ func (l *Batch) MaskHint(s string, fromWeb bool, pos Position, hint string) (str
 	r = l.withMemory(s, r, hint)
 	if _, already := l.outputs[pos]; !already {
 		l.outputs[pos] = r
+		l.data[pos] = true
 	}
 	return r.text, r.entries
 }

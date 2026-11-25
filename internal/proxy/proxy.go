@@ -203,9 +203,11 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		p.log.Printf("ERROR %s %s: upstream: %v", r.Method, cleaned(r.URL.Path), err)
 		return
 	}
+	consistency := ""
 	if batch != nil {
 		// the API received it: from here on, these texts always go out the same (cache)
 		batch.Freeze()
+		consistency = consistencyOf(batch.Check(entries))
 	}
 	defer resp.Body.Close()
 	for k, vs := range resp.Header {
@@ -252,9 +254,15 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		p.seenSet.SaveIfDirty()
 	}
 	p.m.Persist()
-	p.log.Printf("%s %s -> %d | %d replacements | %d collisions | mask %s | total %s%s%s%s%s%s", r.Method, cleaned(r.URL.Path), resp.StatusCode,
+	p.log.Printf("%s %s -> %d | %d replacements | %d collisions | mask %s | total %s%s%s%s%s%s%s", r.Method, cleaned(r.URL.Path), resp.StatusCode,
 		len(entries), tab.Conflicts, tMask.Round(time.Millisecond), time.Since(t0).Round(time.Millisecond), byType(entries),
-		collided(tab), notUndone(tab), apiError, errSuffix(err))
+		consistency, collided(tab), notUndone(tab), apiError, errSuffix(err))
+}
+
+// consistencyOf: " | in the clear elsewhere: table 2 | common words masked: table 1" (mask.Check),
+// counts only.
+func consistencyOf(c mask.Consistency) string {
+	return typeCounts(" | in the clear elsewhere:", c.InClear) + typeCounts(" | common words masked:", c.Commons)
 }
 
 // byType: how many distinct values of each type were masked (" | types: cpf 2, ip 1, table 5"),
@@ -268,6 +276,11 @@ func byType(es []mask.Entry) string {
 			n[t]++
 		}
 	}
+	return typeCounts(" | types:", n)
+}
+
+// typeCounts: label followed by "type n" pairs, from most to least frequent; "" if empty.
+func typeCounts(label string, n map[string]int) string {
 	if len(n) == 0 {
 		return ""
 	}
@@ -277,7 +290,7 @@ func byType(es []mask.Entry) string {
 	}
 	sort.Slice(ts, func(i, j int) bool { return n[ts[i]] > n[ts[j]] || n[ts[i]] == n[ts[j]] && ts[i] < ts[j] })
 	var b strings.Builder
-	b.WriteString(" | types:")
+	b.WriteString(label)
 	for i, t := range ts {
 		if i > 0 {
 			b.WriteByte(',')
