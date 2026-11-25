@@ -350,7 +350,8 @@ func publicGroup(v string) bool {
 func vocabularyFinding(l Reader, o ObjFinding, v string, sw map[string]bool) bool {
 	// (a label in a non-Latin script, "スキーマ", stays masked: for a Russian, Chinese or Israeli
 	// customer the real table name is also in that script)
-	if fieldName(v) || ownerless(v, sw) {
+	// a type word is a label (typeWord), except as a piece of a path: there it is the folder's own name
+	if fieldName(v) || ownerless(v, sw) || typeWord(v) && o.Ent != "folder" {
 		return true
 	}
 	lv := strings.ToLower(v)
@@ -417,3 +418,14 @@ var publicNpmScopes = setOf("types", "angular", "babel", "vue", "nestjs", "aws-s
 	"sinonjs", "hapi", "fastify", "trpc", "supabase", "auth0", "stripe", "slack", "cloudflare", "netlify",
 	"docusaurus", "mdx-js", "iconify", "faker-js", "hookform", "vueuse", "ant-design", "chakra-ui", "mantine",
 	"xstate", "oclif", "inquirer", "modelcontextprotocol", "langchain", "huggingface", "google", "openai")
+
+// typeWord: a word that names a kind of object, the project's own type words (the keys of entPiece
+// and catalogHdr: "tabela", "schema", "coluna", "banco"): a label, never the name of one. Decided as
+// a name once (the parameter TABELA of a CALL, a header taken for a value), the memory carried it
+// to every text of the conversation.
+func typeWord(v string) bool {
+	lv := strings.ToLower(v)
+	_, a := entPiece[lv]
+	_, b := catalogHdr[lv]
+	return a || b
+}

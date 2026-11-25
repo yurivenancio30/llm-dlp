@@ -125,7 +125,7 @@ func (l *Batch) MaskContagion(s string, fromWeb bool, pos Position) (string, []E
 // publicSystem (rule 3): system vocabulary (SQL, development, devops, databases); never masked, not
 // even in place.
 func publicSystem(v string) bool {
-	return publicSQL(v) || publicDev(v) || publicDevops(v) || databaseSchemes[strings.ToLower(v)]
+	return publicSQL(v) || publicDev(v) || publicDevops(v) || databaseSchemes[strings.ToLower(v)] || typeWord(v)
 }
 
 // publicGeneral: the system one and the measured reference (publicRef). The reference, with proof,
