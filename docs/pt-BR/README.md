@@ -286,7 +286,7 @@ em diante ele também volta sozinho.
 | [Estruturas](structures.md) | A pesquisa por trás das regras de estrutura: onde ficam os nomes de recursos internos em cada formato, e as regras de quando um nome é público |
 | [Versões e lançamentos](versioning.md) | O que cada número da versão significa, o que vem numa release e como lançar uma |
 | [Mudanças](CHANGELOG.md) | O que mudou em cada versão |
-| [Como contribuir](CONTRIBUTING.md) · [Política de segurança](SECURITY.md) | Como contribuir e como relatar uma vulnerabilidade |
+| [Como contribuir](CONTRIBUTING.md) · [Política de segurança](security-policy.md) | Como contribuir e como relatar uma vulnerabilidade |
 
 ## Licença
 

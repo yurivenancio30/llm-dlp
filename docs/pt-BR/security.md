@@ -2,7 +2,7 @@
 
 [← voltar ao README](README.md) · [English](../security.md)
 
-Para relatar uma vulnerabilidade, veja [SECURITY.md](SECURITY.md).
+Para relatar uma vulnerabilidade, veja [security-policy.md](security-policy.md).
 
 **O que protege:**
 
