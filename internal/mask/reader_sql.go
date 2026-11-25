@@ -40,8 +40,11 @@ const (
 )
 
 const (
-	reIdSQL   = "(?:\\[[^\\]\\n]{1,128}\\]|\"[^\"\\n]{1,128}\"|`[^`\\n]{1,128}`|[\\p{L}_][\\p{L}0-9_$#]*)"
-	reSQLQual = reIdSQL + "(?:\\." + reIdSQL + ")*"
+	reIdSQL = "(?:\\[[^\\]\\n]{1,128}\\]|\"[^\"\\n]{1,128}\"|`[^`\\n]{1,128}`|[\\p{L}_][\\p{L}0-9_$#]*)"
+	// Snowflake IDENTIFIER('db.sch.t') or IDENTIFIER($var) stands where a name stands (the literal
+	// may already be blank: see sqlStatement)
+	reIdCall  = "IDENTIFIER\\s*\\(\\s*(?:'[^'\\n]{0,256}'|[$:]?[\\p{L}_][\\p{L}0-9_$.]*)?\\s*\\)"
+	reSQLQual = "(?:" + reIdCall + "|" + reIdSQL + "(?:\\." + reIdSQL + ")*)"
 	// target of FROM/INTO/UPDATE: a name, or the place of a name in a code template (SQL built by
 	// the program: f"... FROM {tbl}", "FROM ${tabela}", "FROM %s", dbt "{{ ref('x') }}"). The
 	// statement is still SQL; its columns are read as always
@@ -86,7 +89,7 @@ var (
 	}{
 		{regexp.MustCompile(`(?i)\b(?:FROM|JOIN|INTO|UPDATE|TABLE|VIEW|REFERENCES|USING|OVERWRITE)\s+(?:IF\s+(?:NOT\s+)?EXISTS\s+|ONLY\s+)?(` + reSQLQual + `)`), "table", nil},
 		{regexp.MustCompile(`(?i)\b(?:PROCEDURE|PROC|FUNCTION|TRIGGER|PACKAGE(?:\s+BODY)?|EXEC|EXECUTE|CALL)\s+(?:IF\s+(?:NOT\s+)?EXISTS\s+)?(` + reSQLQual + `)`), "procedure", []string{"PROC", "FUNCTION", "TRIGGER", "PACKAGE", "EXEC", "CALL"}},
-		{regexp.MustCompile(`(?i)\b(?:USE|DATABASE)\s+(?:IF\s+(?:NOT\s+)?EXISTS\s+)?(` + reSQLQual + `)`), "database", []string{"USE", "DATABASE"}},
+		{regexp.MustCompile(`(?i)\b(?:USE(?:\s+DATABASE)?|DATABASE)\s+(?:IF\s+(?:NOT\s+)?EXISTS\s+)?(` + reSQLQual + `)`), "database", []string{"USE", "DATABASE"}},
 		{regexp.MustCompile(`(?i)\bSCHEMA\s+(?:IF\s+(?:NOT\s+)?EXISTS\s+)?(` + reSQLQual + `)`), "schema", []string{"SCHEMA"}},
 		{regexp.MustCompile(`(?i)\bINDEX\s+(?:IF\s+(?:NOT\s+)?EXISTS\s+)?(` + reIdSQL + `)`), "index", []string{"INDEX"}},
 		{regexp.MustCompile(`(?i)\bCONSTRAINT\s+(` + reIdSQL + `)`), "index", []string{"CONSTRAINT"}},
@@ -103,6 +106,7 @@ var (
 	// is not confused with prose ("create a new table"). The known types (TABLE, INDEX, USER...)
 	// still give the type of the name (reSQLObjPos).
 	reDDLGenerico = regexp.MustCompile(`^(?:CREATE|ALTER|DROP)\s+(?:OR\s+(?:REPLACE|ALTER)\s+)?(?:[A-Z]+\s+){1,4}(?:IF\s+(?:NOT\s+)?EXISTS\s+)?(` + reSQLQual + `)`)
+	reDDLHead     = regexp.MustCompile(`^(?:CREATE|ALTER|DROP)\s+(?:OR\s+(?:REPLACE|ALTER)\s+)?`)
 	// CTE declaration: WITH [RECURSIVE] x [(columns)] AS ( and ), y AS (
 	reCTE     = regexp.MustCompile(`(?i)(?:\bWITH\s+(?:RECURSIVE\s+)?|\)\s*,\s*)(` + reIdSQL + `)\s*(?:\([^)]{0,500}\)\s*)?AS\s*\(`)
 	reSQLList = regexp.MustCompile(`^\s*(?:(?:AS\s+)?[A-Za-z_]\w*\s*)?,\s*(` + reSQLQual + `)`)
@@ -448,7 +452,7 @@ var (
 	reMinTarget = regexp.MustCompile(`(?is)^(?:insert\s+into|delete\s+from|update)\s+(` + reSQLQual + `)(.{0,12})`)
 	// DDL, TRUNCATE, EXEC/CALL and USE outside uppercase ("create table t_x (", "exec sp_x @a = 1")
 	reDDLMin = regexp.MustCompile(`(?is)^(?:(?:create|alter|drop)\s+(?:or\s+(?:replace|alter)\s+)?(?:(?:global|local|temp|temporary|unique|external|materialized|transient|secure|clustered|nonclustered)\s+)*` +
-		`(?:table|view|procedure|proc|function|schema|database|index|sequence)|truncate\s+table|exec|execute|call|use|describe|desc)\s+(?:if\s+(?:not\s+)?exists\s+)?(` + reSQLQual + `)(.{0,12})`)
+		`(?:table|view|procedure|proc|function|schema|database|index|sequence)|truncate\s+table|exec|execute|call|use(?:\s+(?:role|warehouse|database|schema|secondary\s+roles))?|describe|desc)\s+(?:if\s+(?:not\s+)?exists\s+)?(` + reSQLQual + `)(.{0,12})`)
 	reAfterDDL = regexp.MustCompile(`^\s*(?:\(|;|@|\n|$)|^\s+as\s+(?:select|\()`)
 	reAfterMin = regexp.MustCompile(`(?i)^(?:\s*(?:;|$)|\s+(?:where|join|inner|left|right|full|cross|limit|order|group|having|union|values|set|select|as\s+\w+\s+(?:where|join)|\(|[a-z]\w{0,2}\s+(?:where|join|on)\b)|\s*\n)`)
 )
@@ -463,7 +467,7 @@ func unambiguousShape(body, kw string) bool {
 		}
 		target, after = m[2], m[3]
 		if m[1] == "*" || strings.Contains(m[1], ",") {
-			return reAfterMin.MatchString(after) || identifierShape(target)
+			return reAfterMin.MatchString(after) || nameShape(target)
 		}
 	case "CREATE", "ALTER", "DROP", "TRUNCATE", "EXEC", "EXECUTE", "CALL", "USE", "DESCRIBE":
 		// a name that looks like an identifier, or followed by what only SQL puts there: "(", ";",
@@ -474,9 +478,9 @@ func unambiguousShape(body, kw string) bool {
 		}
 		target := strings.Trim(m[1], "[]\"`")
 		if kw == "USE" || kw == "DESCRIBE" || kw == "EXEC" || kw == "EXECUTE" || kw == "CALL" {
-			return identifierShape(target) && reAfterDDL.MatchString(m[2])
+			return nameShape(target) && reAfterDDL.MatchString(m[2])
 		}
-		return identifierShape(target) || strings.HasPrefix(strings.TrimSpace(m[2]), "(") || strings.HasPrefix(strings.TrimSpace(m[2]), ";")
+		return nameShape(target) || strings.HasPrefix(strings.TrimSpace(m[2]), "(") || strings.HasPrefix(strings.TrimSpace(m[2]), ";")
 	case "INSERT", "DELETE", "UPDATE":
 		m := reMinTarget.FindStringSubmatch(body)
 		if m == nil {
@@ -486,7 +490,7 @@ func unambiguousShape(body, kw string) bool {
 	default:
 		return false
 	}
-	return identifierShape(target) || reAfterMin.MatchString(after)
+	return nameShape(target) || reAfterMin.MatchString(after)
 }
 
 // sqlStatement classifies the identifiers of an already recognized statement.
@@ -506,11 +510,31 @@ func sqlStatement(s string, base int, body, kw string, strong bool, add func(Obj
 			ctes[strings.ToLower(strings.Trim(m[1], "[]\"`"))] = true
 		}
 	}
+	var ddlType [2]int // the type words of a DDL (CREATE OR REPLACE <type words> name)
 	isCTE := func(a, b int) bool {
 		return len(ctes) > 0 && ctes[strings.ToLower(strings.Trim(lit[a:b], "[]\"`"))]
 	}
 	markWhich := func(a, b int, lastPos string) {
 		if isCTE(a, b) {
+			return
+		}
+		if len(lit[a:b]) >= 10 && strings.EqualFold(lit[a:a+10], "IDENTIFIER") && (b == a+10 || lit[a+10] == '(' || lit[a+10] == ' ' || lit[a+10] == '\t') {
+			b = a + 10
+			// Snowflake IDENTIFIER('db.sch.t') in the place of a name: the name is the string
+			// inside (blank in lit), with the type of the position; IDENTIFIER($var) is a session
+			// variable, not the name (as sqlglot's Snowflake parser reads it)
+			if c0, c1, ok := identifierLiteral(body, b); ok {
+				var vs [][2]int
+				for _, p := range sqlParts(body, c0, c1) {
+					if v := strings.Trim(body[p[0]:p[1]], "\"`"); len(v) > 1 && !publicSQL(v) {
+						vs = append(vs, p)
+					}
+				}
+				for k, e := range entQual(len(vs), lastPos) {
+					ia, ib := stripQuote(body, vs[k][0], vs[k][1])
+					add(ObjFinding{base + ia, base + ib, e, "sql", strong})
+				}
+			}
 			return
 		}
 		var vs [][2]int
@@ -537,6 +561,9 @@ func sqlStatement(s string, base int, body, kw string, strong bool, add func(Obj
 	// table); the position rules below correct the type when they know it
 	if kw == "CREATE" || kw == "ALTER" || kw == "DROP" {
 		if m := reDDLGenerico.FindStringSubmatchIndex(lit); m != nil {
+			// the words between the verb and the name are the type of the object (SECRET, NETWORK RULE),
+			// never columns, whether or not the position rules know the type
+			ddlType = [2]int{len(reDDLHead.FindString(lit)), m[2]}
 			if !reSQLShape.MatchString(lit) {
 				// type the rules do not know (NETWORK RULE, AGENT...): the body is properties (TYPE
 				// = IPV4, VALUE_LIST = (...)), not columns; only the object name is a name
@@ -591,6 +618,12 @@ func sqlStatement(s string, base int, body, kw string, strong bool, add func(Obj
 			v := lit[a:b]
 			e, hasPos := ent[[2]int{a, b}]
 			if !hasPos {
+				if a >= ddlType[0] && b <= ddlType[1] {
+					continue // a type word of the DDL (SECRET), not a column
+				}
+				if len(ps) == 1 && namedArgument(lit, b) {
+					continue // CALL p(TABELA => 'x'): the parameter's name, a label, not a column
+				}
 				if publicSQL(strings.Trim(v, "[]\"`")) || v[0] == '@' || (a > 0 && (lit[a-1] == ':' || lit[a-1] == '@' || lit[a-1] == '$')) {
 					continue
 				}
@@ -1191,4 +1224,41 @@ func stringContinuation(s string, p, lim int) (string, int) {
 		}
 	}
 	return "", 0
+}
+
+// identifierLiteral: the content of the string literal of IDENTIFIER('...') whose word ends at i
+// ("Literals and variables as identifiers", Snowflake docs), on the same line.
+func identifierLiteral(s string, i int) (int, int, bool) {
+	for i < len(s) && (s[i] == ' ' || s[i] == '\t') {
+		i++
+	}
+	if i >= len(s) || s[i] != '(' {
+		return 0, 0, false
+	}
+	i++
+	for i < len(s) && (s[i] == ' ' || s[i] == '\t') {
+		i++
+	}
+	if i >= len(s) || s[i] != '\'' {
+		return 0, 0, false
+	}
+	j := strings.IndexAny(s[i+1:], "'\n")
+	if j <= 0 || s[i+1+j] != '\'' {
+		return 0, 0, false
+	}
+	return i + 1, i + 1 + j, true
+}
+
+var reIdCallWhole = regexp.MustCompile(`(?i)^` + reIdCall + `$`)
+
+// nameShape: the target of a statement looks like a name: an identifier or IDENTIFIER('...').
+func nameShape(t string) bool { return identifierShape(t) || reIdCallWhole.MatchString(t) }
+
+// namedArgument: the word that ends at i is followed by "=>": the name of a parameter in named
+// notation (Snowflake CALL p(arg => value); PostgreSQL "Using Named Notation", 4.3.2; Oracle).
+func namedArgument(s string, i int) bool {
+	for i < len(s) && (s[i] == ' ' || s[i] == '\t') {
+		i++
+	}
+	return i+1 < len(s) && s[i] == '=' && s[i+1] == '>'
 }

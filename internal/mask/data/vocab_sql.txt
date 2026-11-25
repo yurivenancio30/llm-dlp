@@ -10,7 +10,7 @@ each element else elseif elsif empty enable encoding encrypted end enforced enum
 false fetch file fillfactor filter final first first_value flatten float float4 float8 float64 floor following for force foreign format forward found free freetext freetexttable freeze from full fulltext function functions
 general generated geography geometry get getdate getutcdate global go goto grant granted grants greatest group grouping groups
 handler hash having header hold holdlock hour hours
-identified identity identity_insert identitycol if ifnull ignore ilike immediate immutable implicit import in include including increment index indexes indicator infile inherit inherits initial initially inner inout input insensitive insert inserted deleted instead int int2 int4 int8 int64 integer intersect interval into invoker is isnull isolation iterate
+identified identifier identity identity_insert identitycol if ifnull ignore ilike immediate immutable implicit import in include including increment index indexes indicator infile inherit inherits initial initially inner inout input insensitive insert inserted deleted instead int int2 int4 int8 int64 integer intersect interval into invoker is isnull isolation iterate
 join json jsonb
 key keys kill
 label lag language large last last_day last_value lateral lead leading leakproof least leave left len length less level like limit lineno lines list listagg listen ln load local localtime localtimestamp location lock locked log logged login long longblob longtext loop low lower lpad ltrim
